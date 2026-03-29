@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root { --primary-color: {{primary_color}}; --text-color: #0f172a; --accent-color: #64748b; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Georgia', serif; color: var(--text-color); width: 210mm; min-height: 297mm; margin: 0 auto; padding: 14mm; font-size: 11pt; line-height: 1.45; }
+    h1 { font-family: 'DM Sans', sans-serif; font-size: 22pt; margin: 0; color: var(--primary-color); }
+    .title { font-family: 'Inter', sans-serif; font-size: 12pt; color: var(--accent-color); margin-top: 4px; }
+    .contact { font-family: 'Inter', sans-serif; font-size: 9pt; margin-top: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; }
+    h2 { font-family: 'DM Sans', sans-serif; font-size: 11pt; text-transform: uppercase; letter-spacing: 0.08em; border-bottom: 2px solid var(--primary-color); padding-bottom: 4px; margin: 18px 0 10px; }
+    .summary { font-size: 10.5pt; }
+    .exp-block { margin-bottom: 12px; }
+    .exp-head { font-weight: 600; }
+    .muted { color: var(--accent-color); font-size: 9.5pt; }
+    ul { margin: 6px 0 0 18px; padding: 0; }
+    .chip { display: inline-block; background: #f1f5f9; padding: 2px 8px; border-radius: 4px; margin: 2px; font-size: 9pt; }
+    .skill-group { margin-bottom: 8px; }
+    .cat { font-weight: 600; font-size: 9pt; text-transform: capitalize; }
+    @media print { * { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+  </style>
+</head>
+<body>
+  <h1>{{full_name}}</h1>
+  <div class="title">{{professional_title}}</div>
+  <div class="contact">{{email}} · {{phone}} · {{location}}<br/>
+    <span class="muted">{{linkedin_url}} {{portfolio_url}} {{website_url}}</span>
+  </div>
+  <h2>Summary</h2>
+  <div class="summary">{{summary}}</div>
+  <h2>Experience</h2>
+  {{experience_html}}
+  <h2>Education</h2>
+  {{education_html}}
+  <h2>Skills</h2>
+  {{skills_html}}
+  <h2>Projects</h2>
+  {{projects_html}}
+  <h2>Certifications</h2>
+  {{certifications_html}}
+  <h2>Languages</h2>
+  {{languages_html}}
+  <h2>Awards</h2>
+  {{awards_html}}
+</body>
+</html>

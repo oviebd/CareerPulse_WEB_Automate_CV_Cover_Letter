@@ -1,0 +1,246 @@
+'use client';
+
+import Link from 'next/link';
+import { useMemo } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { Skeleton } from '@/components/ui/skeleton';
+import { UpgradeCTA } from '@/components/shared/UpgradeCTA';
+import { useCVProfile } from '@/hooks/useCV';
+import { useCoverLettersList } from '@/hooks/useCoverLetters';
+import { useJobApplications } from '@/hooks/useTracker';
+import { useSubscription } from '@/hooks/useSubscription';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { formatDate } from '@/lib/utils';
+import { TIER_LIMITS } from '@/types';
+
+export default function DashboardPage() {
+  const profile = useAuthStore((s) => s.profile);
+  const { tier, limits } = useSubscription();
+  const { data: cv, isLoading: cvLoading } = useCVProfile();
+  const { data: letters = [], isLoading: clLoading } = useCoverLettersList();
+  const { data: apps = [], isLoading: appLoading } = useJobApplications();
+
+  const greeting = useMemo(() => {
+    const h = new Date().getHours();
+    if (h < 12) return 'Good morning';
+    if (h < 18) return 'Good afternoon';
+    return 'Good evening';
+  }, []);
+
+  const activeApps = apps.filter((a) => !['rejected', 'withdrawn'].includes(a.status));
+  const genLimit = TIER_LIMITS[tier].generationsPerMonth;
+  const usedThisMonth = letters.filter((l) => {
+    const d = new Date(l.created_at);
+    const n = new Date();
+    return d.getMonth() === n.getMonth() && d.getFullYear() === n.getFullYear();
+  }).length;
+  const pct =
+    genLimit === Number.POSITIVE_INFINITY
+      ? 0
+      : Math.min(100, (usedThisMonth / genLimit) * 100);
+
+  const statusCounts = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const a of apps) {
+      m[a.status] = (m[a.status] ?? 0) + 1;
+    }
+    return m;
+  }, [apps]);
+
+  return (
+    <div className="mx-auto max-w-6xl space-y-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="font-display text-2xl font-bold">
+            {greeting},{' '}
+            {profile?.full_name?.split(' ')[0] || 'there'}.
+          </h1>
+          <p className="mt-1 text-sm text-[var(--color-muted)]">
+            You have {activeApps.length} active application
+            {activeApps.length === 1 ? '' : 's'}.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="primary" size="sm" onClick={() => (window.location.href = '/cover-letters/new')}>
+            New cover letter
+          </Button>
+          <Button variant="secondary" size="sm" onClick={() => (window.location.href = '/cv/upload')}>
+            Upload CV
+          </Button>
+          <Button variant="secondary" size="sm" onClick={() => (window.location.href = '/tracker')}>
+            Open tracker
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <h2 className="font-display font-semibold text-[var(--color-secondary)]">
+            CV profile
+          </h2>
+          {cvLoading ? (
+            <Skeleton className="mt-4 h-24 w-full" />
+          ) : cv ? (
+            <>
+              <div className="mt-4 flex items-center gap-3">
+                <Progress value={cv.completion_percentage} className="flex-1" />
+                <span className="text-sm font-medium">{cv.completion_percentage}%</span>
+              </div>
+              <p className="mt-2 text-xs text-[var(--color-muted)]">
+                Updated {formatDate(cv.updated_at)} · Template{' '}
+                {cv.preferred_cv_template_id}
+              </p>
+              <Link
+                href="/cv/edit"
+                className="mt-4 inline-block text-sm font-semibold text-[var(--color-primary)]"
+              >
+                Edit profile
+              </Link>
+            </>
+          ) : (
+            <p className="mt-4 text-sm text-[var(--color-muted)]">
+              No CV profile yet.{' '}
+              <Link href="/cv/upload" className="font-medium text-[var(--color-primary)]">
+                Upload
+              </Link>
+            </p>
+          )}
+        </Card>
+
+        <Card>
+          <h2 className="font-display font-semibold">Monthly usage</h2>
+          <p className="mt-2 text-sm text-[var(--color-muted)]">
+            Cover letter generations this month:{' '}
+            <strong>
+              {usedThisMonth}
+              {genLimit === Number.POSITIVE_INFINITY ? '' : ` / ${genLimit}`}
+            </strong>
+          </p>
+          {genLimit !== Number.POSITIVE_INFINITY ? (
+            <Progress value={pct} className="mt-3" />
+          ) : null}
+          {pct > 80 && genLimit !== Number.POSITIVE_INFINITY ? (
+            <div className="mt-4">
+              <UpgradeCTA />
+            </div>
+          ) : null}
+        </Card>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <div className="flex items-center justify-between">
+            <h2 className="font-display font-semibold">Recent cover letters</h2>
+            <Link href="/cover-letters" className="text-sm text-[var(--color-primary)]">
+              View all
+            </Link>
+          </div>
+          {clLoading ? (
+            <Skeleton className="mt-4 h-20 w-full" />
+          ) : (
+            <ul className="mt-4 space-y-3">
+              {letters.slice(0, 3).map((l) => (
+                <li
+                  key={l.id}
+                  className="flex items-center justify-between rounded-lg border border-[var(--color-border)] p-3 text-sm"
+                >
+                  <div>
+                    <div className="font-medium">{l.company_name || 'Company'}</div>
+                    <div className="text-[var(--color-muted)]">{l.job_title || 'Role'}</div>
+                  </div>
+                  <div className="text-right">
+                    {l.ats_score != null ? (
+                      <Badge
+                        variant={
+                          l.ats_score >= 70
+                            ? 'success'
+                            : l.ats_score >= 40
+                              ? 'warning'
+                              : 'danger'
+                        }
+                      >
+                        ATS {l.ats_score}
+                      </Badge>
+                    ) : (
+                      <span className="text-xs text-[var(--color-muted)]">—</span>
+                    )}
+                    <div className="text-xs text-[var(--color-muted)]">
+                      {formatDate(l.created_at)}
+                    </div>
+                  </div>
+                </li>
+              ))}
+              {letters.length === 0 ? (
+                <li className="text-sm text-[var(--color-muted)]">
+                  No letters yet.{' '}
+                  <Link href="/cover-letters/new" className="text-[var(--color-primary)]">
+                    Generate one
+                  </Link>
+                </li>
+              ) : null}
+            </ul>
+          )}
+        </Card>
+
+        <Card>
+          <h2 className="font-display font-semibold">Tracker snapshot</h2>
+          {appLoading ? (
+            <Skeleton className="mt-4 h-20 w-full" />
+          ) : limits.trackerAccess ? (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {Object.entries(statusCounts).map(([s, n]) => (
+                <Badge key={s} variant="default">
+                  {s}: {n}
+                </Badge>
+              ))}
+              {apps.length === 0 ? (
+                <p className="text-sm text-[var(--color-muted)]">
+                  <Link href="/tracker" className="text-[var(--color-primary)]">
+                    Add your first application
+                  </Link>
+                </p>
+              ) : null}
+            </div>
+          ) : (
+            <div className="mt-4">
+              <p className="text-sm text-[var(--color-muted)]">
+                Application tracker is available on Pro and above.
+              </p>
+              <UpgradeCTA className="mt-4" />
+            </div>
+          )}
+        </Card>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        {(cv?.completion_percentage ?? 0) < 60 ? (
+          <Card padding="sm" className="border-amber-200 bg-amber-50/50">
+            <p className="text-sm font-medium">Complete your CV profile</p>
+            <Link href="/cv/edit" className="mt-2 text-xs text-[var(--color-primary)]">
+              Open editor
+            </Link>
+          </Card>
+        ) : null}
+        {letters.length === 0 ? (
+          <Card padding="sm" className="border-blue-200 bg-blue-50/50">
+            <p className="text-sm font-medium">Generate your first cover letter</p>
+            <Link href="/cover-letters/new" className="mt-2 text-xs text-[var(--color-primary)]">
+              Start
+            </Link>
+          </Card>
+        ) : null}
+        {apps.length === 0 && limits.trackerAccess ? (
+          <Card padding="sm" className="border-slate-200">
+            <p className="text-sm font-medium">Track your applications</p>
+            <Link href="/tracker" className="mt-2 text-xs text-[var(--color-primary)]">
+              Open board
+            </Link>
+          </Card>
+        ) : null}
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+:root { --primary-color: {{primary_color}}; --text-color: #0f172a; }
+body { font-family: 'Inter', sans-serif; width: 210mm; min-height: 297mm; margin: 0 auto; padding: 18mm 20mm; font-size: 11pt; line-height: 1.55; color: var(--text-color); }
+.date { text-align: right; margin-bottom: 20px; color: #64748b; font-size: 10pt; }
+.block { margin-bottom: 16px; }
+.sig { margin-top: 28px; }
+@media print { * { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+</style></head><body>
+<div class="date">{{date}}</div>
+<div class="block">{{applicant_name}}<br/>{{applicant_email}} · {{applicant_phone}}<br/>{{applicant_location}}<br/>{{applicant_linkedin}}</div>
+<div class="block"><strong>{{company_name}}</strong><br/>Re: {{job_title}}</div>
+<div class="block">{{cover_letter_body}}</div>
+<div class="sig">Sincerely,<br/><strong>{{applicant_name}}</strong></div>
+</body></html>

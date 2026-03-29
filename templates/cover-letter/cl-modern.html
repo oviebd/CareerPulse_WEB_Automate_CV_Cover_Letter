@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8" />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;600&family=Inter:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+:root { --primary-color: {{primary_color}}; }
+body { font-family: 'Inter', sans-serif; width: 210mm; min-height: 297mm; margin: 0 auto; padding: 20mm; font-size: 11pt; line-height: 1.6; color: #0f172a; }
+.top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 3px solid var(--primary-color); }
+.name { font-family: 'DM Sans', sans-serif; font-size: 18pt; font-weight: 600; color: var(--primary-color); }
+.meta { font-size: 9.5pt; color: #64748b; text-align: right; }
+.role { font-weight: 600; margin: 16px 0 12px; }
+@media print { * { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+</style></head><body>
+<div class="top">
+  <div class="name">{{applicant_name}}</div>
+  <div class="meta">{{date}}<br/>{{applicant_email}}<br/>{{applicant_phone}}</div>
+</div>
+<div class="role">{{job_title}} · {{company_name}}</div>
+<div>{{cover_letter_body}}</div>
+</body></html>

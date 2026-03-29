@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8" />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600&family=Inter:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+:root { --primary-color: {{primary_color}}; }
+body { margin: 0; font-family: 'Inter', sans-serif; width: 210mm; min-height: 297mm; display: flex; color: #0f172a; }
+.side { width: 30%; background: #0f172a; color: #f8fafc; padding: 14mm 8mm; font-size: 9pt; }
+.side h3 { font-family: 'DM Sans', sans-serif; font-size: 10pt; color: var(--primary-color); margin: 16px 0 8px; }
+.main { width: 70%; padding: 14mm 10mm; font-size: 10pt; }
+.main h1 { font-family: 'DM Sans', sans-serif; font-size: 20pt; margin: 0; color: var(--primary-color); }
+.title { color: #64748b; margin: 4px 0 16px; }
+h2 { font-family: 'DM Sans', sans-serif; font-size: 10pt; border-bottom: 2px solid var(--primary-color); padding-bottom: 4px; margin: 14px 0 8px; }
+.chip { display: inline-block; background: #e0e7ff; color: #312e81; padding: 2px 6px; border-radius: 4px; margin: 2px; font-size: 8pt; }
+@media print { * { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+</style></head><body>
+<div class="side">
+  <h3>Contact</h3>
+  <div>{{email}}</div><div>{{phone}}</div><div>{{location}}</div>
+  <div style="margin-top:8px;word-break:break-all;">{{linkedin_url}}</div>
+  <h3>Skills</h3>
+  {{skills_html}}
+</div>
+<div class="main">
+  <h1>{{full_name}}</h1>
+  <div class="title">{{professional_title}}</div>
+  <h2>Summary</h2><div>{{summary}}</div>
+  <h2>Experience</h2>{{experience_html}}
+  <h2>Education</h2>{{education_html}}
+  <h2>Projects</h2>{{projects_html}}
+  <h2>Certifications</h2>{{certifications_html}}
+  <h2>Languages</h2>{{languages_html}}
+  <h2>Awards</h2>{{awards_html}}
+</div>
+</body></html>

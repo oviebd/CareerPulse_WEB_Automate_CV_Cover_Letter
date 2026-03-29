@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8" />
+<link href="https://fonts.googleapis.com/css2?family=Times+New+Roman&display=swap" rel="stylesheet" />
+<style>
+:root { --primary-color: {{primary_color}}; }
+body { font-family: 'Times New Roman', Times, serif; width: 210mm; min-height: 297mm; margin: 0 auto; padding: 10mm 12mm; font-size: 9.5pt; line-height: 1.35; color: #111; }
+h1 { font-size: 16pt; margin: 0; text-align: center; text-transform: uppercase; letter-spacing: 0.12em; border-bottom: 3px double #000; padding-bottom: 6px; }
+.sub { text-align: center; font-size: 9pt; margin: 6px 0 12px; }
+h2 { font-size: 9.5pt; text-transform: uppercase; margin: 10px 0 4px; border-bottom: 1px solid var(--primary-color); }
+@media print { * { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+</style></head><body>
+<h1>{{full_name}}</h1>
+<div class="sub">{{professional_title}} | {{email}} | {{phone}} | {{location}}</div>
+<h2>Professional Summary</h2><div>{{summary}}</div>
+<h2>Professional Experience</h2>{{experience_html}}
+<h2>Education</h2>{{education_html}}
+<h2>Core Competencies</h2>{{skills_html}}
+<h2>Selected Projects</h2>{{projects_html}}
+<h2>Certifications &amp; Languages</h2>{{certifications_html}}{{languages_html}}
+<h2>Honors</h2>{{awards_html}}
+</body></html>

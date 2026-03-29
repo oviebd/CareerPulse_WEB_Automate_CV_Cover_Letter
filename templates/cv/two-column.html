@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+<style>
+:root { --primary-color: {{primary_color}}; }
+body { font-family: 'Inter', sans-serif; width: 210mm; min-height: 297mm; margin: 0 auto; padding: 12mm; font-size: 10pt; color: #0f172a; }
+h1 { font-size: 20pt; margin: 0; color: var(--primary-color); }
+.grid { display: flex; gap: 10mm; margin-top: 10px; }
+.col { flex: 1; }
+h2 { font-size: 10pt; text-transform: uppercase; letter-spacing: 0.06em; border-bottom: 1px solid var(--primary-color); padding-bottom: 4px; margin: 12px 0 8px; }
+@media print { * { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+</style></head><body>
+<h1>{{full_name}}</h1>
+<div style="color:#64748b;font-size:10pt;">{{professional_title}} · {{email}} · {{phone}}</div>
+<div class="grid">
+  <div class="col">
+    <h2>Experience</h2>{{experience_html}}
+    <h2>Projects</h2>{{projects_html}}
+  </div>
+  <div class="col">
+    <h2>Education</h2>{{education_html}}
+    <h2>Skills</h2>{{skills_html}}
+    <h2>Summary</h2><div>{{summary}}</div>
+    <h2>Certifications</h2>{{certifications_html}}
+    <h2>Languages</h2>{{languages_html}}
+    <h2>Awards</h2>{{awards_html}}
+  </div>
+</div>
+</body></html>
