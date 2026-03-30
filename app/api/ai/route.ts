@@ -16,7 +16,21 @@ type Tool =
   | 'linkedin_summary'
   | 'cold_email'
   | 'bullet_improve'
-  | 'interview_questions';
+  | 'interview_questions'
+  | 'cv_rewrite_suggestions';
+
+function looksLikeCompleteSentence(text: string): boolean {
+  const t = text.trim();
+  if (!t) return false;
+  const words = t.split(/\s+/).filter(Boolean);
+  if (words.length < 4) return false;
+  if (!/[.!?]$/.test(t)) return false;
+  const lower = t.toLowerCase();
+  if (/[,:;]\s*$/.test(t)) return false;
+  if (/\b(and|or|but|with|for|to|of|in|on|at|by)\s*[.!?]$/i.test(t)) return false;
+  if (lower.includes('...')) return false;
+  return true;
+}
 
 export async function POST(request: Request) {
   try {
@@ -120,6 +134,73 @@ export async function POST(request: Request) {
       );
       const clean = out.replace(/```json|```/g, '').trim();
       return NextResponse.json({ result: JSON.parse(clean) });
+    }
+
+    if (tool === 'cv_rewrite_suggestions') {
+      if (!canAccessFeature(tier, 'aiExtrasAccess')) {
+        return NextResponse.json({ error: 'upgrade_required' }, { status: 402 });
+      }
+      const section = payload.section ?? 'CV section';
+      const inputLabel = payload.input_label ?? 'field';
+      const text = payload.text ?? '';
+      const tone = payload.tone ?? 'professional';
+      const charLimitRaw = Number(payload.char_limit ?? '100');
+      const charLimit = Number.isFinite(charLimitRaw)
+        ? Math.min(2000, Math.max(50, Math.round(charLimitRaw)))
+        : 100;
+      const context = payload.context ?? '';
+
+      if (!text.trim()) {
+        return NextResponse.json({ error: 'text_required' }, { status: 400 });
+      }
+
+      const basePrompt = `Rewrite content for a CV section.
+Section: ${section}
+Input label: ${inputLabel}
+Tone: ${tone}
+Maximum characters per suggestion: ${charLimit}
+Extra context: ${context || 'N/A'}
+
+Current text:
+${text}
+
+Return strict JSON exactly like:
+{"suggestions":["...", "...", "..."]}
+
+Rules:
+- Exactly 3 suggestions.
+- Each suggestion must be specific to the provided section and input label.
+- Keep each suggestion at or under ${charLimit} characters.
+ - Do not fabricate facts; only rewrite existing meaning more clearly.
+- Every suggestion must be a complete, meaningful sentence (not a fragment).
+- Every suggestion must end with "." or "!" or "?".`;
+
+      const systemPrompt = 'You are an expert CV writer. Return ONLY valid JSON. No markdown.';
+
+      async function generateOnce(extraInstruction?: string): Promise<string[]> {
+        const out = await claudeTextCompletion(
+          systemPrompt,
+          extraInstruction ? `${basePrompt}\n\n${extraInstruction}` : basePrompt,
+          1200
+        );
+        const clean = out.replace(/```json|```/g, '').trim();
+        const parsed = JSON.parse(clean) as { suggestions?: string[] };
+        return (parsed.suggestions ?? [])
+          .filter((s) => typeof s === 'string' && s.trim().length > 0)
+          .slice(0, 3)
+          .map((s) => s.trim().slice(0, charLimit))
+          .filter(looksLikeCompleteSentence);
+      }
+
+      let suggestions = await generateOnce();
+      if (suggestions.length < 3) {
+        suggestions = await generateOnce(
+          `Your previous response had incomplete or fragmented lines.
+Return exactly 3 complete, meaningful sentences.`
+        );
+      }
+
+      return NextResponse.json({ result: { suggestions } });
     }
 
     return NextResponse.json({ error: 'unknown_tool' }, { status: 400 });

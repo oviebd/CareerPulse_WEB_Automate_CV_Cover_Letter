@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -18,6 +19,7 @@ import type {
 } from '@/types';
 import { CVPhotoField } from '@/components/cv/CVPhotoField';
 import { CVSectionVisibilityPanel } from '@/components/cv/CVSectionVisibilityPanel';
+import { CVRewriteWithAIModal } from '@/components/cv/CVRewriteWithAIModal';
 import { generateId } from '@/lib/utils';
 
 export type CVFormTab =
@@ -101,6 +103,7 @@ type Props = {
   onAwardsChange: (next: AwardEntry[]) => void;
   hiddenTabs?: CVFormTab[];
   highlightedKeywords?: string[];
+  atsBySection?: Record<string, { score: number; suggestions: string[] }>;
 };
 
 function HighlightedText({ text, keywords }: { text: string; keywords: string[] }) {
@@ -187,12 +190,30 @@ export function CVFormFields(props: Props) {
     onAwardsChange,
     hiddenTabs,
     highlightedKeywords,
+    atsBySection,
   } = props;
 
   const visibleTabs = hiddenTabs
     ? TAB_DEFS.filter((t) => !hiddenTabs.includes(t.id))
     : TAB_DEFS;
   const kw = highlightedKeywords ?? [];
+  const atsSectionKeyByTab: Partial<Record<CVFormTab, string>> = {
+    header: 'header',
+    summary: 'summary',
+    experience: 'experience',
+    education: 'education',
+    skills: 'skills',
+    projects: 'projects',
+  };
+  const activeAtsSectionKey = atsSectionKeyByTab[tab];
+  const activeAts = activeAtsSectionKey ? atsBySection?.[activeAtsSectionKey] : undefined;
+  const [rewriteTarget, setRewriteTarget] = useState<{
+    section: string;
+    inputLabel: string;
+    sourceText: string;
+    extraContext?: string;
+    onApply: (value: string) => void;
+  } | null>(null);
 
   return (
     <div className="space-y-4">
@@ -202,6 +223,28 @@ export function CVFormFields(props: Props) {
       />
       <Tabs value={tab} onChange={onTabChange} tabs={visibleTabs} />
       <div className="pt-4">
+        {activeAts ? (
+          <div className="mb-4 rounded-lg border border-indigo-200 bg-indigo-50 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">
+                ATS suggestion
+              </p>
+              <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-800">
+                {activeAts.score}/100
+              </span>
+            </div>
+            {activeAts.suggestions.length > 0 ? (
+              <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-indigo-900">
+                {activeAts.suggestions.slice(0, 3).map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2 text-sm text-indigo-900">This section is already ATS-friendly.</p>
+            )}
+          </div>
+        ) : null}
+
         {tab === 'header' ? (
           <div className="space-y-4">
             <CVPhotoField photoUrl={photo_url} onPhotoUrl={onPhotoUrl} />
@@ -244,6 +287,22 @@ export function CVFormFields(props: Props) {
               value={summary}
               onChange={(e) => onSummary(e.target.value)}
             />
+            <div className="flex justify-end">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() =>
+                  setRewriteTarget({
+                    section: 'Summary',
+                    inputLabel: 'Summary',
+                    sourceText: summary ?? '',
+                    onApply: onSummary,
+                  })
+                }
+              >
+                Rewrite with AI
+              </Button>
+            </div>
             {kw.length > 0 && summary && (
               <div className="rounded-md border border-yellow-200 bg-yellow-50/50 p-3">
                 <span className="text-[10px] font-medium uppercase tracking-wide text-yellow-700">Preview with highlights</span>
@@ -336,19 +395,98 @@ export function CVFormFields(props: Props) {
                     onExperienceChange(n);
                   }}
                 />
-                <Textarea
-                  className="mt-3"
-                  label="Bullets (one per line)"
-                  value={ex.bullets.join('\n')}
-                  onChange={(e) => {
-                    const n = [...experience];
-                    n[i] = {
-                      ...ex,
-                      bullets: e.target.value.split('\n').filter(Boolean).slice(0, 8),
-                    };
-                    onExperienceChange(n);
-                  }}
-                />
+                <div className="mt-2 flex justify-end">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      setRewriteTarget({
+                        section: 'Experience',
+                        inputLabel: `${ex.title || 'Role'} description`,
+                        sourceText: ex.description ?? '',
+                        extraContext: `Company: ${ex.company || 'N/A'}`,
+                        onApply: (value) => {
+                          const n = [...experience];
+                          n[i] = { ...ex, description: value || null };
+                          onExperienceChange(n);
+                        },
+                      })
+                    }
+                  >
+                    Rewrite with AI
+                  </Button>
+                </div>
+                <div className="mt-3 space-y-2">
+                  <p className="text-sm font-medium text-[var(--color-secondary)]">Bullets</p>
+                  {ex.bullets.map((bullet, bi) => (
+                    <div
+                      key={`${ex.id}-bullet-${bi}`}
+                      className="rounded-lg border border-[var(--color-border)] p-2"
+                    >
+                      <Input
+                        label={`Bullet ${bi + 1}`}
+                        value={bullet}
+                        onChange={(e) => {
+                          const n = [...experience];
+                          const nextBullets = [...(ex.bullets ?? [])];
+                          nextBullets[bi] = e.target.value;
+                          n[i] = { ...ex, bullets: nextBullets };
+                          onExperienceChange(n);
+                        }}
+                      />
+                      <div className="mt-2 flex flex-wrap justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            setRewriteTarget({
+                              section: 'Experience',
+                              inputLabel: `${ex.title || 'Role'} bullet ${bi + 1}`,
+                              sourceText: bullet,
+                              extraContext: `Company: ${ex.company || 'N/A'}`,
+                              onApply: (value) => {
+                                const n = [...experience];
+                                const nextBullets = [...(ex.bullets ?? [])];
+                                nextBullets[bi] = value;
+                                n[i] = { ...ex, bullets: nextBullets };
+                                onExperienceChange(n);
+                              },
+                            })
+                          }
+                        >
+                          Rewrite with AI
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const n = [...experience];
+                            const nextBullets = (ex.bullets ?? []).filter((_, idx) => idx !== bi);
+                            n[i] = { ...ex, bullets: nextBullets };
+                            onExperienceChange(n);
+                          }}
+                        >
+                          - Remove
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="flex justify-end">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      disabled={(ex.bullets ?? []).length >= 8}
+                      onClick={() => {
+                        const n = [...experience];
+                        const nextBullets = [...(ex.bullets ?? []), ''];
+                        n[i] = { ...ex, bullets: nextBullets.slice(0, 8) };
+                        onExperienceChange(n);
+                      }}
+                    >
+                      + Add bullet
+                    </Button>
+                  </div>
+                </div>
                 {kw.length > 0 && ex.bullets.length > 0 && (
                   <div className="mt-2 space-y-1 rounded-md border border-yellow-200 bg-yellow-50/50 p-2">
                     <span className="text-[10px] font-medium uppercase tracking-wide text-yellow-700">Preview with highlights</span>
@@ -469,6 +607,26 @@ export function CVFormFields(props: Props) {
                     onEducationChange(n);
                   }}
                 />
+                <div className="mt-2 flex justify-end">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      setRewriteTarget({
+                        section: 'Education',
+                        inputLabel: `${ed.institution || 'Education'} notes`,
+                        sourceText: ed.description ?? '',
+                        onApply: (value) => {
+                          const n = [...education];
+                          n[i] = { ...ed, description: value || null };
+                          onEducationChange(n);
+                        },
+                      })
+                    }
+                  >
+                    Rewrite with AI
+                  </Button>
+                </div>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -600,6 +758,26 @@ export function CVFormFields(props: Props) {
                     onProjectsChange(n);
                   }}
                 />
+                <div className="mt-2 flex justify-end">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      setRewriteTarget({
+                        section: 'Projects',
+                        inputLabel: `${p.name || 'Project'} description`,
+                        sourceText: p.description ?? '',
+                        onApply: (value) => {
+                          const n = [...projects];
+                          n[i] = { ...p, description: value };
+                          onProjectsChange(n);
+                        },
+                      })
+                    }
+                  >
+                    Rewrite with AI
+                  </Button>
+                </div>
                 <Textarea
                   className="mt-3"
                   label="Tech stack (one per line)"
@@ -959,6 +1137,26 @@ export function CVFormFields(props: Props) {
                     onAwardsChange(n);
                   }}
                 />
+                <div className="mt-2 flex justify-end">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      setRewriteTarget({
+                        section: 'Awards',
+                        inputLabel: `${a.title || 'Award'} description`,
+                        sourceText: a.description ?? '',
+                        onApply: (value) => {
+                          const n = [...awards];
+                          n[i] = { ...a, description: value || null };
+                          onAwardsChange(n);
+                        },
+                      })
+                    }
+                  >
+                    Rewrite with AI
+                  </Button>
+                </div>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -989,6 +1187,17 @@ export function CVFormFields(props: Props) {
           </div>
         ) : null}
       </div>
+      {rewriteTarget ? (
+        <CVRewriteWithAIModal
+          isOpen={Boolean(rewriteTarget)}
+          onClose={() => setRewriteTarget(null)}
+          section={rewriteTarget.section}
+          inputLabel={rewriteTarget.inputLabel}
+          sourceText={rewriteTarget.sourceText}
+          extraContext={rewriteTarget.extraContext}
+          onSelectSuggestion={(value) => rewriteTarget.onApply(value)}
+        />
+      ) : null}
     </div>
   );
 }

@@ -14,6 +14,8 @@ import type {
   SkillGroup,
 } from '@/types';
 import { CVFormFields, type CVFormTab } from '@/components/cv/CVFormFields';
+import { Progress } from '@/components/ui/progress';
+import { buildATSReport } from '@/lib/cv-ats';
 
 export interface CVEditorPanelProps {
   value: CVData;
@@ -164,9 +166,34 @@ export function CVEditorPanel({
   };
 
   const COMPACT_TABS: CVFormTab[] = ['header', 'summary', 'experience', 'education', 'skills'];
+  const ats = buildATSReport(value, highlightedKeywords ?? []);
 
   return (
     <div className="space-y-4">
+      <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">
+              ATS Checker
+            </p>
+            <p className="mt-1 text-sm text-indigo-900">{ats.summary}</p>
+          </div>
+          <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-sm font-semibold text-indigo-800">
+            {ats.score}/100
+          </span>
+        </div>
+        <Progress value={ats.score} className="mt-3 h-2.5 bg-indigo-100" colorClass="bg-indigo-600" />
+        {ats.suggestions.length > 0 ? (
+          <ul className="mt-3 list-inside list-disc space-y-1 text-sm text-indigo-900">
+            {ats.suggestions.slice(0, 4).map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-3 text-sm text-indigo-900">Great work. Your CV is ATS-friendly.</p>
+        )}
+      </div>
+
       {highlightedKeywords && highlightedKeywords.length > 0 && (
         <div className="flex flex-wrap gap-1.5 rounded-lg border border-amber-200 bg-amber-50 p-3">
           <span className="mr-1 text-xs font-medium text-amber-800">
@@ -230,6 +257,7 @@ export function CVEditorPanel({
         onAwardsChange={(v) => { setAwards(v); emitChange({ awards: v }); }}
         hiddenTabs={mode === 'compact' ? undefined : undefined}
         highlightedKeywords={highlightedKeywords}
+        atsBySection={ats.sections}
       />
     </div>
   );
