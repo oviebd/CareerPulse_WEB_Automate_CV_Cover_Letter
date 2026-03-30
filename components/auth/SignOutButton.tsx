@@ -14,30 +14,21 @@ export function SignOutButton() {
     setLoading(true);
     const supabase = createClient();
 
-    // 1) Server route must run while session cookies are still present so it can clear them on the response.
     try {
-      const res = await fetch('/api/auth/signout', {
+      await fetch('/api/auth/signout', {
         method: 'POST',
         credentials: 'same-origin',
       });
-      if (!res.ok) {
-        console.error('[sign out] server route failed:', res.status, await res.text());
-      }
-    } catch (e) {
-      console.error('[sign out] server route:', e);
+    } catch {
+      // Non-critical — client signOut below also clears cookies
     }
 
-    // 2) `scope: 'local'` — avoids default `global` which can fail the `/logout` request and skip removing the session.
-    const { error: clientErr } = await supabase.auth.signOut({ scope: 'local' });
-    if (clientErr) {
-      console.error('[sign out] client signOut:', clientErr.message);
-    }
+    await supabase.auth.signOut();
 
     reset();
     queryClient.clear();
 
-    // Hard navigation resets the Next.js tree, middleware, and @supabase/ssr singleton client.
-    window.location.assign('/login');
+    window.location.href = '/login';
   }
 
   return (

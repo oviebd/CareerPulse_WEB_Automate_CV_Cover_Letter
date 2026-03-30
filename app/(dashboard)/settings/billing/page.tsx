@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { PRICING, type PricingPlanKey } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -8,20 +9,23 @@ import { useSubscription } from '@/hooks/useSubscription';
 import { createClient } from '@/lib/supabase/client';
 import { formatDate } from '@/lib/utils';
 
+type Payment = { id: string; plan: string; amount: number; status: string; created_at: string };
+
 export default function BillingPage() {
   const { tier, status, expiresAt, profile } = useSubscription();
-  const [payments, setPayments] = useState<
-    { id: string; plan: string; amount: number; status: string; created_at: string }[]
-  >([]);
 
-  useEffect(() => {
-    const supabase = createClient();
-    void supabase
-      .from('payments')
-      .select('id, plan, amount, status, created_at')
-      .order('created_at', { ascending: false })
-      .then(({ data }) => setPayments((data ?? []) as typeof payments));
-  }, []);
+  const { data: payments = [] } = useQuery({
+    queryKey: ['payments'],
+    queryFn: async (): Promise<Payment[]> => {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from('payments')
+        .select('id, plan, amount, status, created_at')
+        .order('created_at', { ascending: false });
+      return (data ?? []) as Payment[];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
 
   async function pay(plan: PricingPlanKey) {
     const res = await fetch('/api/payment/initiate', {

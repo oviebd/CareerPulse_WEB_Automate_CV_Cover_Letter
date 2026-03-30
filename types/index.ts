@@ -100,6 +100,78 @@ export interface AwardEntry {
   description: string | null;
 }
 
+/** Shape passed to CV HTML templates and PDF rendering (JSONB fields normalized). */
+export interface CVData {
+  full_name: string | null;
+  professional_title: string | null;
+  email: string | null;
+  phone: string | null;
+  location: string | null;
+  linkedin_url: string | null;
+  portfolio_url: string | null;
+  website_url: string | null;
+  summary: string | null;
+  experience: Array<{
+    id: string;
+    company: string;
+    title: string;
+    location: string | null;
+    start_date: string | null;
+    end_date: string | null;
+    is_current: boolean;
+    bullets: string[];
+    description: string | null;
+  }>;
+  education: Array<{
+    id: string;
+    institution: string;
+    degree: string | null;
+    field_of_study: string | null;
+    start_date: string | null;
+    end_date: string | null;
+    gpa: string | null;
+    description: string | null;
+  }>;
+  skills: Array<{
+    id: string;
+    category: 'technical' | 'soft' | 'tools' | 'languages';
+    items: string[];
+  }>;
+  projects: Array<{
+    id: string;
+    name: string;
+    description: string | null;
+    tech_stack: string[];
+    url: string | null;
+    start_date: string | null;
+    end_date: string | null;
+  }>;
+  certifications: Array<{
+    id: string;
+    name: string;
+    issuer: string | null;
+    issue_date: string | null;
+    expiry_date: string | null;
+    url: string | null;
+  }>;
+  languages: Array<{
+    id: string;
+    language: string;
+    proficiency: 'native' | 'fluent' | 'advanced' | 'intermediate' | 'basic';
+  }>;
+  awards: Array<{
+    id: string;
+    title: string;
+    issuer: string | null;
+    date: string | null;
+    description: string | null;
+  }>;
+  accent_color?: string;
+  watermark?: boolean;
+  /** Precomputed in renderTemplate for pipe-separated contact (optional). */
+  contact_line?: string;
+}
+
 // CV Profile
 export interface CVProfile {
   id: string;

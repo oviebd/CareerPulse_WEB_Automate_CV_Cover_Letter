@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -40,9 +40,18 @@ export function GenerateCoverLetterForm() {
     missing: string[];
   } | null>(null);
 
+  const streamRef = useRef('');
+  const rafRef = useRef<number | null>(null);
+
+  const flushStream = useCallback(() => {
+    setStreaming(streamRef.current);
+    rafRef.current = null;
+  }, []);
+
   async function generate() {
     setLoading(true);
     setStreaming('');
+    streamRef.current = '';
     setLetterId(null);
     setAts(null);
     const res = await fetch('/api/generate', {
@@ -72,7 +81,6 @@ export function GenerateCoverLetterForm() {
     const reader = res.body.getReader();
     const dec = new TextDecoder();
     let buf = '';
-    let full = '';
     let savedId: string | null = null;
     while (true) {
       const { done, value } = await reader.read();
@@ -92,8 +100,10 @@ export function GenerateCoverLetterForm() {
             error?: string;
           };
           if (data.text) {
-            full += data.text;
-            setStreaming(full);
+            streamRef.current += data.text;
+            if (!rafRef.current) {
+              rafRef.current = requestAnimationFrame(flushStream);
+            }
           }
           if (data.done && data.id) {
             savedId = data.id;
@@ -107,6 +117,11 @@ export function GenerateCoverLetterForm() {
         }
       }
     }
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+    setStreaming(streamRef.current);
     setLoading(false);
     if (savedId && canAccessFeature(tier, 'atsAccess')) {
       const supabase = createClient();

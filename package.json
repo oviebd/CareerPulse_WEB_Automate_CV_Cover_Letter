@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test-templates": "tsx scripts/test-templates.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
@@ -29,6 +30,7 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
+    "tsx": "^4.19.4",
     "@types/node": "^20",
     "@types/pdf-parse": "^1.1.5",
     "@types/react": "^18",

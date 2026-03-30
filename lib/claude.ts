@@ -6,7 +6,8 @@ import type {
 } from '@/types';
 
 const claude = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-export const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
+export const CLAUDE_MODEL =
+  process.env.ANTHROPIC_MODEL?.trim() || 'claude-sonnet-4-20250514';
 
 function isRetryable(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false;

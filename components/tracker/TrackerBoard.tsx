@@ -9,7 +9,7 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
-import { useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import type { ApplicationStatus, JobApplication, WorkType } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -34,7 +34,7 @@ const COLUMNS: { id: ApplicationStatus; label: string }[] = [
   { id: 'withdrawn', label: 'Withdrawn' },
 ];
 
-function Column({
+const Column = memo(function Column({
   status,
   count,
   children,
@@ -61,9 +61,9 @@ function Column({
       <div className="flex flex-1 flex-col gap-2 overflow-y-auto">{children}</div>
     </div>
   );
-}
+});
 
-function AppCard({ app }: { app: JobApplication }) {
+const AppCard = memo(function AppCard({ app }: { app: JobApplication }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: app.id,
     data: { status: app.status },
@@ -94,7 +94,7 @@ function AppCard({ app }: { app: JobApplication }) {
       ) : null}
     </div>
   );
-}
+});
 
 export function TrackerBoard() {
   const { data: apps = [] } = useJobApplications();
@@ -103,18 +103,30 @@ export function TrackerBoard() {
   const [selected, setSelected] = useState<JobApplication | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
-  function onDragEnd(e: DragEndEvent) {
-    const overId = e.over?.id as ApplicationStatus | undefined;
-    const activeId = e.active.id as string;
-    if (!overId || !activeId) return;
-    updateStatus.mutate({ id: activeId, status: overId });
-  }
+  const onDragEnd = useCallback(
+    (e: DragEndEvent) => {
+      const overId = e.over?.id as ApplicationStatus | undefined;
+      const activeId = e.active.id as string;
+      if (!overId || !activeId) return;
+      updateStatus.mutate({ id: activeId, status: overId });
+    },
+    [updateStatus]
+  );
 
-  const total = apps.filter((a) => !['rejected', 'withdrawn'].includes(a.status)).length;
-  const thisWeek = apps.filter((a) => {
-    const t = new Date(a.updated_at).getTime();
-    return Date.now() - t < 7 * 86400000;
-  }).length;
+  const { total, thisWeek, grouped } = useMemo(() => {
+    const now = Date.now();
+    const g = new Map<ApplicationStatus, JobApplication[]>();
+    let t = 0;
+    let tw = 0;
+    for (const a of apps) {
+      if (!['rejected', 'withdrawn'].includes(a.status)) t++;
+      if (now - new Date(a.updated_at).getTime() < 7 * 86400000) tw++;
+      const list = g.get(a.status);
+      if (list) list.push(a);
+      else g.set(a.status, [a]);
+    }
+    return { total: t, thisWeek: tw, grouped: g };
+  }, [apps]);
 
   return (
     <div className="space-y-4">
@@ -145,7 +157,7 @@ export function TrackerBoard() {
       <DndContext sensors={sensors} onDragEnd={onDragEnd}>
         <div className="flex gap-3 overflow-x-auto pb-4">
           {COLUMNS.map((col) => {
-            const list = apps.filter((a) => a.status === col.id);
+            const list = grouped.get(col.id) ?? [];
             return (
               <Column key={col.id} status={col.id} count={list.length}>
                 {list.map((app) => (

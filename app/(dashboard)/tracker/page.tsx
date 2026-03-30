@@ -1,9 +1,27 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { FeatureGate } from '@/components/shared/FeatureGate';
 import { UpgradeCTA } from '@/components/shared/UpgradeCTA';
-import { TrackerBoard } from '@/components/tracker/TrackerBoard';
 import { useSubscription } from '@/hooks/useSubscription';
+
+const TrackerBoard = dynamic(
+  () =>
+    import('@/components/tracker/TrackerBoard').then((m) => m.TrackerBoard),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex gap-3 overflow-hidden animate-pulse">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div
+            key={i}
+            className="h-64 w-64 shrink-0 rounded-xl border border-[var(--color-border)] bg-slate-50"
+          />
+        ))}
+      </div>
+    ),
+  }
+);
 
 export default function TrackerPage() {
   const { tier } = useSubscription();

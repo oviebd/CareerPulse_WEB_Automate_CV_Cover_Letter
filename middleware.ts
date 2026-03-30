@@ -56,10 +56,11 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Exclude all Next internals (/_next/*), not only /_next/static and /_next/image.
-     * A too-narrow exclusion can let middleware run on dev assets (e.g. webpack-hmr)
-     * and cause flaky 404s for CSS/JS. Also skip the payment webhook and favicon.
+     * Only match pages that need auth checks. Exclude:
+     * - _next/ (build assets, HMR)
+     * - api/ (route handlers authenticate themselves)
+     * - favicon.ico, static files
      */
-    '/((?!_next/|api/payment/ipn|favicon\\.ico).*)',
+    '/((?!_next/|api/|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
   ],
 };

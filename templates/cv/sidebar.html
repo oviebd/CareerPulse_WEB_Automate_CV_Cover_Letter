@@ -1,34 +1,121 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8" />
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600&family=Inter:wght@400;500&display=swap" rel="stylesheet" />
-<style>
-:root { --primary-color: {{primary_color}}; }
-body { margin: 0; font-family: 'Inter', sans-serif; width: 210mm; min-height: 297mm; display: flex; color: #0f172a; }
-.side { width: 30%; background: #0f172a; color: #f8fafc; padding: 14mm 8mm; font-size: 9pt; }
-.side h3 { font-family: 'DM Sans', sans-serif; font-size: 10pt; color: var(--primary-color); margin: 16px 0 8px; }
-.main { width: 70%; padding: 14mm 10mm; font-size: 10pt; }
-.main h1 { font-family: 'DM Sans', sans-serif; font-size: 20pt; margin: 0; color: var(--primary-color); }
-.title { color: #64748b; margin: 4px 0 16px; }
-h2 { font-family: 'DM Sans', sans-serif; font-size: 10pt; border-bottom: 2px solid var(--primary-color); padding-bottom: 4px; margin: 14px 0 8px; }
-.chip { display: inline-block; background: #e0e7ff; color: #312e81; padding: 2px 6px; border-radius: 4px; margin: 2px; font-size: 8pt; }
-@media print { * { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
-</style></head><body>
-<div class="side">
-  <h3>Contact</h3>
-  <div>{{email}}</div><div>{{phone}}</div><div>{{location}}</div>
-  <div style="margin-top:8px;word-break:break-all;">{{linkedin_url}}</div>
-  <h3>Skills</h3>
-  {{skills_html}}
-</div>
-<div class="main">
-  <h1>{{full_name}}</h1>
-  <div class="title">{{professional_title}}</div>
-  <h2>Summary</h2><div>{{summary}}</div>
-  <h2>Experience</h2>{{experience_html}}
-  <h2>Education</h2>{{education_html}}
-  <h2>Projects</h2>{{projects_html}}
-  <h2>Certifications</h2>{{certifications_html}}
-  <h2>Languages</h2>{{languages_html}}
-  <h2>Awards</h2>{{awards_html}}
-</div>
-</body></html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    @page { size: A4; margin: 0; }
+    * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    body { margin: 0; font-family: 'Inter', Arial, sans-serif; color: #1e293b; background: #fff; }
+    .page { width: 210mm; min-height: 297mm; display: flex; flex-direction: row; align-items: stretch; position: relative; }
+    .sidebar { width: 32%; flex-shrink: 0; background: {{accent_color}}14; padding: 20pt; font-size: 9pt; }
+    .sidebar h3 { font-size: 10pt; font-weight: 500; color: {{accent_color}}; margin: 0 0 8pt; text-transform: uppercase; letter-spacing: 0.06em; }
+    .sb-block { margin-bottom: 16pt; page-break-inside: avoid; }
+    .sb-item { margin-bottom: 5pt; display: flex; gap: 6pt; align-items: flex-start; }
+    .sb-icon { flex-shrink: 0; }
+    .pill { display: inline-block; background: {{accent_color}}26; color: #1e293b; padding: 2pt 8pt; border-radius: 4pt; margin: 2pt 4pt 2pt 0; font-size: 8.5pt; }
+    .cat { font-weight: 600; font-size: 8.5pt; color: {{accent_color}}; margin: 8pt 0 4pt; }
+    .main { width: 68%; flex: 1; padding: 18pt 16pt 18pt 24pt; font-size: 10pt; line-height: 1.45; }
+    .main h1 { font-size: 20pt; font-weight: 700; margin: 0; color: #0f172a; }
+    .main .subtitle { font-size: 11pt; color: {{accent_color}}; margin-top: 4pt; font-weight: 500; }
+    .section-title { font-size: 10pt; font-weight: 600; color: #0f172a; margin: 14pt 0 8pt; padding-left: 8pt; border-left: 3pt solid {{accent_color}}; }
+    .summary { font-size: 10pt; color: #334155; }
+    .exp-card { page-break-inside: avoid; margin-bottom: 12pt; }
+    .exp-line { display: flex; justify-content: space-between; gap: 8pt; }
+    .exp-co { font-weight: 700; font-size: 10pt; }
+    .exp-dt { font-size: 9pt; color: #64748b; white-space: nowrap; }
+    .exp-title { font-size: 10pt; margin-top: 2pt; color: #334155; }
+    .exp-bullets { margin: 6pt 0 0 14pt; padding: 0; font-size: 9pt; }
+    .exp-bullets li { margin-bottom: 3pt; }
+    .edu-card { page-break-inside: avoid; margin-bottom: 10pt; }
+    .edu-line { display: flex; justify-content: space-between; gap: 8pt; }
+    .proj-card { page-break-inside: avoid; margin-bottom: 10pt; }
+    .watermark { position: fixed; bottom: 8mm; right: 10mm; font-size: 8pt; color: #94a3b8; z-index: 1000; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="sidebar">
+      <div class="sb-block">
+        <h3>Contact</h3>
+        {{#if email}}<div class="sb-item"><span class="sb-icon">✉</span><span>{{email}}</span></div>{{/if}}
+        {{#if phone}}<div class="sb-item"><span class="sb-icon">📞</span><span>{{phone}}</span></div>{{/if}}
+        {{#if location}}<div class="sb-item"><span class="sb-icon">📍</span><span>{{location}}</span></div>{{/if}}
+        {{#if linkedin_url}}<div class="sb-item"><span class="sb-icon">🔗</span><span>{{linkedin_url}}</span></div>{{/if}}
+        {{#if portfolio_url}}<div class="sb-item"><span class="sb-icon">🔗</span><span>{{portfolio_url}}</span></div>{{/if}}
+        {{#if website_url}}<div class="sb-item"><span class="sb-icon">🔗</span><span>{{website_url}}</span></div>{{/if}}
+      </div>
+      {{#if skills.length}}
+      <div class="sb-block">
+        <h3>Skills</h3>
+        {{#each skills}}
+        <div class="cat">{{category}}</div>
+        <div>{{#each items}}<span class="pill">{{this}}</span>{{/each}}</div>
+        {{/each}}
+      </div>
+      {{/if}}
+      {{#if languages.length}}
+      <div class="sb-block">
+        <h3>Languages</h3>
+        {{#each languages}}
+        <div class="sb-item">{{language}} — {{proficiency}}</div>
+        {{/each}}
+      </div>
+      {{/if}}
+      {{#if certifications.length}}
+      <div class="sb-block">
+        <h3>Certifications</h3>
+        {{#each certifications}}
+        <div style="margin-bottom:6pt;">{{name}}{{#if issuer}}<br/><span style="color:#64748b;">{{issuer}}</span>{{/if}}</div>
+        {{/each}}
+      </div>
+      {{/if}}
+    </div>
+    <div class="main">
+      <h1>{{full_name}}</h1>
+      {{#if professional_title}}<div class="subtitle">{{professional_title}}</div>{{/if}}
+      {{#if summary}}
+      <div class="section-title">Summary</div>
+      <div class="summary">{{summary}}</div>
+      {{/if}}
+      {{#if experience.length}}
+      <div class="section-title">Experience</div>
+      {{#each experience}}
+      <div class="exp-card">
+        <div class="exp-line">
+          <span class="exp-co">{{company}}</span>
+          <span class="exp-dt">{{formatDate start_date}} – {{#ifCurrent is_current end_date}}Present{{else}}{{formatDate end_date}}{{/ifCurrent}}</span>
+        </div>
+        <div class="exp-title">{{title}}</div>
+        {{#if bullets.length}}
+        <ul class="exp-bullets">{{#each bullets}}<li>{{this}}</li>{{/each}}</ul>
+        {{/if}}
+      </div>
+      {{/each}}
+      {{/if}}
+      {{#if education.length}}
+      <div class="section-title">Education</div>
+      {{#each education}}
+      <div class="edu-card">
+        <div class="edu-line">
+          <strong>{{institution}}</strong>
+          <span class="exp-dt">{{formatDate start_date}} – {{formatDate end_date}}</span>
+        </div>
+        <div class="exp-title">{{#if degree}}{{degree}}{{/if}}{{#if field_of_study}} — {{field_of_study}}{{/if}}</div>
+      </div>
+      {{/each}}
+      {{/if}}
+      {{#if projects.length}}
+      <div class="section-title">Projects</div>
+      {{#each projects}}
+      <div class="proj-card">
+        <strong>{{name}}</strong>
+        {{#if description}}<div class="summary" style="margin-top:4pt;">{{description}}</div>{{/if}}
+      </div>
+      {{/each}}
+      {{/if}}
+      {{#if watermark}}<div class="watermark">Created with CareerAI</div>{{/if}}
+    </div>
+  </div>
+</body>
+</html>

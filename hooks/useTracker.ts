@@ -2,25 +2,25 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createClient } from '@/lib/supabase/client';
+import { useAuthStore } from '@/stores/useAuthStore';
 import type { ApplicationStatus, JobApplication } from '@/types';
 
 export function useJobApplications() {
+  const userId = useAuthStore((s) => s.user?.id);
   return useQuery({
-    queryKey: ['job-applications'],
+    queryKey: ['job-applications', userId],
     queryFn: async (): Promise<JobApplication[]> => {
+      if (!userId) return [];
       const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return [];
       const { data, error } = await supabase
         .from('job_applications')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .order('updated_at', { ascending: false });
       if (error) throw error;
       return (data ?? []) as JobApplication[];
     },
+    enabled: !!userId,
     staleTime: 60 * 1000,
   });
 }
@@ -50,21 +50,19 @@ export function useUpdateApplicationStatus() {
 
 export function useUpsertJobApplication() {
   const qc = useQueryClient();
+  const userId = useAuthStore((s) => s.user?.id);
   return useMutation({
     mutationFn: async (
       payload: Partial<JobApplication> & { company_name: string; job_title: string }
     ) => {
+      if (!userId) throw new Error('Unauthorized');
       const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error('Unauthorized');
       if (payload.id) {
         const { data, error } = await supabase
           .from('job_applications')
           .update(payload)
           .eq('id', payload.id)
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
           .select()
           .single();
         if (error) throw error;
@@ -72,7 +70,7 @@ export function useUpsertJobApplication() {
       }
       const { data, error } = await supabase
         .from('job_applications')
-        .insert({ ...payload, user_id: user.id })
+        .insert({ ...payload, user_id: userId })
         .select()
         .single();
       if (error) throw error;

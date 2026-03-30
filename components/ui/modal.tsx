@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils';
 import { Button } from './button';
@@ -18,10 +18,14 @@ export function Modal({
   children: React.ReactNode;
   className?: string;
 }) {
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const stableOnClose = useCallback(() => onCloseRef.current(), []);
+
   useEffect(() => {
     if (!isOpen) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') stableOnClose();
     };
     document.addEventListener('keydown', onKey);
     document.body.style.overflow = 'hidden';
@@ -29,7 +33,7 @@ export function Modal({
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = '';
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, stableOnClose]);
 
   if (!isOpen || typeof document === 'undefined') return null;
 
@@ -44,7 +48,7 @@ export function Modal({
         type="button"
         className="absolute inset-0 bg-black/40"
         aria-label="Close dialog"
-        onClick={onClose}
+        onClick={stableOnClose}
       />
       <div
         className={cn(
@@ -60,7 +64,7 @@ export function Modal({
           ) : (
             <span />
           )}
-          <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close">
+          <Button variant="ghost" size="sm" onClick={stableOnClose} aria-label="Close">
             ✕
           </Button>
         </div>

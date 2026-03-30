@@ -6,15 +6,12 @@ import {
   scoreATS,
 } from '@/lib/claude';
 import { rateLimitHit } from '@/lib/rate-limit';
+import { resolveEffectiveTier } from '@/lib/dev-subscription';
 import {
   assertGenerationAllowed,
   canAccessFeature,
 } from '@/lib/subscription';
-import type {
-  CoverLetterLength,
-  CoverLetterTone,
-  SubscriptionTier,
-} from '@/types';
+import type { CoverLetterLength, CoverLetterTone } from '@/types';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
@@ -61,7 +58,7 @@ export async function POST(request: Request) {
       .select('subscription_tier')
       .eq('id', user.id)
       .single();
-    const tier = (prof?.subscription_tier ?? 'free') as SubscriptionTier;
+    const tier = resolveEffectiveTier(prof?.subscription_tier);
 
     try {
       await assertGenerationAllowed(user.id, tier, supabase);

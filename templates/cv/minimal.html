@@ -1,24 +1,121 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8" />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet" />
-<style>
-:root { --primary-color: {{primary_color}}; --text-color: #0f172a; }
-body { font-family: 'Inter', sans-serif; color: var(--text-color); width: 210mm; min-height: 297mm; margin: 0 auto; padding: 20mm 18mm; font-size: 10.5pt; line-height: 1.7; font-weight: 300; }
-h1 { font-weight: 600; font-size: 20pt; margin: 0 0 24px; letter-spacing: -0.02em; }
-h2 { font-size: 9pt; text-transform: uppercase; letter-spacing: 0.2em; color: var(--primary-color); margin: 28px 0 12px; }
-.muted { color: #94a3b8; font-size: 9pt; }
-ul { margin: 8px 0 0 20px; }
-.chip { display: inline-block; border: 1px solid #e2e8f0; padding: 2px 10px; border-radius: 99px; margin: 3px 6px 3px 0; font-size: 9pt; }
-@media print { * { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
-</style></head><body>
-<h1>{{full_name}}</h1>
-<div class="muted">{{professional_title}} · {{email}} · {{phone}} · {{location}}</div>
-<h2>Summary</h2><div>{{summary}}</div>
-<h2>Experience</h2>{{experience_html}}
-<h2>Education</h2>{{education_html}}
-<h2>Skills</h2>{{skills_html}}
-<h2>Projects</h2>{{projects_html}}
-<h2>Certifications</h2>{{certifications_html}}
-<h2>Languages</h2>{{languages_html}}
-<h2>Awards</h2>{{awards_html}}
-</body></html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap');
+    @page { size: A4; margin: 0; }
+    * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    body { margin: 0; font-family: 'DM Sans', Arial, sans-serif; color: #111; background: #fff; }
+    .page { width: 210mm; min-height: 297mm; padding: 18mm 20mm; position: relative; font-size: 10pt; line-height: 1.45; }
+    h1 { font-family: 'DM Sans', Arial, sans-serif; font-size: 28pt; font-weight: 300; margin: 0; color: {{accent_color}}; letter-spacing: -0.02em; }
+    .title { font-size: 11pt; color: #555; margin-top: 8pt; }
+    .contact { font-size: 9pt; color: #555; margin-top: 12pt; }
+    .sp-section { margin-top: 20pt; }
+    .sec-label { font-size: 8pt; text-transform: uppercase; letter-spacing: 0.15em; color: #555; margin-bottom: 12pt; }
+    .exp-card { page-break-inside: avoid; margin-bottom: 16pt; }
+    .exp-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8pt; }
+    .exp-co { font-weight: 600; color: #111; font-size: 10pt; }
+    .exp-dt { font-size: 9pt; color: #555; white-space: nowrap; }
+    .exp-role { font-size: 10pt; color: {{accent_color}}; margin-top: 4pt; }
+    .exp-bullets { margin: 8pt 0 0 14pt; padding: 0; color: #444; font-size: 9.5pt; line-height: 1.2; }
+    .exp-bullets li { margin-bottom: 4pt; }
+    .summary { font-size: 10pt; color: #444; line-height: 1.5; }
+    .edu-card { page-break-inside: avoid; margin-bottom: 12pt; }
+    .edu-top { display: flex; justify-content: space-between; gap: 8pt; }
+    .muted { color: #555; font-size: 9pt; }
+    .skills-line { font-size: 9.5pt; color: #444; margin-bottom: 10pt; page-break-inside: avoid; }
+    .skills-line .lbl { font-weight: 600; color: #111; margin-right: 6pt; }
+    .proj-card { page-break-inside: avoid; margin-bottom: 14pt; }
+    .watermark { position: fixed; bottom: 8mm; right: 10mm; font-size: 8pt; color: #aaa; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <h1>{{full_name}}</h1>
+    {{#if professional_title}}<div class="title">{{professional_title}}</div>{{/if}}
+    <div class="contact">{{contact_line}}</div>
+
+    {{#if summary}}
+    <div class="sp-section">
+      <div class="sec-label">Summary</div>
+      <div class="summary">{{summary}}</div>
+    </div>
+    {{/if}}
+
+    {{#if experience.length}}
+    <div class="sp-section">
+      <div class="sec-label">Experience</div>
+      {{#each experience}}
+      <div class="exp-card">
+        <div class="exp-top">
+          <span class="exp-co">{{company}}</span>
+          <span class="exp-dt">{{formatDate start_date}} – {{#ifCurrent is_current end_date}}Present{{else}}{{formatDate end_date}}{{/ifCurrent}}</span>
+        </div>
+        <div class="exp-role">{{title}}</div>
+        {{#if bullets.length}}
+        <ul class="exp-bullets">{{#each bullets}}<li>{{this}}</li>{{/each}}</ul>
+        {{/if}}
+      </div>
+      {{/each}}
+    </div>
+    {{/if}}
+
+    {{#if education.length}}
+    <div class="sp-section">
+      <div class="sec-label">Education</div>
+      {{#each education}}
+      <div class="edu-card">
+        <div class="edu-top">
+          <strong>{{institution}}</strong>
+          <span class="muted">{{formatDate start_date}} – {{formatDate end_date}}</span>
+        </div>
+        <div class="muted">{{#if degree}}{{degree}}{{/if}}{{#if field_of_study}} — {{field_of_study}}{{/if}}</div>
+      </div>
+      {{/each}}
+    </div>
+    {{/if}}
+
+    {{#if skills.length}}
+    <div class="sp-section">
+      <div class="sec-label">Skills</div>
+      {{#each skills}}
+      <div class="skills-line"><span class="lbl">{{category}}:</span>{{join items}}</div>
+      {{/each}}
+    </div>
+    {{/if}}
+
+    {{#if projects.length}}
+    <div class="sp-section">
+      <div class="sec-label">Projects</div>
+      {{#each projects}}
+      <div class="proj-card">
+        <strong>{{name}}</strong>
+        {{#if description}}<div class="muted" style="margin-top:4pt;">{{description}}</div>{{/if}}
+      </div>
+      {{/each}}
+    </div>
+    {{/if}}
+
+    {{#if certifications.length}}
+    <div class="sp-section">
+      <div class="sec-label">Certifications</div>
+      {{#each certifications}}
+      <div class="muted" style="margin-bottom:6pt;">{{name}}{{#if issuer}} — {{issuer}}{{/if}}</div>
+      {{/each}}
+    </div>
+    {{/if}}
+
+    {{#if languages.length}}
+    <div class="sp-section">
+      <div class="sec-label">Languages</div>
+      {{#each languages}}
+      <div class="skills-line">{{language}} ({{proficiency}})</div>
+      {{/each}}
+    </div>
+    {{/if}}
+
+    {{#if watermark}}<div class="watermark">Created with CareerAI</div>{{/if}}
+  </div>
+</body>
+</html>

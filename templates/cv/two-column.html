@@ -1,29 +1,113 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8" />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
-<style>
-:root { --primary-color: {{primary_color}}; }
-body { font-family: 'Inter', sans-serif; width: 210mm; min-height: 297mm; margin: 0 auto; padding: 12mm; font-size: 10pt; color: #0f172a; }
-h1 { font-size: 20pt; margin: 0; color: var(--primary-color); }
-.grid { display: flex; gap: 10mm; margin-top: 10px; }
-.col { flex: 1; }
-h2 { font-size: 10pt; text-transform: uppercase; letter-spacing: 0.06em; border-bottom: 1px solid var(--primary-color); padding-bottom: 4px; margin: 12px 0 8px; }
-@media print { * { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
-</style></head><body>
-<h1>{{full_name}}</h1>
-<div style="color:#64748b;font-size:10pt;">{{professional_title}} · {{email}} · {{phone}}</div>
-<div class="grid">
-  <div class="col">
-    <h2>Experience</h2>{{experience_html}}
-    <h2>Projects</h2>{{projects_html}}
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    @page { size: A4; margin: 0; }
+    * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    body { margin: 0; font-family: 'Inter', Arial, sans-serif; color: #2d2d2d; background: #fff; font-size: 10pt; line-height: 1.35; }
+    .page { width: 210mm; min-height: 297mm; padding: 12mm 14mm; position: relative; }
+    .header { border-bottom: 1pt solid {{accent_color}}; padding-bottom: 10pt; margin-bottom: 12pt; }
+    .header h1 { font-size: 20pt; font-weight: 700; margin: 0; color: {{accent_color}}; }
+    .header .sub { font-size: 11pt; color: #64748b; margin-top: 4pt; }
+    .header .contact { font-size: 9pt; color: #64748b; margin-top: 6pt; }
+    .cols { display: flex; flex-direction: row; align-items: flex-start; gap: 12pt; }
+    .col { width: 50%; flex: 1; }
+    .section-title { font-size: 10pt; font-weight: 700; color: #2d2d2d; margin: 10pt 0 6pt; }
+    .section-title .sq { color: {{accent_color}}; margin-right: 4pt; }
+    .summary { font-size: 9.5pt; color: #334155; }
+    .exp-card { page-break-inside: avoid; margin-bottom: 10pt; }
+    .exp-line { display: flex; justify-content: space-between; gap: 6pt; }
+    .exp-co { font-weight: 700; font-size: 9.5pt; }
+    .exp-dt { font-size: 8.5pt; color: #64748b; white-space: nowrap; }
+    .exp-title { font-size: 9pt; margin-top: 2pt; }
+    .exp-bullets { margin: 4pt 0 0 12pt; padding: 0; font-size: 8.5pt; }
+    .exp-bullets li { margin-bottom: 2pt; }
+    .edu-card { page-break-inside: avoid; margin-bottom: 8pt; }
+    .skills-grid { display: flex; flex-wrap: wrap; gap: 4pt 8pt; font-size: 8.5pt; }
+    .skill-col { width: 48%; }
+    .proj-card { page-break-inside: avoid; margin-bottom: 8pt; font-size: 9pt; }
+    .watermark { position: fixed; bottom: 8mm; right: 10mm; font-size: 8pt; color: #94a3b8; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="header">
+      <h1>{{full_name}}</h1>
+      {{#if professional_title}}<div class="sub">{{professional_title}}</div>{{/if}}
+      <div class="contact">{{contact_line}}</div>
+    </div>
+    <div class="cols">
+      <div class="col">
+        {{#if summary}}
+        <div class="section-title"><span class="sq">▪</span> SUMMARY</div>
+        <div class="summary">{{summary}}</div>
+        {{/if}}
+        {{#if experience.length}}
+        <div class="section-title"><span class="sq">▪</span> EXPERIENCE</div>
+        {{#each experience}}
+        <div class="exp-card">
+          <div class="exp-line">
+            <span class="exp-co">{{company}}</span>
+            <span class="exp-dt">{{formatDate start_date}} – {{#ifCurrent is_current end_date}}Present{{else}}{{formatDate end_date}}{{/ifCurrent}}</span>
+          </div>
+          <div class="exp-title">{{title}}</div>
+          {{#if bullets.length}}
+          <ul class="exp-bullets">{{#each bullets}}<li>{{this}}</li>{{/each}}</ul>
+          {{/if}}
+        </div>
+        {{/each}}
+        {{/if}}
+      </div>
+      <div class="col">
+        {{#if education.length}}
+        <div class="section-title"><span class="sq">▪</span> EDUCATION</div>
+        {{#each education}}
+        <div class="edu-card">
+          <div class="exp-line">
+            <strong>{{institution}}</strong>
+            <span class="exp-dt">{{formatDate start_date}}</span>
+          </div>
+          <div class="summary">{{#if degree}}{{degree}}{{/if}}{{#if field_of_study}} — {{field_of_study}}{{/if}}</div>
+        </div>
+        {{/each}}
+        {{/if}}
+        {{#if skills.length}}
+        <div class="section-title"><span class="sq">▪</span> SKILLS</div>
+        <div class="skills-grid">
+          {{#each skills}}
+          <div class="skill-col"><strong>{{category}}</strong><br/>{{join items}}</div>
+          {{/each}}
+        </div>
+        {{/if}}
+        {{#if projects.length}}
+        <div class="section-title"><span class="sq">▪</span> PROJECTS</div>
+        {{#each projects}}
+        <div class="proj-card"><strong>{{name}}</strong>{{#if description}}<br/>{{description}}{{/if}}</div>
+        {{/each}}
+        {{/if}}
+        {{#if certifications.length}}
+        <div class="section-title"><span class="sq">▪</span> CERTIFICATIONS</div>
+        {{#each certifications}}
+        <div class="proj-card">{{name}}</div>
+        {{/each}}
+        {{/if}}
+        {{#if languages.length}}
+        <div class="section-title"><span class="sq">▪</span> LANGUAGES</div>
+        {{#each languages}}
+        <div class="proj-card">{{language}} — {{proficiency}}</div>
+        {{/each}}
+        {{/if}}
+        {{#if awards.length}}
+        <div class="section-title"><span class="sq">▪</span> AWARDS</div>
+        {{#each awards}}
+        <div class="proj-card">{{title}}{{#if issuer}} — {{issuer}}{{/if}}</div>
+        {{/each}}
+        {{/if}}
+      </div>
+    </div>
+    {{#if watermark}}<div class="watermark">Created with CareerAI</div>{{/if}}
   </div>
-  <div class="col">
-    <h2>Education</h2>{{education_html}}
-    <h2>Skills</h2>{{skills_html}}
-    <h2>Summary</h2><div>{{summary}}</div>
-    <h2>Certifications</h2>{{certifications_html}}
-    <h2>Languages</h2>{{languages_html}}
-    <h2>Awards</h2>{{awards_html}}
-  </div>
-</div>
-</body></html>
+</body>
+</html>

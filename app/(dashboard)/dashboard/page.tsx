@@ -30,25 +30,27 @@ export default function DashboardPage() {
     return 'Good evening';
   }, []);
 
-  const activeApps = apps.filter((a) => !['rejected', 'withdrawn'].includes(a.status));
   const genLimit = TIER_LIMITS[tier].generationsPerMonth;
-  const usedThisMonth = letters.filter((l) => {
-    const d = new Date(l.created_at);
-    const n = new Date();
-    return d.getMonth() === n.getMonth() && d.getFullYear() === n.getFullYear();
-  }).length;
-  const pct =
-    genLimit === Number.POSITIVE_INFINITY
-      ? 0
-      : Math.min(100, (usedThisMonth / genLimit) * 100);
 
-  const statusCounts = useMemo(() => {
-    const m: Record<string, number> = {};
+  const { activeApps, usedThisMonth, pct, statusCounts } = useMemo(() => {
+    const active = apps.filter((a) => !['rejected', 'withdrawn'].includes(a.status));
+    const now = new Date();
+    const month = now.getMonth();
+    const year = now.getFullYear();
+    const used = letters.filter((l) => {
+      const d = new Date(l.created_at);
+      return d.getMonth() === month && d.getFullYear() === year;
+    }).length;
+    const p =
+      genLimit === Number.POSITIVE_INFINITY
+        ? 0
+        : Math.min(100, (used / genLimit) * 100);
+    const counts: Record<string, number> = {};
     for (const a of apps) {
-      m[a.status] = (m[a.status] ?? 0) + 1;
+      counts[a.status] = (counts[a.status] ?? 0) + 1;
     }
-    return m;
-  }, [apps]);
+    return { activeApps: active, usedThisMonth: used, pct: p, statusCounts: counts };
+  }, [apps, letters, genLimit]);
 
   return (
     <div className="mx-auto max-w-6xl space-y-8">
@@ -64,15 +66,15 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="primary" size="sm" onClick={() => (window.location.href = '/cover-letters/new')}>
-            New cover letter
-          </Button>
-          <Button variant="secondary" size="sm" onClick={() => (window.location.href = '/cv/upload')}>
-            Upload CV
-          </Button>
-          <Button variant="secondary" size="sm" onClick={() => (window.location.href = '/tracker')}>
-            Open tracker
-          </Button>
+          <Link href="/cover-letters/new">
+            <Button variant="primary" size="sm">New cover letter</Button>
+          </Link>
+          <Link href="/cv/upload">
+            <Button variant="secondary" size="sm">Upload CV</Button>
+          </Link>
+          <Link href="/tracker">
+            <Button variant="secondary" size="sm">Open tracker</Button>
+          </Link>
         </div>
       </div>
 

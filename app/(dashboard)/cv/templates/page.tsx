@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,19 +19,22 @@ export default function CVTemplatesPage() {
   const { toast } = useToast();
   const { data: cv } = useCVProfile();
   const { tier } = useSubscription();
-  const [templates, setTemplates] = useState<CVTemplate[]>([]);
   const [color, setColor] = useState('#2563EB');
   const [exporting, setExporting] = useState<string | null>(null);
 
-  useEffect(() => {
-    const supabase = createClient();
-    void supabase
-      .from('cv_templates')
-      .select('*')
-      .eq('type', 'cv')
-      .order('sort_order')
-      .then(({ data }) => setTemplates((data ?? []) as CVTemplate[]));
-  }, []);
+  const { data: templates = [] } = useQuery({
+    queryKey: ['cv-templates'],
+    queryFn: async (): Promise<CVTemplate[]> => {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from('cv_templates')
+        .select('*')
+        .eq('type', 'cv')
+        .order('sort_order');
+      return (data ?? []) as CVTemplate[];
+    },
+    staleTime: 10 * 60 * 1000,
+  });
 
   async function setPreferredTemplate(id: string) {
     if (!cv) {
@@ -54,17 +58,18 @@ export default function CVTemplatesPage() {
       body: JSON.stringify({
         type: 'cv',
         id: cv.id,
-        templateId,
-        primaryColor: color,
+        template_id: templateId,
+        accent_color: color,
       }),
     });
-    const j = await res.json();
     setExporting(null);
     if (!res.ok) {
       toast('Export failed.', 'error');
       return;
     }
-    window.open(j.pdfUrl, '_blank');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
   }
 
   return (

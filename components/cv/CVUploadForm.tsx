@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -10,6 +11,7 @@ import { useCVProfile } from '@/hooks/useCV';
 import { useSubscription } from '@/hooks/useSubscription';
 import { uploadCvFileWithProgress } from '@/lib/cv-storage-upload';
 import { isAllowedCvFile } from '@/lib/cv-file';
+import type { CVProfile } from '@/types';
 
 const MAX = 10 * 1024 * 1024;
 
@@ -26,6 +28,7 @@ const EXTRACT_ERROR_HINT: Record<string, string> = {
 
 export function CVUploadForm() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { toast } = useToast();
   const { data: existing } = useCVProfile();
   const { limits } = useSubscription();
@@ -112,9 +115,9 @@ export function CVUploadForm() {
       }
 
       const raw = await res.text();
-      let json: { error?: string } = {};
+      let json: { error?: string; cvProfile?: CVProfile } = {};
       try {
-        json = raw ? (JSON.parse(raw) as { error?: string }) : {};
+        json = raw ? (JSON.parse(raw) as { error?: string; cvProfile?: CVProfile }) : {};
       } catch {
         reportError(
           raw
@@ -150,6 +153,10 @@ export function CVUploadForm() {
       setPhase('complete');
       setUploadProgress(100);
       toast('CV imported.', 'success');
+      if (json.cvProfile) {
+        queryClient.setQueryData(['cv-profile'], json.cvProfile);
+      }
+      await queryClient.invalidateQueries({ queryKey: ['cv-profile'] });
       router.push('/cv/edit');
       router.refresh();
     } catch (e) {

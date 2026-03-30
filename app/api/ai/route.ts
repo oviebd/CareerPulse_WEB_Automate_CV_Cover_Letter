@@ -4,9 +4,9 @@ import {
   getJdAnalyzeCountThisMonth,
   incrementJdAnalyze,
 } from '@/lib/jd-monthly-limit';
+import { resolveEffectiveTier } from '@/lib/dev-subscription';
 import { canAccessFeature } from '@/lib/subscription';
 import { createClient } from '@/lib/supabase/server';
-import type { SubscriptionTier } from '@/types';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
       .select('subscription_tier')
       .eq('id', user.id)
       .single();
-    const tier = (profile?.subscription_tier ?? 'free') as SubscriptionTier;
+    const tier = resolveEffectiveTier(profile?.subscription_tier);
 
     const body = (await request.json()) as { tool?: Tool; payload?: Record<string, string> };
     const tool = body.tool;

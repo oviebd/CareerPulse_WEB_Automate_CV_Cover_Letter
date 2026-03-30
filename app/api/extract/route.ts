@@ -6,6 +6,7 @@ import { extractCVFromText } from '@/lib/claude';
 import { computeCompletionPercentage } from '@/lib/cv-completion';
 import { assertFileSize, validatePdfOrDocx } from '@/lib/file-magic';
 import { normalizeExtractedCV } from '@/lib/cv-parse-payload';
+import { resolveEffectiveTier } from '@/lib/dev-subscription';
 import { rateLimitHit } from '@/lib/rate-limit';
 import { TIER_LIMITS, type SubscriptionTier } from '@/types';
 
@@ -40,7 +41,7 @@ export async function POST(request: Request) {
       .select('subscription_tier')
       .eq('id', user.id)
       .single();
-    const tier = (profile?.subscription_tier ?? 'free') as SubscriptionTier;
+    const tier = resolveEffectiveTier(profile?.subscription_tier);
     const uploadLimit = TIER_LIMITS[tier].cvUploads;
 
     const { data: existing } = await supabase

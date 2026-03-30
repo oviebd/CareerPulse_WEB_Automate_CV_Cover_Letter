@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     }
   );
 
-  const { error } = await supabase.auth.signOut({ scope: 'local' });
+  const { error } = await supabase.auth.signOut();
   if (error) {
     console.error('[api/auth/signout]', error.message);
   }
