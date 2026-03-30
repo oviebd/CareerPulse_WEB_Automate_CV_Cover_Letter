@@ -39,6 +39,7 @@
     .lang-row { font-size: 9pt; margin-bottom: 4pt; }
     .award-row { font-size: 9pt; margin-bottom: 6pt; page-break-inside: avoid; }
     .watermark { position: fixed; bottom: 8mm; right: 10mm; font-size: 8pt; color: #94a3b8; z-index: 1000; }
+    a { color: inherit; text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -54,9 +55,9 @@
           {{#if email}}<span>✉ {{email}}</span>{{/if}}
           {{#if phone}}<span>📞 {{phone}}</span>{{/if}}
           {{#if location}}<span>📍 {{location}}</span>{{/if}}
-          {{#if linkedin_url}}<span>🔗 {{linkedin_url}}</span>{{/if}}
-          {{#if portfolio_url}}<span>🔗 {{portfolio_url}}</span>{{/if}}
-          {{#if website_url}}<span>🔗 {{website_url}}</span>{{/if}}
+          {{#if linkedin_url}}<span><a href="{{linkedin_url}}" target="_blank" rel="noopener noreferrer">LinkedIn</a></span>{{/if}}
+          {{#if portfolio_url}}<span><a href="{{portfolio_url}}" target="_blank" rel="noopener noreferrer">Portfolio</a></span>{{/if}}
+          {{#if website_url}}<span><a href="{{website_url}}" target="_blank" rel="noopener noreferrer">Website</a></span>{{/if}}
         </div>
       </div>
     </div>
@@ -114,7 +115,7 @@
     {{#each projects}}
     <div class="proj-card">
       <div class="proj-name">{{name}}</div>
-      <div class="proj-meta">{{formatDate start_date}}{{#if end_date}} – {{formatDate end_date}}{{/if}}{{#if url}} · {{url}}{{/if}}</div>
+      <div class="proj-meta">{{formatDate start_date}}{{#if end_date}} – {{formatDate end_date}}{{/if}}{{#if url}} · <a href="{{url}}" target="_blank" rel="noopener noreferrer">{{url_label}}</a>{{/if}}</div>
       {{#if description}}<div class="proj-desc">{{description}}</div>{{/if}}
       {{#if tech_stack.length}}<div class="proj-meta">{{join tech_stack}}</div>{{/if}}
     </div>
@@ -124,7 +125,7 @@
     {{#if certifications.length}}
     <div class="section-title">Certifications</div>
     {{#each certifications}}
-    <div class="cert-row">{{name}}{{#if issuer}} — {{issuer}}{{/if}}{{#if issue_date}} · {{formatDate issue_date}}{{/if}}</div>
+    <div class="cert-row">{{name}}{{#if issuer}} — {{issuer}}{{/if}}{{#if issue_date}} · {{formatDate issue_date}}{{/if}}{{#if url}} · <a href="{{url}}" target="_blank" rel="noopener noreferrer">{{url_label}}</a>{{/if}}</div>
     {{/each}}
     {{/if}}
 

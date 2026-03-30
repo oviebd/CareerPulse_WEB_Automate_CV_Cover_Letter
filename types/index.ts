@@ -139,6 +139,8 @@ export interface CVData {
   linkedin_url: string | null;
   portfolio_url: string | null;
   website_url: string | null;
+  /** Used only for PDF/HTML preview rendering to include/exclude CV sections. */
+  section_visibility?: CVSectionVisibility;
   /** Full postal / mailing address (separate from short location line). */
   address: string | null;
   /** Public URL to profile photo (e.g. Supabase Storage). */

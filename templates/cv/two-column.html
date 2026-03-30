@@ -29,6 +29,7 @@
     .skill-col { width: 48%; }
     .proj-card { page-break-inside: avoid; margin-bottom: 8pt; font-size: 9pt; }
     .watermark { position: fixed; bottom: 8mm; right: 10mm; font-size: 8pt; color: #94a3b8; }
+    a { color: inherit; text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -39,7 +40,7 @@
         <div style="flex:1;">
           <h1>{{full_name}}</h1>
           {{#if professional_title}}<div class="sub">{{professional_title}}</div>{{/if}}
-          <div class="contact">{{contact_line}}</div>
+          <div class="contact">{{contact_line|raw}}</div>
           {{#if address}}<div class="summary" style="margin-top:6pt;white-space:pre-wrap;">{{address}}</div>{{/if}}
         </div>
       </div>
@@ -90,13 +91,13 @@
         {{#if projects.length}}
         <div class="section-title"><span class="sq">▪</span> PROJECTS</div>
         {{#each projects}}
-        <div class="proj-card"><strong>{{name}}</strong>{{#if description}}<br/>{{description}}{{/if}}</div>
+      <div class="proj-card"><strong>{{name}}</strong>{{#if description}}<br/>{{description}}{{/if}}{{#if url}}<div style="margin-top:4pt;"><a href="{{url}}" target="_blank" rel="noopener noreferrer">{{url_label}}</a></div>{{/if}}</div>
         {{/each}}
         {{/if}}
         {{#if certifications.length}}
         <div class="section-title"><span class="sq">▪</span> CERTIFICATIONS</div>
         {{#each certifications}}
-        <div class="proj-card">{{name}}</div>
+      <div class="proj-card">{{name}}{{#if url}}<div style="margin-top:4pt;"><a href="{{url}}" target="_blank" rel="noopener noreferrer">{{url_label}}</a></div>{{/if}}</div>
         {{/each}}
         {{/if}}
         {{#if languages.length}}

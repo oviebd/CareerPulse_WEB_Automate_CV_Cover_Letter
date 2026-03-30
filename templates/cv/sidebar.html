@@ -31,6 +31,7 @@
     .edu-line { display: flex; justify-content: space-between; gap: 8pt; }
     .proj-card { page-break-inside: avoid; margin-bottom: 10pt; }
     .watermark { position: fixed; bottom: 8mm; right: 10mm; font-size: 8pt; color: #94a3b8; z-index: 1000; }
+    a { color: inherit; text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -42,9 +43,9 @@
         {{#if email}}<div class="sb-item"><span class="sb-icon">✉</span><span>{{email}}</span></div>{{/if}}
         {{#if phone}}<div class="sb-item"><span class="sb-icon">📞</span><span>{{phone}}</span></div>{{/if}}
         {{#if location}}<div class="sb-item"><span class="sb-icon">📍</span><span>{{location}}</span></div>{{/if}}
-        {{#if linkedin_url}}<div class="sb-item"><span class="sb-icon">🔗</span><span>{{linkedin_url}}</span></div>{{/if}}
-        {{#if portfolio_url}}<div class="sb-item"><span class="sb-icon">🔗</span><span>{{portfolio_url}}</span></div>{{/if}}
-        {{#if website_url}}<div class="sb-item"><span class="sb-icon">🔗</span><span>{{website_url}}</span></div>{{/if}}
+        {{#if linkedin_url}}<div class="sb-item"><a href="{{linkedin_url}}" target="_blank" rel="noopener noreferrer">LinkedIn</a></div>{{/if}}
+        {{#if portfolio_url}}<div class="sb-item"><a href="{{portfolio_url}}" target="_blank" rel="noopener noreferrer">Portfolio</a></div>{{/if}}
+        {{#if website_url}}<div class="sb-item"><a href="{{website_url}}" target="_blank" rel="noopener noreferrer">Website</a></div>{{/if}}
         {{#if address}}<div class="sb-item"><span class="sb-icon">⌂</span><span style="white-space:pre-wrap;">{{address}}</span></div>{{/if}}
       </div>
       {{#if skills.length}}
@@ -68,7 +69,7 @@
       <div class="sb-block">
         <h3>Certifications</h3>
         {{#each certifications}}
-        <div style="margin-bottom:6pt;">{{name}}{{#if issuer}}<br/><span style="color:#64748b;">{{issuer}}</span>{{/if}}</div>
+        <div style="margin-bottom:6pt;">{{name}}{{#if issuer}}<br/><span style="color:#64748b;">{{issuer}}</span>{{/if}}{{#if url}}<br/><a href="{{url}}" target="_blank" rel="noopener noreferrer">{{url_label}}</a>{{/if}}</div>
         {{/each}}
       </div>
       {{/if}}
@@ -113,6 +114,7 @@
       <div class="proj-card">
         <strong>{{name}}</strong>
         {{#if description}}<div class="summary" style="margin-top:4pt;">{{description}}</div>{{/if}}
+        {{#if url}}<div style="margin-top:4pt;"><a href="{{url}}" target="_blank" rel="noopener noreferrer">{{url_label}}</a></div>{{/if}}
       </div>
       {{/each}}
       {{/if}}

@@ -88,6 +88,50 @@ function escapeHtml(s: string): string {
     .replaceAll('"', '&quot;');
 }
 
+function normalizeUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const s = String(url).trim();
+  if (!s) return null;
+  if (/^(https?:\/\/|mailto:|tel:)/i.test(s)) return s;
+  // Many of our stored URLs are domain-like (e.g. "linkedin.com/in/...").
+  return `https://${s.replace(/^\/+/, '')}`;
+}
+
+function urlToLabel(url: string | null | undefined): string {
+  const normalized = normalizeUrl(url);
+  if (!normalized) return 'Link';
+  try {
+    const u = new URL(normalized);
+    const host = u.hostname.replace(/^www\./i, '').toLowerCase();
+    if (host.includes('linkedin.com')) return 'LinkedIn';
+    if (host.includes('github.com')) return 'GitHub';
+    if (host.includes('coursera.org')) return 'Coursera';
+    if (host.includes('udemy.com')) return 'Udemy';
+    return host;
+  } catch {
+    return 'Link';
+  }
+}
+
+function monthYearToValue(ym: string | null | undefined): number {
+  if (!ym) return Number.NEGATIVE_INFINITY;
+  const s = String(ym).trim();
+  if (!s) return Number.NEGATIVE_INFINITY;
+  const m = s.match(/^(\d{4})-(\d{1,2})/);
+  if (!m) return Number.NEGATIVE_INFINITY;
+  const year = parseInt(m[1], 10);
+  const month = parseInt(m[2], 10);
+  if (!Number.isFinite(year) || !Number.isFinite(month)) {
+    return Number.NEGATIVE_INFINITY;
+  }
+  const clampedMonth = Math.min(12, Math.max(1, month));
+  return year * 12 + clampedMonth;
+}
+
+function projectSortValue(p: { start_date: string | null; end_date: string | null }): number {
+  return monthYearToValue(p.start_date ?? p.end_date);
+}
+
 export function formatMonthYear(ym: string | null | undefined): string {
   if (ym == null || typeof ym !== 'string' || ym.trim() === '') return '';
   const m = ym.trim().match(/^(\d{4})-(\d{1,2})/);
@@ -343,23 +387,72 @@ export function renderTemplate(templateId: string, cvData: CVData): string {
   );
   let html = readFileSync(filePath, 'utf-8');
   const accent = cvData.accent_color ?? '#6C63FF';
-  const contactParts = [
-    cvData.email,
-    cvData.phone,
-    cvData.location,
-    cvData.linkedin_url,
-    cvData.portfolio_url,
-    cvData.website_url,
-  ].filter((x): x is string => Boolean(x && String(x).trim()));
+
+  const normalizedLinkedin = normalizeUrl(cvData.linkedin_url);
+  const normalizedPortfolio = normalizeUrl(cvData.portfolio_url);
+  const normalizedWebsite = normalizeUrl(cvData.website_url);
+
+  const contactParts: string[] = [];
+  if (cvData.email) contactParts.push(escapeHtml(cvData.email));
+  if (cvData.phone) contactParts.push(escapeHtml(cvData.phone));
+  if (cvData.location) contactParts.push(escapeHtml(cvData.location));
+  if (normalizedLinkedin) {
+    contactParts.push(
+      `<a href="${escapeHtml(normalizedLinkedin)}" target="_blank" rel="noopener noreferrer">LinkedIn</a>`
+    );
+  }
+  if (normalizedPortfolio) {
+    contactParts.push(
+      `<a href="${escapeHtml(normalizedPortfolio)}" target="_blank" rel="noopener noreferrer">Portfolio</a>`
+    );
+  }
+  if (normalizedWebsite) {
+    contactParts.push(
+      `<a href="${escapeHtml(normalizedWebsite)}" target="_blank" rel="noopener noreferrer">Website</a>`
+    );
+  }
+
+  const sortedExperience = [...(cvData.experience ?? [])].sort(
+    (a, b) =>
+      monthYearToValue(b.start_date) - monthYearToValue(a.start_date)
+  );
+  const sortedProjects = [...(cvData.projects ?? [])].sort(
+    (a, b) => projectSortValue(b) - projectSortValue(a)
+  );
+  const sortedCertifications = [...(cvData.certifications ?? [])].sort(
+    (a, b) => monthYearToValue(b.issue_date) - monthYearToValue(a.issue_date)
+  );
+
+  const normalizedProjects = sortedProjects.map((p) => {
+    const normalized = normalizeUrl(p.url);
+    return {
+      ...p,
+      url: normalized,
+      url_label: urlToLabel(normalized),
+    };
+  });
+
+  const normalizedCertifications = sortedCertifications.map((c) => {
+    const normalized = normalizeUrl(c.url);
+    return {
+      ...c,
+      url: normalized,
+      url_label: urlToLabel(normalized),
+    };
+  });
+
   const root: Record<string, unknown> = {
     ...cvData,
     accent_color: accent,
     contact_line: contactParts.join(' | '),
-    experience: cvData.experience ?? [],
+    linkedin_url: normalizedLinkedin,
+    portfolio_url: normalizedPortfolio,
+    website_url: normalizedWebsite,
+    experience: sortedExperience,
     education: cvData.education ?? [],
     skills: cvData.skills ?? [],
-    projects: cvData.projects ?? [],
-    certifications: cvData.certifications ?? [],
+    projects: normalizedProjects,
+    certifications: normalizedCertifications,
     languages: cvData.languages ?? [],
     awards: cvData.awards ?? [],
   };

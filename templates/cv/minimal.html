@@ -28,6 +28,7 @@
     .skills-line .lbl { font-weight: 600; color: #111; margin-right: 6pt; }
     .proj-card { page-break-inside: avoid; margin-bottom: 14pt; }
     .watermark { position: fixed; bottom: 8mm; right: 10mm; font-size: 8pt; color: #aaa; }
+    a { color: inherit; text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -35,7 +36,7 @@
     {{#if photo_url}}<div style="text-align:center;margin-bottom:10pt;"><img src="{{photo_url}}" alt="" style="max-height:72pt;border-radius:6pt;" /></div>{{/if}}
     <h1>{{full_name}}</h1>
     {{#if professional_title}}<div class="title">{{professional_title}}</div>{{/if}}
-    <div class="contact">{{contact_line}}</div>
+    <div class="contact">{{contact_line|raw}}</div>
     {{#if address}}<div class="summary" style="margin-top:10pt;text-align:center;white-space:pre-wrap;">{{address}}</div>{{/if}}
 
     {{#if summary}}
@@ -94,6 +95,7 @@
       <div class="proj-card">
         <strong>{{name}}</strong>
         {{#if description}}<div class="muted" style="margin-top:4pt;">{{description}}</div>{{/if}}
+        {{#if url}}<div class="muted" style="margin-top:4pt;"><a href="{{url}}" target="_blank" rel="noopener noreferrer">{{url_label}}</a></div>{{/if}}
       </div>
       {{/each}}
     </div>
@@ -103,7 +105,7 @@
     <div class="sp-section">
       <div class="sec-label">Certifications</div>
       {{#each certifications}}
-      <div class="muted" style="margin-bottom:6pt;">{{name}}{{#if issuer}} — {{issuer}}{{/if}}</div>
+      <div class="muted" style="margin-bottom:6pt;">{{name}}{{#if issuer}} — {{issuer}}{{/if}}{{#if url}} · <a href="{{url}}" target="_blank" rel="noopener noreferrer">{{url_label}}</a>{{/if}}</div>
       {{/each}}
     </div>
     {{/if}}

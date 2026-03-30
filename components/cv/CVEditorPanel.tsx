@@ -45,7 +45,9 @@ export function CVEditorPanel({
   const [address, setAddress] = useState(value.address ?? '');
   const [photo_url, setPhotoUrl] = useState(value.photo_url ?? '');
   const [summary, setSummary] = useState(value.summary ?? '');
-  const [section_visibility, setSectionVisibility] = useState<CVSectionVisibility>({});
+  const [section_visibility, setSectionVisibility] = useState<CVSectionVisibility>(
+    value.section_visibility ?? {}
+  );
   const [experience, setExperience] = useState<ExperienceEntry[]>(
     (value.experience ?? []) as ExperienceEntry[]
   );
@@ -86,6 +88,7 @@ export function CVEditorPanel({
     setAddress(value.address ?? '');
     setPhotoUrl(value.photo_url ?? '');
     setSummary(value.summary ?? '');
+    setSectionVisibility(value.section_visibility ?? {});
     setExperience((value.experience ?? []) as ExperienceEntry[]);
     setEducation((value.education ?? []) as EducationEntry[]);
     setSkills((value.skills ?? []) as SkillGroup[]);
@@ -108,6 +111,7 @@ export function CVEditorPanel({
         linkedin_url,
         portfolio_url,
         website_url,
+        section_visibility,
         address,
         photo_url,
         summary,
@@ -133,6 +137,7 @@ export function CVEditorPanel({
       linkedin_url,
       portfolio_url,
       website_url,
+      section_visibility,
       address,
       photo_url,
       summary,
@@ -203,7 +208,10 @@ export function CVEditorPanel({
         summary={summary}
         onSummary={(v) => { setSummary(v); emitChange({ summary: v }); }}
         sectionVisibility={section_visibility}
-        onSectionVisibilityChange={(v) => { setSectionVisibility(v); }}
+        onSectionVisibilityChange={(v) => {
+          setSectionVisibility(v);
+          emitChange({ section_visibility: v });
+        }}
         experience={experience}
         onExperienceChange={(v) => { setExperience(v); emitChange({ experience: v }); }}
         education={education}

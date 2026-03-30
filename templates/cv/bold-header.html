@@ -28,6 +28,7 @@
     .chip { display: inline-block; background: {{accent_color}}22; color: {{accent_color}}; border: 1pt solid {{accent_color}}55; padding: 2pt 8pt; border-radius: 4pt; margin: 2pt 4pt 2pt 0; font-size: 8.5pt; }
     .proj-card { page-break-inside: avoid; margin-bottom: 10pt; font-size: 9pt; }
     .watermark { position: fixed; bottom: 8mm; right: 10mm; font-size: 8pt; color: #94a3b8; z-index: 1000; }
+    a { color: inherit; text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -38,7 +39,7 @@
         <div style="flex:1;">
           <h1>{{full_name}}</h1>
           {{#if professional_title}}<div class="subtitle">{{professional_title}}</div>{{/if}}
-          <div class="contact">{{contact_line}}</div>
+          <div class="contact">{{contact_line|raw}}</div>
           {{#if address}}<div style="font-size:8.5pt;opacity:0.92;margin-top:10pt;white-space:pre-wrap;">{{address}}</div>{{/if}}
         </div>
       </div>
@@ -100,13 +101,13 @@
         {{#if projects.length}}
         <div class="section-title">Projects</div>
         {{#each projects}}
-        <div class="proj-card"><strong>{{name}}</strong>{{#if description}}<div class="summary" style="margin-top:4pt;">{{description}}</div>{{/if}}</div>
+        <div class="proj-card"><strong>{{name}}</strong>{{#if description}}<div class="summary" style="margin-top:4pt;">{{description}}</div>{{/if}}{{#if url}}<div style="margin-top:4pt;"><a href="{{url}}" target="_blank" rel="noopener noreferrer">{{url_label}}</a></div>{{/if}}</div>
         {{/each}}
         {{/if}}
         {{#if certifications.length}}
         <div class="section-title">Certifications</div>
         {{#each certifications}}
-        <div class="proj-card">{{name}}{{#if issuer}} — {{issuer}}{{/if}}</div>
+        <div class="proj-card">{{name}}{{#if issuer}} — {{issuer}}{{/if}}{{#if url}} · <a href="{{url}}" target="_blank" rel="noopener noreferrer">{{url_label}}</a>{{/if}}</div>
         {{/each}}
         {{/if}}
         {{#if languages.length}}

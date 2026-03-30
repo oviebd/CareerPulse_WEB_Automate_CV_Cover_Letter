@@ -15,6 +15,7 @@ import type { CVData } from '@/types';
 import type { CVTemplate, SubscriptionTier } from '@/types';
 import { canUseTemplate } from '@/lib/subscription';
 import { formatDate } from '@/lib/utils';
+import { useSearchParams } from 'next/navigation';
 
 const SWATCHES = ['#2563EB', '#0d9488', '#7c3aed', '#dc2626', '#0f172a'];
 
@@ -31,9 +32,8 @@ function previewPayloadFromCVData(d: CVData): Record<string, unknown> {
     address: d.address ?? null,
     photo_url: d.photo_url ?? null,
     summary: d.summary,
-    // Section visibility is not currently editable on /cv/edit, but
-    // renderTemplate expects this to exist (defaults to all visible).
-    section_visibility: {},
+    // Used by applyCvSectionVisibility() during HTML/PDF rendering.
+    section_visibility: d.section_visibility ?? {},
     experience: d.experience ?? [],
     education: d.education ?? [],
     skills: d.skills ?? [],
@@ -49,6 +49,8 @@ export function CVEditor() {
   const queryClient = useQueryClient();
   const { data: coreVersions = [], isLoading: coreVersionsLoading } = useCoreCVVersions();
   const [selectedCoreCvId, setSelectedCoreCvId] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const coreCvIdFromQuery = searchParams.get('core_cv_id');
 
   const { data: cv, isLoading, refetch } = useCVProfile(selectedCoreCvId);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -69,9 +71,13 @@ export function CVEditor() {
     if (draftActive) return;
     if (!coreVersionsLoading && coreVersions.length > 0) {
       const latestId = coreVersions[0]?.id ?? null;
-      setSelectedCoreCvId((prev) => (prev ? prev : latestId));
+      const requestedId =
+        coreCvIdFromQuery && coreVersions.some((v) => v.id === coreCvIdFromQuery)
+          ? coreCvIdFromQuery
+          : null;
+      setSelectedCoreCvId((prev) => (prev ? prev : requestedId ?? latestId));
     }
-  }, [coreVersionsLoading, coreVersions, draftActive]);
+  }, [coreVersionsLoading, coreVersions, draftActive, coreCvIdFromQuery]);
 
   useEffect(() => {
     // Reset initialization when the user changes versions (or a draft appears).
@@ -224,7 +230,7 @@ export function CVEditor() {
         summary: cvData.summary,
         // Ensure we never persist uploaded PDFs; we only keep extracted info.
         original_cv_file_url: null,
-        section_visibility: {},
+        section_visibility: cvData.section_visibility ?? {},
         experience: cvData.experience,
         education: cvData.education,
         skills: cvData.skills,

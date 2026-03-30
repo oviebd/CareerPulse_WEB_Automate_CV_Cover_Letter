@@ -118,3 +118,18 @@ export function useUpdateCVProfile() {
     },
   });
 }
+
+export function useDeleteCoreCVVersion() {
+  const qc = useQueryClient();
+  const userId = useAuthStore((s) => s.user?.id);
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/cv/versions/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete core CV version');
+      return res.json() as Promise<{ ok: boolean }>;
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['cv-versions', userId] });
+    },
+  });
+}

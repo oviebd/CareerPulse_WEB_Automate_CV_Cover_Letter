@@ -23,6 +23,7 @@
     .exp-bullets { margin: 4pt 0 0 14pt; padding: 0; font-size: 10pt; }
     .exp-bullets li { margin-bottom: 2pt; }
     .edu-card { page-break-inside: avoid; margin-bottom: 8pt; font-size: 10pt; }
+    a { color: inherit; text-decoration: underline; }
     .footer { text-align: center; font-size: 8pt; color: #94a3b8; margin-top: 16pt; }
     .watermark { position: fixed; bottom: 8mm; right: 10mm; font-size: 8pt; color: #cbd5e1; }
   </style>
@@ -32,7 +33,7 @@
     {{#if photo_url}}<div style="text-align:center;margin-bottom:8pt;"><img src="{{photo_url}}" alt="" style="max-height:72pt;border-radius:6pt;" /></div>{{/if}}
     <h1>{{full_name}}</h1>
     {{#if professional_title}}<div class="title">{{professional_title}}</div>{{/if}}
-    <div class="contact">{{contact_line}}</div>
+    <div class="contact">{{contact_line|raw}}</div>
     {{#if address}}<div class="summary" style="margin-top:8pt;text-align:center;white-space:pre-wrap;">{{address}}</div>{{/if}}
     <div class="rule"></div>
 
@@ -81,7 +82,7 @@
     {{#if certifications.length}}
     <div class="section-title">Certifications</div>
     {{#each certifications}}
-    <div class="edu-card">{{name}}{{#if issuer}} — {{issuer}}{{/if}}{{#if issue_date}} ({{formatDate issue_date}}){{/if}}</div>
+    <div class="edu-card">{{name}}{{#if issuer}} — {{issuer}}{{/if}}{{#if issue_date}} ({{formatDate issue_date}}){{/if}}{{#if url}} · <a href="{{url}}" target="_blank" rel="noopener noreferrer">{{url_label}}</a>{{/if}}</div>
     {{/each}}
     {{/if}}
 
