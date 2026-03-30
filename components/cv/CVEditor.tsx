@@ -1,26 +1,27 @@
 'use client';
 
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCVProfile, useCoreCVVersions } from '@/hooks/useCV';
 import { useSubscription } from '@/hooks/useSubscription';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
-import { CVEditorPanel } from '@/components/cv/CVEditorPanel';
-import { Card } from '@/components/ui/card';
 import { Select } from '@/components/ui/select';
-import { Progress } from '@/components/ui/progress';
+import { CVEditorPanel } from '@/components/cv/CVEditorPanel';
+import { Sidebar } from '@/components/cv/premium/Sidebar';
+import { PreviewPanel } from '@/components/cv/premium/PreviewPanel';
+import { ATSIndicator } from '@/components/cv/premium/ATSIndicator';
+import type { CVFormTab } from '@/components/cv/CVFormFields';
 import { FeatureGate, TemplateGate } from '@/components/shared/FeatureGate';
 import { useToast } from '@/components/ui/toast';
 import type { CVData } from '@/types';
 import type { CVTemplate, SubscriptionTier } from '@/types';
 import { canUseTemplate } from '@/lib/subscription';
+import { buildATSReport } from '@/lib/cv-ats';
 import { formatDate } from '@/lib/utils';
+import { cloneCvData } from '@/lib/cv-clone';
 import { useSearchParams } from 'next/navigation';
-import { Eye, EyeOff } from 'lucide-react';
-
-const SWATCHES = ['#2563EB', '#0d9488', '#7c3aed', '#dc2626', '#0f172a'];
+import { Undo2, Redo2 } from 'lucide-react';
 
 function previewPayloadFromCVData(d: CVData): Record<string, unknown> {
   return {
@@ -49,7 +50,6 @@ function previewPayloadFromCVData(d: CVData): Record<string, unknown> {
 }
 
 export function CVEditor() {
-  const reduce = useReducedMotion();
   const queryClient = useQueryClient();
   const { data: coreVersions = [], isLoading: coreVersionsLoading } = useCoreCVVersions();
   const [selectedCoreCvId, setSelectedCoreCvId] = useState<string | null>(null);
@@ -97,7 +97,29 @@ export function CVEditor() {
   const [previewBusy, setPreviewBusy] = useState(false);
   const [settingDefault, setSettingDefault] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(true);
+  const [editorTab, setEditorTab] = useState<CVFormTab>('header');
+  const [rightTab, setRightTab] = useState<'preview' | 'design'>('preview');
+  const [zoom, setZoom] = useState(100);
+  const [page, setPage] = useState(1);
+  const [fontFamily, setFontFamily] = useState('Inter');
+  const [autosaveState, setAutosaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [prevAtsScore, setPrevAtsScore] = useState(0);
+  const [undoPast, setUndoPast] = useState<CVData[]>([]);
+  const [undoFuture, setUndoFuture] = useState<CVData[]>([]);
+  const burstStartRef = useRef<CVData | null>(null);
+  const historyDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const skipHistoryRef = useRef(false);
+  const allowUndoHistoryRef = useRef(false);
+  const cvDataRef = useRef<CVData | null>(null);
+  cvDataRef.current = cvData;
+
+  useEffect(() => {
+    allowUndoHistoryRef.current = false;
+    const t = window.setTimeout(() => {
+      allowUndoHistoryRef.current = true;
+    }, 900);
+    return () => window.clearTimeout(t);
+  }, [selectedCoreCvId, cv?.id]);
 
   const { data: templates = [], isLoading: templatesLoading } = useQuery({
     queryKey: ['cv-templates'],
@@ -122,6 +144,9 @@ export function CVEditor() {
     if (!cv || initialized.current) return;
     initialized.current = true;
     setSelectedTemplateId(cv.preferred_cv_template_id ?? 'classic');
+    setUndoPast([]);
+    setUndoFuture([]);
+    burstStartRef.current = null;
     setCvData({
       full_name: cv.full_name ?? null,
       professional_title: cv.professional_title ?? null,
@@ -134,6 +159,7 @@ export function CVEditor() {
       address: cv.address ?? null,
       photo_url: cv.photo_url ?? null,
       summary: cv.summary ?? null,
+      section_visibility: cv.section_visibility ?? {},
       experience: cv.experience ?? [],
       education: cv.education ?? [],
       skills: cv.skills ?? [],
@@ -146,8 +172,65 @@ export function CVEditor() {
   }, [cv]);
 
   const handleChange = useCallback((data: CVData) => {
-    setCvData(data);
+    setCvData((prev) => {
+      if (prev && !skipHistoryRef.current && allowUndoHistoryRef.current) {
+        if (burstStartRef.current === null) {
+          burstStartRef.current = cloneCvData(prev);
+        }
+        if (historyDebounceRef.current) clearTimeout(historyDebounceRef.current);
+        historyDebounceRef.current = setTimeout(() => {
+          const snapshot = burstStartRef.current;
+          burstStartRef.current = null;
+          if (snapshot) {
+            setUndoPast((p) => [...p.slice(-49), snapshot]);
+            setUndoFuture([]);
+          }
+        }, 550);
+      }
+      skipHistoryRef.current = false;
+      return data;
+    });
   }, []);
+
+  const undo = useCallback(() => {
+    setUndoPast((p) => {
+      if (!p.length) return p;
+      const snapshot = p[p.length - 1];
+      skipHistoryRef.current = true;
+      if (historyDebounceRef.current) clearTimeout(historyDebounceRef.current);
+      burstStartRef.current = null;
+      const cur = cvDataRef.current;
+      if (cur) setUndoFuture((f) => [cloneCvData(cur), ...f].slice(0, 50));
+      setCvData(cloneCvData(snapshot));
+      return p.slice(0, -1);
+    });
+  }, []);
+
+  const redo = useCallback(() => {
+    setUndoFuture((f) => {
+      if (!f.length) return f;
+      const next = f[0];
+      skipHistoryRef.current = true;
+      if (historyDebounceRef.current) clearTimeout(historyDebounceRef.current);
+      burstStartRef.current = null;
+      const cur = cvDataRef.current;
+      if (cur) setUndoPast((p) => [...p.slice(-49), cloneCvData(cur)]);
+      setCvData(cloneCvData(next));
+      return f.slice(1);
+    });
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [undo, redo]);
 
   useEffect(() => {
     if (templatesLoading || !templates.length) return;
@@ -193,6 +276,13 @@ export function CVEditor() {
     }, 700);
     return () => window.clearTimeout(t);
   }, [selectedTemplateId, cvData, templatesLoading, refreshPreview]);
+
+  useEffect(() => {
+    if (!cvData) return;
+    setAutosaveState('saving');
+    const t = window.setTimeout(() => setAutosaveState('saved'), 500);
+    return () => window.clearTimeout(t);
+  }, [cvData]);
 
   useEffect(() => {
     return () => {
@@ -322,30 +412,48 @@ export function CVEditor() {
     }
   }
 
+  const ats = cvData
+    ? buildATSReport(cvData)
+    : { score: 0, summary: '', suggestions: [], sections: {} };
+  useEffect(() => {
+    setPrevAtsScore((prev) => (ats.score === prev ? prev : ats.score));
+  }, [ats.score]);
+
   if (isLoading || !cvData) {
     return <p className="text-sm text-[var(--color-muted)]">Loading profile…</p>;
   }
 
   return (
-    <div className="mx-auto max-w-[1500px] space-y-4">
-      <div className="sticky top-0 z-20 border-b border-[var(--color-border)] bg-white/95 py-3 backdrop-blur">
+    <div className="mx-auto max-w-[1650px] space-y-4">
+      <div className="sticky top-0 z-20 rounded-2xl border border-slate-200 bg-white/90 p-3 backdrop-blur">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="font-display text-2xl font-bold">Edit CV</h1>
           <p className="mt-1 text-sm text-[var(--color-muted)]">
-            Choose a template and preview updates live while you edit.
+            Editor-first CV writing with live ATS feedback and preview.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="text-xs text-[var(--color-muted)]">
-            {cv ? (
-              <>
-                Completion: <strong>{cv.completion_percentage}%</strong>
-              </>
-            ) : (
-              'New profile'
-            )}
-          </span>
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={!undoPast.length}
+            onClick={undo}
+            icon={<Undo2 className="h-4 w-4" />}
+            title="Undo (⌘Z)"
+          >
+            Undo
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={!undoFuture.length}
+            onClick={redo}
+            icon={<Redo2 className="h-4 w-4" />}
+            title="Redo (⌘⇧Z)"
+          >
+            Redo
+          </Button>
           <Button
             variant="primary"
             size="sm"
@@ -363,37 +471,36 @@ export function CVEditor() {
           >
             Export PDF
           </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setPreviewOpen((v) => !v)}
-            icon={previewOpen ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          >
-            {previewOpen ? 'Hide preview' : 'Preview'}
-          </Button>
           <span className="text-xs text-[var(--color-muted)]">
-            {saveState === 'saved' ? '✓ Saved' : ''}
+            {saveState === 'saved' || autosaveState === 'saved' ? 'Saved ✓' : autosaveState === 'saving' ? 'Saving…' : ''}
           </span>
         </div>
       </div>
-        <Progress value={cv?.completion_percentage ?? 0} className="mt-3 h-1" />
+      <div className="mt-3">
+        <ATSIndicator score={ats.score} previousScore={prevAtsScore} />
+      </div>
       </div>
 
-      <div className="relative flex gap-4">
-        <Card className="p-4 sm:p-6">
-          <CVEditorPanel value={cvData} onChange={handleChange} />
-        </Card>
-
-        <AnimatePresence>
-          {previewOpen ? (
-            <motion.div
-              className="hidden xl:block xl:w-[40%] xl:min-w-[360px]"
-              initial={reduce ? undefined : { width: 0, opacity: 0 }}
-              animate={reduce ? undefined : { width: '40%', opacity: 1 }}
-              exit={reduce ? undefined : { width: 0, opacity: 0 }}
-            >
-              <div className="space-y-4 rounded-lg bg-[var(--color-surface-2)] p-3">
-          <div>
+      <div className="grid gap-4 xl:grid-cols-[260px_minmax(0,1fr)_420px]">
+        <Sidebar activeSection={editorTab} onSelect={setEditorTab} />
+        <div className="space-y-3">
+          <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200 sm:p-6">
+            <CVEditorPanel
+              value={cvData}
+              onChange={handleChange}
+              activeTab={editorTab}
+              onActiveTabChange={setEditorTab}
+              hideAtsBanner
+              hideFormTabBar
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+            <span>Version: {selectedCoreCvId ? selectedCoreCvId.slice(0, 8) : 'draft'}</span>
+            {draftActive ? <span className="rounded bg-amber-100 px-2 py-0.5 text-amber-700">Draft mode</span> : null}
+          </div>
+        </div>
+        <div className="space-y-3">
+          <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
             <p className="mb-2 text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
               Core CV version
             </p>
@@ -413,89 +520,32 @@ export function CVEditor() {
               </p>
             ) : null}
           </div>
-
-          <div>
-            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
-              Template
-            </p>
-            <Select
-              label={templatesLoading ? 'Loading…' : 'Choose layout'}
-              value={selectedTemplateId}
-              disabled={templatesLoading || !templates.length}
-              options={templates.map((t) => ({
-                value: t.id,
-                label: t.name,
-              }))}
-              onChange={(e) => setSelectedTemplateId(e.target.value)}
-            />
-            {!allowed && templateMeta ? (
-              <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                Upgrade to set this template as default.
-              </p>
-            ) : null}
-          </div>
-
-          <TemplateGate
-            availableTiers={(templateMeta?.available_tiers ?? []) as SubscriptionTier[]}
-            userTier={tier}
-          >
-            <Button
-              variant="secondary"
-              size="sm"
-              loading={settingDefault}
-              disabled={!allowed || draftActive}
-              onClick={() => void setPreferredTemplate()}
-            >
-              Set as default
+          <PreviewPanel
+            activeTab={rightTab}
+            onTabChange={setRightTab}
+            previewPdfUrl={previewPdfUrl}
+            previewBusy={previewBusy}
+            zoom={zoom}
+            onZoomChange={setZoom}
+            currentPage={page}
+            onPageChange={setPage}
+            selectedTemplateId={selectedTemplateId}
+            templates={templates}
+            onTemplateChange={setSelectedTemplateId}
+            accent={accent}
+            onAccentChange={setAccent}
+            fontFamily={fontFamily}
+            onFontFamilyChange={setFontFamily}
+          />
+          <TemplateGate availableTiers={(templateMeta?.available_tiers ?? []) as SubscriptionTier[]} userTier={tier}>
+            <Button variant="secondary" size="sm" loading={settingDefault} disabled={!allowed || draftActive} onClick={() => void setPreferredTemplate()}>
+              Set as default template
             </Button>
           </TemplateGate>
-
           <FeatureGate requiredTier={['pro', 'premium', 'career']} userTier={tier}>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs text-[var(--color-muted)]">Accent:</span>
-              {SWATCHES.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  className="h-8 w-8 rounded-full border-2 border-white shadow ring-2 ring-transparent ring-offset-2"
-                  style={{ background: c }}
-                  onClick={() => setAccent(c)}
-                  aria-label={`Set accent ${c}`}
-                />
-              ))}
-            </div>
+            <p className="text-xs text-slate-500">Pro settings unlocked</p>
           </FeatureGate>
-
-          <div>
-            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
-              Print preview (A4)
-            </p>
-            <div
-              className="relative overflow-auto rounded-lg border border-[var(--color-primary-200)] bg-white shadow-inner"
-              style={{ height: '70vh' }}
-            >
-              {previewBusy ? (
-                <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/80 text-sm text-[var(--color-muted)]">
-                  Updating preview…
-                </div>
-              ) : null}
-              {previewPdfUrl ? (
-                <iframe
-                  title="CV print preview"
-                  className="min-h-[1100px] w-full"
-                  src={previewPdfUrl}
-                />
-              ) : (
-                <div className="flex h-full min-h-[320px] items-center justify-center p-4 text-center text-sm text-[var(--color-muted)]">
-                  Could not render preview.
-                </div>
-              )}
-            </div>
-          </div>
-              </div>
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
+        </div>
       </div>
     </div>
   );

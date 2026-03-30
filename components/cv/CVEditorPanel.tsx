@@ -23,6 +23,13 @@ export interface CVEditorPanelProps {
   mode?: 'full' | 'compact';
   readOnly?: boolean;
   highlightedKeywords?: string[];
+  /** Controlled section tab (sync with side nav). */
+  activeTab?: CVFormTab;
+  onActiveTabChange?: (tab: CVFormTab) => void;
+  /** Hide the large ATS checker card (e.g. when the parent shows ATS in the header). */
+  hideAtsBanner?: boolean;
+  /** Hide horizontal tab row when using a side nav. */
+  hideFormTabBar?: boolean;
 }
 
 export function CVEditorPanel({
@@ -31,8 +38,18 @@ export function CVEditorPanel({
   mode = 'full',
   readOnly = false,
   highlightedKeywords,
+  activeTab: activeTabProp,
+  onActiveTabChange,
+  hideAtsBanner = false,
+  hideFormTabBar = false,
 }: CVEditorPanelProps) {
-  const [tab, setTab] = useState<CVFormTab>('header');
+  const [internalTab, setInternalTab] = useState<CVFormTab>('header');
+  const isTabControlled = activeTabProp !== undefined && onActiveTabChange !== undefined;
+  const tab = isTabControlled ? activeTabProp : internalTab;
+  const setTab = (next: CVFormTab) => {
+    if (isTabControlled) onActiveTabChange(next);
+    else setInternalTab(next);
+  };
   const latestValue = useRef(value);
   latestValue.current = value;
 
@@ -170,29 +187,31 @@ export function CVEditorPanel({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">
-              ATS Checker
-            </p>
-            <p className="mt-1 text-sm text-indigo-900">{ats.summary}</p>
+      {hideAtsBanner ? null : (
+        <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">
+                ATS Checker
+              </p>
+              <p className="mt-1 text-sm text-indigo-900">{ats.summary}</p>
+            </div>
+            <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-sm font-semibold text-indigo-800">
+              {ats.score}/100
+            </span>
           </div>
-          <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-sm font-semibold text-indigo-800">
-            {ats.score}/100
-          </span>
+          <Progress value={ats.score} className="mt-3 h-2.5 bg-indigo-100" colorClass="bg-indigo-600" />
+          {ats.suggestions.length > 0 ? (
+            <ul className="mt-3 list-inside list-disc space-y-1 text-sm text-indigo-900">
+              {ats.suggestions.slice(0, 4).map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-3 text-sm text-indigo-900">Great work. Your CV is ATS-friendly.</p>
+          )}
         </div>
-        <Progress value={ats.score} className="mt-3 h-2.5 bg-indigo-100" colorClass="bg-indigo-600" />
-        {ats.suggestions.length > 0 ? (
-          <ul className="mt-3 list-inside list-disc space-y-1 text-sm text-indigo-900">
-            {ats.suggestions.slice(0, 4).map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        ) : (
-          <p className="mt-3 text-sm text-indigo-900">Great work. Your CV is ATS-friendly.</p>
-        )}
-      </div>
+      )}
 
       {highlightedKeywords && highlightedKeywords.length > 0 && (
         <div className="flex flex-wrap gap-1.5 rounded-lg border border-amber-200 bg-amber-50 p-3">
@@ -212,6 +231,7 @@ export function CVEditorPanel({
       <CVFormFields
         tab={tab}
         onTabChange={(id) => setTab(id as CVFormTab)}
+        hideTabBar={hideFormTabBar}
         full_name={full_name}
         onFullName={(v) => { setFullName(v); emitChange({ full_name: v }); }}
         professional_title={professional_title}

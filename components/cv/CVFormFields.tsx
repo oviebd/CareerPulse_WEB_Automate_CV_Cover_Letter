@@ -20,7 +20,11 @@ import type {
 import { CVPhotoField } from '@/components/cv/CVPhotoField';
 import { CVSectionVisibilityPanel } from '@/components/cv/CVSectionVisibilityPanel';
 import { CVRewriteWithAIModal } from '@/components/cv/CVRewriteWithAIModal';
-import { generateId } from '@/lib/utils';
+import { CvAtsPolishButton } from '@/components/cv/CvAtsPolishButton';
+import { cn, generateId } from '@/lib/utils';
+
+const FORM_CARD =
+  'rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm ring-1 ring-slate-100/80 sm:p-5';
 
 export type CVFormTab =
   | 'header'
@@ -102,6 +106,8 @@ type Props = {
   awards: AwardEntry[];
   onAwardsChange: (next: AwardEntry[]) => void;
   hiddenTabs?: CVFormTab[];
+  /** When true, horizontal tab pills are hidden (e.g. when using a side nav). */
+  hideTabBar?: boolean;
   highlightedKeywords?: string[];
   atsBySection?: Record<string, { score: number; suggestions: string[] }>;
 };
@@ -189,6 +195,7 @@ export function CVFormFields(props: Props) {
     awards,
     onAwardsChange,
     hiddenTabs,
+    hideTabBar,
     highlightedKeywords,
     atsBySection,
   } = props;
@@ -216,15 +223,17 @@ export function CVFormFields(props: Props) {
   } | null>(null);
 
   return (
-    <div className="space-y-4">
-      <CVSectionVisibilityPanel
-        visibility={sectionVisibility}
-        onChange={onSectionVisibilityChange}
-      />
-      <Tabs value={tab} onChange={onTabChange} tabs={visibleTabs} />
+    <div className="space-y-5">
+      <div className={FORM_CARD}>
+        <CVSectionVisibilityPanel
+          visibility={sectionVisibility}
+          onChange={onSectionVisibilityChange}
+        />
+      </div>
+      {hideTabBar ? null : <Tabs value={tab} onChange={onTabChange} tabs={visibleTabs} />}
       <div className="pt-4">
         {activeAts ? (
-          <div className="mb-4 rounded-lg border border-indigo-200 bg-indigo-50 p-3">
+          <div className="mb-4 rounded-xl border border-indigo-200/80 bg-gradient-to-br from-indigo-50/90 to-white p-4 shadow-sm">
             <div className="flex items-center justify-between gap-2">
               <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">
                 ATS suggestion
@@ -246,7 +255,7 @@ export function CVFormFields(props: Props) {
         ) : null}
 
         {tab === 'header' ? (
-          <div className="space-y-4">
+          <div className={cn('space-y-4', FORM_CARD)}>
             <CVPhotoField photoUrl={photo_url} onPhotoUrl={onPhotoUrl} />
             <div className="grid gap-4 sm:grid-cols-2">
             <Input label="Full name" value={full_name} onChange={(e) => onFullName(e.target.value)} />
@@ -276,21 +285,34 @@ export function CVFormFields(props: Props) {
               onChange={(e) => onAddress(e.target.value)}
               placeholder="Street, city, postal code, country"
             />
+            <div className="flex flex-wrap justify-end gap-2">
+              <CvAtsPolishButton
+                disabled={!address?.trim()}
+                onClick={() =>
+                  setRewriteTarget({
+                    section: 'Header',
+                    inputLabel: 'Full address',
+                    sourceText: address ?? '',
+                    onApply: onAddress,
+                  })
+                }
+              />
+            </div>
           </div>
         ) : null}
 
         {tab === 'summary' ? (
-          <div className="space-y-2">
+          <div className={cn('space-y-3', FORM_CARD)}>
             <Textarea
+              className="min-h-[140px]"
               label="Summary"
               maxLength={2000}
               value={summary}
               onChange={(e) => onSummary(e.target.value)}
             />
-            <div className="flex justify-end">
-              <Button
-                variant="ghost"
-                size="sm"
+            <div className="flex flex-wrap justify-end gap-2">
+              <CvAtsPolishButton
+                disabled={!summary?.trim()}
                 onClick={() =>
                   setRewriteTarget({
                     section: 'Summary',
@@ -299,9 +321,7 @@ export function CVFormFields(props: Props) {
                     onApply: onSummary,
                   })
                 }
-              >
-                Rewrite with AI
-              </Button>
+              />
             </div>
             {kw.length > 0 && summary && (
               <div className="rounded-md border border-yellow-200 bg-yellow-50/50 p-3">
@@ -317,7 +337,7 @@ export function CVFormFields(props: Props) {
         {tab === 'experience' ? (
           <div className="space-y-4">
             {experience.map((ex, i) => (
-              <div key={ex.id} className="rounded-lg border border-[var(--color-border)] p-4">
+              <div key={ex.id} className={FORM_CARD}>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <Input
                     label="Job title"
@@ -395,10 +415,9 @@ export function CVFormFields(props: Props) {
                     onExperienceChange(n);
                   }}
                 />
-                <div className="mt-2 flex justify-end">
-                  <Button
-                    variant="ghost"
-                    size="sm"
+                <div className="mt-2 flex flex-wrap justify-end gap-2">
+                  <CvAtsPolishButton
+                    disabled={!(ex.description ?? '').trim()}
                     onClick={() =>
                       setRewriteTarget({
                         section: 'Experience',
@@ -412,9 +431,7 @@ export function CVFormFields(props: Props) {
                         },
                       })
                     }
-                  >
-                    Rewrite with AI
-                  </Button>
+                  />
                 </div>
                 <div className="mt-3 space-y-2">
                   <p className="text-sm font-medium text-[var(--color-secondary)]">Bullets</p>
@@ -435,9 +452,8 @@ export function CVFormFields(props: Props) {
                         }}
                       />
                       <div className="mt-2 flex flex-wrap justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
+                        <CvAtsPolishButton
+                          disabled={!bullet.trim()}
                           onClick={() =>
                             setRewriteTarget({
                               section: 'Experience',
@@ -453,9 +469,7 @@ export function CVFormFields(props: Props) {
                               },
                             })
                           }
-                        >
-                          Rewrite with AI
-                        </Button>
+                        />
                         <Button
                           variant="ghost"
                           size="sm"
@@ -536,7 +550,7 @@ export function CVFormFields(props: Props) {
         {tab === 'education' ? (
           <div className="space-y-4">
             {education.map((ed, i) => (
-              <div key={ed.id} className="rounded-lg border border-[var(--color-border)] p-4">
+              <div key={ed.id} className={FORM_CARD}>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <Input
                     className="sm:col-span-2"
@@ -607,10 +621,9 @@ export function CVFormFields(props: Props) {
                     onEducationChange(n);
                   }}
                 />
-                <div className="mt-2 flex justify-end">
-                  <Button
-                    variant="ghost"
-                    size="sm"
+                <div className="mt-2 flex flex-wrap justify-end gap-2">
+                  <CvAtsPolishButton
+                    disabled={!(ed.description ?? '').trim()}
                     onClick={() =>
                       setRewriteTarget({
                         section: 'Education',
@@ -623,9 +636,7 @@ export function CVFormFields(props: Props) {
                         },
                       })
                     }
-                  >
-                    Rewrite with AI
-                  </Button>
+                  />
                 </div>
                 <Button
                   variant="ghost"
@@ -662,11 +673,11 @@ export function CVFormFields(props: Props) {
 
         {tab === 'skills' ? (
           <div className="space-y-4">
-            <p className="text-sm text-[var(--color-muted)]">
+            <p className="text-sm text-slate-600">
               Group skills by category (e.g. technical, tools). These appear as labeled chips in many templates.
             </p>
             {skills.map((g, i) => (
-              <div key={g.id} className="rounded-lg border border-[var(--color-border)] p-4">
+              <div key={g.id} className={FORM_CARD}>
                 <Select
                   label="Category label"
                   value={g.category}
@@ -678,7 +689,7 @@ export function CVFormFields(props: Props) {
                   }}
                 />
                 <Textarea
-                  className="mt-3"
+                  className="mt-3 min-h-[120px]"
                   label="Skills (one per line)"
                   value={g.items.join('\n')}
                   onChange={(e) => {
@@ -690,6 +701,29 @@ export function CVFormFields(props: Props) {
                     onSkillsChange(n);
                   }}
                 />
+                <div className="mt-2 flex flex-wrap justify-end gap-2">
+                  <CvAtsPolishButton
+                    disabled={!g.items.join('\n').trim()}
+                    onClick={() =>
+                      setRewriteTarget({
+                        section: 'Skills',
+                        inputLabel: `${g.category} skills (one per line)`,
+                        sourceText: g.items.join('\n'),
+                        onApply: (value) => {
+                          const n = [...skills];
+                          n[i] = {
+                            ...g,
+                            items: value
+                              .split('\n')
+                              .map((s) => s.trim())
+                              .filter(Boolean),
+                          };
+                          onSkillsChange(n);
+                        },
+                      })
+                    }
+                  />
+                </div>
                 {kw.length > 0 && g.items.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {g.items.map((skill, si) => {
@@ -738,7 +772,7 @@ export function CVFormFields(props: Props) {
         {tab === 'projects' ? (
           <div className="space-y-4">
             {projects.map((p, i) => (
-              <div key={p.id} className="rounded-lg border border-[var(--color-border)] p-4">
+              <div key={p.id} className={FORM_CARD}>
                 <Input
                   label="Project name"
                   value={p.name}
@@ -758,10 +792,9 @@ export function CVFormFields(props: Props) {
                     onProjectsChange(n);
                   }}
                 />
-                <div className="mt-2 flex justify-end">
-                  <Button
-                    variant="ghost"
-                    size="sm"
+                <div className="mt-2 flex flex-wrap justify-end gap-2">
+                  <CvAtsPolishButton
+                    disabled={!(p.description ?? '').trim()}
                     onClick={() =>
                       setRewriteTarget({
                         section: 'Projects',
@@ -774,12 +807,10 @@ export function CVFormFields(props: Props) {
                         },
                       })
                     }
-                  >
-                    Rewrite with AI
-                  </Button>
+                  />
                 </div>
                 <Textarea
-                  className="mt-3"
+                  className="mt-3 min-h-[88px]"
                   label="Tech stack (one per line)"
                   value={(p.tech_stack ?? []).join('\n')}
                   onChange={(e) => {
@@ -791,6 +822,29 @@ export function CVFormFields(props: Props) {
                     onProjectsChange(n);
                   }}
                 />
+                <div className="mt-2 flex flex-wrap justify-end gap-2">
+                  <CvAtsPolishButton
+                    disabled={!(p.tech_stack ?? []).join('\n').trim()}
+                    onClick={() =>
+                      setRewriteTarget({
+                        section: 'Projects',
+                        inputLabel: `${p.name || 'Project'} tech stack (one per line)`,
+                        sourceText: (p.tech_stack ?? []).join('\n'),
+                        onApply: (value) => {
+                          const n = [...projects];
+                          n[i] = {
+                            ...p,
+                            tech_stack: value
+                              .split('\n')
+                              .map((s) => s.trim())
+                              .filter(Boolean),
+                          };
+                          onProjectsChange(n);
+                        },
+                      })
+                    }
+                  />
+                </div>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <Input
                     label="URL (optional)"
@@ -857,7 +911,7 @@ export function CVFormFields(props: Props) {
         {tab === 'languages' ? (
           <div className="space-y-4">
             {languages.map((lang, i) => (
-              <div key={lang.id} className="rounded-lg border border-[var(--color-border)] p-4">
+              <div key={lang.id} className={FORM_CARD}>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <Input
                     label="Language"
@@ -909,7 +963,7 @@ export function CVFormFields(props: Props) {
         {tab === 'certifications' ? (
           <div className="space-y-4">
             {certifications.map((c, i) => (
-              <div key={c.id} className="rounded-lg border border-[var(--color-border)] p-4">
+              <div key={c.id} className={FORM_CARD}>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <Input
                     className="sm:col-span-2"
@@ -994,11 +1048,11 @@ export function CVFormFields(props: Props) {
 
         {tab === 'references' ? (
           <div className="space-y-4">
-            <p className="text-sm text-[var(--color-muted)]">
+            <p className="text-sm text-slate-600">
               Add up to two professional references (name, role, and contact optional).
             </p>
             {referrals.map((r, i) => (
-              <div key={r.id} className="rounded-lg border border-[var(--color-border)] p-4">
+              <div key={r.id} className={FORM_CARD}>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <Input
                     className="sm:col-span-2"
@@ -1095,7 +1149,7 @@ export function CVFormFields(props: Props) {
         {tab === 'awards' ? (
           <div className="space-y-4">
             {awards.map((a, i) => (
-              <div key={a.id} className="rounded-lg border border-[var(--color-border)] p-4">
+              <div key={a.id} className={FORM_CARD}>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <Input
                     className="sm:col-span-2"
@@ -1137,10 +1191,9 @@ export function CVFormFields(props: Props) {
                     onAwardsChange(n);
                   }}
                 />
-                <div className="mt-2 flex justify-end">
-                  <Button
-                    variant="ghost"
-                    size="sm"
+                <div className="mt-2 flex flex-wrap justify-end gap-2">
+                  <CvAtsPolishButton
+                    disabled={!(a.description ?? '').trim()}
                     onClick={() =>
                       setRewriteTarget({
                         section: 'Awards',
@@ -1153,9 +1206,7 @@ export function CVFormFields(props: Props) {
                         },
                       })
                     }
-                  >
-                    Rewrite with AI
-                  </Button>
+                  />
                 </div>
                 <Button
                   variant="ghost"
