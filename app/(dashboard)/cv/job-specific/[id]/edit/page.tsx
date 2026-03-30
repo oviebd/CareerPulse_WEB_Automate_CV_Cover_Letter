@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
+import { Select } from '@/components/ui/select';
 import { CVEditorPanel } from '@/components/cv/CVEditorPanel';
 import { Sidebar } from '@/components/cv/premium/Sidebar';
 import { PreviewPanel } from '@/components/cv/premium/PreviewPanel';
@@ -16,11 +17,14 @@ import {
   useJobSpecificCV,
   useUpdateJobSpecificCV,
 } from '@/hooks/useJobSpecificCVs';
+import { useCoreCVVersions } from '@/hooks/useCV';
 import { useSubscription } from '@/hooks/useSubscription';
+import { formatDate } from '@/lib/utils';
 import type { CVData } from '@/types';
 import type { CVTemplate, SubscriptionTier } from '@/types';
 import { canUseTemplate } from '@/lib/subscription';
 import { buildATSReport } from '@/lib/cv-ats';
+import { isKeywordPresentInCv } from '@/lib/cv-keyword-presence';
 import { cloneCvData } from '@/lib/cv-clone';
 import { useToast } from '@/components/ui/toast';
 import { Undo2, Redo2, ChevronDown, ChevronUp } from 'lucide-react';
@@ -73,11 +77,49 @@ function patchFromCvData(data: CVData, selectedTemplateId: string, accent: strin
   };
 }
 
+/** Payload for PATCH /api/cv (core profile), matching core editor save. */
+function atsLabel(score: number): string {
+  if (score >= 85) return 'Interview Ready';
+  if (score >= 65) return 'Strong';
+  return 'Beginner';
+}
+
+function coreCvPatchFromDraft(data: CVData, preferredTemplateId: string) {
+  return {
+    full_name: data.full_name,
+    professional_title: data.professional_title,
+    email: data.email,
+    phone: data.phone,
+    location: data.location,
+    linkedin_url: data.linkedin_url,
+    portfolio_url: data.portfolio_url,
+    website_url: data.website_url,
+    address: data.address,
+    photo_url: data.photo_url || null,
+    summary: data.summary,
+    original_cv_file_url: null,
+    section_visibility: data.section_visibility ?? {},
+    experience: data.experience,
+    education: data.education,
+    skills: data.skills,
+    projects: data.projects,
+    languages: data.languages,
+    certifications: data.certifications,
+    referrals: (data.referrals ?? []).slice(0, 2),
+    awards: data.awards,
+    preferred_cv_template_id: preferredTemplateId,
+  };
+}
+
 export default function JobCVEditPage() {
   const { id } = useParams<{ id: string }>();
+  const queryClient = useQueryClient();
   const { data: jobCV, isLoading } = useJobSpecificCV(id);
-  const { update, isSaving, lastSaved } = useUpdateJobSpecificCV(id);
+  const { update, saveImmediately, isSaving, lastSaved } = useUpdateJobSpecificCV(id);
+  const { data: coreVersions = [], isLoading: coreVersionsLoading } = useCoreCVVersions();
   const [showJD, setShowJD] = useState(false);
+  const [jobInfoOpen, setJobInfoOpen] = useState(false);
+  const [atsKeywordsOpen, setAtsKeywordsOpen] = useState(false);
 
   const { tier } = useSubscription();
   const { toast } = useToast();
@@ -98,6 +140,8 @@ export default function JobCVEditPage() {
   const [fontFamily, setFontFamily] = useState('Inter');
   const [autosaveState, setAutosaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [prevAtsScore, setPrevAtsScore] = useState(0);
+  const [targetCoreCvId, setTargetCoreCvId] = useState<string | null>(null);
+  const [savingCore, setSavingCore] = useState(false);
 
   const [undoPast, setUndoPast] = useState<CVData[]>([]);
   const [undoFuture, setUndoFuture] = useState<CVData[]>([]);
@@ -340,10 +384,62 @@ export default function JobCVEditPage() {
     setSelectedTemplateId(templates[0].id);
   }, [templatesLoading, templates, selectedTemplateId]);
 
+  useEffect(() => {
+    if (!coreVersions.length) {
+      setTargetCoreCvId(null);
+      return;
+    }
+    setTargetCoreCvId((prev) =>
+      prev && coreVersions.some((v) => v.id === prev) ? prev : coreVersions[0].id
+    );
+  }, [coreVersions]);
+
+  const saveJobCv = useCallback(async () => {
+    if (!draft) return;
+    try {
+      await saveImmediately(patchFromCvData(draft, selectedTemplateId, accent));
+      toast('Job CV saved.', 'success');
+    } catch {
+      toast('Could not save job CV.', 'error');
+    }
+  }, [draft, saveImmediately, selectedTemplateId, accent, toast]);
+
+  const updateCoreCvFromJob = useCallback(async () => {
+    if (!draft || !targetCoreCvId) {
+      toast('Select a core CV.', 'error');
+      return;
+    }
+    setSavingCore(true);
+    try {
+      const res = await fetch('/api/cv', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          core_cv_id: targetCoreCvId,
+          ...coreCvPatchFromDraft(draft, selectedTemplateId),
+        }),
+      });
+      if (!res.ok) {
+        toast('Could not update core CV.', 'error');
+        return;
+      }
+      toast('Core CV updated. This job CV was not changed.', 'success');
+      void queryClient.invalidateQueries({ queryKey: ['cv-versions'] });
+      void queryClient.invalidateQueries({ queryKey: ['cv-profile'] });
+    } finally {
+      setSavingCore(false);
+    }
+  }, [draft, targetCoreCvId, selectedTemplateId, toast, queryClient]);
+
   const keywords = jobCV?.keywords_added ?? [];
   const ats = draft
     ? buildATSReport(draft, keywords)
     : { score: 0, summary: '', suggestions: [], sections: {} };
+
+  const keywordMatchedCount = useMemo(() => {
+    if (!draft || !keywords.length) return 0;
+    return keywords.filter((k) => isKeywordPresentInCv(k, draft)).length;
+  }, [keywords, draft]);
 
   useEffect(() => {
     setPrevAtsScore((prev) => (ats.score === prev ? prev : ats.score));
@@ -366,9 +462,14 @@ export default function JobCVEditPage() {
 
   return (
     <div className="mx-auto max-w-[1650px] space-y-4">
-      <div className="rounded-2xl border border-slate-200/90 bg-gradient-to-br from-slate-50/80 to-white p-4 shadow-sm ring-1 ring-slate-200/60 sm:p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
+      <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-gradient-to-br from-slate-50/80 to-white shadow-sm ring-1 ring-slate-200/60">
+        <button
+          type="button"
+          className="flex w-full items-start justify-between gap-3 p-4 text-left sm:p-5"
+          onClick={() => setJobInfoOpen((v) => !v)}
+          aria-expanded={jobInfoOpen}
+        >
+          <div className="min-w-0 flex-1">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Job-tailored CV</p>
             <h2 className="mt-1 font-display text-xl font-bold text-slate-900 sm:text-2xl">
               {jobCV.job_title}
@@ -376,36 +477,53 @@ export default function JobCVEditPage() {
                 <span className="font-semibold text-slate-600"> · {jobCV.company_name}</span>
               ) : null}
             </h2>
-            {jobCV.ai_changes_summary ? (
-              <p className="mt-2 text-sm leading-relaxed text-slate-600">{jobCV.ai_changes_summary}</p>
+            {!jobInfoOpen ? (
+              <>
+                {jobCV.ai_changes_summary ? (
+                  <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-slate-600">{jobCV.ai_changes_summary}</p>
+                ) : null}
+                <p className="mt-2 text-xs text-slate-500">Expand for full summary, back link, and job description.</p>
+              </>
             ) : null}
-            <Link
-              href="/cv/job-specific"
-              className="mt-3 inline-flex text-sm font-medium text-indigo-600 hover:text-indigo-800"
-            >
-              ← All Job CVs
-            </Link>
           </div>
-          <button
-            type="button"
-            className="flex shrink-0 items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-50"
-            onClick={() => setShowJD(!showJD)}
-          >
+          <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm">
+            {jobInfoOpen ? <ChevronUp className="h-4 w-4" aria-hidden /> : <ChevronDown className="h-4 w-4" aria-hidden />}
+          </span>
+        </button>
+        {jobInfoOpen ? (
+          <div className="border-t border-slate-200/80 bg-white/70 px-4 pb-4 pt-3 sm:px-5 sm:pb-5">
+            {jobCV.ai_changes_summary ? (
+              <p className="text-sm leading-relaxed text-slate-600">{jobCV.ai_changes_summary}</p>
+            ) : null}
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+              <Link
+                href="/cv/job-specific"
+                className="inline-flex text-sm font-medium text-indigo-600 hover:text-indigo-800"
+              >
+                ← All Job CVs
+              </Link>
+              <button
+                type="button"
+                className="flex shrink-0 items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+                onClick={() => setShowJD(!showJD)}
+              >
+                {showJD ? (
+                  <>
+                    Hide job description <ChevronUp className="h-3.5 w-3.5" />
+                  </>
+                ) : (
+                  <>
+                    View job description <ChevronDown className="h-3.5 w-3.5" />
+                  </>
+                )}
+              </button>
+            </div>
             {showJD ? (
-              <>
-                Hide job description <ChevronUp className="h-3.5 w-3.5" />
-              </>
-            ) : (
-              <>
-                View job description <ChevronDown className="h-3.5 w-3.5" />
-              </>
-            )}
-          </button>
-        </div>
-        {showJD ? (
-          <pre className="mt-4 max-h-64 overflow-auto whitespace-pre-wrap rounded-xl border border-slate-200 bg-white p-4 text-xs leading-relaxed text-slate-700 shadow-inner">
-            {jobCV.job_description}
-          </pre>
+              <pre className="mt-4 max-h-64 overflow-auto whitespace-pre-wrap rounded-xl border border-slate-200 bg-white p-4 text-xs leading-relaxed text-slate-700 shadow-inner">
+                {jobCV.job_description}
+              </pre>
+            ) : null}
+          </div>
         ) : null}
       </div>
 
@@ -417,45 +535,127 @@ export default function JobCVEditPage() {
               Same editor as your core CV — live ATS feedback, preview, and undo.
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={!undoPast.length}
-              onClick={undo}
-              icon={<Undo2 className="h-4 w-4" />}
-              title="Undo (⌘Z)"
-            >
-              Undo
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={!undoFuture.length}
-              onClick={redo}
-              icon={<Redo2 className="h-4 w-4" />}
-              title="Redo (⌘⇧Z)"
-            >
-              Redo
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              loading={exporting}
-              disabled={!allowed}
-              onClick={() => void exportPdf()}
-            >
-              Export PDF
-            </Button>
-            <span className="text-xs text-[var(--color-muted)]">{saveLabel}</span>
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:items-end">
+            <div className="flex flex-wrap items-center gap-2 sm:justify-end sm:gap-3">
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={!undoPast.length}
+                onClick={undo}
+                icon={<Undo2 className="h-4 w-4" />}
+                title="Undo (⌘Z)"
+              >
+                Undo
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={!undoFuture.length}
+                onClick={redo}
+                icon={<Redo2 className="h-4 w-4" />}
+                title="Redo (⌘⇧Z)"
+              >
+                Redo
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                loading={isSaving}
+                onClick={() => void saveJobCv()}
+              >
+                Save
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                loading={exporting}
+                disabled={!allowed}
+                onClick={() => void exportPdf()}
+              >
+                Export PDF
+              </Button>
+              <span className="text-xs text-[var(--color-muted)]">{saveLabel}</span>
+            </div>
+            <div className="flex w-full flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50/80 p-3 sm:max-w-md sm:flex-row sm:items-end">
+              <div className="min-w-0 flex-1">
+                <Select
+                  label="Core CV version"
+                  value={targetCoreCvId ?? ''}
+                  disabled={coreVersionsLoading || coreVersions.length === 0}
+                  options={
+                    coreVersions.length
+                      ? coreVersions.map((v) => ({
+                          value: v.id,
+                          label: `${v.full_name ?? 'Core CV'} · ${formatDate(v.created_at)}`,
+                        }))
+                      : [{ value: '', label: coreVersionsLoading ? 'Loading…' : 'No core CV yet' }]
+                  }
+                  onChange={(e) => setTargetCoreCvId(e.target.value || null)}
+                />
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                className="shrink-0 sm:mb-0.5"
+                loading={savingCore}
+                disabled={!draft || !targetCoreCvId || !coreVersions.length}
+                onClick={() => void updateCoreCvFromJob()}
+                title="Apply this editor content to the selected core CV. Does not modify this job CV."
+              >
+                Update core CV
+              </Button>
+            </div>
+            <p className="max-w-md text-right text-[10px] leading-snug text-slate-500 sm:self-end">
+              Update core CV copies your current fields into the profile you pick. This job-specific CV stays as-is until
+              you use Save.
+            </p>
           </div>
-        </div>
-        <div className="mt-3">
-          <ATSIndicator score={ats.score} previousScore={prevAtsScore} suggestions={ats.suggestions} />
         </div>
       </div>
 
-      {keywords.length > 0 ? <JobKeywordsBanner keywords={keywords} cv={draft} /> : null}
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm ring-1 ring-slate-200/80">
+        <button
+          type="button"
+          className="flex w-full flex-wrap items-center justify-between gap-3 p-4 text-left sm:p-5"
+          onClick={() => setAtsKeywordsOpen((v) => !v)}
+          aria-expanded={atsKeywordsOpen}
+        >
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">ATS &amp; keywords</span>
+            <span className="text-xl font-bold tabular-nums text-slate-900">{ats.score}/100</span>
+            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700">
+              {atsLabel(ats.score)}
+            </span>
+            {keywords.length > 0 ? (
+              <span className="text-sm text-slate-600">
+                <span className="font-semibold text-emerald-700">{keywordMatchedCount}</span>
+                <span className="text-slate-500"> / {keywords.length}</span>
+                <span className="text-slate-500"> role keywords in CV</span>
+              </span>
+            ) : (
+              <span className="text-sm text-slate-500">No role keywords for this job</span>
+            )}
+          </div>
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600">
+            {atsKeywordsOpen ? <ChevronUp className="h-4 w-4" aria-hidden /> : <ChevronDown className="h-4 w-4" aria-hidden />}
+          </span>
+        </button>
+        {atsKeywordsOpen ? (
+          <div className="border-t border-slate-100 px-4 pb-4 pt-2 sm:px-5 sm:pb-5">
+            <ATSIndicator
+              embedded
+              score={ats.score}
+              previousScore={prevAtsScore}
+              suggestions={ats.suggestions}
+            />
+            {keywords.length > 0 ? (
+              <div className="mt-4 border-t border-slate-100 pt-4">
+                <JobKeywordsBanner embedded keywords={keywords} cv={draft} />
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
 
       <div className="grid gap-4 xl:grid-cols-[260px_minmax(0,1fr)_420px]">
         <Sidebar activeSection={editorTab} onSelect={setEditorTab} />

@@ -8,6 +8,8 @@ interface ATSIndicatorProps {
   previousScore: number;
   /** Top suggestions from the ATS report (shown under the score bar). */
   suggestions?: string[];
+  /** Omit outer card shell when nested inside another panel. */
+  embedded?: boolean;
 }
 
 function getLabel(score: number): string {
@@ -16,12 +18,16 @@ function getLabel(score: number): string {
   return 'Beginner';
 }
 
-export function ATSIndicator({ score, previousScore, suggestions = [] }: ATSIndicatorProps) {
+export function ATSIndicator({ score, previousScore, suggestions = [], embedded = false }: ATSIndicatorProps) {
   const delta = score - previousScore;
   const topSuggestions = suggestions.slice(0, 5);
 
+  const shell = embedded
+    ? 'space-y-3'
+    : 'rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200';
+
   return (
-    <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+    <div className={shell}>
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">ATS Score</p>

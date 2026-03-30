@@ -100,6 +100,19 @@ export function useUpdateJobSpecificCV(id: string) {
     [mutation]
   );
 
+  /** Clears debounce and persists immediately (e.g. explicit Save). */
+  const saveImmediately = useCallback(
+    async (patch: Record<string, unknown>) => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+      pendingRef.current = null;
+      return mutation.mutateAsync(patch);
+    },
+    [mutation]
+  );
+
   useEffect(() => {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
@@ -112,6 +125,7 @@ export function useUpdateJobSpecificCV(id: string) {
 
   return {
     update,
+    saveImmediately,
     isSaving: mutation.isPending,
     lastSaved,
   };

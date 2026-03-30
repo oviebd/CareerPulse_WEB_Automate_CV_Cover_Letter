@@ -9,10 +9,12 @@ interface JobKeywordsBannerProps {
   keywords: string[];
   /** Current CV content; chips update as this changes. */
   cv: CVData;
+  /** Omit outer gradient card when nested inside another panel. */
+  embedded?: boolean;
 }
 
 /** Prominent display of role keywords with live match state (green = found in CV). */
-export function JobKeywordsBanner({ keywords, cv }: JobKeywordsBannerProps) {
+export function JobKeywordsBanner({ keywords, cv, embedded = false }: JobKeywordsBannerProps) {
   const rows = useMemo(
     () =>
       keywords.map((kw, i) => ({
@@ -27,8 +29,13 @@ export function JobKeywordsBanner({ keywords, cv }: JobKeywordsBannerProps) {
 
   if (!keywords.length) return null;
 
+  const outer =
+    embedded
+      ? 'space-y-3'
+      : 'rounded-2xl border border-sky-200/80 bg-gradient-to-br from-sky-50/90 via-white to-indigo-50/40 p-4 shadow-sm ring-1 ring-slate-200/80 sm:p-5';
+
   return (
-    <div className="rounded-2xl border border-sky-200/80 bg-gradient-to-br from-sky-50/90 via-white to-indigo-50/40 p-4 shadow-sm ring-1 ring-slate-200/80 sm:p-5">
+    <div className={outer}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700 shadow-sm">
           <Tag className="h-5 w-5" aria-hidden />
