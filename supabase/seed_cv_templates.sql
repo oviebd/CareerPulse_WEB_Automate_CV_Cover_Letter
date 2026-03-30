@@ -8,5 +8,7 @@ VALUES
   ('sidebar',     'cv', 'Sidebar',     'Two-column with skills sidebar',             'professional', true,  ARRAY['pro','premium','career'],        3),
   ('bold-header', 'cv', 'Bold Header', 'Full-width colored header band',             'creative',     true,  ARRAY['pro','premium','career'],        4),
   ('two-column',  'cv', 'Two Column',  'Equal two-column body layout',               'professional', true,  ARRAY['pro','premium','career'],        5),
-  ('executive',   'cv', 'Executive',   'Dense serif layout for senior roles',        'executive',    true,  ARRAY['premium','career'],              6)
+  ('executive',   'cv', 'Executive',   'Dense serif layout for senior roles',        'executive',    true,  ARRAY['premium','career'],              6),
+  ('apex',        'cv', 'Apex',        'Gradient header, timeline, and sidebar',      'creative',     true,  ARRAY['pro','premium','career'],        7),
+  ('nova',        'cv', 'Nova',        'Dark sidebar and project grid',             'creative',     true,  ARRAY['pro','premium','career'],        8)
 ON CONFLICT (id) DO NOTHING;

@@ -155,6 +155,8 @@ const TEMPLATE_IDS = [
   'bold-header',
   'two-column',
   'executive',
+  'apex',
+  'nova',
 ] as const;
 
 async function main() {

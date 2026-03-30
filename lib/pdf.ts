@@ -379,6 +379,47 @@ function renderRecursive(html: string, stack: Record<string, unknown>[]): string
   return renderRecursive(before, stack) + out + renderRecursive(after, stack);
 }
 
+function initialsFromName(name: string | null | undefined): string {
+  if (!name?.trim()) return '?';
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (
+    parts[0].charAt(0) + parts[parts.length - 1].charAt(0)
+  ).toUpperCase();
+}
+
+function nameTwoLines(name: string | null | undefined): {
+  name_line1: string;
+  name_line2: string;
+} {
+  if (!name?.trim()) return { name_line1: '', name_line2: '' };
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return { name_line1: parts[0], name_line2: '' };
+  const last = parts.pop()!;
+  return { name_line1: parts.join(' '), name_line2: last };
+}
+
+function flattenSkillItems(
+  skills: CVData['skills'] | undefined,
+  max: number
+): string[] {
+  const out: string[] = [];
+  for (const s of skills ?? []) {
+    for (const item of s.items ?? []) {
+      if (out.length >= max) return out;
+      out.push(item);
+    }
+  }
+  return out;
+}
+
+function skillItemsByCategory(
+  skills: CVData['skills'] | undefined,
+  cat: 'technical' | 'soft' | 'tools' | 'languages'
+): string[] {
+  return skills?.find((x) => x.category === cat)?.items ?? [];
+}
+
 export function renderTemplate(templateId: string, cvData: CVData): string {
   const filePath = path.join(
     process.cwd(),
@@ -442,8 +483,20 @@ export function renderTemplate(templateId: string, cvData: CVData): string {
     };
   });
 
+  const twoLineName = nameTwoLines(cvData.full_name);
+  const coreSkillItems = [
+    ...skillItemsByCategory(cvData.skills, 'technical'),
+    ...skillItemsByCategory(cvData.skills, 'soft'),
+    ...skillItemsByCategory(cvData.skills, 'languages'),
+  ].slice(0, 14);
+
   const root: Record<string, unknown> = {
     ...cvData,
+    ...twoLineName,
+    initials: initialsFromName(cvData.full_name),
+    skill_tags: flattenSkillItems(cvData.skills, 8),
+    skills_core_items: coreSkillItems,
+    skills_tools_items: skillItemsByCategory(cvData.skills, 'tools'),
     accent_color: accent,
     contact_line: contactParts.join(' | '),
     linkedin_url: normalizedLinkedin,
