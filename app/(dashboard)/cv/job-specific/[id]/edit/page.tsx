@@ -18,6 +18,7 @@ import { useSubscription } from '@/hooks/useSubscription';
 import type { CVData } from '@/types';
 import type { CVTemplate, SubscriptionTier } from '@/types';
 import { canUseTemplate } from '@/lib/subscription';
+import { useToast } from '@/components/ui/toast';
 
 const SWATCHES = ['#2563EB', '#0d9488', '#7c3aed', '#dc2626', '#0f172a'];
 
@@ -59,6 +60,8 @@ export default function JobCVEditPage() {
   const [accent, setAccent] = useState<string>('#2563EB');
   const [previewHtml, setPreviewHtml] = useState<string>('');
   const [previewBusy, setPreviewBusy] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const { toast } = useToast();
 
   const { data: templates = [], isLoading: templatesLoading } = useQuery({
     queryKey: ['cv-templates'],
@@ -172,6 +175,41 @@ export default function JobCVEditPage() {
     [update, selectedTemplateId, accent]
   );
 
+  const exportPdf = useCallback(async () => {
+    if (!draft || !selectedTemplateId) return;
+    if (!allowed) {
+      toast('Upgrade to export with this template.', 'error');
+      return;
+    }
+    setExporting(true);
+    try {
+      const res = await fetch('/api/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'cv',
+          job_cv_id: id,
+          template_id: selectedTemplateId,
+          accent_color: accent,
+          cv_snapshot: previewPayloadFromCVData(draft),
+        }),
+      });
+      if (!res.ok) {
+        if (res.status === 422) {
+          toast('Add your name and at least one role to export.', 'error');
+        } else {
+          toast('Export failed.', 'error');
+        }
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    } finally {
+      setExporting(false);
+    }
+  }, [accent, allowed, draft, id, selectedTemplateId, toast]);
+
   if (isLoading || !draft || !jobCV) {
     return (
       <div className="mx-auto max-w-4xl space-y-4">
@@ -231,13 +269,15 @@ export default function JobCVEditPage() {
                 ? `Saved ${lastSaved.toLocaleTimeString()}`
                 : ''}
           </span>
-          <Link
-            href={`/cv/templates?job_cv_id=${id}`}
+          <Button
+            variant="primary"
+            size="sm"
+            loading={exporting}
+            disabled={!allowed}
+            onClick={() => void exportPdf()}
           >
-            <Button variant="primary" size="sm">
-              Export PDF
-            </Button>
-          </Link>
+            Export PDF
+          </Button>
         </div>
       </div>
 

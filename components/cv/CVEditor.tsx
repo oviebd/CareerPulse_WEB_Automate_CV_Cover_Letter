@@ -92,6 +92,7 @@ export function CVEditor() {
   const [previewHtml, setPreviewHtml] = useState<string>('');
   const [previewBusy, setPreviewBusy] = useState(false);
   const [settingDefault, setSettingDefault] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const { data: templates = [], isLoading: templatesLoading } = useQuery({
     queryKey: ['cv-templates'],
@@ -265,6 +266,41 @@ export function CVEditor() {
     }
   }
 
+  async function exportPdf() {
+    if (!cvData || !selectedTemplateId) return;
+    if (!allowed) {
+      toast('Upgrade to export with this template.', 'error');
+      return;
+    }
+    setExporting(true);
+    try {
+      const res = await fetch('/api/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'cv',
+          id: cv?.id,
+          template_id: selectedTemplateId,
+          accent_color: accent,
+          cv_snapshot: previewPayloadFromCVData(cvData),
+        }),
+      });
+      if (!res.ok) {
+        if (res.status === 422) {
+          toast('Add your name and at least one role to export.', 'error');
+        } else {
+          toast('Export failed.', 'error');
+        }
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    } finally {
+      setExporting(false);
+    }
+  }
+
   if (isLoading || !cvData) {
     return <p className="text-sm text-[var(--color-muted)]">Loading profile…</p>;
   }
@@ -295,6 +331,15 @@ export function CVEditor() {
             onClick={() => void save()}
           >
             Save
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            loading={exporting}
+            disabled={!allowed}
+            onClick={() => void exportPdf()}
+          >
+            Export PDF
           </Button>
           <span className="text-xs text-[var(--color-muted)]">
             {saveState === 'saved' ? '✓ Saved' : ''}
