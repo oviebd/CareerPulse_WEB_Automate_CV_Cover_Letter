@@ -8,12 +8,16 @@ import { Select } from '@/components/ui/select';
 import type {
   AwardEntry,
   CertificationEntry,
+  CVSectionVisibility,
   EducationEntry,
   ExperienceEntry,
   LanguageEntry,
   ProjectEntry,
+  ReferralEntry,
   SkillGroup,
 } from '@/types';
+import { CVPhotoField } from '@/components/cv/CVPhotoField';
+import { CVSectionVisibilityPanel } from '@/components/cv/CVSectionVisibilityPanel';
 import { generateId } from '@/lib/utils';
 
 export type CVFormTab =
@@ -25,6 +29,7 @@ export type CVFormTab =
   | 'projects'
   | 'languages'
   | 'certifications'
+  | 'references'
   | 'awards';
 
 const DEGREE_OPTIONS = [
@@ -70,8 +75,14 @@ type Props = {
   onPortfolioUrl: (v: string) => void;
   website_url: string;
   onWebsiteUrl: (v: string) => void;
+  address: string;
+  onAddress: (v: string) => void;
+  photo_url: string;
+  onPhotoUrl: (v: string | null) => void;
   summary: string;
   onSummary: (v: string) => void;
+  sectionVisibility: CVSectionVisibility | undefined;
+  onSectionVisibilityChange: (next: CVSectionVisibility) => void;
   experience: ExperienceEntry[];
   onExperienceChange: (next: ExperienceEntry[]) => void;
   education: EducationEntry[];
@@ -84,9 +95,38 @@ type Props = {
   onLanguagesChange: (next: LanguageEntry[]) => void;
   certifications: CertificationEntry[];
   onCertificationsChange: (next: CertificationEntry[]) => void;
+  referrals: ReferralEntry[];
+  onReferralsChange: (next: ReferralEntry[]) => void;
   awards: AwardEntry[];
   onAwardsChange: (next: AwardEntry[]) => void;
+  hiddenTabs?: CVFormTab[];
+  highlightedKeywords?: string[];
 };
+
+function HighlightedText({ text, keywords }: { text: string; keywords: string[] }) {
+  if (!keywords.length || !text) return <>{text}</>;
+  const pattern = keywords
+    .map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('|');
+  const regex = new RegExp(`(${pattern})`, 'gi');
+  const parts = text.split(regex);
+  return (
+    <>
+      {parts.map((part, i) =>
+        regex.test(part) ? (
+          <mark
+            key={i}
+            className="rounded-sm bg-yellow-200/70 px-0.5 text-inherit"
+          >
+            {part}
+          </mark>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+    </>
+  );
+}
 
 const TAB_DEFS: { id: CVFormTab; label: string }[] = [
   { id: 'header', label: 'Header & contact' },
@@ -97,6 +137,7 @@ const TAB_DEFS: { id: CVFormTab; label: string }[] = [
   { id: 'projects', label: 'Projects' },
   { id: 'languages', label: 'Languages' },
   { id: 'certifications', label: 'Certifications' },
+  { id: 'references', label: 'References' },
   { id: 'awards', label: 'Awards' },
 ];
 
@@ -120,8 +161,14 @@ export function CVFormFields(props: Props) {
     onPortfolioUrl,
     website_url,
     onWebsiteUrl,
+    address,
+    onAddress,
+    photo_url,
+    onPhotoUrl,
     summary,
     onSummary,
+    sectionVisibility,
+    onSectionVisibilityChange,
     experience,
     onExperienceChange,
     education,
@@ -134,16 +181,31 @@ export function CVFormFields(props: Props) {
     onLanguagesChange,
     certifications,
     onCertificationsChange,
+    referrals,
+    onReferralsChange,
     awards,
     onAwardsChange,
+    hiddenTabs,
+    highlightedKeywords,
   } = props;
 
+  const visibleTabs = hiddenTabs
+    ? TAB_DEFS.filter((t) => !hiddenTabs.includes(t.id))
+    : TAB_DEFS;
+  const kw = highlightedKeywords ?? [];
+
   return (
-    <>
-      <Tabs value={tab} onChange={onTabChange} tabs={TAB_DEFS} />
+    <div className="space-y-4">
+      <CVSectionVisibilityPanel
+        visibility={sectionVisibility}
+        onChange={onSectionVisibilityChange}
+      />
+      <Tabs value={tab} onChange={onTabChange} tabs={visibleTabs} />
       <div className="pt-4">
         {tab === 'header' ? (
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-4">
+            <CVPhotoField photoUrl={photo_url} onPhotoUrl={onPhotoUrl} />
+            <div className="grid gap-4 sm:grid-cols-2">
             <Input label="Full name" value={full_name} onChange={(e) => onFullName(e.target.value)} />
             <Input
               label="Professional title"
@@ -164,16 +226,33 @@ export function CVFormFields(props: Props) {
               onChange={(e) => onPortfolioUrl(e.target.value)}
             />
             <Input label="Website URL" value={website_url} onChange={(e) => onWebsiteUrl(e.target.value)} />
+            </div>
+            <Textarea
+              label="Full address (optional)"
+              value={address}
+              onChange={(e) => onAddress(e.target.value)}
+              placeholder="Street, city, postal code, country"
+            />
           </div>
         ) : null}
 
         {tab === 'summary' ? (
-          <Textarea
-            label="Summary"
-            maxLength={2000}
-            value={summary}
-            onChange={(e) => onSummary(e.target.value)}
-          />
+          <div className="space-y-2">
+            <Textarea
+              label="Summary"
+              maxLength={2000}
+              value={summary}
+              onChange={(e) => onSummary(e.target.value)}
+            />
+            {kw.length > 0 && summary && (
+              <div className="rounded-md border border-yellow-200 bg-yellow-50/50 p-3">
+                <span className="text-[10px] font-medium uppercase tracking-wide text-yellow-700">Preview with highlights</span>
+                <p className="mt-1 text-sm text-[var(--color-secondary)]">
+                  <HighlightedText text={summary} keywords={kw} />
+                </p>
+              </div>
+            )}
+          </div>
         ) : null}
 
         {tab === 'experience' ? (
@@ -270,6 +349,18 @@ export function CVFormFields(props: Props) {
                     onExperienceChange(n);
                   }}
                 />
+                {kw.length > 0 && ex.bullets.length > 0 && (
+                  <div className="mt-2 space-y-1 rounded-md border border-yellow-200 bg-yellow-50/50 p-2">
+                    <span className="text-[10px] font-medium uppercase tracking-wide text-yellow-700">Preview with highlights</span>
+                    <ul className="list-inside list-disc space-y-0.5 text-sm text-[var(--color-secondary)]">
+                      {ex.bullets.map((b, bi) => (
+                        <li key={bi}>
+                          <HighlightedText text={b} keywords={kw} />
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 <Button
                   variant="ghost"
                   size="sm"
@@ -441,6 +532,27 @@ export function CVFormFields(props: Props) {
                     onSkillsChange(n);
                   }}
                 />
+                {kw.length > 0 && g.items.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {g.items.map((skill, si) => {
+                      const isHighlighted = kw.some(
+                        (k) => skill.toLowerCase().includes(k.toLowerCase())
+                      );
+                      return (
+                        <span
+                          key={si}
+                          className={
+                            isHighlighted
+                              ? 'rounded-full bg-yellow-200 px-2 py-0.5 text-xs font-medium text-yellow-900'
+                              : 'rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600'
+                          }
+                        >
+                          {skill}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
                 <Button
                   variant="ghost"
                   size="sm"
@@ -702,6 +814,106 @@ export function CVFormFields(props: Props) {
           </div>
         ) : null}
 
+        {tab === 'references' ? (
+          <div className="space-y-4">
+            <p className="text-sm text-[var(--color-muted)]">
+              Add up to two professional references (name, role, and contact optional).
+            </p>
+            {referrals.map((r, i) => (
+              <div key={r.id} className="rounded-lg border border-[var(--color-border)] p-4">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Input
+                    className="sm:col-span-2"
+                    label="Name"
+                    value={r.name}
+                    onChange={(e) => {
+                      const n = [...referrals];
+                      n[i] = { ...r, name: e.target.value };
+                      onReferralsChange(n);
+                    }}
+                  />
+                  <Input
+                    label="Title / role"
+                    value={r.title ?? ''}
+                    onChange={(e) => {
+                      const n = [...referrals];
+                      n[i] = { ...r, title: e.target.value || null };
+                      onReferralsChange(n);
+                    }}
+                  />
+                  <Input
+                    label="Company"
+                    value={r.company ?? ''}
+                    onChange={(e) => {
+                      const n = [...referrals];
+                      n[i] = { ...r, company: e.target.value || null };
+                      onReferralsChange(n);
+                    }}
+                  />
+                  <Input
+                    label="Relationship"
+                    value={r.relationship ?? ''}
+                    placeholder="e.g. Former manager"
+                    onChange={(e) => {
+                      const n = [...referrals];
+                      n[i] = { ...r, relationship: e.target.value || null };
+                      onReferralsChange(n);
+                    }}
+                  />
+                  <Input
+                    label="Email"
+                    type="email"
+                    value={r.email ?? ''}
+                    onChange={(e) => {
+                      const n = [...referrals];
+                      n[i] = { ...r, email: e.target.value || null };
+                      onReferralsChange(n);
+                    }}
+                  />
+                  <Input
+                    label="Phone"
+                    value={r.phone ?? ''}
+                    onChange={(e) => {
+                      const n = [...referrals];
+                      n[i] = { ...r, phone: e.target.value || null };
+                      onReferralsChange(n);
+                    }}
+                  />
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="mt-2"
+                  onClick={() => onReferralsChange(referrals.filter((_, j) => j !== i))}
+                >
+                  Remove
+                </Button>
+              </div>
+            ))}
+            {referrals.length < 2 ? (
+              <Button
+                variant="secondary"
+                onClick={() =>
+                  onReferralsChange([
+                    ...referrals,
+                    {
+                      id: generateId(),
+                      name: '',
+                      title: null,
+                      company: null,
+                      email: null,
+                      phone: null,
+                      relationship: null,
+                    },
+                  ])
+                }
+              >
+                Add reference
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
+
         {tab === 'awards' ? (
           <div className="space-y-4">
             {awards.map((a, i) => (
@@ -777,6 +989,6 @@ export function CVFormFields(props: Props) {
           </div>
         ) : null}
       </div>
-    </>
+    </div>
   );
 }

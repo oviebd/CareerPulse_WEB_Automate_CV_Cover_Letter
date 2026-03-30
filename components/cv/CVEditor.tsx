@@ -1,85 +1,74 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useCVProfile } from '@/hooks/useCV';
 import { Button } from '@/components/ui/button';
-import type {
-  AwardEntry,
-  CertificationEntry,
-  EducationEntry,
-  ExperienceEntry,
-  LanguageEntry,
-  ProjectEntry,
-  SkillGroup,
-} from '@/types';
-import { CVFormFields, type CVFormTab } from '@/components/cv/CVFormFields';
+import { CVEditorPanel } from '@/components/cv/CVEditorPanel';
+import type { CVData } from '@/types';
 
 export function CVEditor() {
   const { data: cv, isLoading, refetch } = useCVProfile();
-  const [tab, setTab] = useState<CVFormTab>('header');
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
-
-  const [full_name, setFullName] = useState('');
-  const [professional_title, setTitle] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [location, setLocation] = useState('');
-  const [linkedin_url, setLi] = useState('');
-  const [portfolio_url, setPortfolio] = useState('');
-  const [website_url, setWebsite] = useState('');
-  const [summary, setSummary] = useState('');
-  const [experience, setExperience] = useState<ExperienceEntry[]>([]);
-  const [education, setEducation] = useState<EducationEntry[]>([]);
-  const [skills, setSkills] = useState<SkillGroup[]>([]);
-  const [projects, setProjects] = useState<ProjectEntry[]>([]);
-  const [languages, setLanguages] = useState<LanguageEntry[]>([]);
-  const [certifications, setCertifications] = useState<CertificationEntry[]>([]);
-  const [awards, setAwards] = useState<AwardEntry[]>([]);
+  const [cvData, setCvData] = useState<CVData | null>(null);
+  const initialized = useRef(false);
 
   useEffect(() => {
-    if (!cv) return;
-    setFullName(cv.full_name ?? '');
-    setTitle(cv.professional_title ?? '');
-    setEmail(cv.email ?? '');
-    setPhone(cv.phone ?? '');
-    setLocation(cv.location ?? '');
-    setLi(cv.linkedin_url ?? '');
-    setPortfolio(cv.portfolio_url ?? '');
-    setWebsite(cv.website_url ?? '');
-    setSummary(cv.summary ?? '');
-    setExperience((cv.experience?.length ? cv.experience : []) as ExperienceEntry[]);
-    setEducation((cv.education?.length ? cv.education : []) as EducationEntry[]);
-    setSkills((cv.skills?.length ? cv.skills : []) as SkillGroup[]);
-    setProjects((cv.projects?.length ? cv.projects : []) as ProjectEntry[]);
-    setLanguages((cv.languages?.length ? cv.languages : []) as LanguageEntry[]);
-    setCertifications(
-      (cv.certifications?.length ? cv.certifications : []) as CertificationEntry[]
-    );
-    setAwards((cv.awards?.length ? cv.awards : []) as AwardEntry[]);
+    if (!cv || initialized.current) return;
+    initialized.current = true;
+    setCvData({
+      full_name: cv.full_name ?? null,
+      professional_title: cv.professional_title ?? null,
+      email: cv.email ?? null,
+      phone: cv.phone ?? null,
+      location: cv.location ?? null,
+      linkedin_url: cv.linkedin_url ?? null,
+      portfolio_url: cv.portfolio_url ?? null,
+      website_url: cv.website_url ?? null,
+      address: cv.address ?? null,
+      photo_url: cv.photo_url ?? null,
+      summary: cv.summary ?? null,
+      experience: cv.experience ?? [],
+      education: cv.education ?? [],
+      skills: cv.skills ?? [],
+      projects: cv.projects ?? [],
+      certifications: cv.certifications ?? [],
+      languages: cv.languages ?? [],
+      awards: cv.awards ?? [],
+      referrals: cv.referrals ?? [],
+    });
   }, [cv]);
 
+  const handleChange = useCallback((data: CVData) => {
+    setCvData(data);
+  }, []);
+
   async function save() {
+    if (!cvData) return;
     setSaveState('saving');
     const res = await fetch('/api/cv', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        full_name,
-        professional_title,
-        email,
-        phone,
-        location,
-        linkedin_url,
-        portfolio_url,
-        website_url,
-        summary,
-        experience,
-        education,
-        skills,
-        projects,
-        languages,
-        certifications,
-        awards,
+        full_name: cvData.full_name,
+        professional_title: cvData.professional_title,
+        email: cvData.email,
+        phone: cvData.phone,
+        location: cvData.location,
+        linkedin_url: cvData.linkedin_url,
+        portfolio_url: cvData.portfolio_url,
+        website_url: cvData.website_url,
+        address: cvData.address,
+        photo_url: cvData.photo_url || null,
+        summary: cvData.summary,
+        section_visibility: {},
+        experience: cvData.experience,
+        education: cvData.education,
+        skills: cvData.skills,
+        projects: cvData.projects,
+        languages: cvData.languages,
+        certifications: cvData.certifications,
+        referrals: (cvData.referrals ?? []).slice(0, 2),
+        awards: cvData.awards,
       }),
     });
     if (res.ok) {
@@ -91,7 +80,7 @@ export function CVEditor() {
     }
   }
 
-  if (isLoading) {
+  if (isLoading || !cvData) {
     return <p className="text-sm text-[var(--color-muted)]">Loading profile…</p>;
   }
 
@@ -117,42 +106,7 @@ export function CVEditor() {
           </span>
         </div>
       </div>
-      <CVFormFields
-        tab={tab}
-        onTabChange={(id) => setTab(id as CVFormTab)}
-        full_name={full_name}
-        onFullName={setFullName}
-        professional_title={professional_title}
-        onProfessionalTitle={setTitle}
-        email={email}
-        onEmail={setEmail}
-        phone={phone}
-        onPhone={setPhone}
-        location={location}
-        onLocation={setLocation}
-        linkedin_url={linkedin_url}
-        onLinkedinUrl={setLi}
-        portfolio_url={portfolio_url}
-        onPortfolioUrl={setPortfolio}
-        website_url={website_url}
-        onWebsiteUrl={setWebsite}
-        summary={summary}
-        onSummary={setSummary}
-        experience={experience}
-        onExperienceChange={setExperience}
-        education={education}
-        onEducationChange={setEducation}
-        skills={skills}
-        onSkillsChange={setSkills}
-        projects={projects}
-        onProjectsChange={setProjects}
-        languages={languages}
-        onLanguagesChange={setLanguages}
-        certifications={certifications}
-        onCertificationsChange={setCertifications}
-        awards={awards}
-        onAwardsChange={setAwards}
-      />
+      <CVEditorPanel value={cvData} onChange={handleChange} />
     </div>
   );
 }

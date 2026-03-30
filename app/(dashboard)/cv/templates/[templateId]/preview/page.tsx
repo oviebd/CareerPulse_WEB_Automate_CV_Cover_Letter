@@ -2,15 +2,17 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useParams, notFound } from 'next/navigation';
+import { useParams, notFound, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { FeatureGate } from '@/components/shared/FeatureGate';
+import { Modal } from '@/components/ui/modal';
 import { CVFormFields, type CVFormTab } from '@/components/cv/CVFormFields';
 import { useCVProfile } from '@/hooks/useCV';
+import { useJobSpecificCV } from '@/hooks/useJobSpecificCVs';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useToast } from '@/components/ui/toast';
 import type {
@@ -21,7 +23,9 @@ import type {
   EducationEntry,
   ExperienceEntry,
   LanguageEntry,
+  JobSpecificCV,
   ProjectEntry,
+  ReferralEntry,
   SkillGroup,
   SubscriptionTier,
 } from '@/types';
@@ -37,15 +41,53 @@ function previewPayloadFromProfile(d: CVProfile): Record<string, unknown> {
     linkedin_url: d.linkedin_url,
     portfolio_url: d.portfolio_url,
     website_url: d.website_url,
+    address: d.address ?? null,
+    photo_url: d.photo_url ?? null,
     summary: d.summary,
+    section_visibility: d.section_visibility ?? {},
     experience: d.experience ?? [],
     education: d.education ?? [],
     skills: d.skills ?? [],
     projects: d.projects ?? [],
     certifications: d.certifications ?? [],
     languages: d.languages ?? [],
+    referrals: (d.referrals ?? []).slice(0, 2),
     awards: d.awards ?? [],
   };
+}
+
+function draftFromJobSpecificCV(j: JobSpecificCV): CVProfile {
+  return {
+    id: j.id,
+    user_id: j.user_id,
+    full_name: j.full_name,
+    professional_title: j.professional_title,
+    email: j.email,
+    phone: j.phone,
+    location: j.location,
+    linkedin_url: j.linkedin_url,
+    portfolio_url: j.portfolio_url,
+    website_url: j.website_url,
+    address: null,
+    photo_url: null,
+    summary: j.summary,
+    experience: j.experience,
+    education: j.education,
+    skills: j.skills,
+    projects: j.projects,
+    certifications: j.certifications,
+    languages: j.languages,
+    awards: j.awards,
+    referrals: [],
+    section_visibility: {},
+    is_complete: false,
+    completion_percentage: 0,
+    original_cv_file_url: null,
+    preferred_cv_template_id: j.preferred_template_id ?? 'classic',
+    preferred_cl_template_id: 'cl-classic',
+    created_at: j.created_at,
+    updated_at: j.updated_at,
+  } as CVProfile;
 }
 
 const SWATCHES = ['#2563EB', '#0d9488', '#7c3aed', '#dc2626', '#0f172a'];
@@ -54,7 +96,16 @@ export default function CVTemplatePreviewPage() {
   const params = useParams();
   const templateId = typeof params.templateId === 'string' ? params.templateId : '';
   const { toast } = useToast();
+  const searchParams = useSearchParams();
+  const jobCvId = searchParams.get('job_cv_id');
+  const isJobMode = Boolean(jobCvId);
+
   const { data: cv, isLoading: cvLoading, refetch } = useCVProfile();
+  const {
+    data: jobCv,
+    isLoading: jobCvLoading,
+    refetch: refetchJobCv,
+  } = useJobSpecificCV(jobCvId ?? '');
   const { tier } = useSubscription();
   const [tab, setTab] = useState<CVFormTab>('header');
   const [draft, setDraft] = useState<CVProfile | null>(null);
@@ -64,6 +115,7 @@ export default function CVTemplatePreviewPage() {
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [exporting, setExporting] = useState(false);
   const [settingDefault, setSettingDefault] = useState(false);
+  const [showUpdateCoreModal, setShowUpdateCoreModal] = useState(false);
 
   const { data: templates = [], isLoading: templatesLoading } = useQuery({
     queryKey: ['cv-templates'],
@@ -91,12 +143,18 @@ export default function CVTemplatePreviewPage() {
   }, [templatesLoading, templates.length, templateMeta]);
 
   useEffect(() => {
-    if (!cv) return;
+    const src = isJobMode ? jobCv : cv;
+    if (!src) return;
+    const profile = isJobMode
+      ? draftFromJobSpecificCV(src as JobSpecificCV)
+      : (src as CVProfile);
     setDraft((prev) => {
-      if (prev?.id === cv.id && prev.updated_at === cv.updated_at) return prev;
-      return structuredClone(cv) as CVProfile;
+      if (prev?.id === profile.id && prev.updated_at === profile.updated_at) {
+        return prev;
+      }
+      return structuredClone(profile) as CVProfile;
     });
-  }, [cv]);
+  }, [cv, jobCv, isJobMode]);
 
   const refreshPreview = useCallback(async () => {
     if (!templateId || !draft) return;
@@ -132,6 +190,43 @@ export default function CVTemplatePreviewPage() {
   async function save() {
     if (!draft) return;
     setSaveState('saving');
+    if (isJobMode && jobCvId) {
+      const res = await fetch(`/api/cv/job-specific/${jobCvId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          full_name: draft.full_name,
+          professional_title: draft.professional_title,
+          email: draft.email,
+          phone: draft.phone,
+          location: draft.location,
+          linkedin_url: draft.linkedin_url,
+          portfolio_url: draft.portfolio_url,
+          website_url: draft.website_url,
+          summary: draft.summary,
+          experience: draft.experience,
+          education: draft.education,
+          skills: draft.skills,
+          projects: draft.projects,
+          certifications: draft.certifications,
+          languages: draft.languages,
+          awards: draft.awards,
+          preferred_template_id: templateId,
+          accent_color: accent,
+        }),
+      });
+      if (res.ok) {
+        setSaveState('saved');
+        await refetchJobCv();
+        setTimeout(() => setSaveState('idle'), 2000);
+        toast('Saved to Job CV.', 'success');
+      } else {
+        setSaveState('idle');
+        toast('Could not save job CV changes.', 'error');
+      }
+      return;
+    }
+
     const res = await fetch('/api/cv', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -144,13 +239,17 @@ export default function CVTemplatePreviewPage() {
         linkedin_url: draft.linkedin_url,
         portfolio_url: draft.portfolio_url,
         website_url: draft.website_url,
+        address: draft.address,
+        photo_url: draft.photo_url,
         summary: draft.summary,
+        section_visibility: draft.section_visibility,
         experience: draft.experience,
         education: draft.education,
         skills: draft.skills,
         projects: draft.projects,
         languages: draft.languages,
         certifications: draft.certifications,
+        referrals: (draft.referrals ?? []).slice(0, 2),
         awards: draft.awards,
       }),
     });
@@ -161,6 +260,70 @@ export default function CVTemplatePreviewPage() {
     } else {
       setSaveState('idle');
       toast('Could not save changes.', 'error');
+    }
+  }
+
+  async function updateCoreFromDraft() {
+    if (!draft) return;
+    setSaveState('saving');
+    const res = await fetch('/api/cv', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        // In job-CV mode, avoid overwriting fields that we don't snapshot
+        // (address/photo/referrals) by only patching job-CV table fields.
+        ...(isJobMode
+          ? {
+              full_name: draft.full_name,
+              professional_title: draft.professional_title,
+              email: draft.email,
+              phone: draft.phone,
+              location: draft.location,
+              linkedin_url: draft.linkedin_url,
+              portfolio_url: draft.portfolio_url,
+              website_url: draft.website_url,
+              summary: draft.summary,
+              experience: draft.experience,
+              education: draft.education,
+              skills: draft.skills,
+              projects: draft.projects,
+              languages: draft.languages,
+              certifications: draft.certifications,
+              awards: draft.awards,
+              section_visibility: draft.section_visibility,
+            }
+          : {
+              full_name: draft.full_name,
+              professional_title: draft.professional_title,
+              email: draft.email,
+              phone: draft.phone,
+              location: draft.location,
+              linkedin_url: draft.linkedin_url,
+              portfolio_url: draft.portfolio_url,
+              website_url: draft.website_url,
+              address: draft.address,
+              photo_url: draft.photo_url,
+              summary: draft.summary,
+              section_visibility: draft.section_visibility,
+              experience: draft.experience,
+              education: draft.education,
+              skills: draft.skills,
+              projects: draft.projects,
+              languages: draft.languages,
+              certifications: draft.certifications,
+              referrals: (draft.referrals ?? []).slice(0, 2),
+              awards: draft.awards,
+            }),
+      }),
+    });
+    if (res.ok) {
+      setSaveState('saved');
+      void refetch();
+      setTimeout(() => setSaveState('idle'), 2000);
+      toast('Core CV updated.', 'success');
+    } else {
+      setSaveState('idle');
+      toast('Could not update core CV.', 'error');
     }
   }
 
@@ -177,7 +340,7 @@ export default function CVTemplatePreviewPage() {
   }
 
   async function exportPdf() {
-    if (!cv || !draft || !templateId) return;
+    if (!draft || !templateId) return;
     if (!allowed) {
       toast('Upgrade to export with this template.', 'error');
       return;
@@ -186,13 +349,23 @@ export default function CVTemplatePreviewPage() {
     const res = await fetch('/api/export', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: 'cv',
-        id: cv.id,
-        template_id: templateId,
-        accent_color: accent,
-        cv_snapshot: previewPayloadFromProfile(draft),
-      }),
+      body: JSON.stringify(
+        isJobMode
+          ? {
+              type: 'cv',
+              job_cv_id: jobCvId,
+              template_id: templateId,
+              accent_color: accent,
+              cv_snapshot: previewPayloadFromProfile(draft),
+            }
+          : {
+              type: 'cv',
+              id: cv?.id,
+              template_id: templateId,
+              accent_color: accent,
+              cv_snapshot: previewPayloadFromProfile(draft),
+            }
+      ),
     });
     setExporting(false);
     if (!res.ok) {
@@ -208,13 +381,15 @@ export default function CVTemplatePreviewPage() {
     window.open(url, '_blank');
   }
 
-  if (cvLoading || templatesLoading) {
+  const isLoading = isJobMode ? jobCvLoading : cvLoading;
+
+  if (isLoading || templatesLoading) {
     return (
       <p className="text-sm text-[var(--color-muted)]">Loading…</p>
     );
   }
 
-  if (!cv) {
+  if (!isJobMode && !cv) {
     return (
       <div className="mx-auto max-w-lg space-y-4">
         <h1 className="font-display text-2xl font-bold">CV preview</h1>
@@ -238,6 +413,24 @@ export default function CVTemplatePreviewPage() {
             Back to templates
           </Link>
         </div>
+      </div>
+    );
+  }
+
+  if (isJobMode && !jobCv) {
+    return (
+      <div className="mx-auto max-w-lg space-y-4">
+        <h1 className="font-display text-2xl font-bold">CV preview</h1>
+        <p className="text-sm text-[var(--color-muted)]">
+          Could not load the job-specific CV. It may have been archived or does not
+          belong to your account.
+        </p>
+        <Link
+          href="/cv/job-specific"
+          className="rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[var(--color-primary-hover)]"
+        >
+          Back to Job CVs
+        </Link>
       </div>
     );
   }
@@ -266,18 +459,48 @@ export default function CVTemplatePreviewPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant="secondary"
-            size="sm"
-            loading={settingDefault}
-            disabled={!allowed}
-            onClick={() => void setPreferredTemplate()}
-          >
-            Set as default
-          </Button>
-          <Button variant="primary" size="sm" loading={saveState === 'saving'} onClick={() => void save()}>
-            Save
-          </Button>
+          {!isJobMode ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              loading={settingDefault}
+              disabled={!allowed}
+              onClick={() => void setPreferredTemplate()}
+            >
+              Set as default
+            </Button>
+          ) : null}
+
+          {!isJobMode ? (
+            <Button
+              variant="primary"
+              size="sm"
+              loading={saveState === 'saving'}
+              onClick={() => void save()}
+            >
+              Save
+            </Button>
+          ) : (
+            <>
+              <Button
+                variant="primary"
+                size="sm"
+                loading={saveState === 'saving'}
+                onClick={() => void save()}
+              >
+                Save as Job CV
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                loading={saveState === 'saving'}
+                onClick={() => setShowUpdateCoreModal(true)}
+              >
+                Update Core Profile
+              </Button>
+            </>
+          )}
+
           <span className="text-xs text-[var(--color-muted)]">
             {saveState === 'saved' ? '✓ Saved' : ''}
           </span>
@@ -335,8 +558,16 @@ export default function CVTemplatePreviewPage() {
             onPortfolioUrl={(v) => setDraft({ ...draft, portfolio_url: v })}
             website_url={draft.website_url ?? ''}
             onWebsiteUrl={(v) => setDraft({ ...draft, website_url: v })}
+            address={draft.address ?? ''}
+            onAddress={(v) => setDraft({ ...draft, address: v })}
+            photo_url={draft.photo_url ?? ''}
+            onPhotoUrl={(v) => setDraft({ ...draft, photo_url: v })}
             summary={draft.summary ?? ''}
             onSummary={(v) => setDraft({ ...draft, summary: v })}
+            sectionVisibility={draft.section_visibility ?? {}}
+            onSectionVisibilityChange={(next) =>
+              setDraft({ ...draft, section_visibility: next })
+            }
             experience={
               (draft.experience?.length ? draft.experience : []) as ExperienceEntry[]
             }
@@ -354,6 +585,15 @@ export default function CVTemplatePreviewPage() {
             }
             onCertificationsChange={(certifications) =>
               setDraft({ ...draft, certifications })
+            }
+            referrals={
+              ((draft.referrals?.length ? draft.referrals : []) as ReferralEntry[]).slice(
+                0,
+                2
+              )
+            }
+            onReferralsChange={(referrals) =>
+              setDraft({ ...draft, referrals: referrals.slice(0, 2) })
             }
             awards={(draft.awards?.length ? draft.awards : []) as AwardEntry[]}
             onAwardsChange={(awards) => setDraft({ ...draft, awards })}
@@ -389,6 +629,43 @@ export default function CVTemplatePreviewPage() {
           </div>
         </div>
       </div>
+      {isJobMode ? (
+        <Modal
+          isOpen={showUpdateCoreModal}
+          onClose={() => setShowUpdateCoreModal(false)}
+          title="Update your core CV?"
+        >
+          <p className="text-sm text-[var(--color-secondary)]">
+            This will overwrite your main CV profile with the tailored version.
+            Your original information will be replaced.
+          </p>
+          <p className="mt-2 text-sm text-[var(--color-muted)]">
+            Consider saving as a Job CV instead to keep your original CV intact.
+          </p>
+          <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setShowUpdateCoreModal(false);
+                void save();
+              }}
+              loading={saveState === 'saving'}
+            >
+              Save as Job CV instead
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => {
+                setShowUpdateCoreModal(false);
+                void updateCoreFromDraft();
+              }}
+              loading={saveState === 'saving'}
+            >
+              Yes, Update Core Profile
+            </Button>
+          </div>
+        </Modal>
+      ) : null}
     </div>
   );
 }

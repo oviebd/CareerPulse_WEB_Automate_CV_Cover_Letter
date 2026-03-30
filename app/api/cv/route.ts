@@ -41,6 +41,16 @@ export async function PATCH(request: Request) {
     const forbidden = ['id', 'user_id', 'created_at'];
     for (const k of forbidden) delete patch[k];
 
+    if (Array.isArray(patch.referrals)) {
+      patch.referrals = patch.referrals.slice(0, 2);
+    }
+    if (
+      patch.section_visibility != null &&
+      typeof patch.section_visibility !== 'object'
+    ) {
+      delete patch.section_visibility;
+    }
+
     const { data: current } = await supabase
       .from('cv_profiles')
       .select('*')

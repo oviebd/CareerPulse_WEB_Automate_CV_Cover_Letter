@@ -43,16 +43,24 @@
 </head>
 <body>
   <div class="page">
-    <h1>{{full_name}}</h1>
-    {{#if professional_title}}<div class="subtitle">{{professional_title}}</div>{{/if}}
-    <div class="contact-row">
-      {{#if email}}<span>✉ {{email}}</span>{{/if}}
-      {{#if phone}}<span>📞 {{phone}}</span>{{/if}}
-      {{#if location}}<span>📍 {{location}}</span>{{/if}}
-      {{#if linkedin_url}}<span>🔗 {{linkedin_url}}</span>{{/if}}
-      {{#if portfolio_url}}<span>🔗 {{portfolio_url}}</span>{{/if}}
-      {{#if website_url}}<span>🔗 {{website_url}}</span>{{/if}}
+    <div style="display:flex;align-items:flex-start;gap:14pt;">
+      {{#if photo_url}}
+      <img src="{{photo_url}}" alt="" style="width:78pt;height:78pt;object-fit:cover;border-radius:8pt;border:1pt solid #e2e8f0;flex-shrink:0;" />
+      {{/if}}
+      <div style="flex:1;min-width:0;">
+        <h1>{{full_name}}</h1>
+        {{#if professional_title}}<div class="subtitle">{{professional_title}}</div>{{/if}}
+        <div class="contact-row">
+          {{#if email}}<span>✉ {{email}}</span>{{/if}}
+          {{#if phone}}<span>📞 {{phone}}</span>{{/if}}
+          {{#if location}}<span>📍 {{location}}</span>{{/if}}
+          {{#if linkedin_url}}<span>🔗 {{linkedin_url}}</span>{{/if}}
+          {{#if portfolio_url}}<span>🔗 {{portfolio_url}}</span>{{/if}}
+          {{#if website_url}}<span>🔗 {{website_url}}</span>{{/if}}
+        </div>
+      </div>
     </div>
+    {{#if address}}<div class="summary" style="margin-top:10pt;white-space:pre-wrap;">{{address}}</div>{{/if}}
 
     {{#if summary}}
     <div class="section-title">Summary</div>
@@ -124,6 +132,20 @@
     <div class="section-title">Languages</div>
     {{#each languages}}
     <div class="lang-row">{{language}} — {{proficiency}}</div>
+    {{/each}}
+    {{/if}}
+
+    {{#if awards.length}}
+    <div class="section-title">Awards</div>
+    {{#each awards}}
+    <div class="award-row">{{title}}{{#if issuer}} — {{issuer}}{{/if}}{{#if date}} · {{formatDate date}}{{/if}}</div>
+    {{/each}}
+    {{/if}}
+
+    {{#if referrals.length}}
+    <div class="section-title">References</div>
+    {{#each referrals}}
+    <div class="award-row"><strong>{{name}}</strong>{{#if relationship}} — {{relationship}}{{/if}}{{#if company}} · {{company}}{{/if}}{{#if title}}<br/><span style="font-weight:500;">{{title}}</span>{{/if}}{{#if email}}<br/>{{email}}{{/if}}{{#if phone}} · {{phone}}{{/if}}</div>
     {{/each}}
     {{/if}}
 

@@ -33,9 +33,15 @@
 <body>
   <div class="page">
     <div class="header">
-      <h1>{{full_name}}</h1>
-      {{#if professional_title}}<div class="subtitle">{{professional_title}}</div>{{/if}}
-      <div class="contact">{{contact_line}}</div>
+      <div style="display:flex;align-items:flex-start;gap:20pt;">
+        {{#if photo_url}}<img src="{{photo_url}}" alt="" style="width:72pt;height:72pt;object-fit:cover;border-radius:8pt;border:2pt solid rgba(255,255,255,0.35);flex-shrink:0;" />{{/if}}
+        <div style="flex:1;">
+          <h1>{{full_name}}</h1>
+          {{#if professional_title}}<div class="subtitle">{{professional_title}}</div>{{/if}}
+          <div class="contact">{{contact_line}}</div>
+          {{#if address}}<div style="font-size:8.5pt;opacity:0.92;margin-top:10pt;white-space:pre-wrap;">{{address}}</div>{{/if}}
+        </div>
+      </div>
     </div>
     <div class="body">
       <div class="col-main">
@@ -68,6 +74,18 @@
           </div>
           <div class="exp-title">{{#if degree}}{{degree}}{{/if}}{{#if field_of_study}} — {{field_of_study}}{{/if}}</div>
         </div>
+        {{/each}}
+        {{/if}}
+        {{#if awards.length}}
+        <div class="section-title">Awards</div>
+        {{#each awards}}
+        <div class="summary" style="margin-bottom:8pt;">{{title}}{{#if issuer}} — {{issuer}}{{/if}}</div>
+        {{/each}}
+        {{/if}}
+        {{#if referrals.length}}
+        <div class="section-title">References</div>
+        {{#each referrals}}
+        <div class="proj-card"><strong>{{name}}</strong>{{#if relationship}} — {{relationship}}{{/if}}{{#if company}} · {{company}}{{/if}}{{#if title}}<br/>{{title}}{{/if}}{{#if email}}<br/>{{email}}{{/if}}{{#if phone}} · {{phone}}{{/if}}</div>
         {{/each}}
         {{/if}}
       </div>

@@ -3,12 +3,14 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
+import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { FeatureGate, TemplateGate } from '@/components/shared/FeatureGate';
 import { useCVProfile } from '@/hooks/useCV';
+import { useJobSpecificCV } from '@/hooks/useJobSpecificCVs';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useToast } from '@/components/ui/toast';
 import type { CVTemplate, SubscriptionTier } from '@/types';
@@ -41,7 +43,12 @@ function TemplatePreviewThumb({
 
 export default function CVTemplatesPage() {
   const { toast } = useToast();
+  const searchParams = useSearchParams();
+  const jobCvId = searchParams.get('job_cv_id');
   const { data: cv } = useCVProfile();
+  const { data: jobCv, isLoading: jobCvLoading } = useJobSpecificCV(
+    jobCvId ?? ''
+  );
   const { tier } = useSubscription();
   const [color, setColor] = useState('#2563EB');
   const [exporting, setExporting] = useState<string | null>(null);
@@ -74,6 +81,30 @@ export default function CVTemplatesPage() {
   }
 
   async function exportPdf(templateId: string) {
+    if (jobCvId) {
+      if (!jobCv || jobCvLoading) return;
+      setExporting(templateId);
+      const res = await fetch('/api/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'cv',
+          job_cv_id: jobCvId,
+          template_id: templateId,
+          accent_color: color,
+        }),
+      });
+      setExporting(null);
+      if (!res.ok) {
+        toast('Export failed.', 'error');
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      return;
+    }
+
     if (!cv) return;
     setExporting(templateId);
     const res = await fetch('/api/export', {
@@ -95,6 +126,10 @@ export default function CVTemplatesPage() {
     const url = URL.createObjectURL(blob);
     window.open(url, '_blank');
   }
+
+  const hasEditableCv = jobCvId
+    ? Boolean(jobCv && !jobCvLoading)
+    : Boolean(cv);
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -142,15 +177,23 @@ export default function CVTemplatesPage() {
                 <p className="mt-2 flex-1 text-sm text-[var(--color-muted)]">{t.description}</p>
                 <div className="mt-4 flex flex-col gap-2">
                   <Link
-                    href={cv ? `/cv/templates/${t.id}/preview` : '#'}
-                    aria-disabled={!cv}
+                    href={
+                      hasEditableCv
+                        ? `/cv/templates/${t.id}/preview${
+                            jobCvId
+                              ? `?job_cv_id=${encodeURIComponent(jobCvId)}`
+                              : ''
+                          }`
+                        : '#'
+                    }
+                    aria-disabled={!hasEditableCv}
                     className={cn(
                       'inline-flex items-center justify-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold transition',
                       'bg-[var(--color-primary)] text-white shadow-sm hover:bg-[var(--color-primary-hover)]',
-                      !cv && 'pointer-events-none opacity-60'
+                      !hasEditableCv && 'pointer-events-none opacity-60'
                     )}
                     onClick={(e) => {
-                      if (!cv) e.preventDefault();
+                      if (!hasEditableCv) e.preventDefault();
                     }}
                   >
                     Preview &amp; edit
@@ -160,19 +203,21 @@ export default function CVTemplatesPage() {
                     userTier={tier}
                   >
                     <div className="flex flex-wrap gap-2">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        disabled={!cv || !allowed}
-                        onClick={() => void setPreferredTemplate(t.id)}
-                      >
-                        Use as default
-                      </Button>
+                      {!jobCvId ? (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          disabled={!cv || !allowed}
+                          onClick={() => void setPreferredTemplate(t.id)}
+                        >
+                          Use as default
+                        </Button>
+                      ) : null}
                       <Button
                         variant="secondary"
                         size="sm"
                         loading={exporting === t.id}
-                        disabled={!cv || !allowed}
+                        disabled={!hasEditableCv || !allowed}
                         onClick={() => void exportPdf(t.id)}
                       >
                         Export PDF

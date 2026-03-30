@@ -37,6 +37,24 @@ export default function CVOverviewPage() {
             </Link>
           </div>
         </Card>
+        <Card>
+          <h2 className="font-semibold">Tailor for a Job</h2>
+          <p className="mt-2 text-sm text-[var(--color-muted)]">
+            Paste a job description and AI will optimise your CV for that role.
+          </p>
+          <Link href="/cv/optimise" className={`${primary} mt-4 inline-flex`}>
+            Tailor My CV
+          </Link>
+        </Card>
+        <Card>
+          <h2 className="font-semibold">Job Specific CVs</h2>
+          <p className="mt-2 text-sm text-[var(--color-muted)]">
+            View and manage CVs tailored for specific roles.
+          </p>
+          <Link href="/cv/job-specific" className={`${secondary} mt-4 inline-flex px-3 py-2 text-sm`}>
+            View Job CVs
+          </Link>
+        </Card>
       </div>
     </div>
   );

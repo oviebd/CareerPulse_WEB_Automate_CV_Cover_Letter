@@ -20,6 +20,8 @@ type ExportBody = {
   format?: 'pdf' | 'docx';
   /** Optional draft fields merged over the saved profile for PDF (preview flow). */
   cv_snapshot?: Record<string, unknown>;
+  /** When provided, exports a job-specific CV instead of the core profile. */
+  job_cv_id?: string;
 };
 
 export async function POST(request: Request) {
@@ -41,13 +43,81 @@ export async function POST(request: Request) {
     const format = body.format ?? 'pdf';
 
     if (body.type === 'cv') {
+      const accent =
+        body.accent_color ?? body.primaryColor ?? '#6C63FF';
+
+      // Job-specific CV export
+      if (body.job_cv_id) {
+        const { data: jobCv, error: jErr } = await supabase
+          .from('job_specific_cvs')
+          .select('*')
+          .eq('id', body.job_cv_id)
+          .eq('user_id', user.id)
+          .maybeSingle();
+        if (jErr || !jobCv) {
+          return NextResponse.json({ error: 'not_found' }, { status: 404 });
+        }
+        const templateId =
+          body.template_id ?? body.templateId ?? jobCv.preferred_template_id ?? 'classic';
+        const jobCvAccent = body.accent_color ?? jobCv.accent_color ?? '#6C63FF';
+        const baseSnapshot = {
+          full_name: jobCv.full_name,
+          professional_title: jobCv.professional_title,
+          email: jobCv.email,
+          phone: jobCv.phone,
+          location: jobCv.location,
+          linkedin_url: jobCv.linkedin_url,
+          portfolio_url: jobCv.portfolio_url,
+          website_url: jobCv.website_url,
+          summary: jobCv.summary,
+          experience: jobCv.experience,
+          education: jobCv.education,
+          skills: jobCv.skills,
+          projects: jobCv.projects,
+          certifications: jobCv.certifications,
+          languages: jobCv.languages,
+          awards: jobCv.awards,
+        };
+        const overrides =
+          body.cv_snapshot && typeof body.cv_snapshot === 'object'
+            ? (body.cv_snapshot as Record<string, unknown>)
+            : null;
+        const snapshot = overrides
+          ? { ...baseSnapshot, ...overrides }
+          : baseSnapshot;
+        try {
+          const { pdf } = await exportCV(
+            user.id,
+            templateId,
+            jobCvAccent,
+            snapshot
+          );
+          const companySlug = (jobCv.company_name ?? '')
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-|-$/g, '');
+          const titleSlug = jobCv.job_title
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-|-$/g, '');
+          const filename = `cv-${companySlug ? `${companySlug}-` : ''}${titleSlug}.pdf`;
+          return new NextResponse(new Uint8Array(pdf), {
+            status: 200,
+            headers: {
+              'Content-Type': 'application/pdf',
+              'Content-Disposition': `attachment; filename="${filename}"`,
+            },
+          });
+        } catch (e) {
+          console.error('export job cv', e);
+          return NextResponse.json({ error: 'export_failed' }, { status: 500 });
+        }
+      }
+
       const templateId = body.template_id ?? body.templateId;
       if (!templateId) {
         return NextResponse.json({ error: 'invalid_body' }, { status: 400 });
       }
-
-      const accent =
-        body.accent_color ?? body.primaryColor ?? '#6C63FF';
 
       const { data: cvRow } = await supabase
         .from('cv_profiles')

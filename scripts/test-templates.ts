@@ -16,6 +16,8 @@ const testCVData: CVData = {
   linkedin_url: 'https://linkedin.com/in/alexandrachen',
   portfolio_url: 'https://alexandrachen.com',
   website_url: null,
+  address: null,
+  photo_url: null,
   summary:
     'Product leader with 8 years of experience building B2B SaaS products from 0 to 1 and scaling them to $50M ARR. Specializes in AI-powered products, developer tools, and complex enterprise workflows. Previously at Stripe, Notion, and two YC startups.',
   experience: [
@@ -141,6 +143,7 @@ const testCVData: CVData = {
       description: null,
     },
   ],
+  referrals: [],
   accent_color: '#6C63FF',
   watermark: false,
 };

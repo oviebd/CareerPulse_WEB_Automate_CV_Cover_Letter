@@ -34,9 +34,15 @@
 <body>
   <div class="page">
     <div class="header">
-      <h1>{{full_name}}</h1>
-      {{#if professional_title}}<div class="sub">{{professional_title}}</div>{{/if}}
-      <div class="contact">{{contact_line}}</div>
+      <div style="display:flex;align-items:flex-start;gap:12pt;">
+        {{#if photo_url}}<img src="{{photo_url}}" alt="" style="width:64pt;height:64pt;object-fit:cover;border-radius:6pt;border:1pt solid #e2e8f0;flex-shrink:0;" />{{/if}}
+        <div style="flex:1;">
+          <h1>{{full_name}}</h1>
+          {{#if professional_title}}<div class="sub">{{professional_title}}</div>{{/if}}
+          <div class="contact">{{contact_line}}</div>
+          {{#if address}}<div class="summary" style="margin-top:6pt;white-space:pre-wrap;">{{address}}</div>{{/if}}
+        </div>
+      </div>
     </div>
     <div class="cols">
       <div class="col">
@@ -103,6 +109,12 @@
         <div class="section-title"><span class="sq">▪</span> AWARDS</div>
         {{#each awards}}
         <div class="proj-card">{{title}}{{#if issuer}} — {{issuer}}{{/if}}</div>
+        {{/each}}
+        {{/if}}
+        {{#if referrals.length}}
+        <div class="section-title"><span class="sq">▪</span> REFERENCES</div>
+        {{#each referrals}}
+        <div class="proj-card"><strong>{{name}}</strong>{{#if title}} — {{title}}{{/if}}{{#if company}} · {{company}}{{/if}}{{#if email}}<br/>{{email}}{{/if}}</div>
         {{/each}}
         {{/if}}
       </div>

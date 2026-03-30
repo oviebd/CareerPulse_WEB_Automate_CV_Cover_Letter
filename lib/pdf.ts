@@ -3,7 +3,8 @@ import path from 'path';
 import puppeteer, { type Browser, type LaunchOptions } from 'puppeteer';
 import { resolveEffectiveTier } from '@/lib/dev-subscription';
 import { createAdminClient } from '@/lib/supabase/server';
-import type { CVData, CVProfile, SubscriptionTier } from '@/types';
+import { applyCvSectionVisibility } from '@/lib/cv-section-visibility';
+import type { CVData, CVProfile, ReferralEntry, SubscriptionTier } from '@/types';
 import { canUseTemplate } from '@/lib/subscription';
 
 let browser: Browser | null = null;
@@ -387,6 +388,8 @@ export function looseProfileToCVData(
     linkedin_url: row.linkedin_url ?? null,
     portfolio_url: row.portfolio_url ?? null,
     website_url: row.website_url ?? null,
+    address: row.address ?? null,
+    photo_url: row.photo_url ?? null,
     summary: row.summary ?? null,
     experience: Array.isArray(row.experience) ? row.experience : [],
     education: Array.isArray(row.education) ? row.education : [],
@@ -395,6 +398,11 @@ export function looseProfileToCVData(
     certifications: Array.isArray(row.certifications) ? row.certifications : [],
     languages: Array.isArray(row.languages) ? row.languages : [],
     awards: Array.isArray(row.awards) ? row.awards : [],
+    referrals: Array.isArray(row.referrals) ? row.referrals : [],
+    section_visibility:
+      row.section_visibility && typeof row.section_visibility === 'object'
+        ? row.section_visibility
+        : {},
   } as CVProfile;
   return cvProfileToCVData(merged, options);
 }
@@ -433,7 +441,21 @@ export function cvProfileToCVData(
     description: a.description ?? null,
   })) as CVData['awards'];
 
-  return {
+  const rawRefs = Array.isArray(row.referrals) ? row.referrals : [];
+  const referrals = rawRefs.slice(0, 2).map((r) => {
+    const x = r as ReferralEntry;
+    return {
+      id: String(x.id ?? ''),
+      name: String(x.name ?? ''),
+      title: x.title ?? null,
+      company: x.company ?? null,
+      email: x.email ?? null,
+      phone: x.phone ?? null,
+      relationship: x.relationship ?? null,
+    };
+  }) as ReferralEntry[];
+
+  const base: CVData = {
     full_name: row.full_name,
     professional_title: row.professional_title,
     email: row.email,
@@ -442,6 +464,8 @@ export function cvProfileToCVData(
     linkedin_url: row.linkedin_url,
     portfolio_url: row.portfolio_url,
     website_url: row.website_url,
+    address: row.address ?? null,
+    photo_url: row.photo_url ?? null,
     summary: row.summary,
     experience: exp,
     education: edu,
@@ -450,9 +474,11 @@ export function cvProfileToCVData(
     certifications: certs,
     languages: langs,
     awards,
+    referrals,
     accent_color: options.accent_color ?? '#6C63FF',
     watermark: options.watermark ?? false,
   };
+  return applyCvSectionVisibility(base, row.section_visibility);
 }
 
 export async function exportCV(

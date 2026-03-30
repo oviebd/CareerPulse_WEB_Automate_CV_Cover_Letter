@@ -32,9 +32,11 @@
 </head>
 <body>
   <div class="page">
+    {{#if photo_url}}<div style="text-align:center;margin-bottom:10pt;"><img src="{{photo_url}}" alt="" style="max-height:72pt;border-radius:6pt;" /></div>{{/if}}
     <h1>{{full_name}}</h1>
     {{#if professional_title}}<div class="title">{{professional_title}}</div>{{/if}}
     <div class="contact">{{contact_line}}</div>
+    {{#if address}}<div class="summary" style="margin-top:10pt;text-align:center;white-space:pre-wrap;">{{address}}</div>{{/if}}
 
     {{#if summary}}
     <div class="sp-section">
@@ -111,6 +113,24 @@
       <div class="sec-label">Languages</div>
       {{#each languages}}
       <div class="skills-line">{{language}} ({{proficiency}})</div>
+      {{/each}}
+    </div>
+    {{/if}}
+
+    {{#if awards.length}}
+    <div class="sp-section">
+      <div class="sec-label">Awards</div>
+      {{#each awards}}
+      <div class="muted" style="margin-bottom:6pt;">{{title}}{{#if issuer}} — {{issuer}}{{/if}}</div>
+      {{/each}}
+    </div>
+    {{/if}}
+
+    {{#if referrals.length}}
+    <div class="sp-section">
+      <div class="sec-label">References</div>
+      {{#each referrals}}
+      <div class="proj-card"><strong>{{name}}</strong>{{#if title}} — {{title}}{{/if}}{{#if company}} · {{company}}{{/if}}{{#if email}}<br/>{{email}}{{/if}}{{#if phone}} · {{phone}}{{/if}}</div>
       {{/each}}
     </div>
     {{/if}}

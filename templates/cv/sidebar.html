@@ -36,6 +36,7 @@
 <body>
   <div class="page">
     <div class="sidebar">
+      {{#if photo_url}}<div class="sb-block" style="text-align:center;"><img src="{{photo_url}}" alt="" style="width:100%;max-width:120pt;border-radius:8pt;object-fit:cover;" /></div>{{/if}}
       <div class="sb-block">
         <h3>Contact</h3>
         {{#if email}}<div class="sb-item"><span class="sb-icon">✉</span><span>{{email}}</span></div>{{/if}}
@@ -44,6 +45,7 @@
         {{#if linkedin_url}}<div class="sb-item"><span class="sb-icon">🔗</span><span>{{linkedin_url}}</span></div>{{/if}}
         {{#if portfolio_url}}<div class="sb-item"><span class="sb-icon">🔗</span><span>{{portfolio_url}}</span></div>{{/if}}
         {{#if website_url}}<div class="sb-item"><span class="sb-icon">🔗</span><span>{{website_url}}</span></div>{{/if}}
+        {{#if address}}<div class="sb-item"><span class="sb-icon">⌂</span><span style="white-space:pre-wrap;">{{address}}</span></div>{{/if}}
       </div>
       {{#if skills.length}}
       <div class="sb-block">
@@ -112,6 +114,12 @@
         <strong>{{name}}</strong>
         {{#if description}}<div class="summary" style="margin-top:4pt;">{{description}}</div>{{/if}}
       </div>
+      {{/each}}
+      {{/if}}
+      {{#if referrals.length}}
+      <div class="section-title">References</div>
+      {{#each referrals}}
+      <div class="proj-card"><strong>{{name}}</strong>{{#if title}}<br/>{{title}}{{/if}}{{#if email}}<br/>{{email}}{{/if}}</div>
       {{/each}}
       {{/if}}
       {{#if watermark}}<div class="watermark">Created with CareerAI</div>{{/if}}

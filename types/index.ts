@@ -100,6 +100,35 @@ export interface AwardEntry {
   description: string | null;
 }
 
+/** Professional reference (max 2 stored in profile). */
+export interface ReferralEntry {
+  id: string;
+  name: string;
+  title: string | null;
+  company: string | null;
+  email: string | null;
+  phone: string | null;
+  relationship: string | null;
+}
+
+/** Which CV blocks appear on exported PDF/HTML. Omitted or true = show; false = hide. */
+export type CVSectionVisibilityKey =
+  | 'photo'
+  | 'address'
+  | 'summary'
+  | 'experience'
+  | 'education'
+  | 'skills'
+  | 'projects'
+  | 'languages'
+  | 'certifications'
+  | 'awards'
+  | 'referrals';
+
+export type CVSectionVisibility = Partial<
+  Record<CVSectionVisibilityKey, boolean>
+>;
+
 /** Shape passed to CV HTML templates and PDF rendering (JSONB fields normalized). */
 export interface CVData {
   full_name: string | null;
@@ -110,6 +139,10 @@ export interface CVData {
   linkedin_url: string | null;
   portfolio_url: string | null;
   website_url: string | null;
+  /** Full postal / mailing address (separate from short location line). */
+  address: string | null;
+  /** Public URL to profile photo (e.g. Supabase Storage). */
+  photo_url: string | null;
   summary: string | null;
   experience: Array<{
     id: string;
@@ -166,6 +199,7 @@ export interface CVData {
     date: string | null;
     description: string | null;
   }>;
+  referrals: ReferralEntry[];
   accent_color?: string;
   watermark?: boolean;
   /** Precomputed in renderTemplate for pipe-separated contact (optional). */
@@ -184,6 +218,8 @@ export interface CVProfile {
   linkedin_url: string | null;
   portfolio_url: string | null;
   website_url: string | null;
+  address?: string | null;
+  photo_url?: string | null;
   summary: string | null;
   experience: ExperienceEntry[];
   education: EducationEntry[];
@@ -192,6 +228,8 @@ export interface CVProfile {
   certifications: CertificationEntry[];
   languages: LanguageEntry[];
   awards: AwardEntry[];
+  referrals?: ReferralEntry[];
+  section_visibility?: CVSectionVisibility;
   is_complete: boolean;
   completion_percentage: number;
   original_cv_file_url: string | null;
@@ -369,3 +407,45 @@ export const PRICING = {
 };
 
 export type PricingPlanKey = keyof typeof PRICING;
+
+// Job-specific CV (tailored snapshot for a particular role)
+export interface JobSpecificCV {
+  id: string;
+  user_id: string;
+
+  job_title: string;
+  company_name: string | null;
+  job_description: string;
+
+  full_name: string | null;
+  professional_title: string | null;
+  email: string | null;
+  phone: string | null;
+  location: string | null;
+  linkedin_url: string | null;
+  portfolio_url: string | null;
+  website_url: string | null;
+  summary: string | null;
+  experience: ExperienceEntry[];
+  education: EducationEntry[];
+  skills: SkillGroup[];
+  projects: ProjectEntry[];
+  certifications: CertificationEntry[];
+  languages: LanguageEntry[];
+  awards: AwardEntry[];
+
+  ai_changes_summary: string | null;
+  keywords_added: string[];
+  bullets_improved: number;
+
+  preferred_template_id: string | null;
+  accent_color: string;
+
+  is_archived: boolean;
+  job_application_id: string | null;
+
+  created_at: string;
+  updated_at: string;
+}
+
+export type CVSaveAction = 'save_to_core' | 'save_as_job_cv';

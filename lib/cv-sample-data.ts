@@ -11,6 +11,8 @@ export function getSampleCVData(accentColor = '#2563EB'): CVData {
     linkedin_url: 'linkedin.com/in/alexmorgan',
     portfolio_url: null,
     website_url: null,
+    address: null,
+    photo_url: null,
     summary:
       'Product designer with 8+ years shipping B2B SaaS. Focused on research-led UX, design systems, and cross-functional delivery.',
     experience: [
@@ -85,6 +87,7 @@ export function getSampleCVData(accentColor = '#2563EB'): CVData {
       { id: 'l2', language: 'Spanish', proficiency: 'intermediate' },
     ],
     awards: [],
+    referrals: [],
     accent_color: accentColor,
     watermark: false,
   };
