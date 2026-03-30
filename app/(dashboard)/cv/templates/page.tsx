@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -12,8 +13,31 @@ import { useSubscription } from '@/hooks/useSubscription';
 import { useToast } from '@/components/ui/toast';
 import type { CVTemplate, SubscriptionTier } from '@/types';
 import { canUseTemplate } from '@/lib/subscription';
+import { cn } from '@/lib/utils';
 
 const SWATCHES = ['#2563EB', '#0d9488', '#7c3aed', '#dc2626', '#0f172a'];
+
+function TemplatePreviewThumb({
+  templateId,
+  accent,
+  name,
+}: {
+  templateId: string;
+  accent: string;
+  name: string;
+}) {
+  const src = `/api/cv/preview-html?template_id=${encodeURIComponent(templateId)}&sample=1&accent=${encodeURIComponent(accent)}`;
+  return (
+    <div className="relative aspect-[210/297] w-full overflow-hidden bg-slate-100">
+      <iframe
+        src={src}
+        className="pointer-events-none absolute left-0 top-0 h-[1123px] w-[794px] max-w-none origin-top-left scale-[0.24] sm:scale-[0.26]"
+        title={`${name} sample preview`}
+        loading="lazy"
+      />
+    </div>
+  );
+}
 
 export default function CVTemplatesPage() {
   const { toast } = useToast();
@@ -76,11 +100,11 @@ export default function CVTemplatesPage() {
     <div className="mx-auto max-w-6xl space-y-6">
       <h1 className="font-display text-2xl font-bold">CV templates</h1>
       <p className="text-sm text-[var(--color-muted)]">
-        Preview layouts and export PDF. Free exports include a small watermark.
+        Browse layouts with sample previews. Open a template to edit your CV with a live preview, then export PDF.
       </p>
       <FeatureGate requiredTier={['pro', 'premium', 'career']} userTier={tier}>
         <div className="flex flex-wrap gap-2">
-          <span className="text-sm text-[var(--color-muted)]">Accent:</span>
+          <span className="text-sm text-[var(--color-muted)]">Gallery accent:</span>
           {SWATCHES.map((c) => (
             <button
               key={c}
@@ -99,45 +123,64 @@ export default function CVTemplatesPage() {
             tier
           );
           return (
-            <Card key={t.id}>
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <h2 className="font-semibold">{t.name}</h2>
-                  <Badge variant="default" className="mt-1 capitalize">
-                    {t.category}
-                  </Badge>
+            <Card key={t.id} padding="none" className="flex flex-col overflow-hidden">
+              <TemplatePreviewThumb templateId={t.id} accent={color} name={t.name} />
+              <div className="flex flex-1 flex-col p-5">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <h2 className="font-semibold">{t.name}</h2>
+                    <Badge variant="default" className="mt-1 capitalize">
+                      {t.category}
+                    </Badge>
+                  </div>
+                  {t.is_premium ? (
+                    <Badge variant="warning">Pro+</Badge>
+                  ) : (
+                    <Badge variant="success">Free</Badge>
+                  )}
                 </div>
-                {t.is_premium ? (
-                  <Badge variant="warning">Pro+</Badge>
-                ) : (
-                  <Badge variant="success">Free</Badge>
-                )}
+                <p className="mt-2 flex-1 text-sm text-[var(--color-muted)]">{t.description}</p>
+                <div className="mt-4 flex flex-col gap-2">
+                  <Link
+                    href={cv ? `/cv/templates/${t.id}/preview` : '#'}
+                    aria-disabled={!cv}
+                    className={cn(
+                      'inline-flex items-center justify-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold transition',
+                      'bg-[var(--color-primary)] text-white shadow-sm hover:bg-[var(--color-primary-hover)]',
+                      !cv && 'pointer-events-none opacity-60'
+                    )}
+                    onClick={(e) => {
+                      if (!cv) e.preventDefault();
+                    }}
+                  >
+                    Preview &amp; edit
+                  </Link>
+                  <TemplateGate
+                    availableTiers={t.available_tiers as SubscriptionTier[]}
+                    userTier={tier}
+                  >
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        disabled={!cv || !allowed}
+                        onClick={() => void setPreferredTemplate(t.id)}
+                      >
+                        Use as default
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        loading={exporting === t.id}
+                        disabled={!cv || !allowed}
+                        onClick={() => void exportPdf(t.id)}
+                      >
+                        Export PDF
+                      </Button>
+                    </div>
+                  </TemplateGate>
+                </div>
               </div>
-              <p className="mt-2 text-sm text-[var(--color-muted)]">{t.description}</p>
-              <TemplateGate
-                availableTiers={t.available_tiers as SubscriptionTier[]}
-                userTier={tier}
-              >
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    disabled={!cv || !allowed}
-                    onClick={() => void setPreferredTemplate(t.id)}
-                  >
-                    Use template
-                  </Button>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    loading={exporting === t.id}
-                    disabled={!cv || !allowed}
-                    onClick={() => void exportPdf(t.id)}
-                  >
-                    Export PDF
-                  </Button>
-                </div>
-              </TemplateGate>
             </Card>
           );
         })}

@@ -18,6 +18,8 @@ type ExportBody = {
   primaryColor?: string;
   id?: string;
   format?: 'pdf' | 'docx';
+  /** Optional draft fields merged over the saved profile for PDF (preview flow). */
+  cv_snapshot?: Record<string, unknown>;
 };
 
 export async function POST(request: Request) {
@@ -57,7 +59,13 @@ export async function POST(request: Request) {
       }
 
       try {
-        const { pdf, filename } = await exportCV(user.id, templateId, accent);
+        const snapshot = body.cv_snapshot ?? null;
+        const { pdf, filename } = await exportCV(
+          user.id,
+          templateId,
+          accent,
+          snapshot
+        );
         return new NextResponse(new Uint8Array(pdf), {
           status: 200,
           headers: {

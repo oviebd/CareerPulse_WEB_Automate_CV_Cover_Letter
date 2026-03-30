@@ -373,6 +373,32 @@ export function slugifyName(name: string): string {
     .replace(/^-|-$/g, '') || 'cv';
 }
 
+/** Merge a partial profile (e.g. editor draft) into CVData for HTML/PDF rendering. */
+export function looseProfileToCVData(
+  row: Partial<CVProfile> & Record<string, unknown>,
+  options: { accent_color?: string; watermark?: boolean }
+): CVData {
+  const merged = {
+    full_name: row.full_name ?? null,
+    professional_title: row.professional_title ?? null,
+    email: row.email ?? null,
+    phone: row.phone ?? null,
+    location: row.location ?? null,
+    linkedin_url: row.linkedin_url ?? null,
+    portfolio_url: row.portfolio_url ?? null,
+    website_url: row.website_url ?? null,
+    summary: row.summary ?? null,
+    experience: Array.isArray(row.experience) ? row.experience : [],
+    education: Array.isArray(row.education) ? row.education : [],
+    skills: Array.isArray(row.skills) ? row.skills : [],
+    projects: Array.isArray(row.projects) ? row.projects : [],
+    certifications: Array.isArray(row.certifications) ? row.certifications : [],
+    languages: Array.isArray(row.languages) ? row.languages : [],
+    awards: Array.isArray(row.awards) ? row.awards : [],
+  } as CVProfile;
+  return cvProfileToCVData(merged, options);
+}
+
 export function cvProfileToCVData(
   row: CVProfile,
   options: { accent_color?: string; watermark?: boolean }
@@ -432,7 +458,8 @@ export function cvProfileToCVData(
 export async function exportCV(
   userId: string,
   templateId: string,
-  accentColor?: string
+  accentColor?: string,
+  snapshot?: Partial<CVProfile> | null
 ): Promise<{ pdf: Buffer; filename: string }> {
   const supabase = createAdminClient();
   const { data: profile, error: pErr } = await supabase
@@ -468,7 +495,11 @@ export async function exportCV(
     throw new Error('CV_NOT_FOUND');
   }
 
-  const cv = cvRow as CVProfile;
+  let cv = cvRow as CVProfile;
+  if (snapshot && typeof snapshot === 'object') {
+    const { id: _i, user_id: _u, ...rest } = snapshot;
+    cv = { ...cv, ...rest } as CVProfile;
+  }
   if (!cv.full_name?.trim()) {
     throw new Error('CV_INCOMPLETE');
   }
