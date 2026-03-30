@@ -1,13 +1,16 @@
 import { cn } from '@/lib/utils';
+import { motion } from 'framer-motion';
 
 export function Card({
   className,
   children,
   padding = 'md',
+  hoverable = false,
 }: {
   className?: string;
   children: React.ReactNode;
   padding?: 'none' | 'sm' | 'md' | 'lg';
+  hoverable?: boolean;
 }) {
   const p = {
     none: '',
@@ -16,15 +19,17 @@ export function Card({
     lg: 'p-8',
   }[padding];
   return (
-    <div
+    <motion.div
       className={cn(
-        'rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm',
+        'rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm transition-all duration-200',
+        hoverable && 'hover:border-[var(--color-border-hover)] hover:shadow-md',
         p,
         className
       )}
+      whileHover={hoverable ? { y: -2 } : undefined}
     >
       {children}
-    </div>
+    </motion.div>
   );
 }
 

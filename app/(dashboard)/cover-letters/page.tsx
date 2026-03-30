@@ -1,6 +1,10 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
+import { motion } from 'framer-motion';
+import { Star } from 'lucide-react';
+import { ATSBadge } from '@/components/shared/ATSBadge';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { UpgradeCTA } from '@/components/shared/UpgradeCTA';
@@ -9,6 +13,7 @@ import { useSubscription } from '@/hooks/useSubscription';
 import { formatDate } from '@/lib/utils';
 
 export default function CoverLettersPage() {
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const { tier } = useSubscription();
   const { data: letters = [], isLoading } = useCoverLettersList();
   const del = useDeleteCoverLetter();
@@ -30,9 +35,9 @@ export default function CoverLettersPage() {
       {isLoading ? <p className="text-sm text-[var(--color-muted)]">Loading…</p> : null}
       <ul className="space-y-3">
         {visible.map((l) => (
-          <li
+          <motion.li
             key={l.id}
-            className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 transition hover:border-[var(--color-border-hover)] hover:bg-[var(--color-surface-2)]"
           >
             <Link href={`/cover-letters/${l.id}`} className="min-w-0 flex-1">
               <div className="font-medium">{l.company_name || 'Company'}</div>
@@ -40,9 +45,7 @@ export default function CoverLettersPage() {
               <div className="mt-1 text-xs text-[var(--color-muted)]">{formatDate(l.created_at)}</div>
             </Link>
             <div className="flex flex-wrap items-center gap-2">
-              {l.ats_score != null ? (
-                <Badge variant="success">ATS {l.ats_score}</Badge>
-              ) : null}
+              {l.ats_score != null ? <ATSBadge score={l.ats_score} /> : null}
               <Badge variant="default">{l.tone}</Badge>
               <button
                 type="button"
@@ -51,19 +54,25 @@ export default function CoverLettersPage() {
                   fav.mutate({ id: l.id, is_favourited: !l.is_favourited })
                 }
               >
-                {l.is_favourited ? '★' : '☆'}
+                <Star className={`h-4 w-4 ${l.is_favourited ? 'fill-current' : ''}`} />
               </button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  if (confirm('Delete this letter?')) del.mutate(l.id);
-                }}
-              >
-                Delete
-              </Button>
+              {confirmDeleteId === l.id ? (
+                <div className="flex items-center gap-2 text-xs">
+                  <span>Are you sure?</span>
+                  <button type="button" className="text-red-600" onClick={() => del.mutate(l.id)}>
+                    Yes, delete
+                  </button>
+                  <button type="button" onClick={() => setConfirmDeleteId(null)}>
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <Button variant="ghost" size="sm" onClick={() => setConfirmDeleteId(l.id)}>
+                  Delete
+                </Button>
+              )}
             </div>
-          </li>
+          </motion.li>
         ))}
       </ul>
       {isFree && letters.length > 5 ? (

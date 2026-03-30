@@ -8,7 +8,7 @@ export function Skeleton({
   return (
     <div
       className={cn(
-        'animate-pulse rounded-md bg-slate-200/80',
+        'skeleton-shimmer rounded-md',
         className
       )}
     />

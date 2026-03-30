@@ -3,10 +3,10 @@ import { cn } from '@/lib/utils';
 
 const variants = {
   primary:
-    'bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] shadow-sm',
+    'bg-gradient-to-br from-[var(--color-primary-500)] to-[var(--color-primary-600)] text-white shadow-md hover:-translate-y-[1px] hover:shadow-lg active:scale-[0.98]',
   secondary:
-    'border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-secondary)] hover:bg-slate-50',
-  ghost: 'text-[var(--color-secondary)] hover:bg-slate-100',
+    'border border-[var(--color-primary-200)] bg-white text-[var(--color-primary-700)] hover:bg-[var(--color-primary-50)]',
+  ghost: 'text-[var(--color-secondary)] hover:bg-[var(--color-surface-2)]',
   danger: 'bg-[var(--color-danger)] text-white hover:bg-red-600',
 };
 
@@ -42,7 +42,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       type="button"
       disabled={disabled || loading}
       className={cn(
-        'inline-flex items-center justify-center gap-2 rounded-lg font-semibold transition disabled:cursor-not-allowed disabled:opacity-60',
+        'inline-flex min-w-[88px] items-center justify-center gap-2 rounded-md font-semibold transition-all duration-150 ease-in-out focus-visible:focus-ring disabled:cursor-not-allowed disabled:opacity-60',
         variants[variant],
         sizes[size],
         className

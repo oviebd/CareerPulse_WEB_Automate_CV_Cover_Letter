@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
+import { Briefcase, LayoutTemplate, Upload, Wand2 } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -108,6 +110,8 @@ function JobCVRow({
 
 export default function CVOverviewPage() {
   const { toast } = useToast();
+  const [confirmDeleteCoreId, setConfirmDeleteCoreId] = useState<string | null>(null);
+  const [confirmDeleteJobId, setConfirmDeleteJobId] = useState<string | null>(null);
   const {
     data: coreVersions = [],
     isLoading: coreVersionsLoading,
@@ -139,7 +143,6 @@ export default function CVOverviewPage() {
   }, [jobCVs, jobSearch, jobSort]);
 
   const handleDeleteCore = async (id: string) => {
-    if (!confirm('Delete this core CV version?')) return;
     try {
       await deleteCore.mutateAsync(id);
       toast('Core CV version deleted.', 'success');
@@ -149,7 +152,6 @@ export default function CVOverviewPage() {
   };
 
   const handleDeleteJob = async (id: string) => {
-    if (!confirm('Delete this job-specific CV?')) return;
     try {
       await archiveJob.mutateAsync(id);
       toast('Job CV deleted.', 'success');
@@ -166,7 +168,8 @@ export default function CVOverviewPage() {
       </p>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Card className="p-4">
+        <Card className="p-4" hoverable>
+          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-700"><Upload className="h-5 w-5" /></span>
           <h2 className="font-semibold">Upload</h2>
           <p className="mt-2 text-sm text-[var(--color-muted)]">
             PDF or DOCX up to 10MB. We extract structure with AI.
@@ -175,7 +178,8 @@ export default function CVOverviewPage() {
             Upload CV
           </Link>
         </Card>
-        <Card className="p-4">
+        <Card className="p-4" hoverable>
+          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-violet-100 text-violet-700"><LayoutTemplate className="h-5 w-5" /></span>
           <h2 className="font-semibold">Edit &amp; templates</h2>
           <p className="mt-2 text-sm text-[var(--color-muted)]">
             Fine-tune sections and choose export layouts.
@@ -189,7 +193,8 @@ export default function CVOverviewPage() {
             </Link>
           </div>
         </Card>
-        <Card className="p-4">
+        <Card className="p-4" hoverable>
+          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"><Wand2 className="h-5 w-5" /></span>
           <h2 className="font-semibold">Tailor for a Job</h2>
           <p className="mt-2 text-sm text-[var(--color-muted)]">
             Paste a job description and AI will optimise your CV for that role.
@@ -198,7 +203,8 @@ export default function CVOverviewPage() {
             Tailor My CV
           </Link>
         </Card>
-        <Card className="p-4">
+        <Card className="p-4" hoverable>
+          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-amber-100 text-amber-700"><Briefcase className="h-5 w-5" /></span>
           <h2 className="font-semibold">Job Specific CVs</h2>
           <p className="mt-2 text-sm text-[var(--color-muted)]">
             View and manage CVs tailored for specific roles.
@@ -238,7 +244,22 @@ export default function CVOverviewPage() {
 
           {!coreVersionsLoading &&
             coreVersions.map((cv) => (
-              <CoreCVRow key={cv.id} cv={cv} onDelete={(id) => void handleDeleteCore(id)} />
+              <motion.div key={cv.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+                <CoreCVRow
+                  cv={cv}
+                  onDelete={(id) => {
+                    if (confirmDeleteCoreId === id) {
+                      setConfirmDeleteCoreId(null);
+                      void handleDeleteCore(id);
+                      return;
+                    }
+                    setConfirmDeleteCoreId(id);
+                  }}
+                />
+                {confirmDeleteCoreId === cv.id ? (
+                  <div className="mt-1 text-xs text-red-600">Click delete again to confirm.</div>
+                ) : null}
+              </motion.div>
             ))}
         </div>
       </Card>
@@ -294,7 +315,18 @@ export default function CVOverviewPage() {
             <>
               {filteredJobCVs.length > 0 ? (
                 filteredJobCVs.map((cv) => (
-                  <JobCVRow key={cv.id} cv={cv} onDelete={(id) => void handleDeleteJob(id)} />
+                  <JobCVRow
+                    key={cv.id}
+                    cv={cv}
+                    onDelete={(id) => {
+                      if (confirmDeleteJobId === id) {
+                        setConfirmDeleteJobId(null);
+                        void handleDeleteJob(id);
+                        return;
+                      }
+                      setConfirmDeleteJobId(id);
+                    }}
+                  />
                 ))
               ) : (
                 <p className="py-8 text-center text-sm text-[var(--color-muted)]">

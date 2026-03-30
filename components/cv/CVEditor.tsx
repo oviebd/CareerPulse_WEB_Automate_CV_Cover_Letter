@@ -1,5 +1,6 @@
 'use client';
 
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCVProfile, useCoreCVVersions } from '@/hooks/useCV';
@@ -9,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { CVEditorPanel } from '@/components/cv/CVEditorPanel';
 import { Card } from '@/components/ui/card';
 import { Select } from '@/components/ui/select';
+import { Progress } from '@/components/ui/progress';
 import { FeatureGate, TemplateGate } from '@/components/shared/FeatureGate';
 import { useToast } from '@/components/ui/toast';
 import type { CVData } from '@/types';
@@ -16,6 +18,7 @@ import type { CVTemplate, SubscriptionTier } from '@/types';
 import { canUseTemplate } from '@/lib/subscription';
 import { formatDate } from '@/lib/utils';
 import { useSearchParams } from 'next/navigation';
+import { Eye, EyeOff } from 'lucide-react';
 
 const SWATCHES = ['#2563EB', '#0d9488', '#7c3aed', '#dc2626', '#0f172a'];
 
@@ -46,6 +49,7 @@ function previewPayloadFromCVData(d: CVData): Record<string, unknown> {
 }
 
 export function CVEditor() {
+  const reduce = useReducedMotion();
   const queryClient = useQueryClient();
   const { data: coreVersions = [], isLoading: coreVersionsLoading } = useCoreCVVersions();
   const [selectedCoreCvId, setSelectedCoreCvId] = useState<string | null>(null);
@@ -93,6 +97,7 @@ export function CVEditor() {
   const [previewBusy, setPreviewBusy] = useState(false);
   const [settingDefault, setSettingDefault] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(true);
 
   const { data: templates = [], isLoading: templatesLoading } = useQuery({
     queryKey: ['cv-templates'],
@@ -322,8 +327,9 @@ export function CVEditor() {
   }
 
   return (
-    <div className="mx-auto max-w-[1400px] space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <div className="mx-auto max-w-[1500px] space-y-4">
+      <div className="sticky top-0 z-20 border-b border-[var(--color-border)] bg-white/95 py-3 backdrop-blur">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="font-display text-2xl font-bold">Edit CV</h1>
           <p className="mt-1 text-sm text-[var(--color-muted)]">
@@ -357,18 +363,36 @@ export function CVEditor() {
           >
             Export PDF
           </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setPreviewOpen((v) => !v)}
+            icon={previewOpen ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          >
+            {previewOpen ? 'Hide preview' : 'Preview'}
+          </Button>
           <span className="text-xs text-[var(--color-muted)]">
             {saveState === 'saved' ? '✓ Saved' : ''}
           </span>
         </div>
       </div>
+        <Progress value={cv?.completion_percentage ?? 0} className="mt-3 h-1" />
+      </div>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,480px)]">
+      <div className="relative flex gap-4">
         <Card className="p-4 sm:p-6">
           <CVEditorPanel value={cvData} onChange={handleChange} />
         </Card>
 
-        <div className="lg:sticky lg:top-4 lg:self-start space-y-4">
+        <AnimatePresence>
+          {previewOpen ? (
+            <motion.div
+              className="hidden xl:block xl:w-[40%] xl:min-w-[360px]"
+              initial={reduce ? undefined : { width: 0, opacity: 0 }}
+              animate={reduce ? undefined : { width: '40%', opacity: 1 }}
+              exit={reduce ? undefined : { width: 0, opacity: 0 }}
+            >
+              <div className="space-y-4 rounded-lg bg-[var(--color-surface-2)] p-3">
           <div>
             <p className="mb-2 text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
               Core CV version
@@ -447,7 +471,7 @@ export function CVEditor() {
               Print preview (A4)
             </p>
             <div
-              className="relative overflow-auto rounded-lg border border-[var(--color-border)] bg-slate-100 shadow-inner"
+              className="relative overflow-auto rounded-lg border border-[var(--color-primary-200)] bg-white shadow-inner"
               style={{ height: '70vh' }}
             >
               {previewBusy ? (
@@ -468,7 +492,10 @@ export function CVEditor() {
               )}
             </div>
           </div>
-        </div>
+              </div>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
       </div>
     </div>
   );
