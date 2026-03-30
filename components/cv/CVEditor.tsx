@@ -89,7 +89,7 @@ export function CVEditor() {
 
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('classic');
   const [accent, setAccent] = useState('#2563EB');
-  const [previewHtml, setPreviewHtml] = useState<string>('');
+  const [previewPdfUrl, setPreviewPdfUrl] = useState<string>('');
   const [previewBusy, setPreviewBusy] = useState(false);
   const [settingDefault, setSettingDefault] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -155,32 +155,48 @@ export function CVEditor() {
     if (!selectedTemplateId || !cvData) return;
     setPreviewBusy(true);
     try {
-      const res = await fetch('/api/cv/preview-html', {
+      const res = await fetch('/api/export', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          type: 'cv',
+          id: cv?.id,
           template_id: selectedTemplateId,
           accent_color: accent,
-          cv: previewPayloadFromCVData(cvData),
+          cv_snapshot: previewPayloadFromCVData(cvData),
         }),
       });
       if (!res.ok) {
-        setPreviewHtml('');
+        setPreviewPdfUrl('');
         return;
       }
-      setPreviewHtml(await res.text());
+      const blob = await res.blob();
+      const nextUrl = URL.createObjectURL(blob);
+      setPreviewPdfUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return nextUrl;
+      });
     } finally {
       setPreviewBusy(false);
     }
-  }, [selectedTemplateId, cvData, accent]);
+  }, [selectedTemplateId, cvData, accent, cv?.id]);
 
   useEffect(() => {
     if (!selectedTemplateId || !cvData || templatesLoading) return;
     const t = window.setTimeout(() => {
       void refreshPreview();
-    }, 450);
+    }, 700);
     return () => window.clearTimeout(t);
   }, [selectedTemplateId, cvData, templatesLoading, refreshPreview]);
+
+  useEffect(() => {
+    return () => {
+      setPreviewPdfUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return '';
+      });
+    };
+  }, []);
 
   async function setPreferredTemplate() {
     if (!cv || !selectedTemplateId) return;
@@ -428,24 +444,22 @@ export function CVEditor() {
 
           <div>
             <p className="mb-2 text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
-              Live preview (A4)
+              Print preview (A4)
             </p>
             <div
-              className="relative overflow-hidden rounded-lg border border-[var(--color-border)] bg-slate-100 shadow-inner"
-              style={{ aspectRatio: '210 / 297' }}
+              className="relative overflow-auto rounded-lg border border-[var(--color-border)] bg-slate-100 shadow-inner"
+              style={{ height: '70vh' }}
             >
               {previewBusy ? (
                 <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/80 text-sm text-[var(--color-muted)]">
                   Updating preview…
                 </div>
               ) : null}
-              {previewHtml ? (
+              {previewPdfUrl ? (
                 <iframe
-                  title="CV preview"
-                  className="h-[1123px] w-[794px] max-w-none origin-top-left scale-[0.55] sm:scale-[0.58] md:scale-[0.6]"
-                  style={{ transformOrigin: 'top left' }}
-                  srcDoc={previewHtml}
-                  sandbox="allow-same-origin allow-popups"
+                  title="CV print preview"
+                  className="min-h-[1100px] w-full"
+                  src={previewPdfUrl}
                 />
               ) : (
                 <div className="flex h-full min-h-[320px] items-center justify-center p-4 text-center text-sm text-[var(--color-muted)]">
