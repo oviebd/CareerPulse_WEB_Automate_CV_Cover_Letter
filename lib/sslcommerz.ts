@@ -1,7 +1,13 @@
+import crypto from 'node:crypto';
+
 const BASE_URL =
   process.env.SSLCOMMERZ_IS_LIVE === 'true'
     ? 'https://securepay.sslcommerz.com'
     : 'https://sandbox.sslcommerz.com';
+
+function md5(value: string): string {
+  return crypto.createHash('md5').update(value).digest('hex');
+}
 
 export async function initiatePayment(params: {
   total_amount: number;
@@ -64,4 +70,37 @@ export async function validatePayment(val_id: string): Promise<boolean> {
   );
   const data = (await res.json()) as { status?: string };
   return data.status === 'VALID' || data.status === 'VALIDATED';
+}
+
+/**
+ * Verify callback payload integrity using SSLCOMMERZ verify_sign/verify_key.
+ *
+ * Format is md5("k1=v1&k2=v2...&store_passwd=<md5(store_password)>").
+ */
+export function verifyCallbackSignature(
+  payload: Record<string, string>
+): boolean {
+  const verifySign = payload.verify_sign?.trim().toLowerCase();
+  const verifyKeysRaw = payload.verify_key?.trim();
+  const storePassword = process.env.SSLCOMMERZ_STORE_PASSWORD?.trim();
+  if (!verifySign || !verifyKeysRaw || !storePassword) return false;
+
+  const keys = verifyKeysRaw
+    .split(',')
+    .map((k) => k.trim())
+    .filter(Boolean);
+  if (!keys.length) return false;
+
+  const parts: string[] = [];
+  for (const key of keys) {
+    const value = payload[key];
+    if (typeof value === 'undefined') {
+      return false;
+    }
+    parts.push(`${key}=${value}`);
+  }
+
+  parts.push(`store_passwd=${md5(storePassword)}`);
+  const calculated = md5(parts.join('&'));
+  return calculated === verifySign;
 }

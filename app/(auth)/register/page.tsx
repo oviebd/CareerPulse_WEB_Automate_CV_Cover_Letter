@@ -1,12 +1,13 @@
 import { RegisterForm } from './register-form';
 
-export default function RegisterPage({
+export default async function RegisterPage({
   searchParams,
 }: {
-  searchParams: Record<string, string | string[] | undefined>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const params = await searchParams;
   const returnTo =
-    typeof searchParams.returnTo === 'string' ? searchParams.returnTo : undefined;
+    typeof params.returnTo === 'string' ? params.returnTo : undefined;
 
   return (
     <div className="grid min-h-screen lg:grid-cols-2">

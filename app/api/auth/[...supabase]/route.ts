@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { safeRedirectPath } from '@/lib/redirect';
 import { getSupabasePublicAnonKey } from '@/lib/supabase/public-env';
 
-type RouteContext = { params: { supabase: string[] } };
+type RouteContext = { params: Promise<{ supabase: string[] }> };
 
 /**
  * OAuth / magic-link / email confirmation callback (PKCE code exchange).
@@ -18,7 +18,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
     '/dashboard';
   const next = safeRedirectPath(nextRaw);
 
-  const segments = context.params.supabase ?? [];
+  const { supabase: routeSegments } = await context.params;
+  const segments = routeSegments ?? [];
   const last = segments[segments.length - 1];
   if (last !== 'callback' && !code) {
     return NextResponse.redirect(new URL('/login', origin));

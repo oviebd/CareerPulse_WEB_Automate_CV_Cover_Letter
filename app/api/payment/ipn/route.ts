@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { applySuccessfulPayment } from '@/lib/payment-sync';
-import { validatePayment } from '@/lib/sslcommerz';
+import { validatePayment, verifyCallbackSignature } from '@/lib/sslcommerz';
 import { createAdminClient } from '@/lib/supabase/server';
 import { sendPaymentReceiptEmail } from '@/lib/resend-mail';
 
 /**
- * SSLCommerz IPN — validate val_id server-side; idempotent via applySuccessfulPayment.
- * Add SSLCommerz hash verification against store password when you enable live IPN.
+ * SSLCommerz IPN — verify callback signature, then validate val_id server-side.
+ * Idempotent updates are handled by applySuccessfulPayment.
  */
 export async function POST(request: Request) {
   try {
@@ -21,6 +21,11 @@ export async function POST(request: Request) {
 
     if (!tran_id || !val_id) {
       return NextResponse.json({ error: 'bad_request' }, { status: 400 });
+    }
+
+    if (!verifyCallbackSignature(data)) {
+      console.error('IPN signature verification failed', tran_id);
+      return NextResponse.json({ error: 'invalid_signature' }, { status: 400 });
     }
 
     if (status && status !== 'VALID' && status !== 'VALIDATED') {

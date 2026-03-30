@@ -1,14 +1,15 @@
 import { LoginForm } from './login-form';
 
-export default function LoginPage({
+export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Record<string, string | string[] | undefined>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const params = await searchParams;
   const returnTo =
-    typeof searchParams.returnTo === 'string' ? searchParams.returnTo : undefined;
+    typeof params.returnTo === 'string' ? params.returnTo : undefined;
   const error =
-    typeof searchParams.error === 'string' ? searchParams.error : undefined;
+    typeof params.error === 'string' ? params.error : undefined;
 
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
