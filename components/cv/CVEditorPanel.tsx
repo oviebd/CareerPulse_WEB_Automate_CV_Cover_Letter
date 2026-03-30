@@ -30,6 +30,8 @@ export interface CVEditorPanelProps {
   hideAtsBanner?: boolean;
   /** Hide horizontal tab row when using a side nav. */
   hideFormTabBar?: boolean;
+  /** Hide the inline keyword chips strip (parent renders a custom keywords UI). */
+  hideKeywordsBanner?: boolean;
 }
 
 export function CVEditorPanel({
@@ -42,6 +44,7 @@ export function CVEditorPanel({
   onActiveTabChange,
   hideAtsBanner = false,
   hideFormTabBar = false,
+  hideKeywordsBanner = false,
 }: CVEditorPanelProps) {
   const [internalTab, setInternalTab] = useState<CVFormTab>('header');
   const isTabControlled = activeTabProp !== undefined && onActiveTabChange !== undefined;
@@ -213,7 +216,7 @@ export function CVEditorPanel({
         </div>
       )}
 
-      {highlightedKeywords && highlightedKeywords.length > 0 && (
+      {!hideKeywordsBanner && highlightedKeywords && highlightedKeywords.length > 0 && (
         <div className="flex flex-wrap gap-1.5 rounded-lg border border-amber-200 bg-amber-50 p-3">
           <span className="mr-1 text-xs font-medium text-amber-800">
             Highlighted keywords:

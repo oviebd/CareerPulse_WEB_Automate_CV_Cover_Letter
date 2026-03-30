@@ -477,7 +477,7 @@ export function CVEditor() {
         </div>
       </div>
       <div className="mt-3">
-        <ATSIndicator score={ats.score} previousScore={prevAtsScore} />
+        <ATSIndicator score={ats.score} previousScore={prevAtsScore} suggestions={ats.suggestions} />
       </div>
       </div>
 

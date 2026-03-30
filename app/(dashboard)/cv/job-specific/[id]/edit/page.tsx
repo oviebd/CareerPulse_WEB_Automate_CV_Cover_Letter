@@ -1,15 +1,17 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Select } from '@/components/ui/select';
-import { FeatureGate } from '@/components/shared/FeatureGate';
 import { CVEditorPanel } from '@/components/cv/CVEditorPanel';
+import { Sidebar } from '@/components/cv/premium/Sidebar';
+import { PreviewPanel } from '@/components/cv/premium/PreviewPanel';
+import { ATSIndicator } from '@/components/cv/premium/ATSIndicator';
+import { JobKeywordsBanner } from '@/components/cv/premium/JobKeywordsBanner';
+import type { CVFormTab } from '@/components/cv/CVFormFields';
 import {
   useJobSpecificCV,
   useUpdateJobSpecificCV,
@@ -18,9 +20,10 @@ import { useSubscription } from '@/hooks/useSubscription';
 import type { CVData } from '@/types';
 import type { CVTemplate, SubscriptionTier } from '@/types';
 import { canUseTemplate } from '@/lib/subscription';
+import { buildATSReport } from '@/lib/cv-ats';
+import { cloneCvData } from '@/lib/cv-clone';
 import { useToast } from '@/components/ui/toast';
-
-const SWATCHES = ['#2563EB', '#0d9488', '#7c3aed', '#dc2626', '#0f172a'];
+import { Undo2, Redo2, ChevronDown, ChevronUp } from 'lucide-react';
 
 function previewPayloadFromCVData(d: CVData): Record<string, unknown> {
   return {
@@ -35,7 +38,7 @@ function previewPayloadFromCVData(d: CVData): Record<string, unknown> {
     address: d.address ?? null,
     photo_url: d.photo_url ?? null,
     summary: d.summary,
-    section_visibility: {},
+    section_visibility: d.section_visibility ?? {},
     experience: d.experience ?? [],
     education: d.education ?? [],
     skills: d.skills ?? [],
@@ -47,6 +50,29 @@ function previewPayloadFromCVData(d: CVData): Record<string, unknown> {
   };
 }
 
+function patchFromCvData(data: CVData, selectedTemplateId: string, accent: string) {
+  return {
+    full_name: data.full_name,
+    professional_title: data.professional_title,
+    email: data.email,
+    phone: data.phone,
+    location: data.location,
+    linkedin_url: data.linkedin_url,
+    portfolio_url: data.portfolio_url,
+    website_url: data.website_url,
+    summary: data.summary,
+    experience: data.experience,
+    education: data.education,
+    skills: data.skills,
+    projects: data.projects,
+    certifications: data.certifications,
+    languages: data.languages,
+    awards: data.awards,
+    preferred_template_id: selectedTemplateId,
+    accent_color: accent,
+  };
+}
+
 export default function JobCVEditPage() {
   const { id } = useParams<{ id: string }>();
   const { data: jobCV, isLoading } = useJobSpecificCV(id);
@@ -54,14 +80,31 @@ export default function JobCVEditPage() {
   const [showJD, setShowJD] = useState(false);
 
   const { tier } = useSubscription();
+  const { toast } = useToast();
 
   const [draft, setDraft] = useState<CVData | null>(null);
+  const draftRef = useRef<CVData | null>(null);
+  draftRef.current = draft;
+
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('classic');
   const [accent, setAccent] = useState<string>('#2563EB');
   const [previewPdfUrl, setPreviewPdfUrl] = useState<string>('');
   const [previewBusy, setPreviewBusy] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const { toast } = useToast();
+  const [editorTab, setEditorTab] = useState<CVFormTab>('header');
+  const [rightTab, setRightTab] = useState<'preview' | 'design'>('preview');
+  const [zoom, setZoom] = useState(100);
+  const [page, setPage] = useState(1);
+  const [fontFamily, setFontFamily] = useState('Inter');
+  const [autosaveState, setAutosaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [prevAtsScore, setPrevAtsScore] = useState(0);
+
+  const [undoPast, setUndoPast] = useState<CVData[]>([]);
+  const [undoFuture, setUndoFuture] = useState<CVData[]>([]);
+  const burstStartRef = useRef<CVData | null>(null);
+  const historyDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const skipHistoryRef = useRef(false);
+  const allowUndoHistoryRef = useRef(false);
 
   const { data: templates = [], isLoading: templatesLoading } = useQuery({
     queryKey: ['cv-templates'],
@@ -90,6 +133,18 @@ export default function JobCVEditPage() {
   }, [templateMeta, tier]);
 
   useEffect(() => {
+    allowUndoHistoryRef.current = false;
+    const t = window.setTimeout(() => {
+      allowUndoHistoryRef.current = true;
+    }, 900);
+    return () => window.clearTimeout(t);
+  }, [id, jobCV?.id]);
+
+  useEffect(() => {
+    setDraft(null);
+  }, [id]);
+
+  useEffect(() => {
     if (!jobCV || draft) return;
     setDraft({
       full_name: jobCV.full_name ?? null,
@@ -103,6 +158,7 @@ export default function JobCVEditPage() {
       address: null,
       photo_url: null,
       summary: jobCV.summary ?? null,
+      section_visibility: {},
       experience: jobCV.experience ?? [],
       education: jobCV.education ?? [],
       skills: jobCV.skills ?? [],
@@ -114,8 +170,80 @@ export default function JobCVEditPage() {
     });
     setSelectedTemplateId(jobCV.preferred_template_id ?? 'classic');
     setAccent(jobCV.accent_color ?? '#6C63FF');
+    setUndoPast([]);
+    setUndoFuture([]);
+    burstStartRef.current = null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobCV]);
+
+  const handleChange = useCallback(
+    (data: CVData) => {
+      setDraft((prev) => {
+        if (prev && !skipHistoryRef.current && allowUndoHistoryRef.current) {
+          if (burstStartRef.current === null) {
+            burstStartRef.current = cloneCvData(prev);
+          }
+          if (historyDebounceRef.current) clearTimeout(historyDebounceRef.current);
+          historyDebounceRef.current = setTimeout(() => {
+            const snapshot = burstStartRef.current;
+            burstStartRef.current = null;
+            if (snapshot) {
+              setUndoPast((p) => [...p.slice(-49), snapshot]);
+              setUndoFuture([]);
+            }
+          }, 550);
+        }
+        skipHistoryRef.current = false;
+        update(patchFromCvData(data, selectedTemplateId, accent));
+        return data;
+      });
+    },
+    [update, selectedTemplateId, accent]
+  );
+
+  const undo = useCallback(() => {
+    setUndoPast((p) => {
+      if (!p.length) return p;
+      const snapshot = p[p.length - 1];
+      skipHistoryRef.current = true;
+      if (historyDebounceRef.current) clearTimeout(historyDebounceRef.current);
+      burstStartRef.current = null;
+      const cur = draftRef.current;
+      if (cur) setUndoFuture((f) => [cloneCvData(cur), ...f].slice(0, 50));
+      const next = cloneCvData(snapshot);
+      setDraft(next);
+      update(patchFromCvData(next, selectedTemplateId, accent));
+      return p.slice(0, -1);
+    });
+  }, [update, selectedTemplateId, accent]);
+
+  const redo = useCallback(() => {
+    setUndoFuture((f) => {
+      if (!f.length) return f;
+      const nextSnap = f[0];
+      skipHistoryRef.current = true;
+      if (historyDebounceRef.current) clearTimeout(historyDebounceRef.current);
+      burstStartRef.current = null;
+      const cur = draftRef.current;
+      if (cur) setUndoPast((p) => [...p.slice(-49), cloneCvData(cur)]);
+      const next = cloneCvData(nextSnap);
+      setDraft(next);
+      update(patchFromCvData(next, selectedTemplateId, accent));
+      return f.slice(1);
+    });
+  }, [update, selectedTemplateId, accent]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [undo, redo]);
 
   const refreshPreview = useCallback(async () => {
     if (!draft || !selectedTemplateId) return;
@@ -164,32 +292,12 @@ export default function JobCVEditPage() {
     };
   }, []);
 
-  const handleChange = useCallback(
-    (data: CVData) => {
-      setDraft(data);
-      update({
-        full_name: data.full_name,
-        professional_title: data.professional_title,
-        email: data.email,
-        phone: data.phone,
-        location: data.location,
-        linkedin_url: data.linkedin_url,
-        portfolio_url: data.portfolio_url,
-        website_url: data.website_url,
-        summary: data.summary,
-        experience: data.experience,
-        education: data.education,
-        skills: data.skills,
-        projects: data.projects,
-        certifications: data.certifications,
-        languages: data.languages,
-        awards: data.awards,
-        preferred_template_id: selectedTemplateId,
-        accent_color: accent,
-      });
-    },
-    [update, selectedTemplateId, accent]
-  );
+  useEffect(() => {
+    if (!draft) return;
+    setAutosaveState('saving');
+    const t = window.setTimeout(() => setAutosaveState('saved'), 500);
+    return () => window.clearTimeout(t);
+  }, [draft]);
 
   const exportPdf = useCallback(async () => {
     if (!draft || !selectedTemplateId) return;
@@ -226,6 +334,21 @@ export default function JobCVEditPage() {
     }
   }, [accent, allowed, draft, id, selectedTemplateId, toast]);
 
+  useEffect(() => {
+    if (templatesLoading || !templates.length) return;
+    if (templates.some((t) => t.id === selectedTemplateId)) return;
+    setSelectedTemplateId(templates[0].id);
+  }, [templatesLoading, templates, selectedTemplateId]);
+
+  const keywords = jobCV?.keywords_added ?? [];
+  const ats = draft
+    ? buildATSReport(draft, keywords)
+    : { score: 0, summary: '', suggestions: [], sections: {} };
+
+  useEffect(() => {
+    setPrevAtsScore((prev) => (ats.score === prev ? prev : ats.score));
+  }, [ats.score]);
+
   if (isLoading || !draft || !jobCV) {
     return (
       <div className="mx-auto max-w-4xl space-y-4">
@@ -234,154 +357,151 @@ export default function JobCVEditPage() {
     );
   }
 
-  const keywords = jobCV.keywords_added ?? [];
+  const saveLabel =
+    isSaving || autosaveState === 'saving'
+      ? 'Saving…'
+      : lastSaved || autosaveState === 'saved'
+        ? `Saved ${lastSaved ? lastSaved.toLocaleTimeString() : '✓'}`
+        : '';
 
   return (
-    <div className="mx-auto max-w-[1400px] space-y-4 lg:space-y-6">
-      {/* Job CV banner */}
-      <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div>
-            <h2 className="font-semibold text-blue-900">
-              Job CV for {jobCV.job_title}
-              {jobCV.company_name ? ` at ${jobCV.company_name}` : ''}
+    <div className="mx-auto max-w-[1650px] space-y-4">
+      <div className="rounded-2xl border border-slate-200/90 bg-gradient-to-br from-slate-50/80 to-white p-4 shadow-sm ring-1 ring-slate-200/60 sm:p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Job-tailored CV</p>
+            <h2 className="mt-1 font-display text-xl font-bold text-slate-900 sm:text-2xl">
+              {jobCV.job_title}
+              {jobCV.company_name ? (
+                <span className="font-semibold text-slate-600"> · {jobCV.company_name}</span>
+              ) : null}
             </h2>
-            {jobCV.ai_changes_summary && (
-              <p className="mt-1 text-sm text-blue-800">
-                {jobCV.ai_changes_summary}
-              </p>
-            )}
+            {jobCV.ai_changes_summary ? (
+              <p className="mt-2 text-sm leading-relaxed text-slate-600">{jobCV.ai_changes_summary}</p>
+            ) : null}
+            <Link
+              href="/cv/job-specific"
+              className="mt-3 inline-flex text-sm font-medium text-indigo-600 hover:text-indigo-800"
+            >
+              ← All Job CVs
+            </Link>
           </div>
           <button
             type="button"
-            className="shrink-0 text-xs font-medium text-blue-700 hover:underline"
+            className="flex shrink-0 items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-50"
             onClick={() => setShowJD(!showJD)}
           >
-            {showJD ? 'Hide' : 'View'} Job Description
+            {showJD ? (
+              <>
+                Hide job description <ChevronUp className="h-3.5 w-3.5" />
+              </>
+            ) : (
+              <>
+                View job description <ChevronDown className="h-3.5 w-3.5" />
+              </>
+            )}
           </button>
         </div>
-        {showJD && (
-          <pre className="mt-3 max-h-60 overflow-auto whitespace-pre-wrap rounded-lg bg-white p-3 text-xs text-slate-700">
+        {showJD ? (
+          <pre className="mt-4 max-h-64 overflow-auto whitespace-pre-wrap rounded-xl border border-slate-200 bg-white p-4 text-xs leading-relaxed text-slate-700 shadow-inner">
             {jobCV.job_description}
           </pre>
-        )}
+        ) : null}
       </div>
 
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <Link
-            href="/cv/job-specific"
-            className="text-sm font-medium text-[var(--color-muted)] hover:text-[var(--color-secondary)]"
-          >
-            &larr; All Job CVs
-          </Link>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-[var(--color-muted)]">
-            {isSaving
-              ? 'Saving...'
-              : lastSaved
-                ? `Saved ${lastSaved.toLocaleTimeString()}`
-                : ''}
-          </span>
-          <Button
-            variant="primary"
-            size="sm"
-            loading={exporting}
-            disabled={!allowed}
-            onClick={() => void exportPdf()}
-          >
-            Export PDF
-          </Button>
-        </div>
-      </div>
-
-      {/* Editor */}
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,480px)]">
-        <Card className="p-4 sm:p-6">
-          <CVEditorPanel
-            value={draft}
-            onChange={handleChange}
-            highlightedKeywords={keywords}
-          />
-        </Card>
-
-        <div className="lg:sticky lg:top-4 lg:self-start space-y-4">
+      <div className="sticky top-0 z-20 rounded-2xl border border-slate-200 bg-white/90 p-3 backdrop-blur">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
-              Template
+            <h1 className="font-display text-2xl font-bold">Edit job CV</h1>
+            <p className="mt-1 text-sm text-[var(--color-muted)]">
+              Same editor as your core CV — live ATS feedback, preview, and undo.
             </p>
-            <Select
-              label={templatesLoading ? 'Loading…' : 'Choose layout'}
-              value={selectedTemplateId}
-              disabled={templatesLoading || !templates.length}
-              options={templates.map((t) => ({
-                value: t.id,
-                label: t.name,
-              }))}
-              onChange={(e) => {
-                const next = e.target.value;
-                setSelectedTemplateId(next);
-                update({ preferred_template_id: next, accent_color: accent });
-              }}
-            />
-            {!templatesLoading && !allowed ? (
-              <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                You can preview this layout with your data here. Upgrade to export
-                this template.
-              </p>
-            ) : null}
           </div>
-
-          <FeatureGate requiredTier={['pro', 'premium', 'career']} userTier={tier}>
-            <div className="flex flex-wrap gap-2">
-              <span className="text-xs text-[var(--color-muted)]">Accent:</span>
-              {SWATCHES.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  className="h-8 w-8 rounded-full border-2 border-white shadow ring-2 ring-transparent ring-offset-2"
-                  style={{ background: c }}
-                  onClick={() => {
-                    setAccent(c);
-                    update({
-                      accent_color: c,
-                      preferred_template_id: selectedTemplateId,
-                    });
-                  }}
-                  aria-label={`Set accent ${c}`}
-                />
-              ))}
-            </div>
-          </FeatureGate>
-
-          <div>
-            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
-              Print preview (A4)
-            </p>
-            <div
-              className="relative overflow-auto rounded-lg border border-[var(--color-border)] bg-slate-100 shadow-inner"
-              style={{ height: '70vh' }}
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={!undoPast.length}
+              onClick={undo}
+              icon={<Undo2 className="h-4 w-4" />}
+              title="Undo (⌘Z)"
             >
-              {previewBusy ? (
-                <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/80 text-sm text-[var(--color-muted)]">
-                  Updating preview…
-                </div>
-              ) : null}
-              {previewPdfUrl ? (
-                <iframe
-                  title="CV print preview"
-                  className="min-h-[1100px] w-full"
-                  src={previewPdfUrl}
-                />
-              ) : (
-                <div className="flex h-full min-h-[320px] items-center justify-center p-4 text-center text-sm text-[var(--color-muted)]">
-                  Could not render preview.
-                </div>
-              )}
-            </div>
+              Undo
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={!undoFuture.length}
+              onClick={redo}
+              icon={<Redo2 className="h-4 w-4" />}
+              title="Redo (⌘⇧Z)"
+            >
+              Redo
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              loading={exporting}
+              disabled={!allowed}
+              onClick={() => void exportPdf()}
+            >
+              Export PDF
+            </Button>
+            <span className="text-xs text-[var(--color-muted)]">{saveLabel}</span>
           </div>
+        </div>
+        <div className="mt-3">
+          <ATSIndicator score={ats.score} previousScore={prevAtsScore} suggestions={ats.suggestions} />
+        </div>
+      </div>
+
+      {keywords.length > 0 ? <JobKeywordsBanner keywords={keywords} cv={draft} /> : null}
+
+      <div className="grid gap-4 xl:grid-cols-[260px_minmax(0,1fr)_420px]">
+        <Sidebar activeSection={editorTab} onSelect={setEditorTab} />
+        <div className="space-y-3">
+          <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200 sm:p-6">
+            <CVEditorPanel
+              value={draft}
+              onChange={handleChange}
+              activeTab={editorTab}
+              onActiveTabChange={setEditorTab}
+              highlightedKeywords={keywords}
+              hideAtsBanner
+              hideFormTabBar
+              hideKeywordsBanner={keywords.length > 0}
+            />
+          </div>
+        </div>
+        <div className="space-y-3">
+          <PreviewPanel
+            activeTab={rightTab}
+            onTabChange={setRightTab}
+            previewPdfUrl={previewPdfUrl}
+            previewBusy={previewBusy}
+            zoom={zoom}
+            onZoomChange={setZoom}
+            currentPage={page}
+            onPageChange={setPage}
+            selectedTemplateId={selectedTemplateId}
+            templates={templates}
+            onTemplateChange={(nextId) => {
+              setSelectedTemplateId(nextId);
+              update({ preferred_template_id: nextId, accent_color: accent });
+            }}
+            accent={accent}
+            onAccentChange={(c) => {
+              setAccent(c);
+              update({ accent_color: c, preferred_template_id: selectedTemplateId });
+            }}
+            fontFamily={fontFamily}
+            onFontFamilyChange={setFontFamily}
+          />
+          {!templatesLoading && !allowed && templateMeta ? (
+            <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              You can preview this layout with your data here. Upgrade to export with this template.
+            </p>
+          ) : null}
         </div>
       </div>
     </div>
