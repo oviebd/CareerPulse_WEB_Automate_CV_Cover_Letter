@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:hosting": "bash Build/package-hosting.sh",
     "start": "next start",
     "lint": "next lint",
     "test-templates": "tsx scripts/test-templates.ts"
