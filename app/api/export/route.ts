@@ -119,22 +119,27 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'invalid_body' }, { status: 400 });
       }
 
-      const { data: cvRow } = await supabase
-        .from('cv_profiles')
-        .select('id')
-        .eq('user_id', user.id)
-        .maybeSingle();
-      if (body.id && cvRow?.id !== body.id) {
-        return NextResponse.json({ error: 'not_found' }, { status: 404 });
-      }
+      const coreCvId = body.id ?? undefined;
 
       try {
         const snapshot = body.cv_snapshot ?? null;
+        if (!snapshot && coreCvId) {
+          const { data: cvRow, error: cvRowErr } = await supabase
+            .from('cv_profiles')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('id', coreCvId)
+            .maybeSingle();
+          if (cvRowErr || !cvRow) {
+            return NextResponse.json({ error: 'not_found' }, { status: 404 });
+          }
+        }
         const { pdf, filename } = await exportCV(
           user.id,
           templateId,
           accent,
-          snapshot
+          snapshot,
+          coreCvId
         );
         return new NextResponse(new Uint8Array(pdf), {
           status: 200,
@@ -202,6 +207,8 @@ export async function POST(request: Request) {
       .from('cv_profiles')
       .select('*')
       .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     if (format === 'docx') {

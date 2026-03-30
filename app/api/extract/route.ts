@@ -1,14 +1,15 @@
 import { PDFParse } from 'pdf-parse';
 import mammoth from 'mammoth';
 import { NextResponse } from 'next/server';
+import { randomUUID } from 'crypto';
 import { createClient } from '@/lib/supabase/server';
 import { extractCVFromText } from '@/lib/claude';
 import { computeCompletionPercentage } from '@/lib/cv-completion';
 import { assertFileSize, validatePdfOrDocx } from '@/lib/file-magic';
 import { normalizeExtractedCV } from '@/lib/cv-parse-payload';
-import { resolveEffectiveTier } from '@/lib/dev-subscription';
 import { rateLimitHit } from '@/lib/rate-limit';
-import { TIER_LIMITS, type SubscriptionTier } from '@/types';
+import { resolveEffectiveTier } from '@/lib/dev-subscription';
+import { TIER_LIMITS } from '@/types';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -36,6 +37,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'fileUrl_required' }, { status: 400 });
     }
 
+    // Enforce tier limit on number of saved core CV versions.
     const { data: profile } = await supabase
       .from('profiles')
       .select('subscription_tier')
@@ -44,21 +46,18 @@ export async function POST(request: Request) {
     const tier = resolveEffectiveTier(profile?.subscription_tier);
     const uploadLimit = TIER_LIMITS[tier].cvUploads;
 
-    const { data: existing } = await supabase
-      .from('cv_profiles')
-      .select('id, original_cv_file_url')
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    if (
-      uploadLimit !== Number.POSITIVE_INFINITY &&
-      existing?.original_cv_file_url &&
-      !body.force
-    ) {
-      return NextResponse.json(
-        { error: 'CV_UPLOAD_LIMIT', code: 'overwrite_requires_force' },
-        { status: 403 }
-      );
+    if (uploadLimit !== Number.POSITIVE_INFINITY && !body.force) {
+      const { count } = await supabase
+        .from('cv_profiles')
+        .select('id', { count: 'exact' })
+        .eq('user_id', user.id);
+      const existingCount = typeof count === 'number' ? count : 0;
+      if (existingCount >= uploadLimit) {
+        return NextResponse.json(
+          { error: 'CV_UPLOAD_LIMIT', code: 'overwrite_requires_force' },
+          { status: 403 }
+        );
+      }
     }
 
     const fileRes = await fetch(body.fileUrl);
@@ -103,24 +102,39 @@ export async function POST(request: Request) {
       parsed as Parameters<typeof computeCompletionPercentage>[0]
     );
 
-    const row = {
+    // IMPORTANT: extract-only endpoint.
+    // It must not persist anything to `cv_profiles`.
+    const { data: existing } = await supabase
+      .from('cv_profiles')
+      .select('id, preferred_cv_template_id, preferred_cl_template_id, created_at, updated_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const cvProfile = {
+      id: existing?.id ?? randomUUID(),
       user_id: user.id,
       ...parsed,
-      original_cv_file_url: body.fileUrl,
+      // Ensure arrays exist (editor expects them).
+      experience: (parsed.experience ?? []) as unknown[],
+      education: (parsed.education ?? []) as unknown[],
+      skills: (parsed.skills ?? []) as unknown[],
+      projects: (parsed.projects ?? []) as unknown[],
+      certifications: (parsed.certifications ?? []) as unknown[],
+      languages: (parsed.languages ?? []) as unknown[],
+      awards: (parsed.awards ?? []) as unknown[],
+      referrals: (parsed.referrals ?? []) as unknown[],
+      section_visibility: (parsed.section_visibility ?? {}) as Record<string, unknown>,
       completion_percentage: percentage,
       is_complete: isComplete,
+      // Do not store PDF location in DB (pdf is extract-only).
+      original_cv_file_url: null,
+      preferred_cv_template_id: existing?.preferred_cv_template_id ?? 'classic',
+      preferred_cl_template_id: existing?.preferred_cl_template_id ?? 'cl-classic',
+      created_at: existing?.created_at ?? new Date().toISOString(),
+      updated_at: existing?.updated_at ?? new Date().toISOString(),
     };
-
-    const { data: cvProfile, error: upsertError } = await supabase
-      .from('cv_profiles')
-      .upsert(row, { onConflict: 'user_id' })
-      .select()
-      .single();
-
-    if (upsertError) {
-      console.error('cv upsert', upsertError);
-      return NextResponse.json({ error: 'save_failed' }, { status: 500 });
-    }
 
     return NextResponse.json({ success: true, cvProfile });
   } catch (e) {

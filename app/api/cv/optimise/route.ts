@@ -103,6 +103,7 @@ export async function POST(request: Request) {
       job_title?: string;
       company_name?: string;
       job_description?: string;
+      core_cv_id?: string;
     };
 
     if (!body.job_title?.trim()) {
@@ -140,11 +141,20 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data: cvRow, error: cvErr } = await supabase
-      .from('cv_profiles')
-      .select('*')
-      .eq('user_id', user.id)
-      .maybeSingle();
+    const { data: cvRow, error: cvErr } = body.core_cv_id
+      ? await supabase
+          .from('cv_profiles')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('id', body.core_cv_id)
+          .maybeSingle()
+      : await supabase
+          .from('cv_profiles')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
     if (cvErr || !cvRow) {
       return NextResponse.json(
         { error: 'Please complete your CV profile before generating a job-specific version.' },

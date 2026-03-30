@@ -3,15 +3,16 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, notFound, useSearchParams } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 import { FeatureGate } from '@/components/shared/FeatureGate';
 import { Modal } from '@/components/ui/modal';
 import { CVFormFields, type CVFormTab } from '@/components/cv/CVFormFields';
-import { useCVProfile } from '@/hooks/useCV';
+import { Select } from '@/components/ui/select';
+import { useCVProfile, useCoreCVVersions } from '@/hooks/useCV';
 import { useJobSpecificCV } from '@/hooks/useJobSpecificCVs';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useToast } from '@/components/ui/toast';
@@ -93,6 +94,7 @@ function draftFromJobSpecificCV(j: JobSpecificCV): CVProfile {
 const SWATCHES = ['#2563EB', '#0d9488', '#7c3aed', '#dc2626', '#0f172a'];
 
 export default function CVTemplatePreviewPage() {
+  const queryClient = useQueryClient();
   const params = useParams();
   const templateId = typeof params.templateId === 'string' ? params.templateId : '';
   const { toast } = useToast();
@@ -100,7 +102,10 @@ export default function CVTemplatePreviewPage() {
   const jobCvId = searchParams.get('job_cv_id');
   const isJobMode = Boolean(jobCvId);
 
-  const { data: cv, isLoading: cvLoading, refetch } = useCVProfile();
+  const { data: coreVersions = [], isLoading: coreVersionsLoading } = useCoreCVVersions();
+  const [selectedCoreCvId, setSelectedCoreCvId] = useState<string | null>(null);
+
+  const { data: cv, isLoading: cvLoading, refetch } = useCVProfile(selectedCoreCvId);
   const {
     data: jobCv,
     isLoading: jobCvLoading,
@@ -116,6 +121,25 @@ export default function CVTemplatePreviewPage() {
   const [exporting, setExporting] = useState(false);
   const [settingDefault, setSettingDefault] = useState(false);
   const [showUpdateCoreModal, setShowUpdateCoreModal] = useState(false);
+  const [draftActive, setDraftActive] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const compute = () =>
+      setDraftActive(Boolean(sessionStorage.getItem('cv_draft')));
+    compute();
+    const onUpdate = () => compute();
+    window.addEventListener('cv_draft_updated', onUpdate);
+    return () => window.removeEventListener('cv_draft_updated', onUpdate);
+  }, []);
+
+  useEffect(() => {
+    if (isJobMode) return;
+    if (draftActive) return;
+    if (!coreVersionsLoading && coreVersions.length > 0) {
+      setSelectedCoreCvId((prev) => prev ?? coreVersions[0]?.id ?? null);
+    }
+  }, [isJobMode, draftActive, coreVersionsLoading, coreVersions]);
 
   const { data: templates = [], isLoading: templatesLoading } = useQuery({
     queryKey: ['cv-templates'],
@@ -227,10 +251,16 @@ export default function CVTemplatePreviewPage() {
       return;
     }
 
+    const forceOverwrite =
+      sessionStorage.getItem('cv_draft_force_overwrite') === '1';
     const res = await fetch('/api/cv', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        core_cv_id: draftActive ? undefined : selectedCoreCvId,
+        create_new: draftActive,
+        force_overwrite_existing: forceOverwrite,
+        preferred_cv_template_id: draftActive ? templateId : undefined,
         full_name: draft.full_name,
         professional_title: draft.professional_title,
         email: draft.email,
@@ -242,6 +272,8 @@ export default function CVTemplatePreviewPage() {
         address: draft.address,
         photo_url: draft.photo_url,
         summary: draft.summary,
+        // Ensure we never persist uploaded PDFs; we only keep extracted info.
+        original_cv_file_url: null,
         section_visibility: draft.section_visibility,
         experience: draft.experience,
         education: draft.education,
@@ -255,6 +287,22 @@ export default function CVTemplatePreviewPage() {
     });
     if (res.ok) {
       setSaveState('saved');
+      if (draftActive) {
+        try {
+          sessionStorage.removeItem('cv_draft');
+          sessionStorage.removeItem('cv_draft_force_overwrite');
+          window.dispatchEvent(new Event('cv_draft_updated'));
+        } catch {
+          // ignore
+        }
+        try {
+          const json = (await res.json()) as { cvProfile?: { id?: string } };
+          if (json.cvProfile?.id) setSelectedCoreCvId(json.cvProfile.id);
+        } catch {
+          // ignore
+        }
+      }
+      void queryClient.invalidateQueries({ queryKey: ['cv-versions'] });
       void refetch();
       setTimeout(() => setSaveState('idle'), 2000);
     } else {
@@ -290,6 +338,8 @@ export default function CVTemplatePreviewPage() {
               languages: draft.languages,
               certifications: draft.certifications,
               awards: draft.awards,
+                  // Ensure we never persist uploaded PDFs; we only keep extracted info.
+                  original_cv_file_url: null,
               section_visibility: draft.section_visibility,
             }
           : {
@@ -304,6 +354,8 @@ export default function CVTemplatePreviewPage() {
               address: draft.address,
               photo_url: draft.photo_url,
               summary: draft.summary,
+                  // Ensure we never persist uploaded PDFs; we only keep extracted info.
+                  original_cv_file_url: null,
               section_visibility: draft.section_visibility,
               experience: draft.experience,
               education: draft.education,
@@ -329,6 +381,10 @@ export default function CVTemplatePreviewPage() {
 
   async function setPreferredTemplate() {
     if (!cv || !templateId) return;
+    if (draftActive) {
+      toast('Press Save first to persist your core CV.', 'error');
+      return;
+    }
     setSettingDefault(true);
     const supabase = createClient();
     await supabase
@@ -457,6 +513,32 @@ export default function CVTemplatePreviewPage() {
           <p className="mt-1 text-sm text-[var(--color-muted)]">
             Edit your details on the left; the preview updates as you type. Save when you are happy, then export PDF.
           </p>
+          {!isJobMode ? (
+            <div className="mt-4 max-w-sm">
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                Core CV version
+              </p>
+              <Select
+                label={coreVersionsLoading ? 'Loading…' : 'Select saved core CV'}
+                value={selectedCoreCvId ?? ''}
+                disabled={
+                  draftActive || coreVersionsLoading || coreVersions.length === 0
+                }
+                options={coreVersions.map((v) => ({
+                  value: v.id,
+                  label: `${v.full_name ?? 'Core CV'} · ${formatDate(
+                    v.created_at
+                  )}`,
+                }))}
+                onChange={(e) => setSelectedCoreCvId(e.target.value)}
+              />
+              {draftActive ? (
+                <p className="mt-2 text-sm text-[var(--color-muted)]">
+                  You have an upload draft. Press <strong>Save</strong> to create a new version.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {!isJobMode ? (
@@ -464,7 +546,7 @@ export default function CVTemplatePreviewPage() {
               variant="secondary"
               size="sm"
               loading={settingDefault}
-              disabled={!allowed}
+              disabled={!allowed || draftActive}
               onClick={() => void setPreferredTemplate()}
             >
               Set as default

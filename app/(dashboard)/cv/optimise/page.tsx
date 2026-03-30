@@ -1,16 +1,19 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Select } from '@/components/ui/select';
 import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
 import { CVEditorPanel } from '@/components/cv/CVEditorPanel';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useSaveJobSpecificCV } from '@/hooks/useJobSpecificCVs';
+import { useCoreCVVersions } from '@/hooks/useCV';
 import type { CVData } from '@/types';
+import { formatDate } from '@/lib/utils';
 
 interface OptimiseResult {
   optimised_cv: CVData;
@@ -24,6 +27,7 @@ export default function CVOptimisePage() {
   const { tier } = useSubscription();
   const { toast } = useToast();
   const saveJobCV = useSaveJobSpecificCV();
+  const { data: coreVersions = [], isLoading: coreVersionsLoading } = useCoreCVVersions();
 
   const [jobTitle, setJobTitle] = useState('');
   const [companyName, setCompanyName] = useState('');
@@ -35,10 +39,18 @@ export default function CVOptimisePage() {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [coreUpdateStatus, setCoreUpdateStatus] = useState<'idle' | 'saving'>('idle');
   const [savedId, setSavedId] = useState<string | null>(null);
+  const [baseCoreCvId, setBaseCoreCvId] = useState<string | null>(null);
 
   const isFree = tier === 'free';
   const jdLength = jobDescription.trim().length;
-  const canSubmit = jobTitle.trim().length > 0 && jdLength >= 100 && !isFree;
+  const canSubmit =
+    jobTitle.trim().length > 0 && jdLength >= 100 && !isFree && !!baseCoreCvId;
+
+  useEffect(() => {
+    if (!coreVersionsLoading && baseCoreCvId == null && coreVersions.length > 0) {
+      setBaseCoreCvId(coreVersions[0].id);
+    }
+  }, [coreVersionsLoading, coreVersions, baseCoreCvId]);
 
   const handleGenerate = useCallback(async () => {
     setIsGenerating(true);
@@ -54,6 +66,7 @@ export default function CVOptimisePage() {
           job_title: jobTitle.trim(),
           company_name: companyName.trim() || null,
           job_description: jobDescription.trim(),
+          core_cv_id: baseCoreCvId,
         }),
       });
       if (!res.ok) {
@@ -116,6 +129,8 @@ export default function CVOptimisePage() {
           address: editedCV.address,
           photo_url: editedCV.photo_url || null,
           summary: editedCV.summary,
+          // Ensure we never persist uploaded PDFs; we only keep extracted info.
+          original_cv_file_url: null,
           experience: editedCV.experience,
           education: editedCV.education,
           skills: editedCV.skills,
@@ -171,6 +186,16 @@ export default function CVOptimisePage() {
               </div>
             ) : (
               <div className="space-y-4">
+                <Select
+                  label={coreVersionsLoading ? 'Loading…' : 'Base core CV'}
+                  value={baseCoreCvId ?? ''}
+                  disabled={coreVersionsLoading || coreVersions.length === 0}
+                  options={coreVersions.map((v) => ({
+                    value: v.id,
+                    label: `${v.full_name ?? 'Core CV'} · ${formatDate(v.created_at)}`,
+                  }))}
+                  onChange={(e) => setBaseCoreCvId(e.target.value)}
+                />
                 <Input
                   label="Job Title"
                   placeholder="e.g. Senior Product Manager"

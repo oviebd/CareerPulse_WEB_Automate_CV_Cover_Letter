@@ -64,6 +64,7 @@ export function CVUploadForm() {
 
       const ext = file.name.split('.').pop()?.toLowerCase();
       const path = `${user.id}/${Date.now()}.${ext === 'docx' ? 'docx' : 'pdf'}`;
+      let canDeleteFromStorage = false;
 
       const { error: upErr } = await uploadCvFileWithProgress(
         supabase,
@@ -82,6 +83,8 @@ export function CVUploadForm() {
         return;
       }
 
+      canDeleteFromStorage = true;
+
       const { data: signed, error: signErr } = await supabase.storage
         .from('cv-uploads')
         .createSignedUrl(path, 3600);
@@ -92,73 +95,99 @@ export function CVUploadForm() {
         );
         setPhase('idle');
         setUploadProgress(0);
+        if (canDeleteFromStorage) {
+          try {
+            await supabase.storage.from('cv-uploads').remove([path]);
+          } catch (delErr) {
+            console.warn('cv-uploads remove failed', delErr);
+          }
+        }
         return;
       }
 
       setPhase('analysing');
 
-      let res: Response;
       try {
-        res = await fetch('/api/extract', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'same-origin',
-          body: JSON.stringify({ fileUrl: signed.signedUrl, force }),
-        });
-      } catch (e) {
-        const msg =
-          e instanceof Error ? e.message : 'Could not reach the server.';
-        reportError(`Import request failed: ${msg}`);
-        setPhase('idle');
-        setUploadProgress(0);
-        return;
-      }
-
-      const raw = await res.text();
-      let json: { error?: string; cvProfile?: CVProfile } = {};
-      try {
-        json = raw ? (JSON.parse(raw) as { error?: string; cvProfile?: CVProfile }) : {};
-      } catch {
-        reportError(
-          raw
-            ? `Import failed (${res.status}): ${raw.slice(0, 280)}`
-            : `Import failed: empty response (HTTP ${res.status}).`
-        );
-        setPhase('idle');
-        setUploadProgress(0);
-        return;
-      }
-
-      if (!res.ok) {
-        if (json.error === 'CV_UPLOAD_LIMIT') {
-          setShowOverwrite(true);
+        let res: Response;
+        try {
+          res = await fetch('/api/extract', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ fileUrl: signed.signedUrl, force }),
+          });
+        } catch (e) {
+          const msg =
+            e instanceof Error ? e.message : 'Could not reach the server.';
+          reportError(`Import request failed: ${msg}`);
           setPhase('idle');
           setUploadProgress(0);
           return;
         }
-        const hint =
-          (json.error && EXTRACT_ERROR_HINT[json.error]) ||
-          (json.error
-            ? `Import failed (${json.error}).`
-            : `Import failed (HTTP ${res.status}).`);
-        reportError(hint);
-        setPhase('idle');
-        setUploadProgress(0);
-        if (json.error === 'Unauthorized') {
-          router.push('/login');
-        }
-        return;
-      }
 
-      setPhase('complete');
-      setUploadProgress(100);
-      toast('CV imported.', 'success');
-      if (json.cvProfile) {
-        queryClient.setQueryData(['cv-profile'], json.cvProfile);
+        const raw = await res.text();
+        let json: { error?: string; cvProfile?: CVProfile } = {};
+        try {
+          json = raw
+            ? (JSON.parse(raw) as { error?: string; cvProfile?: CVProfile })
+            : {};
+        } catch {
+          reportError(
+            raw
+              ? `Import failed (${res.status}): ${raw.slice(0, 280)}`
+              : `Import failed: empty response (HTTP ${res.status}).`
+          );
+          setPhase('idle');
+          setUploadProgress(0);
+          return;
+        }
+
+        if (!res.ok) {
+          const hint =
+            (json.error && EXTRACT_ERROR_HINT[json.error]) ||
+            (json.error
+              ? `Import failed (${json.error}).`
+              : `Import failed (HTTP ${res.status}).`);
+          reportError(hint);
+          setPhase('idle');
+          setUploadProgress(0);
+          if (json.error === 'Unauthorized') {
+            router.push('/login');
+          }
+          return;
+        }
+
+        if (json.cvProfile) {
+          // Store extraction as a local draft.
+          // It will be persisted to DB only when the user presses Save.
+          sessionStorage.setItem('cv_draft', JSON.stringify(json.cvProfile));
+          sessionStorage.setItem(
+            'cv_draft_force_overwrite',
+            force ? '1' : '0'
+          );
+          window.dispatchEvent(new Event('cv_draft_updated'));
+          queryClient.setQueryData(
+            ['cv-profile', user.id, 'latest'],
+            json.cvProfile
+          );
+        }
+
+        setPhase('complete');
+        setUploadProgress(100);
+        toast('CV imported. Review and press Save.', 'success');
+        router.push('/cv/edit');
+        router.refresh();
+      } finally {
+        // Don't keep user PDFs in storage.
+        if (canDeleteFromStorage) {
+          try {
+            await supabase.storage.from('cv-uploads').remove([path]);
+          } catch (delErr) {
+            // Don't block the UX if deletion fails.
+            console.warn('cv-uploads remove failed', delErr);
+          }
+        }
       }
-      await queryClient.invalidateQueries({ queryKey: ['cv-profile'] });
-      router.push('/cv/edit');
-      router.refresh();
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       reportError(`Unexpected error: ${msg}`);
@@ -183,7 +212,7 @@ export function CVUploadForm() {
 
   function onUploadClick() {
     if (!selectedFile || phase !== 'idle') return;
-    if (existing?.original_cv_file_url && limits.cvUploads === 1) {
+    if (existing && limits.cvUploads === 1) {
       setShowOverwrite(true);
       return;
     }

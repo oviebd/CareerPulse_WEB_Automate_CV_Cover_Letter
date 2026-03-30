@@ -82,6 +82,8 @@ export async function POST(request: Request) {
       .from('cv_profiles')
       .select('*')
       .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
       .maybeSingle();
     if (cvErr || !cvRow) {
       return NextResponse.json({ error: 'cv_profile_required' }, { status: 400 });

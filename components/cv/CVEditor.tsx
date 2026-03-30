@@ -1,20 +1,115 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { useCVProfile } from '@/hooks/useCV';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCVProfile, useCoreCVVersions } from '@/hooks/useCV';
+import { useSubscription } from '@/hooks/useSubscription';
+import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { CVEditorPanel } from '@/components/cv/CVEditorPanel';
+import { Card } from '@/components/ui/card';
+import { Select } from '@/components/ui/select';
+import { FeatureGate, TemplateGate } from '@/components/shared/FeatureGate';
+import { useToast } from '@/components/ui/toast';
 import type { CVData } from '@/types';
+import type { CVTemplate, SubscriptionTier } from '@/types';
+import { canUseTemplate } from '@/lib/subscription';
+import { formatDate } from '@/lib/utils';
+
+const SWATCHES = ['#2563EB', '#0d9488', '#7c3aed', '#dc2626', '#0f172a'];
+
+function previewPayloadFromCVData(d: CVData): Record<string, unknown> {
+  return {
+    full_name: d.full_name,
+    professional_title: d.professional_title,
+    email: d.email,
+    phone: d.phone,
+    location: d.location,
+    linkedin_url: d.linkedin_url,
+    portfolio_url: d.portfolio_url,
+    website_url: d.website_url,
+    address: d.address ?? null,
+    photo_url: d.photo_url ?? null,
+    summary: d.summary,
+    // Section visibility is not currently editable on /cv/edit, but
+    // renderTemplate expects this to exist (defaults to all visible).
+    section_visibility: {},
+    experience: d.experience ?? [],
+    education: d.education ?? [],
+    skills: d.skills ?? [],
+    projects: d.projects ?? [],
+    certifications: d.certifications ?? [],
+    languages: d.languages ?? [],
+    referrals: (d.referrals ?? []).slice(0, 2),
+    awards: d.awards ?? [],
+  };
+}
 
 export function CVEditor() {
-  const { data: cv, isLoading, refetch } = useCVProfile();
+  const queryClient = useQueryClient();
+  const { data: coreVersions = [], isLoading: coreVersionsLoading } = useCoreCVVersions();
+  const [selectedCoreCvId, setSelectedCoreCvId] = useState<string | null>(null);
+
+  const { data: cv, isLoading, refetch } = useCVProfile(selectedCoreCvId);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [cvData, setCvData] = useState<CVData | null>(null);
   const initialized = useRef(false);
 
+  const [draftActive, setDraftActive] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const compute = () => setDraftActive(Boolean(sessionStorage.getItem('cv_draft')));
+    compute();
+    const onUpdate = () => compute();
+    window.addEventListener('cv_draft_updated', onUpdate);
+    return () => window.removeEventListener('cv_draft_updated', onUpdate);
+  }, []);
+
+  useEffect(() => {
+    if (draftActive) return;
+    if (!coreVersionsLoading && coreVersions.length > 0) {
+      const latestId = coreVersions[0]?.id ?? null;
+      setSelectedCoreCvId((prev) => (prev ? prev : latestId));
+    }
+  }, [coreVersionsLoading, coreVersions, draftActive]);
+
+  useEffect(() => {
+    // Reset initialization when the user changes versions (or a draft appears).
+    initialized.current = false;
+  }, [selectedCoreCvId, draftActive]);
+
+  const { toast } = useToast();
+  const { tier } = useSubscription();
+
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('classic');
+  const [accent, setAccent] = useState('#2563EB');
+  const [previewHtml, setPreviewHtml] = useState<string>('');
+  const [previewBusy, setPreviewBusy] = useState(false);
+  const [settingDefault, setSettingDefault] = useState(false);
+
+  const { data: templates = [], isLoading: templatesLoading } = useQuery({
+    queryKey: ['cv-templates'],
+    queryFn: async (): Promise<CVTemplate[]> => {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from('cv_templates')
+        .select('*')
+        .eq('type', 'cv')
+        .order('sort_order');
+      return (data ?? []) as CVTemplate[];
+    },
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const templateMeta = templates.find((t) => t.id === selectedTemplateId) ?? null;
+  const allowed = templateMeta
+    ? canUseTemplate(templateMeta.available_tiers as SubscriptionTier[], tier)
+    : false;
+
   useEffect(() => {
     if (!cv || initialized.current) return;
     initialized.current = true;
+    setSelectedTemplateId(cv.preferred_cv_template_id ?? 'classic');
     setCvData({
       full_name: cv.full_name ?? null,
       professional_title: cv.professional_title ?? null,
@@ -42,13 +137,80 @@ export function CVEditor() {
     setCvData(data);
   }, []);
 
+  useEffect(() => {
+    if (templatesLoading || !templates.length) return;
+    if (templates.some((t) => t.id === selectedTemplateId)) return;
+    // Fallback if the saved preferred template was deleted/changed.
+    setSelectedTemplateId(templates[0].id);
+  }, [templatesLoading, templates, selectedTemplateId]);
+
+  const refreshPreview = useCallback(async () => {
+    if (!selectedTemplateId || !cvData) return;
+    setPreviewBusy(true);
+    try {
+      const res = await fetch('/api/cv/preview-html', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          template_id: selectedTemplateId,
+          accent_color: accent,
+          cv: previewPayloadFromCVData(cvData),
+        }),
+      });
+      if (!res.ok) {
+        setPreviewHtml('');
+        return;
+      }
+      setPreviewHtml(await res.text());
+    } finally {
+      setPreviewBusy(false);
+    }
+  }, [selectedTemplateId, cvData, accent]);
+
+  useEffect(() => {
+    if (!selectedTemplateId || !cvData || templatesLoading) return;
+    const t = window.setTimeout(() => {
+      void refreshPreview();
+    }, 450);
+    return () => window.clearTimeout(t);
+  }, [selectedTemplateId, cvData, templatesLoading, refreshPreview]);
+
+  async function setPreferredTemplate() {
+    if (!cv || !selectedTemplateId) return;
+    if (draftActive) {
+      toast('Press Save first to persist your core CV.', 'error');
+      return;
+    }
+    setSettingDefault(true);
+    try {
+      const supabase = createClient();
+      await supabase
+        .from('cv_profiles')
+        .update({ preferred_cv_template_id: selectedTemplateId })
+        .eq('id', cv.id);
+      toast('Default template updated.', 'success');
+      void refetch();
+    } catch (e) {
+      toast('Could not update template.', 'error');
+    } finally {
+      setSettingDefault(false);
+    }
+  }
+
   async function save() {
     if (!cvData) return;
     setSaveState('saving');
+
+    const forceOverwrite =
+      sessionStorage.getItem('cv_draft_force_overwrite') === '1';
     const res = await fetch('/api/cv', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        core_cv_id: draftActive ? undefined : selectedCoreCvId,
+        create_new: draftActive,
+        force_overwrite_existing: forceOverwrite,
+        preferred_cv_template_id: draftActive ? selectedTemplateId : undefined,
         full_name: cvData.full_name,
         professional_title: cvData.professional_title,
         email: cvData.email,
@@ -60,6 +222,8 @@ export function CVEditor() {
         address: cvData.address,
         photo_url: cvData.photo_url || null,
         summary: cvData.summary,
+        // Ensure we never persist uploaded PDFs; we only keep extracted info.
+        original_cv_file_url: null,
         section_visibility: {},
         experience: cvData.experience,
         education: cvData.education,
@@ -73,6 +237,21 @@ export function CVEditor() {
     });
     if (res.ok) {
       setSaveState('saved');
+      // Persist has completed; draft is no longer needed.
+      try {
+        sessionStorage.removeItem('cv_draft');
+        sessionStorage.removeItem('cv_draft_force_overwrite');
+        window.dispatchEvent(new Event('cv_draft_updated'));
+      } catch {
+        // ignore
+      }
+      try {
+        const json = (await res.json()) as { cvProfile?: { id?: string } };
+        if (json.cvProfile?.id) setSelectedCoreCvId(json.cvProfile.id);
+      } catch {
+        // ignore
+      }
+      void queryClient.invalidateQueries({ queryKey: ['cv-versions'] });
       void refetch();
       setTimeout(() => setSaveState('idle'), 2000);
     } else {
@@ -85,10 +264,15 @@ export function CVEditor() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="font-display text-2xl font-bold">Edit CV</h1>
-        <div className="flex items-center gap-3">
+    <div className="mx-auto max-w-[1400px] space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="font-display text-2xl font-bold">Edit CV</h1>
+          <p className="mt-1 text-sm text-[var(--color-muted)]">
+            Choose a template and preview updates live while you edit.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
           <span className="text-xs text-[var(--color-muted)]">
             {cv ? (
               <>
@@ -98,7 +282,12 @@ export function CVEditor() {
               'New profile'
             )}
           </span>
-          <Button variant="primary" size="sm" loading={saveState === 'saving'} onClick={() => void save()}>
+          <Button
+            variant="primary"
+            size="sm"
+            loading={saveState === 'saving'}
+            onClick={() => void save()}
+          >
             Save
           </Button>
           <span className="text-xs text-[var(--color-muted)]">
@@ -106,7 +295,116 @@ export function CVEditor() {
           </span>
         </div>
       </div>
-      <CVEditorPanel value={cvData} onChange={handleChange} />
+
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,480px)]">
+        <Card className="p-4 sm:p-6">
+          <CVEditorPanel value={cvData} onChange={handleChange} />
+        </Card>
+
+        <div className="lg:sticky lg:top-4 lg:self-start space-y-4">
+          <div>
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+              Core CV version
+            </p>
+            <Select
+              label={coreVersionsLoading ? 'Loading…' : 'Select saved core CV'}
+              value={selectedCoreCvId ?? ''}
+              disabled={draftActive || coreVersionsLoading || coreVersions.length === 0}
+              options={coreVersions.map((v) => ({
+                value: v.id,
+                label: `${v.full_name ?? 'Core CV'} · ${formatDate(v.created_at)}`,
+              }))}
+              onChange={(e) => setSelectedCoreCvId(e.target.value)}
+            />
+            {draftActive ? (
+              <p className="mt-2 text-sm text-[var(--color-muted)]">
+                You have an upload draft. Press <strong>Save</strong> to create a new version.
+              </p>
+            ) : null}
+          </div>
+
+          <div>
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+              Template
+            </p>
+            <Select
+              label={templatesLoading ? 'Loading…' : 'Choose layout'}
+              value={selectedTemplateId}
+              disabled={templatesLoading || !templates.length}
+              options={templates.map((t) => ({
+                value: t.id,
+                label: t.name,
+              }))}
+              onChange={(e) => setSelectedTemplateId(e.target.value)}
+            />
+            {!allowed && templateMeta ? (
+              <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                Upgrade to set this template as default.
+              </p>
+            ) : null}
+          </div>
+
+          <TemplateGate
+            availableTiers={(templateMeta?.available_tiers ?? []) as SubscriptionTier[]}
+            userTier={tier}
+          >
+            <Button
+              variant="secondary"
+              size="sm"
+              loading={settingDefault}
+              disabled={!allowed || draftActive}
+              onClick={() => void setPreferredTemplate()}
+            >
+              Set as default
+            </Button>
+          </TemplateGate>
+
+          <FeatureGate requiredTier={['pro', 'premium', 'career']} userTier={tier}>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-[var(--color-muted)]">Accent:</span>
+              {SWATCHES.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  className="h-8 w-8 rounded-full border-2 border-white shadow ring-2 ring-transparent ring-offset-2"
+                  style={{ background: c }}
+                  onClick={() => setAccent(c)}
+                  aria-label={`Set accent ${c}`}
+                />
+              ))}
+            </div>
+          </FeatureGate>
+
+          <div>
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+              Live preview (A4)
+            </p>
+            <div
+              className="relative overflow-hidden rounded-lg border border-[var(--color-border)] bg-slate-100 shadow-inner"
+              style={{ aspectRatio: '210 / 297' }}
+            >
+              {previewBusy ? (
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/80 text-sm text-[var(--color-muted)]">
+                  Updating preview…
+                </div>
+              ) : null}
+              {previewHtml ? (
+                <iframe
+                  title="CV preview"
+                  className="h-[1123px] w-[794px] max-w-none origin-top-left scale-[0.55] sm:scale-[0.58] md:scale-[0.6]"
+                  style={{ transformOrigin: 'top left' }}
+                  srcDoc={previewHtml}
+                  sandbox="allow-same-origin allow-popups"
+                />
+              ) : (
+                <div className="flex h-full min-h-[320px] items-center justify-center p-4 text-center text-sm text-[var(--color-muted)]">
+                  Could not render preview.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

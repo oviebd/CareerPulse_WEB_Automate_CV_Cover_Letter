@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
@@ -52,6 +52,17 @@ export default function CVTemplatesPage() {
   const { tier } = useSubscription();
   const [color, setColor] = useState('#2563EB');
   const [exporting, setExporting] = useState<string | null>(null);
+  const [draftActive, setDraftActive] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const compute = () =>
+      setDraftActive(Boolean(sessionStorage.getItem('cv_draft')));
+    compute();
+    const onUpdate = () => compute();
+    window.addEventListener('cv_draft_updated', onUpdate);
+    return () => window.removeEventListener('cv_draft_updated', onUpdate);
+  }, []);
 
   const { data: templates = [] } = useQuery({
     queryKey: ['cv-templates'],
@@ -70,6 +81,10 @@ export default function CVTemplatesPage() {
   async function setPreferredTemplate(id: string) {
     if (!cv) {
       toast('Create your CV profile first.', 'error');
+      return;
+    }
+    if (draftActive) {
+      toast('Press Save first to persist your core CV.', 'error');
       return;
     }
     const supabase = createClient();
@@ -207,7 +222,7 @@ export default function CVTemplatesPage() {
                         <Button
                           variant="secondary"
                           size="sm"
-                          disabled={!cv || !allowed}
+                          disabled={!cv || !allowed || draftActive}
                           onClick={() => void setPreferredTemplate(t.id)}
                         >
                           Use as default
@@ -217,7 +232,7 @@ export default function CVTemplatesPage() {
                         variant="secondary"
                         size="sm"
                         loading={exporting === t.id}
-                        disabled={!hasEditableCv || !allowed}
+                        disabled={!hasEditableCv || !allowed || (!jobCvId && draftActive)}
                         onClick={() => void exportPdf(t.id)}
                       >
                         Export PDF

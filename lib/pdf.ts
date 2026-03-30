@@ -485,7 +485,8 @@ export async function exportCV(
   userId: string,
   templateId: string,
   accentColor?: string,
-  snapshot?: Partial<CVProfile> | null
+  snapshot?: Partial<CVProfile> | null,
+  coreCvId?: string | null
 ): Promise<{ pdf: Buffer; filename: string }> {
   const supabase = createAdminClient();
   const { data: profile, error: pErr } = await supabase
@@ -512,16 +513,35 @@ export async function exportCV(
     throw new Error('TEMPLATE_FORBIDDEN');
   }
 
-  const { data: cvRow, error: cErr } = await supabase
-    .from('cv_profiles')
-    .select('*')
-    .eq('user_id', userId)
-    .maybeSingle();
-  if (cErr || !cvRow) {
+  // Base CV to merge over. When exporting a draft/template snapshot, we can
+  // skip requiring a saved core CV row.
+  let cvRow: CVProfile | null = null;
+  if (coreCvId) {
+    const { data, error } = await supabase
+      .from('cv_profiles')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('id', coreCvId)
+      .maybeSingle();
+    if (!error && data) cvRow = data as CVProfile;
+  } else {
+    const { data, error } = await supabase
+      .from('cv_profiles')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!error && data) cvRow = data as CVProfile;
+  }
+
+  // If no base row exists but a snapshot is provided, export using the snapshot.
+  // Otherwise we need a saved CV row.
+  if (!cvRow && !(snapshot && typeof snapshot === 'object')) {
     throw new Error('CV_NOT_FOUND');
   }
 
-  let cv = cvRow as CVProfile;
+  let cv = (cvRow ?? {}) as CVProfile;
   if (snapshot && typeof snapshot === 'object') {
     const { id: _i, user_id: _u, ...rest } = snapshot;
     cv = { ...cv, ...rest } as CVProfile;
