@@ -270,18 +270,6 @@ Optimise the candidate's CV for this role. Return a JSON object with:
 
     const { warnings } = validateOptimisedCV(cvData, parsed.optimised_cv);
 
-    console.log(
-      JSON.stringify({
-        model: CLAUDE_MODEL,
-        input_tokens: message.usage?.input_tokens ?? null,
-        output_tokens: message.usage?.output_tokens ?? null,
-        user_id: user.id,
-        feature_used: 'cv_optimise',
-        warnings_count: warnings.length,
-        timestamp: new Date().toISOString(),
-      })
-    );
-
     return NextResponse.json({
       optimised_cv: parsed.optimised_cv,
       ai_changes_summary: parsed.ai_changes_summary ?? '',

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useSubscription } from '@/hooks/useSubscription';
 import { createClient } from '@/lib/supabase/client';
+import { useToast } from '@/components/ui/toast';
 import { formatDate } from '@/lib/utils';
 
 type Payment = { id: string; plan: string; amount: number; status: string; created_at: string };
@@ -27,12 +28,18 @@ export default function BillingPage() {
     staleTime: 5 * 60 * 1000,
   });
 
+  const { toast } = useToast();
+
   async function pay(plan: PricingPlanKey) {
     const res = await fetch('/api/payment/initiate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ plan }),
     });
+    if (!res.ok) {
+      toast('Payment initiation failed. Please try again.', 'error');
+      return;
+    }
     const j = await res.json();
     if (j.gatewayUrl) {
       window.location.href = j.gatewayUrl;

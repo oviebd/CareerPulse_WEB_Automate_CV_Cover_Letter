@@ -192,17 +192,6 @@ export async function POST(request: Request) {
             }
           }
 
-          console.log(
-            JSON.stringify({
-              model: CLAUDE_MODEL,
-              input_tokens: inputTokens,
-              output_tokens: outputTokens,
-              user_id: user.id,
-              feature_used: 'cover_letter',
-              timestamp: new Date().toISOString(),
-            })
-          );
-
           controller.enqueue(
             encoder.encode(
               `data: ${JSON.stringify({ done: true, id: letterId })}\n\n`

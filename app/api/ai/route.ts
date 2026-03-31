@@ -7,6 +7,7 @@ import {
 import { resolveEffectiveTier } from '@/lib/dev-subscription';
 import { canAccessFeature } from '@/lib/subscription';
 import { createClient } from '@/lib/supabase/server';
+import { rateLimitHit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -67,6 +68,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
+    if (rateLimitHit(`ai:${user.id}`)) {
+      return NextResponse.json({ error: 'RATE_LIMIT' }, { status: 429 });
+    }
+
     const { data: profile } = await supabase
       .from('profiles')
       .select('subscription_tier')
@@ -79,14 +84,19 @@ export async function POST(request: Request) {
       payload?: Record<string, string | string[]>;
     };
     const tool = body.tool;
-    const payload = body.payload ?? {};
+    const rawPayload = body.payload ?? {};
+    const str = (key: string): string => {
+      const v = rawPayload[key];
+      return typeof v === 'string' ? v : Array.isArray(v) ? v.join(', ') : '';
+    };
+    const payload = rawPayload;
 
     if (!tool) {
       return NextResponse.json({ error: 'tool_required' }, { status: 400 });
     }
 
     if (tool === 'jd_analyze') {
-      const jd = payload.jobDescription ?? '';
+      const jd = str('jobDescription');
       if (!jd.trim()) {
         return NextResponse.json({ error: 'job_description_required' }, { status: 400 });
       }
@@ -112,7 +122,7 @@ export async function POST(request: Request) {
       if (!canAccessFeature(tier, 'aiExtrasAccess')) {
         return NextResponse.json({ error: 'upgrade_required' }, { status: 402 });
       }
-      const current = payload.text ?? '';
+      const current = str('text');
       const out = await claudeTextCompletion(
         'You rewrite LinkedIn summaries. Return only the new summary text.',
         `Rewrite for clarity and impact (max 2600 chars):\n${current}`,
@@ -125,7 +135,7 @@ export async function POST(request: Request) {
       if (!canAccessFeature(tier, 'aiExtrasAccess')) {
         return NextResponse.json({ error: 'upgrade_required' }, { status: 402 });
       }
-      const ctx = payload.context ?? '';
+      const ctx = str('context');
       const out = await claudeTextCompletion(
         'Return JSON with keys professional, friendly, concise — each a cold outreach email body.',
         `Context: ${ctx}`,
@@ -139,7 +149,7 @@ export async function POST(request: Request) {
       if (!canAccessFeature(tier, 'aiExtrasAccess')) {
         return NextResponse.json({ error: 'upgrade_required' }, { status: 402 });
       }
-      const bullet = payload.bullet ?? '';
+      const bullet = str('bullet');
       const out = await claudeTextCompletion(
         'You are an ATS-focused resume writer. Return ONLY valid JSON {"before":"","after":""}. Keep meaning truthful and evidence-based.',
         `Rewrite this CV bullet for maximum ATS compatibility and impact.
@@ -162,7 +172,7 @@ Bullet: ${bullet}`,
       if (needPremium) {
         return NextResponse.json({ error: 'upgrade_required' }, { status: 402 });
       }
-      const jd = payload.jobDescription ?? '';
+      const jd = str('jobDescription');
       const out = await claudeTextCompletion(
         'Return ONLY JSON: {"behavioral":[],"technical":[],"questions_to_ask":[]}',
         `Generate interview prep for:\n${jd}`,
@@ -176,13 +186,10 @@ Bullet: ${bullet}`,
       if (!canAccessFeature(tier, 'aiExtrasAccess')) {
         return NextResponse.json({ error: 'upgrade_required' }, { status: 402 });
       }
-      const section = payload.section ?? 'CV section';
-      const inputLabel = payload.input_label ?? 'field';
-      const text = payload.text ?? '';
-      const tone =
-        typeof payload.tone === 'string' && payload.tone.trim()
-          ? payload.tone.trim()
-          : 'professional';
+      const section = str('section') || 'CV section';
+      const inputLabel = str('input_label') || 'field';
+      const text = str('text');
+      const tone = str('tone') || 'professional';
       const tonesRaw = payload.tones;
       const tones =
         Array.isArray(tonesRaw) && tonesRaw.length
@@ -191,11 +198,11 @@ Bullet: ${bullet}`,
               .split(',')
               .map((t) => t.trim())
               .filter(Boolean);
-      const wordLimitRaw = Number(payload.word_limit ?? payload.char_limit ?? '100');
+      const wordLimitRaw = Number(str('word_limit') || str('char_limit') || '100');
       const wordLimit = Number.isFinite(wordLimitRaw)
         ? Math.min(500, Math.max(5, Math.round(wordLimitRaw)))
         : 100;
-      const context = payload.context ?? '';
+      const context = str('context');
 
       if (!text.trim()) {
         return NextResponse.json({ error: 'text_required' }, { status: 400 });
@@ -251,16 +258,6 @@ ${isCoverLetterRequest
   : ''}`;
 
       const systemPrompt = 'You are an expert CV writer. Return ONLY valid JSON. No markdown.';
-      console.log('[ai:cv_rewrite_suggestions] prompt', {
-        systemPrompt,
-        basePrompt,
-        section,
-        inputLabel,
-        tones,
-        wordLimit,
-        context,
-        isCoverLetterRequest,
-      });
 
       async function generateOnce(
         extraInstruction?: string
@@ -323,8 +320,6 @@ ${isCoverLetterRequest
 Return exactly 3 complete, meaningful suggestions, with tone/why per suggestion, plus best_index and best_reason.`
         );
       }
-
-      console.log('[ai:cv_rewrite_suggestions] response', result);
 
       return NextResponse.json({ result });
     }

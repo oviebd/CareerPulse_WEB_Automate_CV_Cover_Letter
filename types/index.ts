@@ -454,5 +454,3 @@ export interface JobSpecificCV {
   created_at: string;
   updated_at: string;
 }
-
-export type CVSaveAction = 'save_to_core' | 'save_as_job_cv';

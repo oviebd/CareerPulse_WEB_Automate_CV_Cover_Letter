@@ -52,10 +52,6 @@ body {
 }
 
 @layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
-
   .focus-ring {
     outline: 2px solid var(--color-primary-400);
     outline-offset: 2px;

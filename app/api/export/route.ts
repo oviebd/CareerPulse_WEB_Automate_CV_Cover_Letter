@@ -8,6 +8,7 @@ import {
   renderCoverLetterPageHtml,
 } from '@/lib/cover-letter-html';
 import { exportCV, generatePDF } from '@/lib/pdf';
+import { rateLimitHit } from '@/lib/rate-limit';
 import type { CoverLetter } from '@/types';
 
 export const runtime = 'nodejs';
@@ -44,6 +45,10 @@ export async function POST(request: Request) {
     } = await supabase.auth.getUser();
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (rateLimitHit(`export:${user.id}`)) {
+      return NextResponse.json({ error: 'RATE_LIMIT' }, { status: 429 });
     }
 
     const body = (await request.json()) as ExportBody;

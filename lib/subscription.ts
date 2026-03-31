@@ -18,15 +18,6 @@ export function canUseTemplate(
   return templateAvailableTiers.includes(userTier);
 }
 
-export function getRemainingGenerations(
-  tier: SubscriptionTier,
-  usedThisMonth: number
-): number {
-  const limit = TIER_LIMITS[tier].generationsPerMonth;
-  if (limit === Number.POSITIVE_INFINITY) return Number.POSITIVE_INFINITY;
-  return Math.max(0, limit - usedThisMonth);
-}
-
 export async function assertGenerationAllowed(
   userId: string,
   tier: SubscriptionTier,

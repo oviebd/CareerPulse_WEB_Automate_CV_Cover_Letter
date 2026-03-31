@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -42,6 +42,11 @@ export function GenerateCoverLetterForm() {
 
   const streamRef = useRef('');
   const rafRef = useRef<number | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => { abortRef.current?.abort(); };
+  }, []);
 
   const flushStream = useCallback(() => {
     setStreaming(streamRef.current);
@@ -49,6 +54,8 @@ export function GenerateCoverLetterForm() {
   }, []);
 
   async function generate() {
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
     setLoading(true);
     setStreaming('');
     streamRef.current = '';
@@ -56,6 +63,7 @@ export function GenerateCoverLetterForm() {
     setAts(null);
     const res = await fetch('/api/generate', {
       method: 'POST',
+      signal: abortRef.current.signal,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         jobDescription,
@@ -252,6 +260,7 @@ export function GenerateCoverLetterForm() {
                     templateId,
                   }),
                 });
+                if (!res.ok) { toast('PDF export failed.', 'error'); return; }
                 const j = await res.json();
                 if (j.pdfUrl) window.open(j.pdfUrl, '_blank');
               }}
@@ -272,6 +281,7 @@ export function GenerateCoverLetterForm() {
                     format: 'docx',
                   }),
                 });
+                if (!res.ok) { toast('DOCX export failed.', 'error'); return; }
                 const j = await res.json();
                 if (j.docxUrl) window.open(j.docxUrl, '_blank');
               }}

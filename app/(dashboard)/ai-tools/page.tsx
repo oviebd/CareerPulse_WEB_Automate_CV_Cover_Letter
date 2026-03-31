@@ -8,6 +8,14 @@ import { FeatureGate } from '@/components/shared/FeatureGate';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useToast } from '@/components/ui/toast';
 
+const AI_TABS: { id: string; label: string }[] = [
+  { id: 'jd', label: 'JD analyser' },
+  { id: 'linkedin', label: 'LinkedIn summary' },
+  { id: 'cold', label: 'Cold email' },
+  { id: 'bullet', label: 'Bullet improver' },
+  { id: 'interview', label: 'Interview prep' },
+];
+
 export default function AIToolsPage() {
   const { tier } = useSubscription();
   const { toast } = useToast();
@@ -40,13 +48,7 @@ export default function AIToolsPage() {
       <Tabs
         value={tab}
         onChange={setTab}
-        tabs={[
-          { id: 'jd', label: 'JD analyser' },
-          { id: 'linkedin', label: 'LinkedIn summary' },
-          { id: 'cold', label: 'Cold email' },
-          { id: 'bullet', label: 'Bullet improver' },
-          { id: 'interview', label: 'Interview prep' },
-        ]}
+        tabs={AI_TABS}
       />
       {tab === 'jd' ? (
         <div className="space-y-3">

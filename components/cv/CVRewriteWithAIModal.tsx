@@ -123,7 +123,6 @@ export function CVRewriteWithAIModal({
           best_reason?: string;
         };
       };
-      console.log('[AI Rewrite] API response', json);
       if (!res.ok) {
         if (res.status === 402) {
           toast('Upgrade required for Rewrite with AI.', 'error');

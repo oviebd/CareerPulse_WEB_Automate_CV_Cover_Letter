@@ -97,28 +97,6 @@ export function useCVProfile(coreCvId?: string | null) {
   });
 }
 
-export function useUpdateCVProfile() {
-  const qc = useQueryClient();
-  const userId = useAuthStore((s) => s.user?.id);
-  return useMutation({
-    mutationFn: async (patch: Record<string, unknown>) => {
-      if (!userId) throw new Error('Unauthorized');
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from('cv_profiles')
-        .update(patch)
-        .eq('user_id', userId)
-        .select()
-        .single();
-      if (error) throw error;
-      return data as CVProfile;
-    },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['cv-profile'] });
-    },
-  });
-}
-
 export function useDeleteCoreCVVersion() {
   const qc = useQueryClient();
   const userId = useAuthStore((s) => s.user?.id);

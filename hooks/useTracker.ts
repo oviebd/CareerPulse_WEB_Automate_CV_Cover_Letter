@@ -82,19 +82,3 @@ export function useUpsertJobApplication() {
   });
 }
 
-export function useDeleteJobApplication() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const supabase = createClient();
-      const { error } = await supabase
-        .from('job_applications')
-        .delete()
-        .eq('id', id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['job-applications'] });
-    },
-  });
-}

@@ -11,6 +11,16 @@ import { rateLimitHit } from '@/lib/rate-limit';
 import { resolveEffectiveTier } from '@/lib/dev-subscription';
 import { TIER_LIMITS } from '@/types';
 
+function isAllowedStorageUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    const supabaseHost = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!).host;
+    return parsed.protocol === 'https:' && parsed.host === supabaseHost;
+  } catch {
+    return false;
+  }
+}
+
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
@@ -35,6 +45,9 @@ export async function POST(request: Request) {
     };
     if (!body.fileUrl) {
       return NextResponse.json({ error: 'fileUrl_required' }, { status: 400 });
+    }
+    if (!isAllowedStorageUrl(body.fileUrl)) {
+      return NextResponse.json({ error: 'invalid_file_url' }, { status: 400 });
     }
 
     // Enforce tier limit on number of saved core CV versions.

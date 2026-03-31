@@ -67,8 +67,7 @@ async function handlePaymentReturn(request: Request) {
       return NextResponse.redirect(new URL('/settings/billing?payment=invalid', appUrl));
     }
 
-    const hasSignature = Boolean(callbackData.verify_sign && callbackData.verify_key);
-    if (hasSignature && !verifyCallbackSignature(callbackData)) {
+    if (!verifyCallbackSignature(callbackData)) {
       console.error('payment success signature verification failed', tran_id);
       return NextResponse.redirect(new URL('/settings/billing?payment=invalid', appUrl));
     }

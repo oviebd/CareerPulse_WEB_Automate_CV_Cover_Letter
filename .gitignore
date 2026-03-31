@@ -17,7 +17,11 @@
 
 # misc
 .DS_Store
+**/.DS_Store
 *.pem
+
+# build artifacts
+Build/*.zip
 
 # debug
 npm-debug.log*

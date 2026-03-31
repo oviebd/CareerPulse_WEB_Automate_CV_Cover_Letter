@@ -442,8 +442,8 @@ export default function JobCVEditPage() {
           draft,
           selectedTemplateId,
           accent,
-          jobCV.job_title,
-          jobCV.company_name
+          jobCV?.job_title ?? '',
+          jobCV?.company_name ?? null
         )
       );
       toast('Job CV saved.', 'success');
