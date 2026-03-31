@@ -2,9 +2,12 @@ import { readFile } from 'fs/promises';
 import path from 'path';
 import { NextResponse } from 'next/server';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
-import { resolveEffectiveTier } from '@/lib/dev-subscription';
 import { createClient } from '@/lib/supabase/server';
-import { exportCV, generatePDF, injectTemplateData } from '@/lib/pdf';
+import {
+  buildCoverLetterVariables,
+  renderCoverLetterPageHtml,
+} from '@/lib/cover-letter-html';
+import { exportCV, generatePDF } from '@/lib/pdf';
 import type { CoverLetter } from '@/types';
 
 export const runtime = 'nodejs';
@@ -22,6 +25,8 @@ type ExportBody = {
   cv_snapshot?: Record<string, unknown>;
   /** When provided, exports a job-specific CV instead of the core profile. */
   job_cv_id?: string;
+  /** Cover letter body override (editor preview / export without saving). */
+  content?: string;
 };
 
 export async function POST(request: Request) {
@@ -190,7 +195,6 @@ export async function POST(request: Request) {
       .select('subscription_tier')
       .eq('id', user.id)
       .single();
-    const tier = resolveEffectiveTier(profile?.subscription_tier);
 
     const { data: letter, error: leErr } = await supabase
       .from('cover_letters')
@@ -203,6 +207,8 @@ export async function POST(request: Request) {
     }
 
     const cl = letter as CoverLetter;
+    const contentForExport =
+      typeof body.content === 'string' ? body.content : cl.content;
     const { data: cvForLetter } = await supabase
       .from('cv_profiles')
       .select('*')
@@ -215,7 +221,7 @@ export async function POST(request: Request) {
       const doc = new Document({
         sections: [
           {
-            children: cl.content.split('\n').map(
+            children: contentForExport.split('\n').map(
               (line) =>
                 new Paragraph({
                   children: [new TextRun(line || ' ')],
@@ -252,31 +258,17 @@ export async function POST(request: Request) {
       'cover-letter',
       `${templateId}.html`
     );
-    let html = await readFile(templatePath, 'utf-8');
-    const today = new Date().toLocaleDateString(undefined, {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-    const vars: Record<string, string> = {
-      applicant_name: cvForLetter?.full_name ?? '',
-      applicant_email: cvForLetter?.email ?? '',
-      applicant_phone: cvForLetter?.phone ?? '',
-      applicant_location: cvForLetter?.location ?? '',
-      applicant_linkedin: cvForLetter?.linkedin_url ?? '',
-      company_name: cl.company_name ?? '',
-      job_title: cl.job_title ?? '',
-      date: today,
-      cover_letter_body: cl.content.replaceAll('\n', '<br/>'),
-      primary_color: body.primaryColor ?? body.accent_color ?? '#2563EB',
-    };
-    html = injectTemplateData(html, vars);
-    if (tier === 'free') {
-      html = html.replace(
-        '</body>',
-        '<div style="position:fixed;bottom:10mm;right:10mm;font-size:9px;color:#64748b;">Created with CV&amp;CL — cvai.app</div></body>'
-      );
-    }
+    const templateHtml = await readFile(templatePath, 'utf-8');
+    const vars = buildCoverLetterVariables(cvForLetter, {
+      content: contentForExport,
+      company_name: cl.company_name,
+      job_title: cl.job_title,
+    }, body.primaryColor ?? body.accent_color ?? '#2563EB');
+    const html = renderCoverLetterPageHtml(
+      templateHtml,
+      vars,
+      profile?.subscription_tier
+    );
     const pdfBuffer = await generatePDF(html);
     const filePath = `${user.id}/cl-${templateId}-${Date.now()}.pdf`;
     const { error: upErr } = await supabase.storage

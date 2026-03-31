@@ -85,3 +85,28 @@ export function useToggleCoverLetterFavourite() {
     },
   });
 }
+
+export function useUpdateCoverLetter() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: {
+      id: string;
+      content: string;
+      template_id: string;
+    }) => {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from('cover_letters')
+        .update({
+          content: payload.content,
+          template_id: payload.template_id,
+        })
+        .eq('id', payload.id);
+      if (error) throw error;
+    },
+    onSuccess: (_, v) => {
+      void qc.invalidateQueries({ queryKey: ['cover-letter', v.id] });
+      void qc.invalidateQueries({ queryKey: ['cover-letters'] });
+    },
+  });
+}

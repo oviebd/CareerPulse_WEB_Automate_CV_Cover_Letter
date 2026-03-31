@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Star } from 'lucide-react';
+import { LayoutTemplate, Star } from 'lucide-react';
 import { ATSBadge } from '@/components/shared/ATSBadge';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,14 +23,23 @@ export default function CoverLettersPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="font-display text-2xl font-bold">Cover letters</h1>
-        <Link
-          href="/cover-letters/new"
-          className="inline-flex rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-hover)]"
-        >
-          New
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/cover-letters/templates"
+            className="inline-flex items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2 text-sm font-semibold text-[var(--color-secondary)] hover:bg-[var(--color-surface-2)]"
+          >
+            <LayoutTemplate className="h-4 w-4" />
+            Templates
+          </Link>
+          <Link
+            href="/cover-letters/new"
+            className="inline-flex rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-hover)]"
+          >
+            New
+          </Link>
+        </div>
       </div>
       {isLoading ? <p className="text-sm text-[var(--color-muted)]">Loading…</p> : null}
       <ul className="space-y-3">

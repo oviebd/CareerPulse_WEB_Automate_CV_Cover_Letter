@@ -7,6 +7,7 @@ import {
   FileText,
   Kanban,
   LayoutDashboard,
+  LayoutTemplate,
   Mail,
   Menu,
   Settings,
@@ -43,7 +44,15 @@ const nav: NavItem[] = [
       { href: '/cv/job-specific', label: 'Job CVs', icon: Briefcase },
     ],
   },
-  { href: '/cover-letters', label: 'Cover letters', icon: Mail },
+  {
+    href: '/cover-letters',
+    label: 'Cover letters',
+    icon: Mail,
+    children: [
+      { href: '/cover-letters', label: 'My letters', icon: Mail },
+      { href: '/cover-letters/templates', label: 'Templates', icon: LayoutTemplate },
+    ],
+  },
   { href: '/tracker', label: 'Tracker', icon: Kanban },
   { href: '/ai-tools', label: 'AI tools', icon: Sparkles },
   { href: '/settings', label: 'Settings', icon: Settings },
@@ -57,6 +66,21 @@ function isCvChildActive(pathname: string, href: string) {
       pathname === '/cv/upload' ||
       pathname.startsWith('/cv/templates')
     );
+  }
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function isCoverLetterChildActive(pathname: string, href: string) {
+  if (href === '/cover-letters') {
+    return (
+      pathname === '/cover-letters' ||
+      pathname.startsWith('/cover-letters/new') ||
+      (pathname.startsWith('/cover-letters/') &&
+        !pathname.startsWith('/cover-letters/templates'))
+    );
+  }
+  if (href === '/cover-letters/templates') {
+    return pathname.startsWith('/cover-letters/templates');
   }
   return pathname === href || pathname.startsWith(`${href}/`);
 }
@@ -147,7 +171,13 @@ export function AppHeader() {
                         >
                           {item.children.map((child) => {
                             const ChildIcon = child.icon;
-                            const childActive = isCvChildActive(pathname, child.href);
+                            const childActive =
+                              item.href === '/cv'
+                                ? isCvChildActive(pathname, child.href)
+                                : item.href === '/cover-letters'
+                                  ? isCoverLetterChildActive(pathname, child.href)
+                                  : pathname === child.href ||
+                                    pathname.startsWith(`${child.href}/`);
                             return (
                               <Link
                                 key={child.href}
@@ -233,7 +263,13 @@ export function AppHeader() {
                         </div>
                         {item.children.map((child) => {
                           const ChildIcon = child.icon;
-                          const childActive = isCvChildActive(pathname, child.href);
+                          const childActive =
+                            item.href === '/cv'
+                              ? isCvChildActive(pathname, child.href)
+                              : item.href === '/cover-letters'
+                                ? isCoverLetterChildActive(pathname, child.href)
+                                : pathname === child.href ||
+                                  pathname.startsWith(`${child.href}/`);
                           return (
                             <Link
                               key={child.href}
