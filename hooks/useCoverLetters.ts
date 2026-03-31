@@ -93,6 +93,13 @@ export function useUpdateCoverLetter() {
       id: string;
       content: string;
       template_id: string;
+      company_name: string | null;
+      job_title: string | null;
+      applicant_name: string | null;
+      applicant_role: string | null;
+      applicant_email: string | null;
+      applicant_phone: string | null;
+      applicant_location: string | null;
     }) => {
       const supabase = createClient();
       const { error } = await supabase
@@ -100,6 +107,13 @@ export function useUpdateCoverLetter() {
         .update({
           content: payload.content,
           template_id: payload.template_id,
+          company_name: payload.company_name,
+          job_title: payload.job_title,
+          applicant_name: payload.applicant_name,
+          applicant_role: payload.applicant_role,
+          applicant_email: payload.applicant_email,
+          applicant_phone: payload.applicant_phone,
+          applicant_location: payload.applicant_location,
         })
         .eq('id', payload.id);
       if (error) throw error;

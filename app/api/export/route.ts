@@ -27,6 +27,13 @@ type ExportBody = {
   job_cv_id?: string;
   /** Cover letter body override (editor preview / export without saving). */
   content?: string;
+  company_name?: string | null;
+  job_title?: string | null;
+  applicant_name?: string | null;
+  applicant_role?: string | null;
+  applicant_email?: string | null;
+  applicant_phone?: string | null;
+  applicant_location?: string | null;
 };
 
 export async function POST(request: Request) {
@@ -209,6 +216,32 @@ export async function POST(request: Request) {
     const cl = letter as CoverLetter;
     const contentForExport =
       typeof body.content === 'string' ? body.content : cl.content;
+    const companyName =
+      typeof body.company_name === 'string'
+        ? body.company_name
+        : cl.company_name;
+    const jobTitle =
+      typeof body.job_title === 'string' ? body.job_title : cl.job_title;
+    const applicantName =
+      typeof body.applicant_name === 'string'
+        ? body.applicant_name
+        : cl.applicant_name;
+    const applicantRole =
+      typeof body.applicant_role === 'string'
+        ? body.applicant_role
+        : cl.applicant_role;
+    const applicantEmail =
+      typeof body.applicant_email === 'string'
+        ? body.applicant_email
+        : cl.applicant_email;
+    const applicantPhone =
+      typeof body.applicant_phone === 'string'
+        ? body.applicant_phone
+        : cl.applicant_phone;
+    const applicantLocation =
+      typeof body.applicant_location === 'string'
+        ? body.applicant_location
+        : cl.applicant_location;
     const { data: cvForLetter } = await supabase
       .from('cv_profiles')
       .select('*')
@@ -261,8 +294,13 @@ export async function POST(request: Request) {
     const templateHtml = await readFile(templatePath, 'utf-8');
     const vars = buildCoverLetterVariables(cvForLetter, {
       content: contentForExport,
-      company_name: cl.company_name,
-      job_title: cl.job_title,
+      company_name: companyName,
+      job_title: jobTitle,
+      applicant_name: applicantName,
+      applicant_role: applicantRole,
+      applicant_email: applicantEmail,
+      applicant_phone: applicantPhone,
+      applicant_location: applicantLocation,
     }, body.primaryColor ?? body.accent_color ?? '#2563EB');
     const html = renderCoverLetterPageHtml(
       templateHtml,

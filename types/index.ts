@@ -247,6 +247,11 @@ export interface CoverLetter {
   user_id: string;
   job_title: string | null;
   company_name: string | null;
+  applicant_name: string | null;
+  applicant_role: string | null;
+  applicant_email: string | null;
+  applicant_phone: string | null;
+  applicant_location: string | null;
   job_description: string;
   tone: CoverLetterTone;
   length: CoverLetterLength;

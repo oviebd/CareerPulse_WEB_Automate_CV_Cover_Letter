@@ -13,6 +13,11 @@ export function buildCoverLetterVariables(
     content: string;
     company_name: string | null;
     job_title: string | null;
+    applicant_name?: string | null;
+    applicant_role?: string | null;
+    applicant_email?: string | null;
+    applicant_phone?: string | null;
+    applicant_location?: string | null;
   },
   accent: string
 ): Record<string, string> {
@@ -22,13 +27,13 @@ export function buildCoverLetterVariables(
     day: 'numeric',
   });
   return {
-    applicant_name: cv?.full_name ?? '',
-    applicant_email: cv?.email ?? '',
-    applicant_phone: cv?.phone ?? '',
-    applicant_location: cv?.location ?? '',
+    applicant_name: letter.applicant_name ?? cv?.full_name ?? '',
+    applicant_email: letter.applicant_email ?? cv?.email ?? '',
+    applicant_phone: letter.applicant_phone ?? cv?.phone ?? '',
+    applicant_location: letter.applicant_location ?? cv?.location ?? '',
     applicant_linkedin: cv?.linkedin_url ?? '',
     company_name: letter.company_name ?? '',
-    job_title: letter.job_title ?? '',
+    job_title: letter.applicant_role ?? letter.job_title ?? '',
     date: today,
     cover_letter_body: letter.content.replaceAll('\n', '<br/>'),
     primary_color: accent,

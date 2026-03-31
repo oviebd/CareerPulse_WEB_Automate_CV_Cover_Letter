@@ -32,6 +32,31 @@ function looksLikeCompleteSentence(text: string): boolean {
   return true;
 }
 
+function normalizeParagraphSpacing(text: string): string {
+  return text
+    .replace(/\r\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function clampWords(text: string, maxWords: number): string {
+  const words = text.split(/\s+/).filter(Boolean);
+  if (words.length <= maxWords) return text.trim();
+  return words.slice(0, maxWords).join(' ').trim();
+}
+
+function enforceCoverLetterParagraphs(text: string): string {
+  const normalized = normalizeParagraphSpacing(text);
+  if (!normalized) return normalized;
+  if (normalized.includes('\n\n')) return normalized;
+  const sentences = normalized.match(/[^.!?]+[.!?]+/g)?.map((s) => s.trim()) ?? [normalized];
+  if (sentences.length <= 2) return normalized;
+  const splitAt = Math.ceil(sentences.length / 2);
+  const first = sentences.slice(0, splitAt).join(' ').trim();
+  const second = sentences.slice(splitAt).join(' ').trim();
+  return `${first}\n\n${second}`.trim();
+}
+
 export async function POST(request: Request) {
   try {
     const supabase = await createClient();
@@ -49,7 +74,10 @@ export async function POST(request: Request) {
       .single();
     const tier = resolveEffectiveTier(profile?.subscription_tier);
 
-    const body = (await request.json()) as { tool?: Tool; payload?: Record<string, string> };
+    const body = (await request.json()) as {
+      tool?: Tool;
+      payload?: Record<string, string | string[]>;
+    };
     const tool = body.tool;
     const payload = body.payload ?? {};
 
@@ -143,10 +171,21 @@ export async function POST(request: Request) {
       const section = payload.section ?? 'CV section';
       const inputLabel = payload.input_label ?? 'field';
       const text = payload.text ?? '';
-      const tone = payload.tone ?? 'professional';
-      const charLimitRaw = Number(payload.char_limit ?? '100');
-      const charLimit = Number.isFinite(charLimitRaw)
-        ? Math.min(2000, Math.max(50, Math.round(charLimitRaw)))
+      const tone =
+        typeof payload.tone === 'string' && payload.tone.trim()
+          ? payload.tone.trim()
+          : 'professional';
+      const tonesRaw = payload.tones;
+      const tones =
+        Array.isArray(tonesRaw) && tonesRaw.length
+          ? tonesRaw.filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
+          : tone
+              .split(',')
+              .map((t) => t.trim())
+              .filter(Boolean);
+      const wordLimitRaw = Number(payload.word_limit ?? payload.char_limit ?? '100');
+      const wordLimit = Number.isFinite(wordLimitRaw)
+        ? Math.min(500, Math.max(5, Math.round(wordLimitRaw)))
         : 100;
       const context = payload.context ?? '';
 
@@ -154,53 +193,130 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'text_required' }, { status: 400 });
       }
 
+      const isCoverLetterRequest =
+        /cover\s*letter/i.test(section) || /cover\s*letter/i.test(inputLabel);
+
       const basePrompt = `Rewrite content for a CV section.
 Section: ${section}
 Input label: ${inputLabel}
-Tone: ${tone}
-Maximum characters per suggestion: ${charLimit}
+Tone style: ${tones.join(', ') || 'professional'}
+Maximum words per suggestion: ${wordLimit}
 Extra context: ${context || 'N/A'}
 
 Current text:
 ${text}
 
 Return strict JSON exactly like:
-{"suggestions":["...", "...", "..."]}
+{
+  "suggestions":[
+    {"text":"...", "tone":"...", "why":"..."},
+    {"text":"...", "tone":"...", "why":"..."},
+    {"text":"...", "tone":"...", "why":"..."}
+  ],
+  "best_index": 0,
+  "best_reason":"..."
+}
 
 Rules:
 - Exactly 3 suggestions.
 - Each suggestion must be specific to the provided section and input label.
-- Keep each suggestion at or under ${charLimit} characters.
- - Do not fabricate facts; only rewrite existing meaning more clearly.
+- Keep each suggestion at or under ${wordLimit} words.
+- Do not fabricate facts; only rewrite existing meaning more clearly.
+- "tone" must be a short label matching the applied style.
+- "why" must be one concise sentence explaining the strength.
+- "best_index" must be 0, 1, or 2.
+- "best_reason" must explain which final suggestion to use and why.
 - Every suggestion must be a complete, meaningful sentence (not a fragment).
-- Every suggestion must end with "." or "!" or "?".`;
+- Every suggestion must end with "." or "!" or "?".
+- Keep formatting appropriate to field type:
+  - Cover letters / long text: preserve natural paragraph structure (2-4 paragraphs when useful).
+  - Summary/short fields: keep concise single paragraph unless line breaks are clearly better.
+${isCoverLetterRequest
+  ? `- This is a cover letter rewrite request. Write each suggestion as realistic letter body text:
+  - Start with a role/company-aware opening sentence.
+  - Keep a clear middle focused on relevant achievements and fit.
+  - End with a polite, forward-looking closing sentence.
+  - Keep first-person voice ("I"), natural flow, and professional tone.
+  - Do NOT output bullet points, outlines, headings, or fragmented statements.`
+  : ''}`;
 
       const systemPrompt = 'You are an expert CV writer. Return ONLY valid JSON. No markdown.';
+      console.log('[ai:cv_rewrite_suggestions] prompt', {
+        systemPrompt,
+        basePrompt,
+        section,
+        inputLabel,
+        tones,
+        wordLimit,
+        context,
+        isCoverLetterRequest,
+      });
 
-      async function generateOnce(extraInstruction?: string): Promise<string[]> {
+      async function generateOnce(
+        extraInstruction?: string
+      ): Promise<{
+        suggestions: Array<{ text: string; tone: string; why: string }>;
+        best_index: number;
+        best_reason: string;
+      }> {
         const out = await claudeTextCompletion(
           systemPrompt,
           extraInstruction ? `${basePrompt}\n\n${extraInstruction}` : basePrompt,
           1200
         );
         const clean = out.replace(/```json|```/g, '').trim();
-        const parsed = JSON.parse(clean) as { suggestions?: string[] };
-        return (parsed.suggestions ?? [])
-          .filter((s) => typeof s === 'string' && s.trim().length > 0)
+        const parsed = JSON.parse(clean) as {
+          suggestions?: Array<string | { text?: string; tone?: string; why?: string }>;
+          best_index?: number;
+          best_reason?: string;
+        };
+        const suggestions = (parsed.suggestions ?? [])
+          .map((item) => {
+            if (typeof item === 'string') {
+              return {
+                text: item,
+                tone: tones[0] ?? 'professional',
+                why: 'Clear and relevant rewrite.',
+              };
+            }
+            return {
+              text: item.text ?? '',
+              tone: (item.tone ?? tones[0] ?? 'professional').trim(),
+              why: (item.why ?? 'Clear and relevant rewrite.').trim(),
+            };
+          })
+          .filter((s) => s.text.trim().length > 0)
           .slice(0, 3)
-          .map((s) => s.trim().slice(0, charLimit))
-          .filter(looksLikeCompleteSentence);
+          .map((s) => ({
+            text: isCoverLetterRequest
+              ? enforceCoverLetterParagraphs(clampWords(normalizeParagraphSpacing(s.text), wordLimit))
+              : clampWords(normalizeParagraphSpacing(s.text), wordLimit),
+            tone: s.tone || (tones[0] ?? 'professional'),
+            why: s.why || 'Clear and relevant rewrite.',
+          }))
+          .filter((s) => looksLikeCompleteSentence(s.text.replace(/\n+/g, ' ')));
+
+        return {
+          suggestions,
+          best_index:
+            typeof parsed.best_index === 'number' && parsed.best_index >= 0 && parsed.best_index <= 2
+              ? parsed.best_index
+              : 0,
+          best_reason: (parsed.best_reason ?? '').trim(),
+        };
       }
 
-      let suggestions = await generateOnce();
-      if (suggestions.length < 3) {
-        suggestions = await generateOnce(
+      let result = await generateOnce();
+      if (result.suggestions.length < 3) {
+        result = await generateOnce(
           `Your previous response had incomplete or fragmented lines.
-Return exactly 3 complete, meaningful sentences.`
+Return exactly 3 complete, meaningful suggestions, with tone/why per suggestion, plus best_index and best_reason.`
         );
       }
 
-      return NextResponse.json({ result: { suggestions } });
+      console.log('[ai:cv_rewrite_suggestions] response', result);
+
+      return NextResponse.json({ result });
     }
 
     return NextResponse.json({ error: 'unknown_tool' }, { status: 400 });

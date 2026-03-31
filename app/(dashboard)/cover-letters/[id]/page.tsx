@@ -7,9 +7,12 @@ import { useQuery } from '@tanstack/react-query';
 import { LayoutTemplate } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
+import { CVRewriteWithAIModal } from '@/components/cv/CVRewriteWithAIModal';
+import { CvAtsPolishButton } from '@/components/cv/CvAtsPolishButton';
 import { CoverLetterPrintPreviewFrame } from '@/components/cover-letter/CoverLetterPrintPreviewFrame';
 import {
   useCoverLetter,
@@ -33,9 +36,17 @@ export default function CoverLetterDetailPage() {
 
   const [draftContent, setDraftContent] = useState('');
   const [draftTemplateId, setDraftTemplateId] = useState('cl-classic');
+  const [draftCompanyName, setDraftCompanyName] = useState('');
+  const [draftJobTitle, setDraftJobTitle] = useState('');
+  const [draftApplicantName, setDraftApplicantName] = useState('');
+  const [draftApplicantRole, setDraftApplicantRole] = useState('');
+  const [draftApplicantEmail, setDraftApplicantEmail] = useState('');
+  const [draftApplicantPhone, setDraftApplicantPhone] = useState('');
+  const [draftApplicantLocation, setDraftApplicantLocation] = useState('');
   const [accent, setAccent] = useState('#2563EB');
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [showAiRewriteModal, setShowAiRewriteModal] = useState(false);
   const initLetterIdRef = useRef<string | null>(null);
   const previewUrlRef = useRef<string | null>(null);
 
@@ -59,6 +70,13 @@ export default function CoverLetterDetailPage() {
       initLetterIdRef.current = letter.id;
       setDraftContent(letter.content);
       setDraftTemplateId(letter.template_id?.trim() || 'cl-classic');
+      setDraftCompanyName(letter.company_name ?? '');
+      setDraftJobTitle(letter.job_title ?? '');
+      setDraftApplicantName(letter.applicant_name ?? '');
+      setDraftApplicantRole(letter.applicant_role ?? '');
+      setDraftApplicantEmail(letter.applicant_email ?? '');
+      setDraftApplicantPhone(letter.applicant_phone ?? '');
+      setDraftApplicantLocation(letter.applicant_location ?? '');
     }
   }, [letter]);
 
@@ -83,6 +101,13 @@ export default function CoverLetterDetailPage() {
           content: draftContent,
           template_id: draftTemplateId,
           accent_color: accent,
+          company_name: draftCompanyName,
+          job_title: draftJobTitle,
+          applicant_name: draftApplicantName,
+          applicant_role: draftApplicantRole,
+          applicant_email: draftApplicantEmail,
+          applicant_phone: draftApplicantPhone,
+          applicant_location: draftApplicantLocation,
         }),
       });
       const text = await res.text();
@@ -100,7 +125,19 @@ export default function CoverLetterDetailPage() {
     } finally {
       setPreviewLoading(false);
     }
-  }, [letter, draftContent, draftTemplateId, accent]);
+  }, [
+    letter,
+    draftContent,
+    draftTemplateId,
+    accent,
+    draftCompanyName,
+    draftJobTitle,
+    draftApplicantName,
+    draftApplicantRole,
+    draftApplicantEmail,
+    draftApplicantPhone,
+    draftApplicantLocation,
+  ]);
 
   useEffect(() => {
     if (!letter) return;
@@ -108,12 +145,32 @@ export default function CoverLetterDetailPage() {
       void refreshPreview();
     }, 400);
     return () => window.clearTimeout(t);
-  }, [letter, draftContent, draftTemplateId, accent, refreshPreview]);
+  }, [
+    letter,
+    draftContent,
+    draftTemplateId,
+    accent,
+    draftCompanyName,
+    draftJobTitle,
+    draftApplicantName,
+    draftApplicantRole,
+    draftApplicantEmail,
+    draftApplicantPhone,
+    draftApplicantLocation,
+    refreshPreview,
+  ]);
 
   const isDirty =
     letter &&
     (draftContent !== letter.content ||
-      draftTemplateId !== (letter.template_id?.trim() || 'cl-classic'));
+      draftTemplateId !== (letter.template_id?.trim() || 'cl-classic') ||
+      draftCompanyName !== (letter.company_name ?? '') ||
+      draftJobTitle !== (letter.job_title ?? '') ||
+      draftApplicantName !== (letter.applicant_name ?? '') ||
+      draftApplicantRole !== (letter.applicant_role ?? '') ||
+      draftApplicantEmail !== (letter.applicant_email ?? '') ||
+      draftApplicantPhone !== (letter.applicant_phone ?? '') ||
+      draftApplicantLocation !== (letter.applicant_location ?? ''));
 
   async function handleSave() {
     if (!letter) return;
@@ -130,6 +187,13 @@ export default function CoverLetterDetailPage() {
         id: letter.id,
         content: draftContent,
         template_id: draftTemplateId,
+        company_name: draftCompanyName.trim() || null,
+        job_title: draftJobTitle.trim() || null,
+        applicant_name: draftApplicantName.trim() || null,
+        applicant_role: draftApplicantRole.trim() || null,
+        applicant_email: draftApplicantEmail.trim() || null,
+        applicant_phone: draftApplicantPhone.trim() || null,
+        applicant_location: draftApplicantLocation.trim() || null,
       });
       toast('Cover letter saved.', 'success');
     } catch {
@@ -148,6 +212,13 @@ export default function CoverLetterDetailPage() {
         templateId: draftTemplateId,
         content: draftContent,
         accent_color: accent,
+        company_name: draftCompanyName,
+        job_title: draftJobTitle,
+        applicant_name: draftApplicantName,
+        applicant_role: draftApplicantRole,
+        applicant_email: draftApplicantEmail,
+        applicant_phone: draftApplicantPhone,
+        applicant_location: draftApplicantLocation,
       }),
     });
     const j = (await res.json()) as { pdfUrl?: string; error?: string };
@@ -234,6 +305,44 @@ export default function CoverLetterDetailPage() {
               Browse all templates
             </Link>
           </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Input
+              label="Your name"
+              value={draftApplicantName}
+              onChange={(e) => setDraftApplicantName(e.target.value)}
+            />
+            <Input
+              label="Your role"
+              value={draftApplicantRole}
+              onChange={(e) => setDraftApplicantRole(e.target.value)}
+            />
+            <Input
+              label="Company"
+              value={draftCompanyName}
+              onChange={(e) => setDraftCompanyName(e.target.value)}
+            />
+            <Input
+              label="Job title"
+              value={draftJobTitle}
+              onChange={(e) => setDraftJobTitle(e.target.value)}
+            />
+            <Input
+              label="Email"
+              value={draftApplicantEmail}
+              onChange={(e) => setDraftApplicantEmail(e.target.value)}
+            />
+            <Input
+              label="Phone"
+              value={draftApplicantPhone}
+              onChange={(e) => setDraftApplicantPhone(e.target.value)}
+            />
+            <Input
+              label="Location"
+              value={draftApplicantLocation}
+              onChange={(e) => setDraftApplicantLocation(e.target.value)}
+              className="sm:col-span-2"
+            />
+          </div>
 
           <div>
             <span className="mb-1 block text-sm font-medium text-[var(--color-secondary)]">
@@ -261,6 +370,12 @@ export default function CoverLetterDetailPage() {
             className="min-h-[280px] font-sans text-sm leading-relaxed"
             rows={14}
           />
+          <div className="flex flex-wrap justify-end gap-2">
+            <CvAtsPolishButton
+              disabled={!draftContent.trim()}
+              onClick={() => setShowAiRewriteModal(true)}
+            />
+          </div>
         </div>
 
         <div className="lg:sticky lg:top-20">
@@ -270,15 +385,25 @@ export default function CoverLetterDetailPage() {
           <p className="mb-3 text-xs text-[var(--color-muted)]">
             Matches the PDF (including footer on Free plans).
           </p>
-          <div className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm">
+          <div className="relative h-[70vh] overflow-auto rounded-xl border border-[var(--color-border)] bg-slate-50 shadow-sm">
             <CoverLetterPrintPreviewFrame
               src={previewUrl}
               title="Cover letter print preview"
               isLoading={previewLoading}
+              containerHeight="70vh"
             />
           </div>
         </div>
       </div>
+      <CVRewriteWithAIModal
+        isOpen={showAiRewriteModal}
+        onClose={() => setShowAiRewriteModal(false)}
+        section="Cover letter"
+        inputLabel="Letter text"
+        sourceText={draftContent}
+        extraContext={`${letter.job_title || ''} ${letter.company_name || ''}`.trim()}
+        onSelectSuggestion={(value) => setDraftContent(value)}
+      />
     </div>
   );
 }

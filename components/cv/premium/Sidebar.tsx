@@ -37,7 +37,7 @@ interface SidebarProps {
 
 export function Sidebar({ activeSection, onSelect }: SidebarProps) {
   return (
-    <aside className="sticky top-24 max-h-[calc(100vh-7rem)] w-64 overflow-y-auto rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200">
+    <aside className="w-full rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200 xl:sticky xl:top-24 xl:max-h-[calc(100vh-7rem)] xl:w-64 xl:overflow-y-auto">
       <div className="mb-4 flex items-center gap-2 px-2 py-3">
         <span className="rounded-lg bg-indigo-100 p-1.5 text-indigo-600">
           <Sparkles className="h-4 w-4" />

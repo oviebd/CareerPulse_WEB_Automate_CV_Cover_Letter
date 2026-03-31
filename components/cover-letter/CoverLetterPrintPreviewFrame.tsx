@@ -15,12 +15,11 @@ type Props = {
   /** When true, dims the preview (e.g. while regenerating HTML). */
   isLoading?: boolean;
   /**
-   * Fixed pixel height for the preview container. When provided the card is
-   * always this tall and the iframe is clipped to fit — use this for gallery
-   * grids where uniform card sizes are desired.
+   * Fixed height for the preview container (e.g. 840 or '70vh').
+   * When provided the card keeps a stable viewport height and clips overflow.
    * When omitted, the container auto-sizes to the letter content height.
    */
-  containerHeight?: number;
+  containerHeight?: number | string;
 };
 
 /** Small buffer so the iframe never sits exactly at scrollHeight (avoids 1-px scrollbar). */
