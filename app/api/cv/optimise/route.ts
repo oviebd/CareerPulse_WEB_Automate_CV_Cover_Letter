@@ -106,19 +106,19 @@ export async function POST(request: Request) {
       core_cv_id?: string;
     };
 
-    if (!body.job_title?.trim()) {
-      return NextResponse.json(
-        { error: 'job_title is required.' },
-        { status: 422 }
-      );
-    }
-
     if (!body.job_description?.trim() || body.job_description.trim().length < 100) {
       return NextResponse.json(
         {
           error:
             'Please paste the full job description for best results.',
         },
+        { status: 422 }
+      );
+    }
+
+    if (!body.job_title?.trim() || !body.company_name?.trim()) {
+      return NextResponse.json(
+        { error: 'Job title and company name are required.' },
         { status: 422 }
       );
     }
@@ -195,15 +195,16 @@ export async function POST(request: Request) {
       referrals: cvRow.referrals ?? [],
     };
 
-    const jobTitle = body.job_title.trim();
-    const companyName = body.company_name?.trim() || null;
     const jobDescription = body.job_description.trim();
+    const jobTitle = body.job_title.trim();
+    const companyName = body.company_name.trim();
 
     const systemPrompt = `You are an expert CV/resume optimiser and career coach with 15 years of experience helping candidates get shortlisted for competitive roles.
 
 Your task is to optimise a candidate's existing CV for a specific job description. You must follow these rules absolutely:
 
 RULES — READ CAREFULLY:
+0. Primary objective: maximize ATS match to the target job description as much as possible while remaining 100% truthful to the candidate's existing CV.
 1. You may ONLY use information that already exists in the candidate's CV. Never invent, fabricate, or assume any experience, skill, qualification, or achievement.
 2. You may NOT add new jobs, companies, education institutions, or certifications that are not already in the CV.
 3. You may NOT change job titles, company names, education institution names, or dates.
@@ -214,6 +215,7 @@ RULES — READ CAREFULLY:
 8. You MAY: reorder skill items within a category to put the most job-relevant skills first.
 9. You MAY: add skills to the skills list ONLY if they are clearly evidenced in the candidate's experience bullets or projects.
 10. Keep the tone professional and consistent throughout.
+11. Prefer ATS-friendly wording: clear role terms, standard job titles, and explicit tools/skills already evidenced in the CV.
 
 Return ONLY a valid JSON object matching the exact schema provided. No preamble, no explanation, no markdown fences.`;
 
@@ -222,7 +224,7 @@ ${JSON.stringify(cvData, null, 2)}
 
 TARGET JOB:
 Title: ${jobTitle}
-Company: ${companyName || 'Not specified'}
+Company: ${companyName}
 
 Job Description:
 ${jobDescription}
@@ -285,6 +287,8 @@ Optimise the candidate's CV for this role. Return a JSON object with:
       ai_changes_summary: parsed.ai_changes_summary ?? '',
       keywords_added: parsed.keywords_added ?? [],
       bullets_improved: parsed.bullets_improved ?? 0,
+      resolved_job_title: jobTitle,
+      resolved_company_name: companyName,
       warnings,
     });
   } catch (e) {

@@ -141,8 +141,16 @@ export async function POST(request: Request) {
       }
       const bullet = payload.bullet ?? '';
       const out = await claudeTextCompletion(
-        'Return JSON {"before":"","after":""} with improved resume bullet using metrics.',
-        `Bullet: ${bullet}`,
+        'You are an ATS-focused resume writer. Return ONLY valid JSON {"before":"","after":""}. Keep meaning truthful and evidence-based.',
+        `Rewrite this CV bullet for maximum ATS compatibility and impact.
+
+Rules:
+- Do NOT fabricate facts, tools, scope, responsibilities, outcomes, numbers, or percentages.
+- If the original bullet has no metric, do not invent one.
+- Keep the same core meaning and role context.
+- Use clear ATS-friendly phrasing with relevant keywords only when supported by the original bullet.
+
+Bullet: ${bullet}`,
         400
       );
       const clean = out.replace(/```json|```/g, '').trim();
@@ -222,6 +230,8 @@ Rules:
 - Each suggestion must be specific to the provided section and input label.
 - Keep each suggestion at or under ${wordLimit} words.
 - Do not fabricate facts; only rewrite existing meaning more clearly.
+- Make suggestions as ATS-optimized as possible while staying fully truthful to the source text.
+- Prefer plain, scannable phrasing and role-relevant keywords only when supported by the provided text/context.
 - "tone" must be a short label matching the applied style.
 - "why" must be one concise sentence explaining the strength.
 - "best_index" must be 0, 1, or 2.

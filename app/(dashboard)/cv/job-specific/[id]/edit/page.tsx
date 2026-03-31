@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ import type { CVFormTab } from '@/components/cv/CVFormFields';
 import {
   useJobSpecificCV,
   useUpdateJobSpecificCV,
+  useArchiveJobSpecificCV,
 } from '@/hooks/useJobSpecificCVs';
 import { useCoreCVVersions } from '@/hooks/useCV';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -77,6 +78,20 @@ function patchFromCvData(data: CVData, selectedTemplateId: string, accent: strin
   };
 }
 
+function patchFromCvDataWithJobMeta(
+  data: CVData,
+  selectedTemplateId: string,
+  accent: string,
+  jobTitle: string | null | undefined,
+  companyName: string | null | undefined
+) {
+  return {
+    ...patchFromCvData(data, selectedTemplateId, accent),
+    job_title: jobTitle ?? null,
+    company_name: companyName ?? null,
+  };
+}
+
 /** Payload for PATCH /api/cv (core profile), matching core editor save. */
 function atsLabel(score: number): string {
   if (score >= 85) return 'Interview Ready';
@@ -113,12 +128,13 @@ function coreCvPatchFromDraft(data: CVData, preferredTemplateId: string) {
 
 export default function JobCVEditPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const queryClient = useQueryClient();
   const { data: jobCV, isLoading } = useJobSpecificCV(id);
   const { update, saveImmediately, isSaving, lastSaved } = useUpdateJobSpecificCV(id);
+  const archive = useArchiveJobSpecificCV();
   const { data: coreVersions = [], isLoading: coreVersionsLoading } = useCoreCVVersions();
   const [showJD, setShowJD] = useState(false);
-  const [jobInfoOpen, setJobInfoOpen] = useState(false);
   const [atsKeywordsOpen, setAtsKeywordsOpen] = useState(false);
 
   const { tier } = useSubscription();
@@ -238,11 +254,19 @@ export default function JobCVEditPage() {
           }, 550);
         }
         skipHistoryRef.current = false;
-        update(patchFromCvData(data, selectedTemplateId, accent));
+        update(
+          patchFromCvDataWithJobMeta(
+            data,
+            selectedTemplateId,
+            accent,
+            jobCV?.job_title,
+            jobCV?.company_name
+          )
+        );
         return data;
       });
     },
-    [update, selectedTemplateId, accent]
+    [update, selectedTemplateId, accent, jobCV?.job_title, jobCV?.company_name]
   );
 
   const undo = useCallback(() => {
@@ -256,10 +280,18 @@ export default function JobCVEditPage() {
       if (cur) setUndoFuture((f) => [cloneCvData(cur), ...f].slice(0, 50));
       const next = cloneCvData(snapshot);
       setDraft(next);
-      update(patchFromCvData(next, selectedTemplateId, accent));
+      update(
+        patchFromCvDataWithJobMeta(
+          next,
+          selectedTemplateId,
+          accent,
+          jobCV?.job_title,
+          jobCV?.company_name
+        )
+      );
       return p.slice(0, -1);
     });
-  }, [update, selectedTemplateId, accent]);
+  }, [update, selectedTemplateId, accent, jobCV?.job_title, jobCV?.company_name]);
 
   const redo = useCallback(() => {
     setUndoFuture((f) => {
@@ -272,10 +304,18 @@ export default function JobCVEditPage() {
       if (cur) setUndoPast((p) => [...p.slice(-49), cloneCvData(cur)]);
       const next = cloneCvData(nextSnap);
       setDraft(next);
-      update(patchFromCvData(next, selectedTemplateId, accent));
+      update(
+        patchFromCvDataWithJobMeta(
+          next,
+          selectedTemplateId,
+          accent,
+          jobCV?.job_title,
+          jobCV?.company_name
+        )
+      );
       return f.slice(1);
     });
-  }, [update, selectedTemplateId, accent]);
+  }, [update, selectedTemplateId, accent, jobCV?.job_title, jobCV?.company_name]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -397,12 +437,20 @@ export default function JobCVEditPage() {
   const saveJobCv = useCallback(async () => {
     if (!draft) return;
     try {
-      await saveImmediately(patchFromCvData(draft, selectedTemplateId, accent));
+      await saveImmediately(
+        patchFromCvDataWithJobMeta(
+          draft,
+          selectedTemplateId,
+          accent,
+          jobCV.job_title,
+          jobCV.company_name
+        )
+      );
       toast('Job CV saved.', 'success');
     } catch {
       toast('Could not save job CV.', 'error');
     }
-  }, [draft, saveImmediately, selectedTemplateId, accent, toast]);
+  }, [draft, saveImmediately, selectedTemplateId, accent, toast, jobCV]);
 
   const updateCoreCvFromJob = useCallback(async () => {
     if (!draft || !targetCoreCvId) {
@@ -430,6 +478,18 @@ export default function JobCVEditPage() {
       setSavingCore(false);
     }
   }, [draft, targetCoreCvId, selectedTemplateId, toast, queryClient]);
+
+  const deleteJobCv = useCallback(async () => {
+    if (!id) return;
+    if (!window.confirm('Delete this job-specific CV?')) return;
+    try {
+      await archive.mutateAsync(id);
+      toast('Job CV deleted.', 'success');
+      router.push('/cv/job-specific');
+    } catch {
+      toast('Could not delete job CV.', 'error');
+    }
+  }, [id, archive, toast, router]);
 
   const keywords = jobCV?.keywords_added ?? [];
   const ats = draft
@@ -462,75 +522,20 @@ export default function JobCVEditPage() {
 
   return (
     <div className="mx-auto max-w-[1650px] space-y-4">
-      <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-gradient-to-br from-slate-50/80 to-white shadow-sm ring-1 ring-slate-200/60">
-        <button
-          type="button"
-          className="flex w-full items-start justify-between gap-3 p-4 text-left sm:p-5"
-          onClick={() => setJobInfoOpen((v) => !v)}
-          aria-expanded={jobInfoOpen}
-        >
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Job-tailored CV</p>
-            <h2 className="mt-1 font-display text-xl font-bold text-slate-900 sm:text-2xl">
-              {jobCV.job_title}
-              {jobCV.company_name ? (
-                <span className="font-semibold text-slate-600"> · {jobCV.company_name}</span>
-              ) : null}
-            </h2>
-            {!jobInfoOpen ? (
-              <>
-                {jobCV.ai_changes_summary ? (
-                  <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-slate-600">{jobCV.ai_changes_summary}</p>
-                ) : null}
-                <p className="mt-2 text-xs text-slate-500">Expand for full summary, back link, and job description.</p>
-              </>
-            ) : null}
-          </div>
-          <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm">
-            {jobInfoOpen ? <ChevronUp className="h-4 w-4" aria-hidden /> : <ChevronDown className="h-4 w-4" aria-hidden />}
-          </span>
-        </button>
-        {jobInfoOpen ? (
-          <div className="border-t border-slate-200/80 bg-white/70 px-4 pb-4 pt-3 sm:px-5 sm:pb-5">
-            {jobCV.ai_changes_summary ? (
-              <p className="text-sm leading-relaxed text-slate-600">{jobCV.ai_changes_summary}</p>
-            ) : null}
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-              <Link
-                href="/cv/job-specific"
-                className="inline-flex text-sm font-medium text-indigo-600 hover:text-indigo-800"
-              >
-                ← All Job CVs
-              </Link>
-              <button
-                type="button"
-                className="flex shrink-0 items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-50"
-                onClick={() => setShowJD(!showJD)}
-              >
-                {showJD ? (
-                  <>
-                    Hide job description <ChevronUp className="h-3.5 w-3.5" />
-                  </>
-                ) : (
-                  <>
-                    View job description <ChevronDown className="h-3.5 w-3.5" />
-                  </>
-                )}
-              </button>
-            </div>
-            {showJD ? (
-              <pre className="mt-4 max-h-64 overflow-auto whitespace-pre-wrap rounded-xl border border-slate-200 bg-white p-4 text-xs leading-relaxed text-slate-700 shadow-inner">
-                {jobCV.job_description}
-              </pre>
-            ) : null}
-          </div>
-        ) : null}
-      </div>
-
-      <div className="sticky top-0 z-20 rounded-2xl border border-slate-200 bg-white/90 p-3 backdrop-blur">
+      <div className="rounded-2xl border border-slate-200 bg-white/90 p-3 backdrop-blur">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
+            <Link
+              href="/cv/job-specific"
+              className="inline-flex text-sm font-medium text-indigo-600 hover:text-indigo-800"
+            >
+              ← All Job CVs
+            </Link>
             <h1 className="font-display text-2xl font-bold">Edit job CV</h1>
+            <p className="mt-1 text-sm font-medium text-slate-700">
+              {jobCV.job_title || 'Target Role'}
+              {jobCV.company_name ? ` at ${jobCV.company_name}` : ''}
+            </p>
             <p className="mt-1 text-sm text-[var(--color-muted)]">
               Same editor as your core CV — live ATS feedback, preview, and undo.
             </p>
@@ -574,6 +579,15 @@ export default function JobCVEditPage() {
               >
                 Export PDF
               </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                loading={archive.isPending}
+                className="text-red-600 hover:text-red-700"
+                onClick={() => void deleteJobCv()}
+              >
+                Delete
+              </Button>
               <span className="text-xs text-[var(--color-muted)]">{saveLabel}</span>
             </div>
             <div className="flex w-full flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50/80 p-3 sm:max-w-md sm:flex-row sm:items-end">
@@ -611,6 +625,32 @@ export default function JobCVEditPage() {
             </p>
           </div>
         </div>
+      </div>
+
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm ring-1 ring-slate-200/80">
+        <button
+          type="button"
+          className="flex w-full items-center justify-between gap-3 p-4 text-left sm:p-5"
+          onClick={() => setShowJD((v) => !v)}
+          aria-expanded={showJD}
+        >
+          <div className="min-w-0 flex-1">
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Job description</span>
+            <p className="mt-1 text-sm text-slate-600">
+              {showJD ? 'Full job description' : 'Expand to view full job description'}
+            </p>
+          </div>
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600">
+            {showJD ? <ChevronUp className="h-4 w-4" aria-hidden /> : <ChevronDown className="h-4 w-4" aria-hidden />}
+          </span>
+        </button>
+        {showJD ? (
+          <div className="border-t border-slate-100 px-4 pb-4 pt-2 sm:px-5 sm:pb-5">
+            <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-xl border border-slate-200 bg-white p-4 text-xs leading-relaxed text-slate-700 shadow-inner">
+              {jobCV.job_description || 'No job description provided.'}
+            </pre>
+          </div>
+        ) : null}
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm ring-1 ring-slate-200/80">

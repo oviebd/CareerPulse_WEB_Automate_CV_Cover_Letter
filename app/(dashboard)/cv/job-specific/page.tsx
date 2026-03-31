@@ -23,12 +23,11 @@ function relativeTime(iso: string): string {
 
 function JobCVCard({
   cv,
-  onArchive,
+  onDelete,
 }: {
   cv: JobSpecificCV;
-  onArchive: (id: string) => void;
+  onDelete: (id: string) => void;
 }) {
-  const [menuOpen, setMenuOpen] = useState(false);
   const keywords = cv.keywords_added ?? [];
   const showKeywords = keywords.slice(0, 4);
   const extraCount = keywords.length - showKeywords.length;
@@ -78,38 +77,14 @@ function JobCVCard({
           >
             <Button variant="ghost" size="sm">Export</Button>
           </Link>
-          <div className="relative">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setMenuOpen(!menuOpen)}
-              aria-label="More actions"
-            >
-              &hellip;
-            </Button>
-            {menuOpen && (
-              <>
-                <button
-                  type="button"
-                  className="fixed inset-0 z-20"
-                  onClick={() => setMenuOpen(false)}
-                  aria-label="Close menu"
-                />
-                <div className="absolute right-0 top-full z-30 mt-1 w-40 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] py-1 shadow-lg">
-                  <button
-                    type="button"
-                    className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
-                    onClick={() => {
-                      setMenuOpen(false);
-                      onArchive(cv.id);
-                    }}
-                  >
-                    Archive
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-red-600 hover:text-red-700"
+            onClick={() => onDelete(cv.id)}
+          >
+            Delete
+          </Button>
         </div>
       </div>
     </div>
@@ -141,12 +116,13 @@ export default function JobSpecificCVsPage() {
     return list;
   }, [jobCVs, search, sort]);
 
-  const handleArchive = async (id: string) => {
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Delete this job-specific CV?')) return;
     try {
       await archive.mutateAsync(id);
-      toast('CV archived', 'success');
+      toast('CV deleted', 'success');
     } catch {
-      toast('Failed to archive', 'error');
+      toast('Failed to delete', 'error');
     }
   };
 
@@ -216,7 +192,7 @@ export default function JobSpecificCVsPage() {
               <JobCVCard
                 key={cv.id}
                 cv={cv}
-                onArchive={(id) => void handleArchive(id)}
+                onDelete={(id) => void handleDelete(id)}
               />
             ))}
             {filtered.length === 0 && (

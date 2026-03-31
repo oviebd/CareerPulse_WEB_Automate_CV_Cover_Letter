@@ -80,11 +80,11 @@ export function generateCoverLetterStream(params: {
     model: CLAUDE_MODEL,
     max_tokens: 1000,
     system:
-      'You are a professional career coach and expert cover letter writer. Write compelling, tailored, authentic cover letters. Return only the cover letter body text — no subject line, no "Dear Hiring Manager" header, no sign-off. Those are handled by the template.',
+      'You are a professional career coach and expert cover letter writer. Write compelling, tailored, authentic, ATS-optimized cover letters. Return only the cover letter body text — no subject line, no "Dear Hiring Manager" header, no sign-off. Those are handled by the template. Never fabricate facts, achievements, tools, or metrics.',
     messages: [
       {
         role: 'user',
-        content: `CANDIDATE PROFILE:\nName: ${params.cvProfile.full_name}\nTitle: ${params.cvProfile.professional_title}\nSummary: ${params.cvProfile.summary}\n\nWork Experience:\n${experienceText}\n\nKey Skills: ${skillsText}\n\nNotable Projects: ${projectsText}\n\n---\n\nJOB DESCRIPTION:\n${params.jobDescription}\n\n---\n\nINSTRUCTIONS:\n- Company: ${params.companyName}\n- Job Title: ${params.jobTitle}\n- Tone: ${params.tone} (professional=formal but warm; confident=assertive,direct; creative=engaging; concise=brief,punchy; formal=traditional)\n- Target length: ~${wordTargets[params.length]} words\n- Special emphasis: ${params.specificEmphasis || 'None'}\n\nWrite the cover letter body now.`,
+        content: `CANDIDATE PROFILE:\nName: ${params.cvProfile.full_name}\nTitle: ${params.cvProfile.professional_title}\nSummary: ${params.cvProfile.summary}\n\nWork Experience:\n${experienceText}\n\nKey Skills: ${skillsText}\n\nNotable Projects: ${projectsText}\n\n---\n\nJOB DESCRIPTION:\n${params.jobDescription}\n\n---\n\nINSTRUCTIONS:\n- Company: ${params.companyName}\n- Job Title: ${params.jobTitle}\n- Tone: ${params.tone} (professional=formal but warm; confident=assertive,direct; creative=engaging; concise=brief,punchy; formal=traditional)\n- Target length: ~${wordTargets[params.length]} words\n- Special emphasis: ${params.specificEmphasis || 'None'}\n- Maximize ATS relevance as much as possible using clear, role-relevant wording from the job description and candidate profile.\n- Use only evidence present in the candidate profile. Do not invent achievements, responsibilities, technologies, or numbers.\n\nWrite the cover letter body now.`,
       },
     ],
   });

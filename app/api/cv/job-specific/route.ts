@@ -42,9 +42,9 @@ export async function POST(request: Request) {
 
     const body = (await request.json()) as Record<string, unknown>;
 
-    if (!body.job_title || !body.job_description) {
+    if (!body.job_description) {
       return NextResponse.json(
-        { error: 'job_title and job_description are required' },
+        { error: 'job_description is required' },
         { status: 422 }
       );
     }
@@ -57,11 +57,21 @@ export async function POST(request: Request) {
       );
     }
 
+    const jobDescription = String(body.job_description ?? '').trim();
+    const resolvedJobTitle = String(body.job_title ?? '').trim();
+    const resolvedCompanyName = String(body.company_name ?? '').trim();
+    if (!resolvedJobTitle || !resolvedCompanyName) {
+      return NextResponse.json(
+        { error: 'job_title and company_name are required' },
+        { status: 422 }
+      );
+    }
+
     const row = {
       user_id: user.id,
-      job_title: body.job_title,
-      company_name: body.company_name ?? null,
-      job_description: body.job_description,
+      job_title: resolvedJobTitle,
+      company_name: resolvedCompanyName,
+      job_description: jobDescription,
       full_name: cv_data.full_name ?? null,
       professional_title: cv_data.professional_title ?? null,
       email: cv_data.email ?? null,
