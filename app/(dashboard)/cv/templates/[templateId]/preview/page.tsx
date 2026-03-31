@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams, notFound, useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -122,6 +122,8 @@ export default function CVTemplatePreviewPage() {
   const [settingDefault, setSettingDefault] = useState(false);
   const [showUpdateCoreModal, setShowUpdateCoreModal] = useState(false);
   const [draftActive, setDraftActive] = useState(false);
+  const previewContainerRef = useRef<HTMLDivElement>(null);
+  const [previewScale, setPreviewScale] = useState(0.5);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -140,6 +142,17 @@ export default function CVTemplatePreviewPage() {
       setSelectedCoreCvId((prev) => prev ?? coreVersions[0]?.id ?? null);
     }
   }, [isJobMode, draftActive, coreVersionsLoading, coreVersions]);
+
+  useEffect(() => {
+    const el = previewContainerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      const w = el.clientWidth;
+      if (w > 0) setPreviewScale(w / 794);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const { data: templates = [], isLoading: templatesLoading } = useQuery({
     queryKey: ['cv-templates'],
@@ -687,6 +700,7 @@ export default function CVTemplatePreviewPage() {
             Live preview (A4)
           </p>
           <div
+            ref={previewContainerRef}
             className="relative overflow-hidden rounded-lg border border-[var(--color-border)] bg-slate-100 shadow-inner"
             style={{ aspectRatio: '210 / 297' }}
           >
@@ -696,13 +710,19 @@ export default function CVTemplatePreviewPage() {
               </div>
             ) : null}
             {previewHtml ? (
-              <iframe
-                title="CV preview"
-                className="h-[1123px] w-[794px] max-w-none origin-top-left scale-[0.55] sm:scale-[0.58] md:scale-[0.6]"
-                style={{ transformOrigin: 'top left' }}
-                srcDoc={previewHtml}
-                sandbox="allow-same-origin allow-popups"
-              />
+              <div
+                className="absolute left-0 top-0 origin-top-left"
+                style={{ width: 794, height: 1123, transform: `scale(${previewScale})` }}
+              >
+                <iframe
+                  title="CV preview"
+                  className="pointer-events-none block max-w-none border-0"
+                  width={794}
+                  height={1123}
+                  srcDoc={previewHtml}
+                  sandbox="allow-same-origin allow-popups"
+                />
+              </div>
             ) : (
               <div className="flex h-full min-h-[320px] items-center justify-center p-4 text-center text-sm text-[var(--color-muted)]">
                 Could not render preview.

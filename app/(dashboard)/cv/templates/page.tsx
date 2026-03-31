@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
@@ -19,6 +19,9 @@ import { cn } from '@/lib/utils';
 
 const SWATCHES = ['#2563EB', '#0d9488', '#7c3aed', '#dc2626', '#0f172a'];
 
+const CV_DOC_WIDTH = 794;
+const CV_DOC_HEIGHT = 1123;
+
 function TemplatePreviewThumb({
   templateId,
   accent,
@@ -28,15 +31,36 @@ function TemplatePreviewThumb({
   accent: string;
   name: string;
 }) {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(0.3);
+
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      const w = el.clientWidth;
+      if (w > 0) setScale(w / CV_DOC_WIDTH);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   const src = `/api/cv/preview-html?template_id=${encodeURIComponent(templateId)}&sample=1&accent=${encodeURIComponent(accent)}`;
   return (
-    <div className="relative aspect-[210/297] w-full overflow-hidden bg-slate-100">
-      <iframe
-        src={src}
-        className="pointer-events-none absolute left-0 top-0 h-[1123px] w-[794px] max-w-none origin-top-left scale-[0.24] sm:scale-[0.26]"
-        title={`${name} sample preview`}
-        loading="lazy"
-      />
+    <div ref={wrapRef} className="relative aspect-[210/297] w-full overflow-hidden bg-slate-100">
+      <div
+        className="absolute left-0 top-0 origin-top-left"
+        style={{ width: CV_DOC_WIDTH, height: CV_DOC_HEIGHT, transform: `scale(${scale})` }}
+      >
+        <iframe
+          src={src}
+          className="pointer-events-none block max-w-none border-0"
+          width={CV_DOC_WIDTH}
+          height={CV_DOC_HEIGHT}
+          title={`${name} sample preview`}
+          loading="lazy"
+        />
+      </div>
     </div>
   );
 }
