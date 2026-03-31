@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Briefcase, LayoutTemplate, Upload, Wand2 } from 'lucide-react';
+import { LayoutTemplate, Upload, Wand2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -161,11 +161,19 @@ export default function CVOverviewPage() {
   };
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <h1 className="font-display text-2xl font-bold">CV</h1>
-      <p className="text-sm text-[var(--color-muted)]">
-        Manage your master profile, upload a new file, pick templates, and export PDFs.
-      </p>
+    <div className="mx-auto max-w-6xl space-y-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="font-display text-2xl font-bold">CV</h1>
+          <p className="text-sm text-[var(--color-muted)]">
+            Manage your core CV and role-specific versions in one place.
+          </p>
+        </div>
+        <Link href="/cv/templates" className={`${secondary} px-3 py-2 text-sm`}>
+          <LayoutTemplate className="mr-2 h-4 w-4" />
+          Templates
+        </Link>
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Card className="p-4" hoverable>
@@ -179,21 +187,6 @@ export default function CVOverviewPage() {
           </Link>
         </Card>
         <Card className="p-4" hoverable>
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-violet-100 text-violet-700"><LayoutTemplate className="h-5 w-5" /></span>
-          <h2 className="font-semibold">Edit &amp; templates</h2>
-          <p className="mt-2 text-sm text-[var(--color-muted)]">
-            Fine-tune sections and choose export layouts.
-          </p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Link href="/cv/edit" className={`${secondary} px-3 py-2 text-sm`}>
-              Edit
-            </Link>
-            <Link href="/cv/templates" className={`${secondary} px-3 py-2 text-sm`}>
-              Templates
-            </Link>
-          </div>
-        </Card>
-        <Card className="p-4" hoverable>
           <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"><Wand2 className="h-5 w-5" /></span>
           <h2 className="font-semibold">Tailor for a Job</h2>
           <p className="mt-2 text-sm text-[var(--color-muted)]">
@@ -203,140 +196,129 @@ export default function CVOverviewPage() {
             Tailor My CV
           </Link>
         </Card>
-        <Card className="p-4" hoverable>
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-amber-100 text-amber-700"><Briefcase className="h-5 w-5" /></span>
-          <h2 className="font-semibold">Job Specific CVs</h2>
-          <p className="mt-2 text-sm text-[var(--color-muted)]">
-            View and manage CVs tailored for specific roles.
-          </p>
-          <Link
-            href="/cv/job-specific"
-            className={`${secondary} mt-4 inline-flex px-3 py-2 text-sm`}
-          >
-            View Job CVs
-          </Link>
-        </Card>
       </div>
 
-      <Card className="p-4">
-        <h2 className="font-semibold">Core CV Versions</h2>
-        <p className="mt-1 text-sm text-[var(--color-muted)]">
-          Your master CV versions. Edit or delete any version.
-        </p>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card className="p-4">
+          <h2 className="font-semibold">Core CV Versions</h2>
+          <p className="mt-1 text-sm text-[var(--color-muted)]">
+            Your master CV versions. Edit or delete any version.
+          </p>
 
-        <div className="mt-4 space-y-3">
-          {coreVersionsLoading && (
-            <>
-              {[1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className="h-20 animate-pulse rounded-xl border border-[var(--color-border)] bg-slate-50"
-                />
-              ))}
-            </>
-          )}
+          <div className="mt-4 space-y-3">
+            {coreVersionsLoading && (
+              <>
+                {[1, 2, 3].map((i) => (
+                  <div
+                    key={i}
+                    className="h-20 animate-pulse rounded-xl border border-[var(--color-border)] bg-slate-50"
+                  />
+                ))}
+              </>
+            )}
 
-          {!coreVersionsLoading && coreVersions.length === 0 && (
-            <p className="py-10 text-center text-sm text-[var(--color-muted)]">
-              No core CV versions yet. Upload your first CV.
-            </p>
-          )}
+            {!coreVersionsLoading && coreVersions.length === 0 && (
+              <p className="py-10 text-center text-sm text-[var(--color-muted)]">
+                No core CV versions yet. Upload your first CV.
+              </p>
+            )}
 
-          {!coreVersionsLoading &&
-            coreVersions.map((cv) => (
-              <motion.div key={cv.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-                <CoreCVRow
-                  cv={cv}
-                  onDelete={(id) => {
-                    if (confirmDeleteCoreId === id) {
-                      setConfirmDeleteCoreId(null);
-                      void handleDeleteCore(id);
-                      return;
-                    }
-                    setConfirmDeleteCoreId(id);
-                  }}
-                />
-                {confirmDeleteCoreId === cv.id ? (
-                  <div className="mt-1 text-xs text-red-600">Click delete again to confirm.</div>
-                ) : null}
-              </motion.div>
-            ))}
-        </div>
-      </Card>
-
-      <Card className="p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="font-semibold">Job Specific CVs</h2>
-            <p className="mt-1 text-sm text-[var(--color-muted)]">
-              Tailored versions saved for specific roles. Edit or delete any CV.
-            </p>
-          </div>
-          <Link href="/cv/optimise" className={`${primary} !px-4 !py-2.5 text-sm`}>
-            Tailor New CV
-          </Link>
-        </div>
-
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          <Input
-            placeholder="Search by company or job title..."
-            value={jobSearch}
-            onChange={(e) => setJobSearch(e.target.value)}
-            className="max-w-xs"
-          />
-          <button
-            type="button"
-            className="text-xs font-medium text-[var(--color-muted)] hover:text-[var(--color-secondary)]"
-            onClick={() => setJobSort(jobSort === 'newest' ? 'oldest' : 'newest')}
-          >
-            {jobSort === 'newest' ? 'Newest first ↓' : 'Oldest first ↑'}
-          </button>
-        </div>
-
-        <div className="mt-4 space-y-3">
-          {jobLoading && (
-            <>
-              {[1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className="h-24 animate-pulse rounded-xl border border-[var(--color-border)] bg-slate-50"
-                />
-              ))}
-            </>
-          )}
-
-          {!jobLoading && (!jobCVs || jobCVs.length === 0) && (
-            <p className="py-10 text-center text-sm text-[var(--color-muted)]">
-              No job-specific CVs yet. Tailor your CV for a specific role to create one.
-            </p>
-          )}
-
-          {!jobLoading && jobCVs && jobCVs.length > 0 && (
-            <>
-              {filteredJobCVs.length > 0 ? (
-                filteredJobCVs.map((cv) => (
-                  <JobCVRow
-                    key={cv.id}
+            {!coreVersionsLoading &&
+              coreVersions.map((cv) => (
+                <motion.div key={cv.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+                  <CoreCVRow
                     cv={cv}
                     onDelete={(id) => {
-                      if (confirmDeleteJobId === id) {
-                        setConfirmDeleteJobId(null);
-                        void handleDeleteJob(id);
+                      if (confirmDeleteCoreId === id) {
+                        setConfirmDeleteCoreId(null);
+                        void handleDeleteCore(id);
                         return;
                       }
-                      setConfirmDeleteJobId(id);
+                      setConfirmDeleteCoreId(id);
                     }}
                   />
-                ))
-              ) : (
-                <p className="py-8 text-center text-sm text-[var(--color-muted)]">
-                  No matches found.
-                </p>
-              )}
-            </>
-          )}
-        </div>
-      </Card>
+                  {confirmDeleteCoreId === cv.id ? (
+                    <div className="mt-1 text-xs text-red-600">Click delete again to confirm.</div>
+                  ) : null}
+                </motion.div>
+              ))}
+          </div>
+        </Card>
+
+        <Card className="p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="font-semibold">Job Specific CVs</h2>
+              <p className="mt-1 text-sm text-[var(--color-muted)]">
+                Tailored versions saved for specific roles. Edit or delete any CV.
+              </p>
+            </div>
+            <Link href="/cv/optimise" className={`${primary} !px-4 !py-2.5 text-sm`}>
+              Tailor New CV
+            </Link>
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <Input
+              placeholder="Search by company or job title..."
+              value={jobSearch}
+              onChange={(e) => setJobSearch(e.target.value)}
+              className="max-w-xs"
+            />
+            <button
+              type="button"
+              className="text-xs font-medium text-[var(--color-muted)] hover:text-[var(--color-secondary)]"
+              onClick={() => setJobSort(jobSort === 'newest' ? 'oldest' : 'newest')}
+            >
+              {jobSort === 'newest' ? 'Newest first ↓' : 'Oldest first ↑'}
+            </button>
+          </div>
+
+          <div className="mt-4 space-y-3">
+            {jobLoading && (
+              <>
+                {[1, 2, 3].map((i) => (
+                  <div
+                    key={i}
+                    className="h-24 animate-pulse rounded-xl border border-[var(--color-border)] bg-slate-50"
+                  />
+                ))}
+              </>
+            )}
+
+            {!jobLoading && (!jobCVs || jobCVs.length === 0) && (
+              <p className="py-10 text-center text-sm text-[var(--color-muted)]">
+                No job-specific CVs yet. Tailor your CV for a specific role to create one.
+              </p>
+            )}
+
+            {!jobLoading && jobCVs && jobCVs.length > 0 && (
+              <>
+                {filteredJobCVs.length > 0 ? (
+                  filteredJobCVs.map((cv) => (
+                    <JobCVRow
+                      key={cv.id}
+                      cv={cv}
+                      onDelete={(id) => {
+                        if (confirmDeleteJobId === id) {
+                          setConfirmDeleteJobId(null);
+                          void handleDeleteJob(id);
+                          return;
+                        }
+                        setConfirmDeleteJobId(id);
+                      }}
+                    />
+                  ))
+                ) : (
+                  <p className="py-8 text-center text-sm text-[var(--color-muted)]">
+                    No matches found.
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        </Card>
+      </div>
     </div>
   );
 }
