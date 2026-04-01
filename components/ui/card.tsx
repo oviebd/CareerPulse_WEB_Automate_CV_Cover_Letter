@@ -21,8 +21,9 @@ export function Card({
   return (
     <motion.div
       className={cn(
-        'rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm transition-all duration-200',
-        hoverable && 'hover:border-[var(--color-border-hover)] hover:shadow-md',
+        'glass-panel rounded-card border border-[var(--color-border)] shadow-sm transition-all duration-200',
+        hoverable &&
+          'hover:-translate-y-0.5 hover:border-[var(--color-border-hover)] hover:shadow-md',
         p,
         className
       )}
@@ -32,7 +33,6 @@ export function Card({
     </motion.div>
   );
 }
-
 
 export function CardHeader({
   className,

@@ -19,6 +19,7 @@ import type { CVTemplate, SubscriptionTier } from '@/types';
 import { canUseTemplate } from '@/lib/subscription';
 import { buildATSReport } from '@/lib/cv-ats';
 import { formatDate } from '@/lib/utils';
+import { CV_FORM_CARD, CV_SHELL_HEADER } from '@/lib/cv-editor-styles';
 import { cloneCvData } from '@/lib/cv-clone';
 import { useSearchParams } from 'next/navigation';
 import { Undo2, Redo2 } from 'lucide-react';
@@ -92,7 +93,7 @@ export function CVEditor() {
   const { tier } = useSubscription();
 
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('classic');
-  const [accent, setAccent] = useState('#2563EB');
+  const [accent, setAccent] = useState('#6C63FF');
   const [previewPdfUrl, setPreviewPdfUrl] = useState<string>('');
   const [previewBusy, setPreviewBusy] = useState(false);
   const [settingDefault, setSettingDefault] = useState(false);
@@ -425,10 +426,10 @@ export function CVEditor() {
 
   return (
     <div className="mx-auto max-w-[1650px] space-y-4">
-      <div className="sticky top-0 z-20 rounded-2xl border border-slate-200 bg-white/90 p-3 backdrop-blur">
+      <div className={CV_SHELL_HEADER}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="font-display text-2xl font-bold">Edit CV</h1>
+          <h1 className="font-display text-2xl font-semibold text-[var(--color-text-primary)]">Edit CV</h1>
           <p className="mt-1 text-sm text-[var(--color-muted)]">
             Editor-first CV writing with live ATS feedback and preview.
           </p>
@@ -484,7 +485,7 @@ export function CVEditor() {
       <div className="grid gap-4 xl:grid-cols-[260px_minmax(0,1fr)_420px]">
         <Sidebar activeSection={editorTab} onSelect={setEditorTab} />
         <div className="space-y-3">
-          <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200 sm:p-6">
+          <div className={CV_FORM_CARD}>
             <CVEditorPanel
               value={cvData}
               onChange={handleChange}
@@ -494,13 +495,17 @@ export function CVEditor() {
               hideFormTabBar
             />
           </div>
-          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-muted)]">
             <span>Version: {selectedCoreCvId ? selectedCoreCvId.slice(0, 8) : 'draft'}</span>
-            {draftActive ? <span className="rounded bg-amber-100 px-2 py-0.5 text-amber-700">Draft mode</span> : null}
+            {draftActive ? (
+              <span className="rounded-badge border border-[var(--color-accent-gold)]/40 bg-[var(--color-accent-gold)]/15 px-2 py-0.5 text-[var(--color-accent-gold)]">
+                Draft mode
+              </span>
+            ) : null}
           </div>
         </div>
         <div className="space-y-3">
-          <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+          <div className={CV_FORM_CARD}>
             <p className="mb-2 text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
               Core CV version
             </p>
@@ -543,7 +548,7 @@ export function CVEditor() {
             </Button>
           </TemplateGate>
           <FeatureGate requiredTier={['pro', 'premium', 'career']} userTier={tier}>
-            <p className="text-xs text-slate-500">Pro settings unlocked</p>
+            <p className="text-xs text-[var(--color-muted)]">Pro settings unlocked</p>
           </FeatureGate>
         </div>
       </div>

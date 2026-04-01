@@ -6,6 +6,8 @@ import { CSS } from '@dnd-kit/utilities';
 import { Button } from '@/components/ui/button';
 import type { CVData } from '@/types';
 import { GripVertical } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { CV_INPUT, CV_NESTED_CARD, CV_TEXTAREA } from '@/lib/cv-editor-styles';
 
 interface ExperienceCardProps {
   entry: CVData['experience'][number];
@@ -48,16 +50,16 @@ export function ExperienceCard({ entry, onChange }: ExperienceCardProps) {
   };
 
   return (
-    <article className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+    <article className={CV_NESTED_CARD}>
       <div className="mb-3 grid gap-2 sm:grid-cols-2">
         <input
-          className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
+          className={cn(CV_INPUT, 'font-semibold')}
           placeholder="Company name"
           value={entry.company}
           onChange={(e) => onChange({ ...entry, company: e.target.value })}
         />
         <input
-          className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
+          className={CV_INPUT}
           placeholder="Role + date"
           value={entry.title}
           onChange={(e) => onChange({ ...entry, title: e.target.value })}
@@ -67,26 +69,26 @@ export function ExperienceCard({ entry, onChange }: ExperienceCardProps) {
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
         <SortableContext items={bulletIds} strategy={verticalListSortingStrategy}>
           <div className="space-y-2">
-        {entry.bullets.map((bullet, i) => {
-          const feedback = getBulletStrength(bullet);
-          return (
-            <SortableBullet
-              key={`${entry.id}-${i}`}
-              id={`${entry.id}-bullet-${i}`}
-              tone={feedback.tone}
-              suggestion={feedback.suggestion}
-              value={bullet}
-              onChange={(next) => updateBullet(i, next)}
-              onEnter={() => {
-                const next = [...entry.bullets];
-                next.splice(i + 1, 0, '');
-                onChange({ ...entry, bullets: next.slice(0, 8) });
-              }}
-              onTab={() => updateBullet(i, `  ${entry.bullets[i] ?? ''}`)}
-            />
-          );
-        })}
-      </div>
+            {entry.bullets.map((bullet, i) => {
+              const feedback = getBulletStrength(bullet);
+              return (
+                <SortableBullet
+                  key={`${entry.id}-${i}`}
+                  id={`${entry.id}-bullet-${i}`}
+                  tone={feedback.tone}
+                  suggestion={feedback.suggestion}
+                  value={bullet}
+                  onChange={(next) => updateBullet(i, next)}
+                  onEnter={() => {
+                    const next = [...entry.bullets];
+                    next.splice(i + 1, 0, '');
+                    onChange({ ...entry, bullets: next.slice(0, 8) });
+                  }}
+                  onTab={() => updateBullet(i, `  ${entry.bullets[i] ?? ''}`)}
+                />
+              );
+            })}
+          </div>
         </SortableContext>
       </DndContext>
 
@@ -119,14 +121,24 @@ function SortableBullet({ id, value, tone, suggestion, onChange, onEnter, onTab 
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={`rounded-xl p-2 transition ${tone === 'strong' ? 'bg-emerald-50' : 'bg-amber-50'}`}
+      className={cn(
+        'rounded-xl p-2 transition',
+        tone === 'strong'
+          ? 'border border-[var(--color-accent-mint)]/25 bg-[var(--color-accent-mint)]/10'
+          : 'border border-[var(--color-accent-gold)]/20 bg-[var(--color-accent-gold)]/8'
+      )}
     >
       <div className="flex items-start gap-2">
-        <button type="button" className="mt-2 cursor-grab text-slate-400 active:cursor-grabbing" {...attributes} {...listeners}>
+        <button
+          type="button"
+          className="mt-2 cursor-grab text-[var(--color-muted)] active:cursor-grabbing"
+          {...attributes}
+          {...listeners}
+        >
           <GripVertical className="h-4 w-4" />
         </button>
         <textarea
-          className="min-h-[52px] flex-1 resize-y rounded-lg border border-transparent bg-white/80 px-3 py-2 text-sm outline-none focus:border-indigo-200"
+          className={cn(CV_TEXTAREA, 'min-h-[52px] flex-1 resize-y border-transparent bg-[var(--color-input-bg)] px-3 py-2 focus:border-[var(--color-primary-500)]')}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={(e) => {
@@ -141,7 +153,12 @@ function SortableBullet({ id, value, tone, suggestion, onChange, onEnter, onTab 
           }}
         />
       </div>
-      <p className={`mt-1 text-xs ${tone === 'strong' ? 'text-emerald-700' : 'text-amber-700'}`}>
+      <p
+        className={cn(
+          'mt-1 text-xs',
+          tone === 'strong' ? 'text-[var(--color-accent-mint)]' : 'text-[var(--color-accent-gold)]'
+        )}
+      >
         {tone === 'weak' ? 'Warning:' : 'Great:'} {suggestion}
       </p>
     </div>

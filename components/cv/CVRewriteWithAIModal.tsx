@@ -198,7 +198,7 @@ export function CVRewriteWithAIModal({
         </div>
 
         <div>
-          <p className="mb-1 block text-sm font-medium text-[var(--color-secondary)]">Tone (multi-select)</p>
+          <p className="mb-1 block text-sm font-medium text-[var(--color-text-primary)]">Tone (multi-select)</p>
           <div className="flex flex-wrap gap-2">
             {TONE_OPTIONS.map((tone) => {
               const active = selectedTones.includes(tone.value);
@@ -210,8 +210,8 @@ export function CVRewriteWithAIModal({
                   className={cn(
                     'rounded-full border px-3 py-1.5 text-sm transition',
                     active
-                      ? 'border-indigo-300 bg-indigo-50 text-indigo-700'
-                      : 'border-[var(--color-border)] bg-white text-[var(--color-secondary)] hover:bg-slate-50'
+                      ? 'border-[var(--color-primary-400)]/50 bg-[var(--color-primary-100)]/50 text-[var(--color-primary-400)]'
+                      : 'border-[var(--color-border)] bg-[var(--color-input-bg)] text-[var(--color-text-primary)] hover:bg-white/[0.06]'
                   )}
                   aria-pressed={active}
                 >
@@ -239,16 +239,16 @@ export function CVRewriteWithAIModal({
                 className="rounded-lg border border-[var(--color-border)] p-3"
               >
                 <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">
+                  <span className="rounded-full border border-[var(--color-primary-200)]/40 bg-[var(--color-primary-100)]/40 px-2 py-0.5 text-xs font-medium text-[var(--color-primary-400)]">
                     {item.tone}
                   </span>
                   {bestIndex === idx ? (
-                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                    <span className="rounded-full border border-[var(--color-accent-mint)]/40 bg-[var(--color-accent-mint)]/15 px-2 py-0.5 text-xs font-medium text-[var(--color-accent-mint)]">
                       AI pick
                     </span>
                   ) : null}
                 </div>
-                <p className="whitespace-pre-wrap text-sm text-[var(--color-secondary)]">{item.text}</p>
+                <p className="whitespace-pre-wrap text-sm text-[var(--color-text-primary)]">{item.text}</p>
                 <p className="mt-2 text-xs text-[var(--color-muted)]">{item.why}</p>
                 <Button
                   variant="secondary"

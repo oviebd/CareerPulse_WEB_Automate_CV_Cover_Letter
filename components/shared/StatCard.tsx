@@ -36,15 +36,23 @@ export function StatCard({
 
   return (
     <motion.div
-      className="relative overflow-hidden rounded-lg border bg-white/70 p-4 backdrop-blur"
-      style={{ borderColor: 'rgba(99,102,241,0.15)' }}
+      className="glass-panel relative overflow-hidden rounded-card border border-[var(--color-border)] p-4 shadow-sm"
       whileHover={reduce ? undefined : { y: -2 }}
       transition={{ duration: 0.2 }}
     >
-      <span className="absolute inset-y-0 left-0 w-1" style={{ background: accent }} />
-      <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-text-secondary)]">{label}</p>
-      <p className="mt-1 text-2xl font-bold text-[var(--color-text-primary)]">{display}</p>
-      {helper ? <p className="mt-1 text-xs text-[var(--color-text-secondary)]">{helper}</p> : null}
+      <span
+        className="absolute inset-y-0 left-0 w-1 rounded-l-[12px]"
+        style={{ background: accent }}
+      />
+      <p className="pl-2 text-xs font-medium uppercase tracking-wide text-[var(--color-text-secondary)]">
+        {label}
+      </p>
+      <p className="mt-1 pl-2 font-mono text-2xl font-bold tabular-nums text-[var(--color-text-primary)]">
+        {display}
+      </p>
+      {helper ? (
+        <p className="mt-1 pl-2 text-xs text-[var(--color-text-secondary)]">{helper}</p>
+      ) : null}
     </motion.div>
   );
 }

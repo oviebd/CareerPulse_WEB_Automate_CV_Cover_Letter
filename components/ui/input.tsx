@@ -20,7 +20,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         {label ? (
           <label
             htmlFor={inputId}
-            className="mb-1 block text-sm font-medium text-[var(--color-secondary)]"
+            className="mb-1 block text-sm font-medium text-[var(--color-text-primary)]"
           >
             {label}
           </label>
@@ -35,10 +35,10 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             ref={ref}
             id={inputId}
             className={cn(
-              'w-full rounded-md border border-[var(--color-border)] bg-white px-3 py-2.5 text-sm outline-none transition duration-150 focus:border-[var(--color-primary-500)] focus:shadow-[0_0_0_3px_rgba(99,102,241,0.12)]',
+              'w-full rounded-btn border border-[var(--color-border)] bg-[var(--color-input-bg)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] outline-none transition duration-150 placeholder:text-[var(--color-muted)] focus:border-[var(--color-primary-500)] focus:shadow-[0_0_0_3px_rgba(108,99,255,0.2)]',
               leftIcon && 'pl-10',
               rightIcon && 'pr-10',
-              error && 'border-red-400 focus:shadow-[0_0_0_3px_rgba(248,113,113,0.2)]',
+              error && 'border-[var(--color-danger)] focus:shadow-[0_0_0_3px_rgba(255,107,107,0.2)]',
               className
             )}
             {...props}

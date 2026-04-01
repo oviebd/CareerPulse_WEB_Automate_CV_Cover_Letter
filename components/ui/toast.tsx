@@ -33,19 +33,27 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const dismiss = useCallback((id: string) => {
     setItems((prev) => prev.filter((t) => t.id !== id));
     const timer = timersRef.current.get(id);
-    if (timer) { clearTimeout(timer); timersRef.current.delete(id); }
+    if (timer) {
+      clearTimeout(timer);
+      timersRef.current.delete(id);
+    }
   }, []);
 
-  const toast = useCallback((message: string, kind: ToastKind = 'info') => {
-    const id = crypto.randomUUID();
-    setItems((prev) => [...prev, { id, message, kind }]);
-    const timer = setTimeout(() => dismiss(id), 4000);
-    timersRef.current.set(id, timer);
-  }, [dismiss]);
+  const toast = useCallback(
+    (message: string, kind: ToastKind = 'info') => {
+      const id = crypto.randomUUID();
+      setItems((prev) => [...prev, { id, message, kind }]);
+      const timer = setTimeout(() => dismiss(id), 4000);
+      timersRef.current.set(id, timer);
+    },
+    [dismiss]
+  );
 
   useEffect(() => {
     const timers = timersRef.current;
-    return () => { timers.forEach(clearTimeout); };
+    return () => {
+      timers.forEach(clearTimeout);
+    };
   }, []);
 
   const value = useMemo(() => ({ toast }), [toast]);
@@ -58,11 +66,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <div
             key={t.id}
             className={cn(
-              'pointer-events-auto rounded-lg border px-4 py-3 text-sm shadow-lg',
+              'glass-panel pointer-events-auto rounded-card border px-4 py-3 text-sm shadow-lg',
               t.kind === 'success' &&
-                'border-emerald-200 bg-emerald-50 text-emerald-900',
-              t.kind === 'error' && 'border-red-200 bg-red-50 text-red-900',
-              t.kind === 'info' && 'border-slate-200 bg-white text-slate-900'
+                'border-[var(--color-accent-mint)]/40 bg-[var(--color-accent-mint)]/10 text-[var(--color-accent-mint)]',
+              t.kind === 'error' &&
+                'border-[var(--color-accent-coral)]/40 bg-[var(--color-accent-coral)]/10 text-[var(--color-accent-coral)]',
+              t.kind === 'info' &&
+                'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-primary)]'
             )}
           >
             {t.message}

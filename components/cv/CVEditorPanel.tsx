@@ -192,40 +192,40 @@ export function CVEditorPanel({
   return (
     <div className="space-y-4">
       {hideAtsBanner ? null : (
-        <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4">
+        <div className="rounded-lg border border-[var(--color-primary-200)]/40 bg-[var(--color-primary-100)]/40 p-4 backdrop-blur-sm">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-primary-400)]">
                 ATS Checker
               </p>
-              <p className="mt-1 text-sm text-indigo-900">{ats.summary}</p>
+              <p className="mt-1 text-sm text-[var(--color-text-primary)]">{ats.summary}</p>
             </div>
-            <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-sm font-semibold text-indigo-800">
+            <span className="rounded-badge border border-[var(--color-primary-200)] bg-[var(--color-primary-100)] px-2.5 py-1 font-mono text-sm font-semibold text-[var(--color-primary-400)]">
               {ats.score}/100
             </span>
           </div>
-          <Progress value={ats.score} className="mt-3 h-2.5 bg-indigo-100" colorClass="bg-indigo-600" />
+          <Progress value={ats.score} className="mt-3 h-2.5 bg-white/[0.08]" />
           {ats.suggestions.length > 0 ? (
-            <ul className="mt-3 list-inside list-disc space-y-1 text-sm text-indigo-900">
+            <ul className="mt-3 list-inside list-disc space-y-1 text-sm text-[var(--color-muted)]">
               {ats.suggestions.slice(0, 4).map((item) => (
                 <li key={item}>{item}</li>
               ))}
             </ul>
           ) : (
-            <p className="mt-3 text-sm text-indigo-900">Great work. Your CV is ATS-friendly.</p>
+            <p className="mt-3 text-sm text-[var(--color-muted)]">Great work. Your CV is ATS-friendly.</p>
           )}
         </div>
       )}
 
       {!hideKeywordsBanner && highlightedKeywords && highlightedKeywords.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 rounded-lg border border-amber-200 bg-amber-50 p-3">
-          <span className="mr-1 text-xs font-medium text-amber-800">
+        <div className="flex flex-wrap gap-1.5 rounded-lg border border-[var(--color-accent-gold)]/25 bg-[var(--color-accent-gold)]/10 p-3">
+          <span className="mr-1 text-xs font-medium text-[var(--color-accent-gold)]">
             Highlighted keywords:
           </span>
           {highlightedKeywords.map((kw) => (
             <span
               key={kw}
-              className="inline-block rounded bg-yellow-200 px-1.5 py-0.5 text-xs font-medium text-yellow-900"
+              className="inline-block rounded-badge border border-[var(--color-accent-gold)]/35 bg-[var(--color-accent-gold)]/15 px-1.5 py-0.5 text-xs font-medium text-[var(--color-accent-gold)]"
             >
               {kw}
             </span>

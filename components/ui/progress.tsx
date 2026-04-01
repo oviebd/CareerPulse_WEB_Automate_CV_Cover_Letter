@@ -13,14 +13,15 @@ export function Progress({
   return (
     <div
       className={cn(
-        'h-2 w-full overflow-hidden rounded-full bg-slate-200',
+        'h-2 w-full overflow-hidden rounded-full bg-white/[0.08]',
         className
       )}
     >
       <div
         className={cn(
-          'h-full rounded-full transition-all',
-          colorClass ?? 'bg-[var(--color-primary)]'
+          'h-full rounded-full transition-all duration-300',
+          colorClass ??
+            'bg-gradient-to-r from-[var(--color-primary-500)] to-[var(--color-accent-mint)]'
         )}
         style={{ width: `${v}%` }}
       />

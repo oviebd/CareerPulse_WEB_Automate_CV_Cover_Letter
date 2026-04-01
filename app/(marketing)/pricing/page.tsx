@@ -5,7 +5,7 @@ export default function PricingPage() {
   const plans = Object.entries(PRICING);
   return (
     <main className="mx-auto max-w-5xl px-4 py-16">
-      <h1 className="font-display text-3xl font-bold">Pricing</h1>
+      <h1 className="font-display text-3xl font-semibold text-[var(--color-text-primary)]">Pricing</h1>
       <p className="mt-2 text-[var(--color-muted)]">
         Billed in USD via SSLCommerz. All plans include core CV and cover letter
         features; limits scale with tier.
@@ -14,12 +14,12 @@ export default function PricingPage() {
         {plans.map(([key, p]) => (
           <div
             key={key}
-            className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-sm"
+            className="glass-panel rounded-card border border-[var(--color-border)] p-6 shadow-sm"
           >
             <div className="text-sm font-medium uppercase tracking-wide text-[var(--color-muted)]">
               {key.replace(/_/g, ' ')}
             </div>
-            <div className="mt-2 font-display text-3xl font-bold">
+            <div className="mt-2 font-display text-3xl font-bold text-[var(--color-text-primary)]">
               ${p.amount}
               <span className="text-base font-normal text-[var(--color-muted)]">
                 /{p.period === 'monthly' ? 'mo' : 'yr'}
@@ -30,7 +30,7 @@ export default function PricingPage() {
             </p>
             <Link
               href="/register"
-              className="mt-6 inline-block rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white"
+              className="mt-6 inline-block rounded-btn bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110"
             >
               Start trial
             </Link>

@@ -105,7 +105,7 @@ export function LoginForm({
   return (
     <div className="w-full max-w-md space-y-8">
       <div>
-        <h1 className="font-[family-name:var(--font-dm-sans)] text-2xl font-semibold tracking-tight text-[var(--color-secondary)]">
+        <h1 className="font-display text-2xl font-semibold tracking-tight text-[var(--color-text-primary)]">
           Welcome back
         </h1>
         <p className="mt-2 text-sm text-[var(--color-muted)]">
@@ -115,7 +115,7 @@ export function LoginForm({
 
       {error ? (
         <div
-          className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+          className="rounded-lg border border-[var(--color-accent-coral)]/40 bg-[var(--color-accent-coral)]/10 px-4 py-3 text-sm text-[var(--color-accent-coral)]"
           role="alert"
         >
           {error}
@@ -126,7 +126,7 @@ export function LoginForm({
         type="button"
         onClick={() => void onGoogle()}
         disabled={loading || magicLoading}
-        className="flex w-full items-center justify-center gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-sm font-medium text-[var(--color-secondary)] shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+        className="flex w-full items-center justify-center gap-3 rounded-btn border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-sm font-medium text-[var(--color-text-primary)] shadow-sm transition hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-60"
       >
         <GoogleIcon />
         {loading ? 'Redirecting…' : 'Continue with Google'}
@@ -147,7 +147,7 @@ export function LoginForm({
         <div>
           <label
             htmlFor="login-email"
-            className="block text-sm font-medium text-[var(--color-secondary)]"
+            className="block text-sm font-medium text-[var(--color-text-primary)]"
           >
             Email
           </label>
@@ -159,13 +159,13 @@ export function LoginForm({
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 text-sm outline-none ring-[var(--color-primary)] transition focus:ring-2"
+            className="mt-1 w-full rounded-btn border border-[var(--color-border)] bg-[var(--color-input-bg)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] outline-none ring-[var(--color-primary)] transition placeholder:text-[var(--color-muted)] focus:ring-2"
           />
         </div>
         <div>
           <label
             htmlFor="login-password"
-            className="block text-sm font-medium text-[var(--color-secondary)]"
+            className="block text-sm font-medium text-[var(--color-text-primary)]"
           >
             Password
           </label>
@@ -177,20 +177,20 @@ export function LoginForm({
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 text-sm outline-none ring-[var(--color-primary)] transition focus:ring-2"
+            className="mt-1 w-full rounded-btn border border-[var(--color-border)] bg-[var(--color-input-bg)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] outline-none ring-[var(--color-primary)] transition placeholder:text-[var(--color-muted)] focus:ring-2"
           />
         </div>
         <button
           type="submit"
           disabled={loading || magicLoading}
-          className="w-full rounded-lg bg-[var(--color-primary)] px-4 py-3 text-sm font-semibold text-white shadow transition hover:bg-[var(--color-primary-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+          className="w-full rounded-btn bg-[var(--color-primary)] px-4 py-3 text-sm font-semibold text-white shadow transition hover:bg-[var(--color-primary-hover)] disabled:cursor-not-allowed disabled:opacity-60"
         >
           {loading ? 'Signing in…' : 'Sign in'}
         </button>
       </form>
 
       <div className="border-t border-[var(--color-border)] pt-6">
-        <p className="text-sm font-medium text-[var(--color-secondary)]">
+        <p className="text-sm font-medium text-[var(--color-text-primary)]">
           Magic link
         </p>
         <p className="mt-1 text-xs text-[var(--color-muted)]">
@@ -203,12 +203,12 @@ export function LoginForm({
             value={magicEmail}
             onChange={(e) => setMagicEmail(e.target.value)}
             required
-            className="flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 text-sm outline-none ring-[var(--color-primary)] focus:ring-2"
+            className="flex-1 rounded-btn border border-[var(--color-border)] bg-[var(--color-input-bg)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] outline-none ring-[var(--color-primary)] placeholder:text-[var(--color-muted)] focus:ring-2"
           />
           <button
             type="submit"
             disabled={magicLoading || loading}
-            className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2.5 text-sm font-medium text-[var(--color-secondary)] hover:bg-slate-50 disabled:opacity-60"
+            className="rounded-btn border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2.5 text-sm font-medium text-[var(--color-text-primary)] hover:bg-white/[0.06] disabled:opacity-60"
           >
             {magicLoading ? 'Sending…' : 'Email link'}
           </button>

@@ -86,7 +86,7 @@ export function RegisterForm({ returnTo }: { returnTo?: string }) {
   if (checkEmail) {
     return (
       <div className="w-full max-w-md space-y-4 text-center">
-        <h1 className="font-[family-name:var(--font-dm-sans)] text-2xl font-semibold text-[var(--color-secondary)]">
+        <h1 className="font-display text-2xl font-semibold text-[var(--color-text-primary)]">
           Check your email
         </h1>
         <p className="text-sm text-[var(--color-muted)]">
@@ -106,7 +106,7 @@ export function RegisterForm({ returnTo }: { returnTo?: string }) {
   return (
     <div className="w-full max-w-md space-y-8">
       <div>
-        <h1 className="font-[family-name:var(--font-dm-sans)] text-2xl font-semibold tracking-tight text-[var(--color-secondary)]">
+        <h1 className="font-display text-2xl font-semibold tracking-tight text-[var(--color-text-primary)]">
           Create your account
         </h1>
         <p className="mt-2 text-sm text-[var(--color-muted)]">
@@ -116,7 +116,7 @@ export function RegisterForm({ returnTo }: { returnTo?: string }) {
 
       {error ? (
         <div
-          className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+          className="rounded-lg border border-[var(--color-accent-coral)]/40 bg-[var(--color-accent-coral)]/10 px-4 py-3 text-sm text-[var(--color-accent-coral)]"
           role="alert"
         >
           {error}
@@ -127,7 +127,7 @@ export function RegisterForm({ returnTo }: { returnTo?: string }) {
         type="button"
         onClick={() => void onGoogle()}
         disabled={loading}
-        className="flex w-full items-center justify-center gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-sm font-medium text-[var(--color-secondary)] shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+        className="flex w-full items-center justify-center gap-3 rounded-btn border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-sm font-medium text-[var(--color-text-primary)] shadow-sm transition hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-60"
       >
         <GoogleIcon />
         {loading ? 'Redirecting…' : 'Continue with Google'}
@@ -148,7 +148,7 @@ export function RegisterForm({ returnTo }: { returnTo?: string }) {
         <div>
           <label
             htmlFor="register-name"
-            className="block text-sm font-medium text-[var(--color-secondary)]"
+            className="block text-sm font-medium text-[var(--color-text-primary)]"
           >
             Full name
           </label>
@@ -159,13 +159,13 @@ export function RegisterForm({ returnTo }: { returnTo?: string }) {
             autoComplete="name"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 text-sm outline-none ring-[var(--color-primary)] transition focus:ring-2"
+            className="mt-1 w-full rounded-btn border border-[var(--color-border)] bg-[var(--color-input-bg)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] outline-none ring-[var(--color-primary)] transition placeholder:text-[var(--color-muted)] focus:ring-2"
           />
         </div>
         <div>
           <label
             htmlFor="register-email"
-            className="block text-sm font-medium text-[var(--color-secondary)]"
+            className="block text-sm font-medium text-[var(--color-text-primary)]"
           >
             Email
           </label>
@@ -177,13 +177,13 @@ export function RegisterForm({ returnTo }: { returnTo?: string }) {
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 text-sm outline-none ring-[var(--color-primary)] transition focus:ring-2"
+            className="mt-1 w-full rounded-btn border border-[var(--color-border)] bg-[var(--color-input-bg)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] outline-none ring-[var(--color-primary)] transition placeholder:text-[var(--color-muted)] focus:ring-2"
           />
         </div>
         <div>
           <label
             htmlFor="register-password"
-            className="block text-sm font-medium text-[var(--color-secondary)]"
+            className="block text-sm font-medium text-[var(--color-text-primary)]"
           >
             Password
           </label>
@@ -196,7 +196,7 @@ export function RegisterForm({ returnTo }: { returnTo?: string }) {
             minLength={8}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 text-sm outline-none ring-[var(--color-primary)] transition focus:ring-2"
+            className="mt-1 w-full rounded-btn border border-[var(--color-border)] bg-[var(--color-input-bg)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] outline-none ring-[var(--color-primary)] transition placeholder:text-[var(--color-muted)] focus:ring-2"
           />
           <p className="mt-1 text-xs text-[var(--color-muted)]">
             At least 8 characters.
@@ -205,7 +205,7 @@ export function RegisterForm({ returnTo }: { returnTo?: string }) {
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-lg bg-[var(--color-primary)] px-4 py-3 text-sm font-semibold text-white shadow transition hover:bg-[var(--color-primary-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+          className="w-full rounded-btn bg-[var(--color-primary)] px-4 py-3 text-sm font-semibold text-white shadow transition hover:bg-[var(--color-primary-hover)] disabled:cursor-not-allowed disabled:opacity-60"
         >
           {loading ? 'Creating account…' : 'Create account'}
         </button>

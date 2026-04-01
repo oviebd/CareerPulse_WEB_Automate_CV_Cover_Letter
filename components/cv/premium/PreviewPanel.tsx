@@ -21,7 +21,7 @@ interface PreviewPanelProps {
   onFontFamilyChange: (font: string) => void;
 }
 
-const SWATCHES = ['#2563EB', '#0d9488', '#7c3aed', '#dc2626', '#0f172a'];
+const SWATCHES = ['#6C63FF', '#00D4A8', '#2563EB', '#7c3aed', '#dc2626', '#0f172a'];
 const FONTS = ['Inter', 'Manrope', 'DM Sans', 'Lora'];
 
 export function PreviewPanel(props: PreviewPanelProps) {
@@ -44,19 +44,33 @@ export function PreviewPanel(props: PreviewPanelProps) {
   } = props;
 
   return (
-    <aside className="sticky top-24 h-[calc(100vh-7rem)] w-full rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200 xl:w-[420px]">
-      <div className="mb-3 flex gap-2 rounded-xl bg-slate-100 p-1">
+    <aside
+      className={cn(
+        'glass-panel sticky top-24 h-[calc(100vh-7rem)] w-full rounded-card border border-[var(--color-border)] p-4 shadow-sm xl:w-[420px]'
+      )}
+    >
+      <div className="mb-3 flex gap-2 rounded-xl bg-white/[0.04] p-1">
         <button
           type="button"
           onClick={() => onTabChange('preview')}
-          className={cn('flex-1 rounded-lg px-3 py-1.5 text-sm', activeTab === 'preview' ? 'bg-white shadow text-slate-900' : 'text-slate-500')}
+          className={cn(
+            'flex-1 rounded-btn px-3 py-1.5 text-sm transition',
+            activeTab === 'preview'
+              ? 'bg-[var(--color-surface)] text-[var(--color-text-primary)] shadow-md'
+              : 'text-[var(--color-muted)] hover:text-[var(--color-text-primary)]'
+          )}
         >
           Live Preview
         </button>
         <button
           type="button"
           onClick={() => onTabChange('design')}
-          className={cn('flex-1 rounded-lg px-3 py-1.5 text-sm', activeTab === 'design' ? 'bg-white shadow text-slate-900' : 'text-slate-500')}
+          className={cn(
+            'flex-1 rounded-btn px-3 py-1.5 text-sm transition',
+            activeTab === 'design'
+              ? 'bg-[var(--color-surface)] text-[var(--color-text-primary)] shadow-md'
+              : 'text-[var(--color-muted)] hover:text-[var(--color-text-primary)]'
+          )}
         >
           Design Settings
         </button>
@@ -64,20 +78,32 @@ export function PreviewPanel(props: PreviewPanelProps) {
 
       {activeTab === 'preview' ? (
         <div className="space-y-3">
-          <div className="flex items-center justify-between text-xs text-slate-500">
+          <div className="flex items-center justify-between text-xs text-[var(--color-muted)]">
             <span>A4 preview</span>
-            <div className="flex items-center gap-2">
-              <button type="button" className="rounded bg-slate-100 px-2 py-1" onClick={() => onZoomChange(Math.max(70, zoom - 10))}>
+            <div className="flex items-center gap-2 font-mono">
+              <button
+                type="button"
+                className="rounded-btn border border-[var(--color-border)] bg-white/[0.06] px-2 py-1 transition hover:bg-white/[0.1]"
+                onClick={() => onZoomChange(Math.max(70, zoom - 10))}
+              >
                 -
               </button>
               <span>{zoom}%</span>
-              <button type="button" className="rounded bg-slate-100 px-2 py-1" onClick={() => onZoomChange(Math.min(140, zoom + 10))}>
+              <button
+                type="button"
+                className="rounded-btn border border-[var(--color-border)] bg-white/[0.06] px-2 py-1 transition hover:bg-white/[0.1]"
+                onClick={() => onZoomChange(Math.min(140, zoom + 10))}
+              >
                 +
               </button>
             </div>
           </div>
-          <div className="relative h-[70vh] overflow-auto rounded-xl border border-slate-200 bg-slate-50">
-            {previewBusy ? <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/75 text-sm">Updating preview...</div> : null}
+          <div className="relative h-[70vh] overflow-auto rounded-xl border border-[var(--color-border)] bg-[#0a0a0f]">
+            {previewBusy ? (
+              <div className="absolute inset-0 z-10 flex items-center justify-center bg-[var(--color-background)]/80 text-sm text-[var(--color-muted)] backdrop-blur-sm">
+                Updating preview…
+              </div>
+            ) : null}
             {previewPdfUrl ? (
               <iframe
                 title="CV live preview"
@@ -86,15 +112,25 @@ export function PreviewPanel(props: PreviewPanelProps) {
                 style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'top center' }}
               />
             ) : (
-              <div className="flex h-full items-center justify-center text-sm text-slate-500">Preview unavailable</div>
+              <div className="flex h-full items-center justify-center text-sm text-[var(--color-muted)]">
+                Preview unavailable
+              </div>
             )}
           </div>
-          <div className="flex items-center justify-center gap-2 text-xs">
-            <button type="button" className="rounded bg-slate-100 px-2 py-1" onClick={() => onPageChange(Math.max(1, currentPage - 1))}>
+          <div className="flex items-center justify-center gap-2 font-mono text-xs">
+            <button
+              type="button"
+              className="rounded-btn border border-[var(--color-border)] bg-white/[0.06] px-2 py-1"
+              onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+            >
               Prev
             </button>
             <span>Page {currentPage}</span>
-            <button type="button" className="rounded bg-slate-100 px-2 py-1" onClick={() => onPageChange(currentPage + 1)}>
+            <button
+              type="button"
+              className="rounded-btn border border-[var(--color-border)] bg-white/[0.06] px-2 py-1"
+              onClick={() => onPageChange(currentPage + 1)}
+            >
               Next
             </button>
           </div>
@@ -102,7 +138,9 @@ export function PreviewPanel(props: PreviewPanelProps) {
       ) : (
         <div className="space-y-5">
           <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Template</p>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">
+              Template
+            </p>
             <div className="grid gap-2">
               {templates.map((template) => (
                 <button
@@ -111,24 +149,31 @@ export function PreviewPanel(props: PreviewPanelProps) {
                   onClick={() => onTemplateChange(template.id)}
                   className={cn(
                     'rounded-xl border px-3 py-2 text-left text-sm transition',
-                    selectedTemplateId === template.id ? 'border-indigo-300 bg-indigo-50 text-indigo-700' : 'border-slate-200 hover:border-slate-300'
+                    selectedTemplateId === template.id
+                      ? 'border-[var(--color-primary-400)]/50 bg-[var(--color-primary-100)]/40 text-[var(--color-text-primary)]'
+                      : 'border-[var(--color-border)] text-[var(--color-muted)] hover:border-[var(--color-border-hover)] hover:text-[var(--color-text-primary)]'
                   )}
                 >
-                  <p className="font-medium">{template.name}</p>
-                  <p className="text-xs text-slate-500">{template.category}</p>
+                  <p className="font-medium text-[var(--color-text-primary)]">{template.name}</p>
+                  <p className="text-xs text-[var(--color-muted)]">{template.category}</p>
                 </button>
               ))}
             </div>
           </div>
 
           <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Accent Color</p>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">
+              Accent color
+            </p>
             <div className="flex flex-wrap gap-2">
               {SWATCHES.map((color) => (
                 <button
                   key={color}
                   type="button"
-                  className={cn('h-8 w-8 rounded-full ring-2 ring-offset-2', accent === color ? 'ring-slate-700' : 'ring-transparent')}
+                  className={cn(
+                    'h-8 w-8 rounded-full ring-2 ring-offset-2 ring-offset-[var(--color-background)] transition',
+                    accent === color ? 'ring-[var(--color-primary-400)]' : 'ring-transparent'
+                  )}
                   style={{ backgroundColor: color }}
                   onClick={() => onAccentChange(color)}
                 />
@@ -137,7 +182,7 @@ export function PreviewPanel(props: PreviewPanelProps) {
           </div>
 
           <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Font</p>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">Font</p>
             <div className="grid grid-cols-2 gap-2">
               {FONTS.map((font) => (
                 <button
@@ -145,8 +190,10 @@ export function PreviewPanel(props: PreviewPanelProps) {
                   type="button"
                   onClick={() => onFontFamilyChange(font)}
                   className={cn(
-                    'rounded-lg border px-3 py-2 text-sm',
-                    fontFamily === font ? 'border-indigo-300 bg-indigo-50 text-indigo-700' : 'border-slate-200'
+                    'rounded-btn border px-3 py-2 text-sm transition',
+                    fontFamily === font
+                      ? 'border-[var(--color-primary-400)]/50 bg-[var(--color-primary-100)]/40 text-[var(--color-text-primary)]'
+                      : 'border-[var(--color-border)] text-[var(--color-muted)] hover:text-[var(--color-text-primary)]'
                   )}
                 >
                   {font}

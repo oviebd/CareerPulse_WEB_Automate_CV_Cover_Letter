@@ -1,5 +1,6 @@
 import { AuthGuard } from '@/components/auth/AuthGuard';
 import { AppHeader } from '@/components/shared/AppHeader';
+import { MeshBackground } from '@/components/layout/MeshBackground';
 import { SubscriptionBanner } from '@/components/shared/SubscriptionBanner';
 import { OnboardingGate } from '@/components/onboarding/OnboardingGate';
 import { PageTransition } from '@/components/shared/PageTransition';
@@ -11,16 +12,15 @@ export default function DashboardGroupLayout({
 }) {
   return (
     <AuthGuard>
-      <div className="min-h-screen bg-[var(--color-background)] text-[var(--color-secondary)]">
+      <div className="relative min-h-screen bg-[var(--color-background)] text-[var(--color-text-primary)]">
+        <MeshBackground />
         <SubscriptionBanner />
-        <div className="flex min-h-[calc(100vh-0px)] flex-col">
-          <AppHeader />
-          <main className="flex-1 p-4 lg:p-8">
-            <OnboardingGate>
-              <PageTransition>{children}</PageTransition>
-            </OnboardingGate>
-          </main>
-        </div>
+        <AppHeader />
+        <main className="relative z-10 flex-1 px-4 pb-8 pt-14 lg:ml-64 lg:px-8 lg:pb-12 lg:pt-8">
+          <OnboardingGate>
+            <PageTransition>{children}</PageTransition>
+          </OnboardingGate>
+        </main>
       </div>
     </AuthGuard>
   );

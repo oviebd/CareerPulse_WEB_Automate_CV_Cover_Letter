@@ -19,13 +19,13 @@ export function CvAtsPolishButton({ onClick, disabled, className }: Props) {
       size="sm"
       disabled={disabled}
       className={cn(
-        'gap-1.5 border border-indigo-200/80 bg-gradient-to-r from-indigo-50 to-white font-medium text-indigo-900 shadow-sm hover:from-indigo-100/80 hover:to-indigo-50/50',
+        'gap-1.5 border border-[var(--color-primary-200)]/50 bg-[var(--color-primary-100)]/40 font-medium text-[var(--color-primary-400)] shadow-sm backdrop-blur-sm hover:bg-[var(--color-primary-100)]/70',
         className
       )}
       title="Rewrite with stronger verbs, metrics, and ATS-friendly phrasing"
       onClick={onClick}
     >
-      <Sparkles className="h-3.5 w-3.5 shrink-0 text-indigo-600" />
+      <Sparkles className="h-3.5 w-3.5 shrink-0 text-[var(--color-accent-mint)]" />
       Rewrite With AI
     </Button>
   );

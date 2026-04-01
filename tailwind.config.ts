@@ -22,12 +22,21 @@ const config: Config = {
         foreground: "var(--foreground)",
         primary: "var(--color-primary)",
         surface: "var(--color-surface)",
+        accent: {
+          DEFAULT: "var(--color-primary-500)",
+          mint: "var(--color-accent-mint)",
+          coral: "var(--color-accent-coral)",
+          gold: "var(--color-accent-gold)",
+        },
       },
       borderRadius: {
         sm: "var(--radius-sm)",
         md: "var(--radius-md)",
         lg: "var(--radius-lg)",
         xl: "var(--radius-xl)",
+        card: "12px",
+        btn: "8px",
+        badge: "20px",
       },
       boxShadow: {
         sm: "var(--shadow-sm)",
@@ -36,18 +45,9 @@ const config: Config = {
         xl: "var(--shadow-xl)",
       },
       fontFamily: {
-        sans: ["var(--font-inter)", "ui-sans-serif", "system-ui", "sans-serif"],
-        display: [
-          "var(--font-dm-sans)",
-          "ui-sans-serif",
-          "system-ui",
-          "sans-serif",
-        ],
-        mono: [
-          "var(--font-jetbrains-mono)",
-          "ui-monospace",
-          "monospace",
-        ],
+        sans: ["var(--font-dm-sans)", "ui-sans-serif", "system-ui", "sans-serif"],
+        display: ["var(--font-clash)", "var(--font-dm-sans)", "ui-sans-serif", "sans-serif"],
+        mono: ["var(--font-jetbrains-mono)", "ui-monospace", "monospace"],
       },
     },
   },

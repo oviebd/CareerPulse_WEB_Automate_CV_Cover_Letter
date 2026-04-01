@@ -71,7 +71,7 @@ export function CVPhotoField({ photoUrl, onPhotoUrl }: Props) {
     <div>
       <p className="mb-1 block text-sm font-medium text-[var(--color-secondary)]">Profile photo</p>
       <div className="flex flex-wrap items-start gap-4">
-        <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[var(--color-border)] bg-slate-100">
+        <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)]">
           {photoUrl ? (
             <img src={photoUrl} alt="" className="h-full w-full object-cover" />
           ) : (

@@ -37,8 +37,8 @@ export function CVSectionVisibilityPanel({ visibility, onChange }: Props) {
   }
 
   return (
-    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] p-4">
-      <p className="text-sm font-semibold text-[var(--color-secondary)]">
+    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)]/80 p-4 backdrop-blur-sm">
+      <p className="text-sm font-semibold text-[var(--color-text-primary)]">
         Sections included in your CV
       </p>
       <p className="mt-1 text-xs text-[var(--color-muted)]">
@@ -49,10 +49,10 @@ export function CVSectionVisibilityPanel({ visibility, onChange }: Props) {
           <button
             key={key}
             type="button"
-            className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+            className={`rounded-badge border px-3 py-1.5 text-xs font-medium transition duration-200 ${
               isOn(key)
-                ? 'border-[var(--color-primary-200)] bg-[var(--color-primary-500)] text-white'
-                : 'border-[var(--color-border)] bg-white text-[var(--color-text-secondary)]'
+                ? 'border-[var(--color-primary-400)]/50 bg-[var(--color-primary-100)] text-[var(--color-primary-400)] shadow-[0_0_0_1px_rgba(108,99,255,0.2)]'
+                : 'border-[var(--color-border)] bg-white/[0.04] text-[var(--color-muted)] hover:bg-white/[0.08] hover:text-[var(--color-text-primary)]'
             }`}
             onClick={() => toggle(key, !isOn(key))}
           >

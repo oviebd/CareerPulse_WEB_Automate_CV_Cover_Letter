@@ -27,6 +27,7 @@
     "puppeteer": "^24.40.0",
     "react": "^18",
     "react-dom": "^18",
+    "recharts": "^3.8.1",
     "resend": "^6.9.4",
     "tailwind-merge": "^3.5.0",
     "zustand": "^5.0.12"

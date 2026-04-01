@@ -7,10 +7,10 @@ export function SubscriptionBanner() {
   const { status, expiresAt, tier } = useSubscription();
   if (status !== 'past_due' && status !== 'cancelled') return null;
   return (
-    <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-sm text-amber-950">
+    <div className="relative z-20 border-b border-[var(--color-accent-gold)]/30 bg-[var(--color-accent-gold)]/10 px-4 py-2 text-center text-sm text-[var(--color-accent-gold)]">
       Your <strong>{tier}</strong> subscription needs attention.
       {expiresAt ? ` Access until ${new Date(expiresAt).toLocaleDateString()}.` : null}{' '}
-      <Link href="/settings/billing" className="font-semibold underline">
+      <Link href="/settings/billing" className="font-semibold text-[var(--color-text-primary)] underline underline-offset-2">
         Billing
       </Link>
     </div>

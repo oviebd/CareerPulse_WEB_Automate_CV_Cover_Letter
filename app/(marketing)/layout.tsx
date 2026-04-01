@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { MeshBackground } from '@/components/layout/MeshBackground';
 
 export const revalidate = 3600;
 
@@ -8,17 +9,24 @@ export default function MarketingLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-[var(--color-background)] text-[var(--color-secondary)]">
-      <header className="border-b border-[var(--color-border)] bg-[var(--color-surface)]">
+    <div className="relative min-h-screen bg-[var(--color-background)] text-[var(--color-text-primary)]">
+      <MeshBackground />
+      <header className="relative z-10 border-b border-[var(--color-border)] bg-[var(--color-surface)]/80 backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
-          <Link href="/" className="font-display font-semibold">
-            CV &amp; Cover Letter
+          <Link href="/" className="font-display text-sm font-semibold tracking-tight">
+            CareerPulse
           </Link>
-          <nav className="flex gap-4 text-sm font-medium">
-            <Link href="/pricing" className="text-[var(--color-muted)] hover:text-[var(--color-primary)]">
+          <nav className="flex gap-6 text-sm font-medium">
+            <Link
+              href="/pricing"
+              className="text-[var(--color-muted)] transition hover:text-[var(--color-primary)]"
+            >
               Pricing
             </Link>
-            <Link href="/blog" className="text-[var(--color-muted)] hover:text-[var(--color-primary)]">
+            <Link
+              href="/blog"
+              className="text-[var(--color-muted)] transition hover:text-[var(--color-primary)]"
+            >
               Blog
             </Link>
             <Link href="/login" className="text-[var(--color-primary)]">
@@ -27,7 +35,7 @@ export default function MarketingLayout({
           </nav>
         </div>
       </header>
-      {children}
+      <div className="relative z-10">{children}</div>
     </div>
   );
 }

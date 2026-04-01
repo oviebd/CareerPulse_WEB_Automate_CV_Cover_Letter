@@ -29,6 +29,7 @@ import { isKeywordPresentInCv } from '@/lib/cv-keyword-presence';
 import { cloneCvData } from '@/lib/cv-clone';
 import { useToast } from '@/components/ui/toast';
 import { Undo2, Redo2, ChevronDown, ChevronUp } from 'lucide-react';
+import { CV_FORM_CARD, CV_SHELL_HEADER } from '@/lib/cv-editor-styles';
 
 function previewPayloadFromCVData(d: CVData): Record<string, unknown> {
   return {
@@ -145,7 +146,7 @@ export default function JobCVEditPage() {
   draftRef.current = draft;
 
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('classic');
-  const [accent, setAccent] = useState<string>('#2563EB');
+  const [accent, setAccent] = useState<string>('#6C63FF');
   const [previewPdfUrl, setPreviewPdfUrl] = useState<string>('');
   const [previewBusy, setPreviewBusy] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -522,17 +523,17 @@ export default function JobCVEditPage() {
 
   return (
     <div className="mx-auto max-w-[1650px] space-y-4">
-      <div className="rounded-2xl border border-slate-200 bg-white/90 p-3 backdrop-blur">
+      <div className={CV_SHELL_HEADER}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <Link
               href="/cv/job-specific"
-              className="inline-flex text-sm font-medium text-indigo-600 hover:text-indigo-800"
+              className="inline-flex text-sm font-medium text-[var(--color-primary)] transition hover:text-[var(--color-primary-400)]"
             >
               ← All Job CVs
             </Link>
-            <h1 className="font-display text-2xl font-bold">Edit job CV</h1>
-            <p className="mt-1 text-sm font-medium text-slate-700">
+            <h1 className="font-display text-2xl font-semibold text-[var(--color-text-primary)]">Edit job CV</h1>
+            <p className="mt-1 text-sm font-medium text-[var(--color-text-primary)]">
               {jobCV.job_title || 'Target Role'}
               {jobCV.company_name ? ` at ${jobCV.company_name}` : ''}
             </p>
@@ -583,14 +584,14 @@ export default function JobCVEditPage() {
                 variant="secondary"
                 size="sm"
                 loading={archive.isPending}
-                className="text-red-600 hover:text-red-700"
+                className="border-[var(--color-accent-coral)]/40 text-[var(--color-accent-coral)] hover:bg-[var(--color-accent-coral)]/10"
                 onClick={() => void deleteJobCv()}
               >
                 Delete
               </Button>
               <span className="text-xs text-[var(--color-muted)]">{saveLabel}</span>
             </div>
-            <div className="flex w-full flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50/80 p-3 sm:max-w-md sm:flex-row sm:items-end">
+            <div className="flex w-full flex-col gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]/80 p-3 backdrop-blur-sm sm:max-w-md sm:flex-row sm:items-end">
               <div className="min-w-0 flex-1">
                 <Select
                   label="Core CV version"
@@ -619,7 +620,7 @@ export default function JobCVEditPage() {
                 Update core CV
               </Button>
             </div>
-            <p className="max-w-md text-right text-[10px] leading-snug text-slate-500 sm:self-end">
+            <p className="max-w-md text-right text-[10px] leading-snug text-[var(--color-muted)] sm:self-end">
               Update core CV copies your current fields into the profile you pick. This job-specific CV stays as-is until
               you use Save.
             </p>
@@ -627,7 +628,7 @@ export default function JobCVEditPage() {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm ring-1 ring-slate-200/80">
+      <div className="overflow-hidden rounded-card border border-[var(--color-border)] bg-[var(--color-surface)]/90 shadow-sm backdrop-blur-sm">
         <button
           type="button"
           className="flex w-full items-center justify-between gap-3 p-4 text-left sm:p-5"
@@ -635,25 +636,25 @@ export default function JobCVEditPage() {
           aria-expanded={showJD}
         >
           <div className="min-w-0 flex-1">
-            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Job description</span>
-            <p className="mt-1 text-sm text-slate-600">
+            <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">Job description</span>
+            <p className="mt-1 text-sm text-[var(--color-muted)]">
               {showJD ? 'Full job description' : 'Expand to view full job description'}
             </p>
           </div>
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--color-border)] bg-white/[0.04] text-[var(--color-muted)]">
             {showJD ? <ChevronUp className="h-4 w-4" aria-hidden /> : <ChevronDown className="h-4 w-4" aria-hidden />}
           </span>
         </button>
         {showJD ? (
-          <div className="border-t border-slate-100 px-4 pb-4 pt-2 sm:px-5 sm:pb-5">
-            <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-xl border border-slate-200 bg-white p-4 text-xs leading-relaxed text-slate-700 shadow-inner">
+          <div className="border-t border-[var(--color-border)] px-4 pb-4 pt-2 sm:px-5 sm:pb-5">
+            <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-xl border border-[var(--color-border)] bg-[var(--color-input-bg)] p-4 font-mono text-xs leading-relaxed text-[var(--color-text-primary)] shadow-inner">
               {jobCV.job_description || 'No job description provided.'}
             </pre>
           </div>
         ) : null}
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm ring-1 ring-slate-200/80">
+      <div className="overflow-hidden rounded-card border border-[var(--color-border)] bg-[var(--color-surface)]/90 shadow-sm backdrop-blur-sm">
         <button
           type="button"
           className="flex w-full flex-wrap items-center justify-between gap-3 p-4 text-left sm:p-5"
@@ -661,27 +662,27 @@ export default function JobCVEditPage() {
           aria-expanded={atsKeywordsOpen}
         >
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">ATS &amp; keywords</span>
-            <span className="text-xl font-bold tabular-nums text-slate-900">{ats.score}/100</span>
-            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700">
+            <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">ATS &amp; keywords</span>
+            <span className="font-mono text-xl font-bold tabular-nums text-[var(--color-text-primary)]">{ats.score}/100</span>
+            <span className="rounded-badge border border-[var(--color-border)] bg-white/[0.06] px-2.5 py-0.5 text-xs font-medium text-[var(--color-text-primary)]">
               {atsLabel(ats.score)}
             </span>
             {keywords.length > 0 ? (
-              <span className="text-sm text-slate-600">
-                <span className="font-semibold text-emerald-700">{keywordMatchedCount}</span>
-                <span className="text-slate-500"> / {keywords.length}</span>
-                <span className="text-slate-500"> role keywords in CV</span>
+              <span className="text-sm text-[var(--color-muted)]">
+                <span className="font-semibold font-mono text-[var(--color-accent-mint)]">{keywordMatchedCount}</span>
+                <span> / {keywords.length}</span>
+                <span> role keywords in CV</span>
               </span>
             ) : (
-              <span className="text-sm text-slate-500">No role keywords for this job</span>
+              <span className="text-sm text-[var(--color-muted)]">No role keywords for this job</span>
             )}
           </div>
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--color-border)] bg-white/[0.04] text-[var(--color-muted)]">
             {atsKeywordsOpen ? <ChevronUp className="h-4 w-4" aria-hidden /> : <ChevronDown className="h-4 w-4" aria-hidden />}
           </span>
         </button>
         {atsKeywordsOpen ? (
-          <div className="border-t border-slate-100 px-4 pb-4 pt-2 sm:px-5 sm:pb-5">
+          <div className="border-t border-[var(--color-border)] px-4 pb-4 pt-2 sm:px-5 sm:pb-5">
             <ATSIndicator
               embedded
               score={ats.score}
@@ -689,7 +690,7 @@ export default function JobCVEditPage() {
               suggestions={ats.suggestions}
             />
             {keywords.length > 0 ? (
-              <div className="mt-4 border-t border-slate-100 pt-4">
+              <div className="mt-4 border-t border-[var(--color-border)] pt-4">
                 <JobKeywordsBanner embedded keywords={keywords} cv={draft} />
               </div>
             ) : null}
@@ -700,7 +701,7 @@ export default function JobCVEditPage() {
       <div className="grid gap-4 xl:grid-cols-[260px_minmax(0,1fr)_420px]">
         <Sidebar activeSection={editorTab} onSelect={setEditorTab} />
         <div className="space-y-3">
-          <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200 sm:p-6">
+          <div className={CV_FORM_CARD}>
             <CVEditorPanel
               value={draft}
               onChange={handleChange}
@@ -738,7 +739,7 @@ export default function JobCVEditPage() {
             onFontFamilyChange={setFontFamily}
           />
           {!templatesLoading && !allowed && templateMeta ? (
-            <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            <p className="rounded-xl border border-[var(--color-accent-gold)]/35 bg-[var(--color-accent-gold)]/10 px-3 py-2 text-sm text-[var(--color-accent-gold)]">
               You can preview this layout with your data here. Upgrade to export with this template.
             </p>
           ) : null}

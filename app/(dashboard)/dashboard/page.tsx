@@ -13,6 +13,7 @@ import { ATSBadge } from '@/components/shared/ATSBadge';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { StatCard } from '@/components/shared/StatCard';
 import { UpgradeCTA } from '@/components/shared/UpgradeCTA';
+import { TrackerStatusChart } from '@/components/dashboard/TrackerStatusChart';
 import { useCVProfile } from '@/hooks/useCV';
 import { useCoverLettersList } from '@/hooks/useCoverLetters';
 import { useJobApplications } from '@/hooks/useTracker';
@@ -82,12 +83,12 @@ export default function DashboardPage() {
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard label="Active applications" value={activeApps.length} helper="Current pipeline" />
         <StatCard label="Letters this month" value={usedThisMonth} helper="Usage tracker" />
-        <StatCard label="CV completion" value={cv?.completion_percentage ?? 0} helper="Profile quality" accent="var(--color-secondary-500)" />
+        <StatCard label="CV completion" value={cv?.completion_percentage ?? 0} helper="Profile quality" accent="var(--color-accent-mint)" />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card hoverable>
-          <h2 className="font-display font-semibold text-[var(--color-secondary)]">
+          <h2 className="font-display font-semibold text-[var(--color-text-primary)]">
             CV profile
           </h2>
           {cvLoading ? (
@@ -160,7 +161,7 @@ export default function DashboardPage() {
                 <motion.li
                   key={l.id}
                   variants={reduce ? undefined : fadeUp}
-                  className="flex items-center justify-between rounded-lg border border-[var(--color-border)] p-3 text-sm transition hover:bg-[var(--color-surface-2)]"
+                  className="flex items-center justify-between rounded-lg border border-[var(--color-border)] p-3 text-sm transition hover:bg-white/[0.04]"
                 >
                   <div>
                     <div className="font-medium">{l.company_name || 'Company'}</div>
@@ -198,14 +199,24 @@ export default function DashboardPage() {
           {appLoading ? (
             <Skeleton className="mt-4 h-20 w-full" />
           ) : limits.trackerAccess ? (
-            <div className="mt-4 flex flex-wrap gap-2">
-              {Object.entries(statusCounts).map(([s, n]) => (
-                <Badge key={s} variant="default">
-                  {s}: {n}
-                </Badge>
-              ))}
+            <div className="mt-4">
+              {apps.length > 0 ? (
+                <TrackerStatusChart
+                  data={Object.entries(statusCounts).map(([name, count]) => ({
+                    name,
+                    count,
+                  }))}
+                />
+              ) : null}
+              <div className="mt-3 flex flex-wrap gap-2">
+                {Object.entries(statusCounts).map(([s, n]) => (
+                  <Badge key={s} variant="default">
+                    {s}: {n}
+                  </Badge>
+                ))}
+              </div>
               {apps.length === 0 ? (
-                <p className="text-sm text-[var(--color-muted)]">
+                <p className="mt-2 text-sm text-[var(--color-muted)]">
                   <Link href="/tracker" className="text-[var(--color-primary)]">
                     Add your first application
                   </Link>
@@ -225,24 +236,24 @@ export default function DashboardPage() {
 
       <div className="grid gap-4 sm:grid-cols-3">
         {(cv?.completion_percentage ?? 0) < 60 ? (
-          <Card padding="sm" className="border-amber-200 bg-amber-50/50">
-            <p className="text-sm font-medium">Complete your CV profile</p>
+          <Card padding="sm" className="border-[var(--color-accent-gold)]/35 bg-[var(--color-accent-gold)]/5">
+            <p className="text-sm font-medium text-[var(--color-text-primary)]">Complete your CV profile</p>
             <Link href="/cv/edit" className="mt-2 text-xs text-[var(--color-primary)]">
               Open editor
             </Link>
           </Card>
         ) : null}
         {letters.length === 0 ? (
-          <Card padding="sm" className="border-blue-200 bg-blue-50/50">
-            <p className="text-sm font-medium">Generate your first cover letter</p>
+          <Card padding="sm" className="border-[var(--color-primary-200)]/50 bg-[var(--color-primary-50)]/30">
+            <p className="text-sm font-medium text-[var(--color-text-primary)]">Generate your first cover letter</p>
             <Link href="/cover-letters/new" className="mt-2 text-xs text-[var(--color-primary)]">
               Start
             </Link>
           </Card>
         ) : null}
         {apps.length === 0 && limits.trackerAccess ? (
-          <Card padding="sm" className="border-slate-200">
-            <p className="text-sm font-medium">Track your applications</p>
+          <Card padding="sm" className="border-[var(--color-border)] bg-white/[0.02]">
+            <p className="text-sm font-medium text-[var(--color-text-primary)]">Track your applications</p>
             <Link href="/tracker" className="mt-2 text-xs text-[var(--color-primary)]">
               Open board
             </Link>

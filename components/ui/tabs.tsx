@@ -30,7 +30,7 @@ export function Tabs({
             'relative whitespace-nowrap rounded-full px-3 py-2 text-sm font-medium transition',
             value === t.id
               ? 'text-white'
-              : 'text-[var(--color-muted)] hover:text-[var(--color-secondary)]'
+              : 'text-[var(--color-muted)] hover:text-[var(--color-text-primary)]'
           )}
         >
           {value === t.id ? (

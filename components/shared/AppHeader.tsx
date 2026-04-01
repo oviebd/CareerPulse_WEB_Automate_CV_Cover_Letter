@@ -3,7 +3,6 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   Briefcase,
-  ChevronDown,
   FileText,
   Kanban,
   LayoutDashboard,
@@ -85,153 +84,141 @@ function isCoverLetterChildActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+function NavLinkContent({
+  item,
+  pathname,
+  isFree,
+  onNavigate,
+}: {
+  item: NavItem;
+  pathname: string;
+  isFree: boolean;
+  onNavigate?: () => void;
+}) {
+  const Icon = item.icon;
+
+  if (item.children) {
+    return (
+      <div className="space-y-1">
+        <div className="flex items-center gap-2 px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-muted)]">
+          <Icon className="h-3.5 w-3.5" aria-hidden />
+          {item.label}
+        </div>
+        <div className="space-y-0.5 border-l border-[var(--color-border)] pl-2 ml-3">
+          {item.children.map((child) => {
+            const ChildIcon = child.icon;
+            const childActive =
+              item.href === '/cv'
+                ? isCvChildActive(pathname, child.href)
+                : item.href === '/cover-letters'
+                  ? isCoverLetterChildActive(pathname, child.href)
+                  : pathname === child.href || pathname.startsWith(`${child.href}/`);
+            return (
+              <Link
+                key={child.href}
+                href={child.href}
+                onClick={onNavigate}
+                className={cn(
+                  'flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-all duration-200',
+                  childActive
+                    ? 'bg-[var(--color-primary-100)] text-[var(--color-primary-400)]'
+                    : 'text-[var(--color-muted)] hover:bg-white/[0.04] hover:text-[var(--color-text-primary)]'
+                )}
+              >
+                <ChildIcon className="h-4 w-4 shrink-0 opacity-90" />
+                <span className="min-w-0 flex-1 truncate">{child.label}</span>
+                {child.proOnly && isFree ? (
+                  <span className="shrink-0 rounded-badge bg-[var(--color-accent-gold)]/20 px-2 py-0.5 text-[10px] font-semibold text-[var(--color-accent-gold)]">
+                    Pro
+                  </span>
+                ) : null}
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+  return (
+    <Link
+      href={item.href}
+      onClick={onNavigate}
+      className={cn(
+        'flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 active:scale-[0.99]',
+        active
+          ? 'bg-[var(--color-primary-100)] text-[var(--color-primary-400)] shadow-[0_0_0_1px_rgba(108,99,255,0.2)]'
+          : 'text-[var(--color-muted)] hover:bg-white/[0.04] hover:text-[var(--color-text-primary)]'
+      )}
+    >
+      <Icon className="h-4 w-4 shrink-0" />
+      {item.label}
+    </Link>
+  );
+}
+
 export function AppHeader() {
   const pathname = usePathname();
   const { tier } = useSubscription();
   const isFree = tier === 'free';
   const { mobileMenuOpen, setMobileMenuOpen, toggleMobileMenu } = useUIStore();
-  const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
   const navRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    function onDoc(e: MouseEvent) {
-      if (navRef.current && !navRef.current.contains(e.target as Node)) {
-        setOpenSubmenu(null);
-      }
-    }
-    document.addEventListener('click', onDoc);
-    return () => document.removeEventListener('click', onDoc);
-  }, []);
-
-  useEffect(() => {
     setMobileMenuOpen(false);
-    setOpenSubmenu(null);
   }, [pathname, setMobileMenuOpen]);
 
-  const navLinkClass = (active: boolean) =>
-    cn(
-      'inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition',
-      active ? 'bg-white/15 text-white' : 'text-white/85 hover:bg-white/10 hover:text-white'
-    );
+  const brand = (
+    <Link
+      href="/dashboard"
+      className="flex items-center gap-2 font-display text-sm font-semibold tracking-tight text-[var(--color-text-primary)] transition hover:opacity-90"
+      onClick={() => setMobileMenuOpen(false)}
+    >
+      <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-[var(--color-primary-500)] to-[var(--color-accent-mint)] text-xs font-bold text-white shadow-md">
+        CP
+      </span>
+      <span className="hidden sm:inline">CareerPulse</span>
+    </Link>
+  );
 
   return (
     <>
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-gradient-to-r from-[var(--color-primary-900)] to-[#312e81] text-white shadow-md">
-        <div className="mx-auto flex h-14 max-w-[1600px] items-center gap-2 px-3 sm:px-4 lg:px-6">
-          <Link
-            href="/dashboard"
-            className="flex shrink-0 items-center gap-2 font-display font-semibold"
-            onClick={() => setMobileMenuOpen(false)}
-          >
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white/20 text-xs">
-              CP
-            </span>
-            <span className="hidden sm:inline text-sm">CareerPulse</span>
-          </Link>
-
-          {/* Desktop nav only; small widths use hamburger */}
-          <nav ref={navRef} className="hidden min-w-0 flex-1 items-center gap-0.5 overflow-visible px-2 lg:flex">
-            {nav.map((item) => {
-              const Icon = item.icon;
-              if (item.children) {
-                const sectionActive =
-                  pathname === item.href ||
-                  pathname.startsWith(`${item.href}/`) ||
-                  item.children.some(
-                    (c) => pathname === c.href || pathname.startsWith(`${c.href}/`)
-                  );
-                return (
-                  <div key={item.href} className="relative shrink-0">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setOpenSubmenu((prev) => (prev === item.href ? null : item.href))
-                      }
-                      className={navLinkClass(sectionActive)}
-                      aria-expanded={openSubmenu === item.href}
-                      aria-haspopup="true"
-                    >
-                      <Icon className="h-4 w-4 shrink-0" />
-                      {item.label}
-                      <ChevronDown
-                        className={cn(
-                          'h-4 w-4 transition',
-                          openSubmenu === item.href && 'rotate-180'
-                        )}
-                      />
-                    </button>
-                    <AnimatePresence>
-                      {openSubmenu === item.href ? (
-                        <motion.div
-                          initial={{ opacity: 0, y: -4 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -4 }}
-                          transition={{ duration: 0.15 }}
-                          className="absolute left-0 top-full z-50 mt-1 min-w-[220px] rounded-lg border border-white/10 bg-[#312e81] py-1 shadow-lg"
-                        >
-                          {item.children.map((child) => {
-                            const ChildIcon = child.icon;
-                            const childActive =
-                              item.href === '/cv'
-                                ? isCvChildActive(pathname, child.href)
-                                : item.href === '/cover-letters'
-                                  ? isCoverLetterChildActive(pathname, child.href)
-                                  : pathname === child.href ||
-                                    pathname.startsWith(`${child.href}/`);
-                            return (
-                              <Link
-                                key={child.href}
-                                href={child.href}
-                                className={cn(
-                                  'flex items-center gap-2 px-3 py-2 text-sm transition',
-                                  childActive
-                                    ? 'bg-white/15 text-white'
-                                    : 'text-white/90 hover:bg-white/10'
-                                )}
-                                onClick={() => setOpenSubmenu(null)}
-                              >
-                                <ChildIcon className="h-4 w-4" />
-                                {child.label}
-                                {child.proOnly && isFree ? (
-                                  <span className="ml-auto rounded bg-amber-300/90 px-1.5 py-0.5 text-[10px] font-semibold text-amber-900">
-                                    Pro
-                                  </span>
-                                ) : null}
-                              </Link>
-                            );
-                          })}
-                        </motion.div>
-                      ) : null}
-                    </AnimatePresence>
-                  </div>
-                );
-              }
-              const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-              return (
-                <Link key={item.href} href={item.href} className={cn(navLinkClass(active), 'shrink-0')}>
-                  <Icon className="h-4 w-4 shrink-0" />
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
-
-          <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
+      {/* Desktop: fixed sidebar */}
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-[var(--color-border)] bg-[var(--color-surface)]/90 backdrop-blur-xl lg:flex">
+        <div className="flex h-16 shrink-0 items-center border-b border-[var(--color-border)] px-4">
+          {brand}
+        </div>
+        <nav ref={navRef} className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
+          {nav.map((item) => (
+            <NavLinkContent key={item.href} item={item} pathname={pathname} isFree={isFree} />
+          ))}
+        </nav>
+        <div className="shrink-0 border-t border-[var(--color-border)] p-3">
+          <div className="flex items-center justify-end gap-2">
             <ProfileMenu />
-            <button
-              type="button"
-              className="rounded-lg p-2 text-white hover:bg-white/10 lg:hidden"
-              onClick={toggleMobileMenu}
-              aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
-              aria-expanded={mobileMenuOpen}
-            >
-              {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-            </button>
           </div>
+        </div>
+      </aside>
+
+      {/* Mobile: top bar */}
+      <header className="fixed left-0 right-0 top-0 z-40 flex h-14 items-center justify-between gap-2 border-b border-[var(--color-border)] bg-[var(--color-surface)]/90 px-3 backdrop-blur-xl lg:hidden">
+        {brand}
+        <div className="flex items-center gap-2">
+          <ProfileMenu />
+          <button
+            type="button"
+            className="rounded-btn p-2 text-[var(--color-text-primary)] transition hover:bg-white/[0.06] active:scale-95"
+            onClick={toggleMobileMenu}
+            aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={mobileMenuOpen}
+          >
+            {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          </button>
         </div>
       </header>
 
-      {/* Mobile full-screen nav */}
+      {/* Mobile drawer */}
       <AnimatePresence>
         {mobileMenuOpen ? (
           <>
@@ -240,82 +227,45 @@ export function AppHeader() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+              className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
               aria-label="Close menu"
               onClick={() => setMobileMenuOpen(false)}
             />
-            <motion.nav
-              initial={{ opacity: 0, y: -8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.2 }}
-              className="fixed inset-x-0 top-14 z-50 max-h-[calc(100vh-3.5rem)] overflow-y-auto border-b border-white/10 bg-gradient-to-b from-[var(--color-primary-900)] to-[#312e81] p-4 shadow-xl lg:hidden"
+            <motion.aside
+              initial={{ x: '-105%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '-105%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+              className="fixed inset-y-0 left-0 z-50 flex w-[min(100vw-2.5rem,300px)] flex-col border-r border-[var(--color-border)] bg-[var(--color-surface)] shadow-2xl lg:hidden"
             >
-              <div className="flex flex-col gap-1">
-                {nav.map((item) => {
-                  const Icon = item.icon;
-                  if (item.children) {
-                    return (
-                      <div key={item.href} className="rounded-lg border border-white/10 p-2">
-                        <div className="mb-2 flex items-center gap-2 px-2 text-xs font-semibold uppercase tracking-wide text-white/70">
-                          <Icon className="h-4 w-4" />
-                          {item.label}
-                        </div>
-                        {item.children.map((child) => {
-                          const ChildIcon = child.icon;
-                          const childActive =
-                            item.href === '/cv'
-                              ? isCvChildActive(pathname, child.href)
-                              : item.href === '/cover-letters'
-                                ? isCoverLetterChildActive(pathname, child.href)
-                                : pathname === child.href ||
-                                  pathname.startsWith(`${child.href}/`);
-                          return (
-                            <Link
-                              key={child.href}
-                              href={child.href}
-                              className={cn(
-                                'flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm',
-                                childActive ? 'bg-white/15 text-white' : 'text-white/90'
-                              )}
-                              onClick={() => setMobileMenuOpen(false)}
-                            >
-                              <ChildIcon className="h-4 w-4" />
-                              {child.label}
-                              {child.proOnly && isFree ? (
-                                <span className="ml-auto rounded bg-amber-300/90 px-1.5 py-0.5 text-[10px] font-semibold text-amber-900">
-                                  Pro
-                                </span>
-                              ) : null}
-                            </Link>
-                          );
-                        })}
-                      </div>
-                    );
-                  }
-                  const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={cn(
-                        'flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium',
-                        active ? 'bg-white/15 text-white' : 'text-white/90'
-                      )}
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      <Icon className="h-5 w-5 shrink-0" />
-                      {item.label}
-                    </Link>
-                  );
-                })}
+              <div className="flex h-14 shrink-0 items-center justify-between border-b border-[var(--color-border)] px-4">
+                <span className="font-display text-sm font-semibold text-[var(--color-text-primary)]">
+                  Menu
+                </span>
+                <button
+                  type="button"
+                  className="rounded-btn p-2 text-[var(--color-muted)] hover:bg-white/[0.06] hover:text-[var(--color-text-primary)]"
+                  onClick={() => setMobileMenuOpen(false)}
+                  aria-label="Close menu"
+                >
+                  <X className="h-5 w-5" />
+                </button>
               </div>
-              <div className="mt-4 border-t border-white/10 pt-4">
-                <p className="px-1 text-xs text-white/70">
-                  Use the profile icon (top right) for account, plans, and sign out.
-                </p>
-              </div>
-            </motion.nav>
+              <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
+                {nav.map((item) => (
+                  <NavLinkContent
+                    key={item.href}
+                    item={item}
+                    pathname={pathname}
+                    isFree={isFree}
+                    onNavigate={() => setMobileMenuOpen(false)}
+                  />
+                ))}
+              </nav>
+              <p className="border-t border-[var(--color-border)] px-4 py-3 text-xs text-[var(--color-muted)]">
+                Account and billing live in the profile menu (top right).
+              </p>
+            </motion.aside>
           </>
         ) : null}
       </AnimatePresence>

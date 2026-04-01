@@ -24,9 +24,7 @@ import { CVSectionVisibilityPanel } from '@/components/cv/CVSectionVisibilityPan
 import { CVRewriteWithAIModal } from '@/components/cv/CVRewriteWithAIModal';
 import { CvAtsPolishButton } from '@/components/cv/CvAtsPolishButton';
 import { cn, generateId } from '@/lib/utils';
-
-const FORM_CARD =
-  'rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm ring-1 ring-slate-100/80 sm:p-5';
+import { CV_FORM_CARD as FORM_CARD } from '@/lib/cv-editor-styles';
 
 export type CVFormTab =
   | 'header'
@@ -127,7 +125,7 @@ function HighlightedText({ text, keywords }: { text: string; keywords: string[] 
         regex.test(part) ? (
           <mark
             key={i}
-            className="rounded-sm bg-yellow-200/70 px-0.5 text-inherit"
+            className="rounded-sm bg-[var(--color-accent-gold)]/35 px-0.5 text-inherit"
           >
             {part}
           </mark>
@@ -235,23 +233,23 @@ export function CVFormFields(props: Props) {
       {hideTabBar ? null : <Tabs value={tab} onChange={onTabChange} tabs={visibleTabs} />}
       <div className="pt-4">
         {activeAts ? (
-          <div className="mb-4 rounded-xl border border-indigo-200/80 bg-gradient-to-br from-indigo-50/90 to-white p-4 shadow-sm">
+          <div className="mb-4 rounded-xl border border-[var(--color-primary-200)]/40 bg-[var(--color-primary-100)]/50 p-4 shadow-sm backdrop-blur-sm">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-primary-400)]">
                 ATS suggestion
               </p>
-              <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-800">
+              <span className="rounded-badge border border-[var(--color-primary-200)] bg-[var(--color-primary-100)] px-2 py-0.5 font-mono text-xs font-semibold text-[var(--color-primary-400)]">
                 {activeAts.score}/100
               </span>
             </div>
             {activeAts.suggestions.length > 0 ? (
-              <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-indigo-900">
+              <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-[var(--color-text-primary)]">
                 {activeAts.suggestions.slice(0, 3).map((item) => (
                   <li key={item}>{item}</li>
                 ))}
               </ul>
             ) : (
-              <p className="mt-2 text-sm text-indigo-900">This section is already ATS-friendly.</p>
+              <p className="mt-2 text-sm text-[var(--color-muted)]">This section is already ATS-friendly.</p>
             )}
           </div>
         ) : null}
@@ -282,8 +280,8 @@ export function CVFormFields(props: Props) {
             </div>
             {/* ── Additional links ──────────────────────────────── */}
             <div className="col-span-2">
-              <p className="mb-2 text-sm font-medium text-[var(--color-secondary)]">Additional links</p>
-              <p className="mb-3 text-xs text-slate-500">Portfolio, website, Behance, Dribbble, blog, Twitter/X, etc. — any links beyond LinkedIn &amp; GitHub.</p>
+              <p className="mb-2 text-sm font-medium text-[var(--color-text-primary)]">Additional links</p>
+              <p className="mb-3 text-xs text-[var(--color-muted)]">Portfolio, website, Behance, Dribbble, blog, Twitter/X, etc. — any links beyond LinkedIn &amp; GitHub.</p>
               <div className="space-y-2">
                 {links.map((link, li) => (
                   <div key={link.id} className="flex items-end gap-2">
@@ -379,9 +377,9 @@ export function CVFormFields(props: Props) {
               />
             </div>
             {kw.length > 0 && summary && (
-              <div className="rounded-md border border-yellow-200 bg-yellow-50/50 p-3">
-                <span className="text-[10px] font-medium uppercase tracking-wide text-yellow-700">Preview with highlights</span>
-                <p className="mt-1 text-sm text-[var(--color-secondary)]">
+              <div className="rounded-btn border border-[var(--color-accent-gold)]/25 bg-[var(--color-accent-gold)]/10 p-3">
+                <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-accent-gold)]">Preview with highlights</span>
+                <p className="mt-1 text-sm text-[var(--color-text-primary)]">
                   <HighlightedText text={summary} keywords={kw} />
                 </p>
               </div>
@@ -443,7 +441,7 @@ export function CVFormFields(props: Props) {
                     }}
                   />
                 </div>
-                <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm text-[var(--color-secondary)]">
+                <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm text-[var(--color-text-primary)]">
                   <input
                     type="checkbox"
                     className="rounded border-[var(--color-border)]"
@@ -489,7 +487,7 @@ export function CVFormFields(props: Props) {
                   />
                 </div>
                 <div className="mt-3 space-y-2">
-                  <p className="text-sm font-medium text-[var(--color-secondary)]">Bullets</p>
+                  <p className="text-sm font-medium text-[var(--color-text-primary)]">Bullets</p>
                   {ex.bullets.map((bullet, bi) => (
                     <div
                       key={`${ex.id}-bullet-${bi}`}
@@ -557,9 +555,9 @@ export function CVFormFields(props: Props) {
                   </div>
                 </div>
                 {kw.length > 0 && ex.bullets.length > 0 && (
-                  <div className="mt-2 space-y-1 rounded-md border border-yellow-200 bg-yellow-50/50 p-2">
-                    <span className="text-[10px] font-medium uppercase tracking-wide text-yellow-700">Preview with highlights</span>
-                    <ul className="list-inside list-disc space-y-0.5 text-sm text-[var(--color-secondary)]">
+                  <div className="mt-2 space-y-1 rounded-btn border border-[var(--color-accent-gold)]/25 bg-[var(--color-accent-gold)]/10 p-2">
+                    <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-accent-gold)]">Preview with highlights</span>
+                    <ul className="list-inside list-disc space-y-0.5 text-sm text-[var(--color-text-primary)]">
                       {ex.bullets.map((b, bi) => (
                         <li key={bi}>
                           <HighlightedText text={b} keywords={kw} />
@@ -728,7 +726,7 @@ export function CVFormFields(props: Props) {
 
         {tab === 'skills' ? (
           <div className="space-y-4">
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-[var(--color-muted)]">
               Group skills by category (e.g. technical, tools). These appear as labeled chips in many templates.
             </p>
             {skills.map((g, i) => (
@@ -790,8 +788,8 @@ export function CVFormFields(props: Props) {
                           key={si}
                           className={
                             isHighlighted
-                              ? 'rounded-full bg-yellow-200 px-2 py-0.5 text-xs font-medium text-yellow-900'
-                              : 'rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600'
+                              ? 'rounded-badge border border-[var(--color-accent-gold)]/40 bg-[var(--color-accent-gold)]/20 px-2 py-0.5 text-xs font-medium text-[var(--color-accent-gold)]'
+                              : 'rounded-badge border border-[var(--color-border)] bg-white/[0.06] px-2 py-0.5 text-xs text-[var(--color-muted)]'
                           }
                         >
                           {skill}
@@ -924,7 +922,7 @@ export function CVFormFields(props: Props) {
                 </div>
                 {/* Project links (GitHub, Live Demo, etc.) */}
                 <div className="mt-3">
-                  <p className="mb-2 text-sm font-medium text-[var(--color-secondary)]">Links</p>
+                  <p className="mb-2 text-sm font-medium text-[var(--color-text-primary)]">Links</p>
                   <div className="space-y-2">
                     {(p.links ?? []).map((lnk: EntryLink, li: number) => (
                       <div key={li} className="flex items-end gap-2">
@@ -1111,7 +1109,7 @@ export function CVFormFields(props: Props) {
                     }}
                   />
                   <div className="sm:col-span-2">
-                    <p className="mb-2 text-sm font-medium text-[var(--color-secondary)]">Credential links (optional)</p>
+                    <p className="mb-2 text-sm font-medium text-[var(--color-text-primary)]">Credential links (optional)</p>
                     <div className="space-y-2">
                       {(c.links ?? []).map((lnk: EntryLink, li: number) => (
                         <div key={li} className="flex items-end gap-2">
@@ -1203,7 +1201,7 @@ export function CVFormFields(props: Props) {
 
         {tab === 'references' ? (
           <div className="space-y-4">
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-[var(--color-muted)]">
               Add up to two professional references (name, role, and contact optional).
             </p>
             {referrals.map((r, i) => (

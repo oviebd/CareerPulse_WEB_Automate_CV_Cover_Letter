@@ -65,8 +65,8 @@ export function ProfileMenu() {
         type="button"
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          'flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white/30 bg-white/15 text-sm font-semibold text-white transition hover:border-white/50 hover:bg-white/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white',
-          open && 'ring-2 ring-white/40'
+          'flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--color-border)] bg-[var(--color-primary-100)] text-sm font-semibold text-[var(--color-primary-400)] transition hover:border-[var(--color-primary-400)] hover:brightness-110 focus-visible:focus-ring',
+          open && 'ring-2 ring-[var(--color-primary-400)]/40'
         )}
         aria-expanded={open}
         aria-haspopup="menu"
@@ -91,30 +91,30 @@ export function ProfileMenu() {
             exit={{ opacity: 0, y: -6 }}
             transition={{ duration: 0.15 }}
             role="menu"
-            className="absolute right-0 top-[calc(100%+8px)] z-[60] w-[min(100vw-24px,280px)] rounded-xl border border-slate-200 bg-white py-2 text-slate-900 shadow-xl"
+            className="glass-panel absolute right-0 top-[calc(100%+8px)] z-[60] w-[min(100vw-24px,280px)] rounded-card border border-[var(--color-border)] py-2 text-[var(--color-text-primary)] shadow-xl"
           >
-            <div className="border-b border-slate-100 px-4 pb-3 pt-1">
-              <p className="truncate font-semibold text-slate-900">{displayName}</p>
+            <div className="border-b border-[var(--color-border)] px-4 pb-3 pt-1">
+              <p className="truncate font-semibold text-[var(--color-text-primary)]">{displayName}</p>
               {email ? (
-                <p className="truncate text-xs text-slate-500">{email}</p>
+                <p className="truncate text-xs text-[var(--color-muted)]">{email}</p>
               ) : null}
             </div>
 
-            <div className="border-b border-slate-100 px-2 py-2">
-              <p className="px-2 pb-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">
+            <div className="border-b border-[var(--color-border)] px-2 py-2">
+              <p className="px-2 pb-1 text-[11px] font-medium uppercase tracking-wide text-[var(--color-muted)]">
                 Plans
               </p>
               <div className="rounded-lg px-2 py-2">
-                <p className="text-sm font-medium text-slate-900">Current plan</p>
-                <p className="text-xs capitalize text-slate-500">{planLabel}</p>
+                <p className="text-sm font-medium text-[var(--color-text-primary)]">Current plan</p>
+                <p className="text-xs capitalize text-[var(--color-muted)]">{planLabel}</p>
               </div>
               <Link
                 href="/settings/billing"
                 role="menuitem"
-                className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm text-slate-700 transition hover:bg-slate-100"
+                className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm text-[var(--color-text-primary)] transition hover:bg-white/[0.06]"
                 onClick={() => setOpen(false)}
               >
-                <CreditCard className="h-4 w-4 shrink-0 text-slate-500" />
+                <CreditCard className="h-4 w-4 shrink-0 text-[var(--color-muted)]" />
                 Billing &amp; plans
               </Link>
             </div>
@@ -123,20 +123,20 @@ export function ProfileMenu() {
               <Link
                 href="/settings"
                 role="menuitem"
-                className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm text-slate-700 transition hover:bg-slate-100"
+                className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm text-[var(--color-text-primary)] transition hover:bg-white/[0.06]"
                 onClick={() => setOpen(false)}
               >
-                <Settings className="h-4 w-4 shrink-0 text-slate-500" />
+                <Settings className="h-4 w-4 shrink-0 text-[var(--color-muted)]" />
                 Settings
               </Link>
               <button
                 type="button"
                 role="menuitem"
                 disabled={signingOut}
-                className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm text-slate-700 transition hover:bg-slate-100 disabled:opacity-60"
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm text-[var(--color-text-primary)] transition hover:bg-white/[0.06] disabled:opacity-60"
                 onClick={() => void signOut()}
               >
-                <LogOut className="h-4 w-4 shrink-0 text-slate-500" />
+                <LogOut className="h-4 w-4 shrink-0 text-[var(--color-muted)]" />
                 {signingOut ? 'Signing out…' : 'Log out'}
               </button>
             </div>
