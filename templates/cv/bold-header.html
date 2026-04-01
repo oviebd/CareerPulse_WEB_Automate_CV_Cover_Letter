@@ -101,13 +101,13 @@
         {{#if projects.length}}
         <div class="section-title">Projects</div>
         {{#each projects}}
-        <div class="proj-card"><strong>{{name}}</strong>{{#if description}}<div class="summary" style="margin-top:4pt;">{{description}}</div>{{/if}}{{#if url}}<div style="margin-top:4pt;"><a href="{{url}}" target="_blank" rel="noopener noreferrer">{{url_label}}</a></div>{{/if}}</div>
+        <div class="proj-card"><strong>{{name}}</strong>{{#if description}}<div class="summary" style="margin-top:4pt;">{{description}}</div>{{/if}}{{#if links.length}}<div style="margin-top:4pt;">{{#each links}}<a href="{{url}}" target="_blank" rel="noopener noreferrer">{{label}}</a> {{/each}}</div>{{/if}}</div>
         {{/each}}
         {{/if}}
         {{#if certifications.length}}
         <div class="section-title">Certifications</div>
         {{#each certifications}}
-        <div class="proj-card">{{name}}{{#if issuer}} — {{issuer}}{{/if}}{{#if url}} · <a href="{{url}}" target="_blank" rel="noopener noreferrer">{{url_label}}</a>{{/if}}</div>
+        <div class="proj-card">{{name}}{{#if issuer}} — {{issuer}}{{/if}}{{#each links}} · <a href="{{url}}" target="_blank" rel="noopener noreferrer">{{label}}</a>{{/each}}</div>
         {{/each}}
         {{/if}}
         {{#if languages.length}}

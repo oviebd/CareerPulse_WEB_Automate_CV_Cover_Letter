@@ -45,8 +45,8 @@
         {{#if phone}}<div class="sb-item"><span class="sb-icon">📞</span><span>{{phone}}</span></div>{{/if}}
         {{#if location}}<div class="sb-item"><span class="sb-icon">📍</span><span>{{location}}</span></div>{{/if}}
         {{#if linkedin_url}}<div class="sb-item"><a href="{{linkedin_url}}" target="_blank" rel="noopener noreferrer">LinkedIn</a></div>{{/if}}
-        {{#if portfolio_url}}<div class="sb-item"><a href="{{portfolio_url}}" target="_blank" rel="noopener noreferrer">Portfolio</a></div>{{/if}}
-        {{#if website_url}}<div class="sb-item"><a href="{{website_url}}" target="_blank" rel="noopener noreferrer">Website</a></div>{{/if}}
+        {{#if github_url}}<div class="sb-item"><a href="{{github_url}}" target="_blank" rel="noopener noreferrer">GitHub</a></div>{{/if}}
+        {{#each links}}<div class="sb-item"><a href="{{url}}" target="_blank" rel="noopener noreferrer">{{label}}</a></div>{{/each}}
         {{#if address}}<div class="sb-item"><span class="sb-icon">⌂</span><span style="white-space:pre-wrap;">{{address}}</span></div>{{/if}}
       </div>
       {{#if skills.length}}
@@ -70,7 +70,7 @@
       <div class="sb-block">
         <h3>Certifications</h3>
         {{#each certifications}}
-        <div style="margin-bottom:6pt;">{{name}}{{#if issuer}}<br/><span style="color:#64748b;">{{issuer}}</span>{{/if}}{{#if url}}<br/><a href="{{url}}" target="_blank" rel="noopener noreferrer">{{url_label}}</a>{{/if}}</div>
+        <div style="margin-bottom:6pt;">{{name}}{{#if issuer}}<br/><span style="color:#64748b;">{{issuer}}</span>{{/if}}{{#each links}}<br/><a href="{{url}}" target="_blank" rel="noopener noreferrer">{{label}}</a>{{/each}}</div>
         {{/each}}
       </div>
       {{/if}}
@@ -115,7 +115,7 @@
       <div class="proj-card">
         <strong>{{name}}</strong>
         {{#if description}}<div class="summary" style="margin-top:4pt;">{{description}}</div>{{/if}}
-        {{#if url}}<div style="margin-top:4pt;"><a href="{{url}}" target="_blank" rel="noopener noreferrer">{{url_label}}</a></div>{{/if}}
+        {{#if links.length}}<div style="margin-top:4pt;">{{#each links}}<a href="{{url}}" target="_blank" rel="noopener noreferrer">{{label}}</a> {{/each}}</div>{{/if}}
       </div>
       {{/each}}
       {{/if}}

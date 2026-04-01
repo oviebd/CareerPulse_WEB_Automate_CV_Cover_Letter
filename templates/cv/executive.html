@@ -83,7 +83,7 @@
     {{#if certifications.length}}
     <div class="section-title">Certifications</div>
     {{#each certifications}}
-    <div class="edu-card">{{name}}{{#if issuer}} — {{issuer}}{{/if}}{{#if issue_date}} ({{formatDate issue_date}}){{/if}}{{#if url}} · <a href="{{url}}" target="_blank" rel="noopener noreferrer">{{url_label}}</a>{{/if}}</div>
+    <div class="edu-card">{{name}}{{#if issuer}} — {{issuer}}{{/if}}{{#if issue_date}} ({{formatDate issue_date}}){{/if}}{{#each links}} · <a href="{{url}}" target="_blank" rel="noopener noreferrer">{{label}}</a>{{/each}}</div>
     {{/each}}
     {{/if}}
 

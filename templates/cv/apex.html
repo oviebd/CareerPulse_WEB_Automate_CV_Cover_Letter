@@ -222,7 +222,8 @@
           {{#if location}}<li>{{location}}</li>{{/if}}
           {{#if website_url}}<li><a href="{{website_url}}" target="_blank" rel="noopener noreferrer">{{website_url}}</a></li>{{/if}}
           {{#if linkedin_url}}<li><a href="{{linkedin_url}}" target="_blank" rel="noopener noreferrer">LinkedIn</a></li>{{/if}}
-          {{#if portfolio_url}}<li><a href="{{portfolio_url}}" target="_blank" rel="noopener noreferrer">Portfolio</a></li>{{/if}}
+          {{#if github_url}}<li><a href="{{github_url}}" target="_blank" rel="noopener noreferrer">GitHub</a></li>{{/if}}
+          {{#each links}}<li><a href="{{url}}" target="_blank" rel="noopener noreferrer">{{label}}</a></li>{{/each}}
         </ul>
       </div>
     </div>
@@ -262,7 +263,7 @@
         <div class="pub-card">
           <div class="pub-title">{{name}}</div>
           {{#if description}}<div class="pub-meta">{{description}}</div>{{/if}}
-          {{#if url}}<div class="pub-meta" style="margin-top:3pt;"><a href="{{url}}" target="_blank" rel="noopener noreferrer">{{url_label}}</a></div>{{/if}}
+          {{#if links.length}}<div class="pub-meta" style="margin-top:3pt;">{{#each links}}<a href="{{url}}" target="_blank" rel="noopener noreferrer">{{label}}</a> {{/each}}</div>{{/if}}
         </div>
         {{/each}}
       </div>

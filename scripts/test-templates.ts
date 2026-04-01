@@ -14,8 +14,8 @@ const testCVData: CVData = {
   phone: '+1 (415) 555-0192',
   location: 'San Francisco, CA',
   linkedin_url: 'https://linkedin.com/in/alexandrachen',
-  portfolio_url: 'https://alexandrachen.com',
-  website_url: null,
+  github_url: 'https://github.com/alexandrachen',
+  links: [{ id: 'p1', label: 'Portfolio', url: 'https://alexandrachen.com' }],
   address: null,
   photo_url: null,
   summary:
@@ -115,7 +115,7 @@ const testCVData: CVData = {
       description:
         "Built and maintain a collection of product management templates used by 8,000+ PMs. Featured in Product Hunt's top products of 2023.",
       tech_stack: ['Next.js', 'Notion API', 'Vercel'],
-      url: 'https://openpm.dev',
+      links: [{ label: 'Live Site', url: 'https://openpm.dev' }],
       start_date: '2023-01',
       end_date: null,
     },
@@ -127,7 +127,7 @@ const testCVData: CVData = {
       issuer: 'Scrum Alliance',
       issue_date: '2020-03',
       expiry_date: null,
-      url: null,
+      links: [],
     },
   ],
   languages: [

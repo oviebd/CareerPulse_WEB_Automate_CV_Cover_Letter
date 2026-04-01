@@ -11,8 +11,10 @@ import type {
   CertificationEntry,
   CVSectionVisibility,
   EducationEntry,
+  EntryLink,
   ExperienceEntry,
   LanguageEntry,
+  ProfileLink,
   ProjectEntry,
   ReferralEntry,
   SkillGroup,
@@ -77,10 +79,10 @@ type Props = {
   onLocation: (v: string) => void;
   linkedin_url: string;
   onLinkedinUrl: (v: string) => void;
-  portfolio_url: string;
-  onPortfolioUrl: (v: string) => void;
-  website_url: string;
-  onWebsiteUrl: (v: string) => void;
+  github_url: string;
+  onGithubUrl: (v: string) => void;
+  links: ProfileLink[];
+  onLinksChange: (v: ProfileLink[]) => void;
   address: string;
   onAddress: (v: string) => void;
   photo_url: string;
@@ -166,10 +168,10 @@ export function CVFormFields(props: Props) {
     onLocation,
     linkedin_url,
     onLinkedinUrl,
-    portfolio_url,
-    onPortfolioUrl,
-    website_url,
-    onWebsiteUrl,
+    github_url,
+    onGithubUrl,
+    links,
+    onLinksChange,
     address,
     onAddress,
     photo_url,
@@ -273,11 +275,64 @@ export function CVFormFields(props: Props) {
               onChange={(e) => onLinkedinUrl(e.target.value)}
             />
             <Input
-              label="Portfolio URL"
-              value={portfolio_url}
-              onChange={(e) => onPortfolioUrl(e.target.value)}
+              label="GitHub URL"
+              value={github_url}
+              onChange={(e) => onGithubUrl(e.target.value)}
             />
-            <Input label="Website URL" value={website_url} onChange={(e) => onWebsiteUrl(e.target.value)} />
+            </div>
+            {/* ── Additional links ──────────────────────────────── */}
+            <div className="col-span-2">
+              <p className="mb-2 text-sm font-medium text-[var(--color-secondary)]">Additional links</p>
+              <p className="mb-3 text-xs text-slate-500">Portfolio, website, Behance, Dribbble, blog, Twitter/X, etc. — any links beyond LinkedIn &amp; GitHub.</p>
+              <div className="space-y-2">
+                {links.map((link, li) => (
+                  <div key={link.id} className="flex items-end gap-2">
+                    <Input
+                      label={li === 0 ? 'Label' : undefined}
+                      placeholder="e.g. Portfolio, Behance…"
+                      value={link.label}
+                      onChange={(e) => {
+                        const next = [...links];
+                        next[li] = { ...link, label: e.target.value };
+                        onLinksChange(next);
+                      }}
+                      className="w-36 shrink-0"
+                    />
+                    <Input
+                      label={li === 0 ? 'URL' : undefined}
+                      placeholder="https://…"
+                      value={link.url}
+                      onChange={(e) => {
+                        const next = [...links];
+                        next[li] = { ...link, url: e.target.value };
+                        onLinksChange(next);
+                      }}
+                      className="min-w-0 flex-1"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="mb-0.5 shrink-0"
+                      onClick={() => onLinksChange(links.filter((_, j) => j !== li))}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                ))}
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                className="mt-2"
+                onClick={() =>
+                  onLinksChange([
+                    ...links,
+                    { id: generateId(), label: '', url: '' },
+                  ])
+                }
+              >
+                + Add link
+              </Button>
             </div>
             <Textarea
               label="Full address (optional)"
@@ -847,15 +902,6 @@ export function CVFormFields(props: Props) {
                 </div>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <Input
-                    label="URL (optional)"
-                    value={p.url ?? ''}
-                    onChange={(e) => {
-                      const n = [...projects];
-                      n[i] = { ...p, url: e.target.value || null };
-                      onProjectsChange(n);
-                    }}
-                  />
-                  <Input
                     label="Start (month)"
                     type="month"
                     value={p.start_date?.slice(0, 7) ?? ''}
@@ -875,6 +921,66 @@ export function CVFormFields(props: Props) {
                       onProjectsChange(n);
                     }}
                   />
+                </div>
+                {/* Project links (GitHub, Live Demo, etc.) */}
+                <div className="mt-3">
+                  <p className="mb-2 text-sm font-medium text-[var(--color-secondary)]">Links</p>
+                  <div className="space-y-2">
+                    {(p.links ?? []).map((lnk: EntryLink, li: number) => (
+                      <div key={li} className="flex items-end gap-2">
+                        <Input
+                          label={li === 0 ? 'Label' : undefined}
+                          placeholder="e.g. GitHub, Live Demo…"
+                          value={lnk.label}
+                          onChange={(e) => {
+                            const n = [...projects];
+                            const nextLinks = [...(p.links ?? [])];
+                            nextLinks[li] = { ...lnk, label: e.target.value };
+                            n[i] = { ...p, links: nextLinks };
+                            onProjectsChange(n);
+                          }}
+                          className="w-36 shrink-0"
+                        />
+                        <Input
+                          label={li === 0 ? 'URL' : undefined}
+                          placeholder="https://…"
+                          value={lnk.url}
+                          onChange={(e) => {
+                            const n = [...projects];
+                            const nextLinks = [...(p.links ?? [])];
+                            nextLinks[li] = { ...lnk, url: e.target.value };
+                            n[i] = { ...p, links: nextLinks };
+                            onProjectsChange(n);
+                          }}
+                          className="min-w-0 flex-1"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="mb-0.5 shrink-0"
+                          onClick={() => {
+                            const n = [...projects];
+                            n[i] = { ...p, links: (p.links ?? []).filter((_, j) => j !== li) };
+                            onProjectsChange(n);
+                          }}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="mt-2"
+                    onClick={() => {
+                      const n = [...projects];
+                      n[i] = { ...p, links: [...(p.links ?? []), { label: '', url: '' }] };
+                      onProjectsChange(n);
+                    }}
+                  >
+                    + Add link
+                  </Button>
                 </div>
                 <Button
                   variant="ghost"
@@ -896,7 +1002,7 @@ export function CVFormFields(props: Props) {
                     name: '',
                     description: '',
                     tech_stack: [],
-                    url: null,
+                    links: [],
                     start_date: null,
                     end_date: null,
                   },
@@ -1004,16 +1110,65 @@ export function CVFormFields(props: Props) {
                       onCertificationsChange(n);
                     }}
                   />
-                  <Input
-                    className="sm:col-span-2"
-                    label="Credential URL (optional)"
-                    value={c.url ?? ''}
-                    onChange={(e) => {
-                      const n = [...certifications];
-                      n[i] = { ...c, url: e.target.value || null };
-                      onCertificationsChange(n);
-                    }}
-                  />
+                  <div className="sm:col-span-2">
+                    <p className="mb-2 text-sm font-medium text-[var(--color-secondary)]">Credential links (optional)</p>
+                    <div className="space-y-2">
+                      {(c.links ?? []).map((lnk: EntryLink, li: number) => (
+                        <div key={li} className="flex items-end gap-2">
+                          <Input
+                            label={li === 0 ? 'Label' : undefined}
+                            placeholder="e.g. Credential, Badge…"
+                            value={lnk.label}
+                            onChange={(e) => {
+                              const n = [...certifications];
+                              const nextLinks = [...(c.links ?? [])];
+                              nextLinks[li] = { ...lnk, label: e.target.value };
+                              n[i] = { ...c, links: nextLinks };
+                              onCertificationsChange(n);
+                            }}
+                            className="w-36 shrink-0"
+                          />
+                          <Input
+                            label={li === 0 ? 'URL' : undefined}
+                            placeholder="https://…"
+                            value={lnk.url}
+                            onChange={(e) => {
+                              const n = [...certifications];
+                              const nextLinks = [...(c.links ?? [])];
+                              nextLinks[li] = { ...lnk, url: e.target.value };
+                              n[i] = { ...c, links: nextLinks };
+                              onCertificationsChange(n);
+                            }}
+                            className="min-w-0 flex-1"
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="mb-0.5 shrink-0"
+                            onClick={() => {
+                              const n = [...certifications];
+                              n[i] = { ...c, links: (c.links ?? []).filter((_, j) => j !== li) };
+                              onCertificationsChange(n);
+                            }}
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="mt-2"
+                      onClick={() => {
+                        const n = [...certifications];
+                        n[i] = { ...c, links: [...(c.links ?? []), { label: '', url: '' }] };
+                        onCertificationsChange(n);
+                      }}
+                    >
+                      + Add link
+                    </Button>
+                  </div>
                 </div>
                 <Button
                   variant="ghost"
@@ -1036,7 +1191,7 @@ export function CVFormFields(props: Props) {
                     issuer: '',
                     issue_date: '',
                     expiry_date: null,
-                    url: null,
+                    links: [],
                   },
                 ])
               }

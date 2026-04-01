@@ -4,7 +4,7 @@ import puppeteer, { type Browser, type LaunchOptions } from 'puppeteer';
 import { resolveEffectiveTier } from '@/lib/dev-subscription';
 import { createAdminClient } from '@/lib/supabase/server';
 import { applyCvSectionVisibility } from '@/lib/cv-section-visibility';
-import type { CVData, CVProfile, ReferralEntry, SubscriptionTier } from '@/types';
+import type { CVData, CVProfile, EntryLink, ProfileLink, ReferralEntry, SubscriptionTier } from '@/types';
 import { canUseTemplate } from '@/lib/subscription';
 
 let browser: Browser | null = null;
@@ -420,6 +420,29 @@ function skillItemsByCategory(
   return skills?.find((x) => x.category === cat)?.items ?? [];
 }
 
+/** Migrate old single `url` string to an EntryLink array (backward-compat). */
+function migrateEntryLinks(
+  links: unknown,
+  legacyUrl: string | null | undefined
+): { label: string; url: string }[] {
+  if (Array.isArray(links) && links.length > 0) return links as { label: string; url: string }[];
+  if (legacyUrl?.trim()) return [{ label: urlToLabel(legacyUrl), url: legacyUrl }];
+  return [];
+}
+
+/** Migrate old portfolio_url / website_url to a ProfileLink array (backward-compat). */
+function migrateProfileLinks(
+  links: unknown,
+  portfolioUrl: string | null | undefined,
+  websiteUrl: string | null | undefined
+): ProfileLink[] {
+  if (Array.isArray(links) && links.length > 0) return links as ProfileLink[];
+  const out: ProfileLink[] = [];
+  if (portfolioUrl?.trim()) out.push({ id: 'legacy-portfolio', label: 'Portfolio', url: portfolioUrl.trim() });
+  if (websiteUrl?.trim()) out.push({ id: 'legacy-website', label: 'Website', url: websiteUrl.trim() });
+  return out;
+}
+
 export function renderTemplate(templateId: string, cvData: CVData): string {
   const filePath = path.join(
     process.cwd(),
@@ -431,8 +454,29 @@ export function renderTemplate(templateId: string, cvData: CVData): string {
   const accent = cvData.accent_color ?? '#6C63FF';
 
   const normalizedLinkedin = normalizeUrl(cvData.linkedin_url);
-  const normalizedPortfolio = normalizeUrl(cvData.portfolio_url);
-  const normalizedWebsite = normalizeUrl(cvData.website_url);
+  const normalizedGithub = normalizeUrl(cvData.github_url);
+
+  // Normalize extra profile links; backward-compat: merge old portfolio/website if not already in links.
+  const seenLinkUrls = new Set<string>();
+  const normalizedLinks: (ProfileLink & { url: string })[] = [];
+  for (const l of cvData.links ?? []) {
+    const u = normalizeUrl(l.url);
+    if (u && !seenLinkUrls.has(u)) {
+      seenLinkUrls.add(u);
+      normalizedLinks.push({ ...l, url: u });
+    }
+  }
+  // Backward-compat: include old portfolio_url / website_url if not already in links
+  const legacyPortfolio = normalizeUrl(cvData.portfolio_url);
+  const legacyWebsite = normalizeUrl(cvData.website_url);
+  if (legacyPortfolio && !seenLinkUrls.has(legacyPortfolio)) {
+    normalizedLinks.push({ id: 'legacy-portfolio', label: 'Portfolio', url: legacyPortfolio });
+    seenLinkUrls.add(legacyPortfolio);
+  }
+  if (legacyWebsite && !seenLinkUrls.has(legacyWebsite)) {
+    normalizedLinks.push({ id: 'legacy-website', label: 'Website', url: legacyWebsite });
+    seenLinkUrls.add(legacyWebsite);
+  }
 
   const contactParts: string[] = [];
   if (cvData.email) contactParts.push(escapeHtml(cvData.email));
@@ -443,14 +487,14 @@ export function renderTemplate(templateId: string, cvData: CVData): string {
       `<a href="${escapeHtml(normalizedLinkedin)}" target="_blank" rel="noopener noreferrer">LinkedIn</a>`
     );
   }
-  if (normalizedPortfolio) {
+  if (normalizedGithub) {
     contactParts.push(
-      `<a href="${escapeHtml(normalizedPortfolio)}" target="_blank" rel="noopener noreferrer">Portfolio</a>`
+      `<a href="${escapeHtml(normalizedGithub)}" target="_blank" rel="noopener noreferrer">GitHub</a>`
     );
   }
-  if (normalizedWebsite) {
+  for (const l of normalizedLinks) {
     contactParts.push(
-      `<a href="${escapeHtml(normalizedWebsite)}" target="_blank" rel="noopener noreferrer">Website</a>`
+      `<a href="${escapeHtml(l.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(l.label)}</a>`
     );
   }
 
@@ -466,21 +510,20 @@ export function renderTemplate(templateId: string, cvData: CVData): string {
   );
 
   const normalizedProjects = sortedProjects.map((p) => {
-    const normalized = normalizeUrl(p.url);
-    return {
-      ...p,
-      url: normalized,
-      url_label: urlToLabel(normalized),
-    };
+    // Normalize the links array; backward-compat: build from legacy url if links is empty.
+    const rawLinks: EntryLink[] = Array.isArray(p.links) && p.links.length > 0
+      ? p.links
+      : (p.url ? [{ label: urlToLabel(p.url), url: p.url }] : []);
+    const links = rawLinks.map((l) => ({ label: l.label, url: normalizeUrl(l.url) ?? l.url })).filter((l) => l.url);
+    return { ...p, links, url: links[0]?.url ?? null, url_label: links[0]?.label ?? '' };
   });
 
   const normalizedCertifications = sortedCertifications.map((c) => {
-    const normalized = normalizeUrl(c.url);
-    return {
-      ...c,
-      url: normalized,
-      url_label: urlToLabel(normalized),
-    };
+    const rawLinks: EntryLink[] = Array.isArray(c.links) && c.links.length > 0
+      ? c.links
+      : (c.url ? [{ label: urlToLabel(c.url), url: c.url }] : []);
+    const links = rawLinks.map((l) => ({ label: l.label, url: normalizeUrl(l.url) ?? l.url })).filter((l) => l.url);
+    return { ...c, links, url: links[0]?.url ?? null, url_label: links[0]?.label ?? '' };
   });
 
   const twoLineName = nameTwoLines(cvData.full_name);
@@ -500,8 +543,8 @@ export function renderTemplate(templateId: string, cvData: CVData): string {
     accent_color: accent,
     contact_line: contactParts.join(' | '),
     linkedin_url: normalizedLinkedin,
-    portfolio_url: normalizedPortfolio,
-    website_url: normalizedWebsite,
+    github_url: normalizedGithub,
+    links: normalizedLinks,
     experience: sortedExperience,
     education: cvData.education ?? [],
     skills: cvData.skills ?? [],
@@ -533,8 +576,8 @@ export function looseProfileToCVData(
     phone: row.phone ?? null,
     location: row.location ?? null,
     linkedin_url: row.linkedin_url ?? null,
-    portfolio_url: row.portfolio_url ?? null,
-    website_url: row.website_url ?? null,
+    github_url: row.github_url ?? null,
+    links: migrateProfileLinks(row.links, row.portfolio_url, row.website_url),
     address: row.address ?? null,
     photo_url: row.photo_url ?? null,
     summary: row.summary ?? null,
@@ -572,13 +615,14 @@ export function cvProfileToCVData(
   const projects = (row.projects ?? []).map((p) => ({
     ...p,
     description: p.description ?? null,
+    links: migrateEntryLinks(p.links, p.url),
   })) as CVData['projects'];
   const certs = (row.certifications ?? []).map((c) => ({
     ...c,
     issuer: c.issuer ?? null,
     issue_date: c.issue_date ?? null,
     expiry_date: c.expiry_date ?? null,
-    url: c.url ?? null,
+    links: migrateEntryLinks(c.links, c.url),
   })) as CVData['certifications'];
   const langs = (row.languages ?? []) as CVData['languages'];
   const awards = (row.awards ?? []).map((a) => ({
@@ -609,8 +653,8 @@ export function cvProfileToCVData(
     phone: row.phone,
     location: row.location,
     linkedin_url: row.linkedin_url,
-    portfolio_url: row.portfolio_url,
-    website_url: row.website_url,
+    github_url: row.github_url,
+    links: migrateProfileLinks(row.links, row.portfolio_url, row.website_url),
     address: row.address ?? null,
     photo_url: row.photo_url ?? null,
     summary: row.summary,

@@ -92,13 +92,13 @@
         {{#if projects.length}}
         <div class="section-title"><span class="sq">▪</span> PROJECTS</div>
         {{#each projects}}
-      <div class="proj-card"><strong>{{name}}</strong>{{#if description}}<br/>{{description}}{{/if}}{{#if url}}<div style="margin-top:4pt;"><a href="{{url}}" target="_blank" rel="noopener noreferrer">{{url_label}}</a></div>{{/if}}</div>
+      <div class="proj-card"><strong>{{name}}</strong>{{#if description}}<br/>{{description}}{{/if}}{{#if links.length}}<div style="margin-top:4pt;">{{#each links}}<a href="{{url}}" target="_blank" rel="noopener noreferrer">{{label}}</a> {{/each}}</div>{{/if}}</div>
         {{/each}}
         {{/if}}
         {{#if certifications.length}}
         <div class="section-title"><span class="sq">▪</span> CERTIFICATIONS</div>
         {{#each certifications}}
-      <div class="proj-card">{{name}}{{#if url}}<div style="margin-top:4pt;"><a href="{{url}}" target="_blank" rel="noopener noreferrer">{{url_label}}</a></div>{{/if}}</div>
+      <div class="proj-card">{{name}}{{#if links.length}}<div style="margin-top:4pt;">{{#each links}}<a href="{{url}}" target="_blank" rel="noopener noreferrer">{{label}}</a> {{/each}}</div>{{/if}}</div>
         {{/each}}
         {{/if}}
         {{#if languages.length}}

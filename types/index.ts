@@ -37,6 +37,19 @@ export interface Profile {
   updated_at: string;
 }
 
+// Generic labeled hyperlink — used by ProjectEntry, CertificationEntry, etc.
+export interface EntryLink {
+  label: string; // e.g. "GitHub", "Live Demo", "Credential", "Slides"
+  url: string;
+}
+
+// Profile-level extra link (beyond the dedicated linkedin / github fields)
+export interface ProfileLink {
+  id: string;
+  label: string; // e.g. "Portfolio", "Behance", "Blog", "npm", "Twitter"
+  url: string;
+}
+
 // CV sub-types (stored as JSONB)
 export interface ExperienceEntry {
   id: string;
@@ -72,7 +85,10 @@ export interface ProjectEntry {
   name: string;
   description: string;
   tech_stack: string[];
-  url: string | null;
+  /** Primary multi-link list. Replaces the legacy single `url` field. */
+  links: EntryLink[];
+  /** @deprecated Use `links`. Kept for backward-compat with old JSONB data. */
+  url?: string | null;
   start_date: string | null;
   end_date: string | null;
 }
@@ -83,7 +99,10 @@ export interface CertificationEntry {
   issuer: string;
   issue_date: string;
   expiry_date: string | null;
-  url: string | null;
+  /** Primary multi-link list. Replaces the legacy single `url` field. */
+  links: EntryLink[];
+  /** @deprecated Use `links`. Kept for backward-compat with old JSONB data. */
+  url?: string | null;
 }
 
 export interface LanguageEntry {
@@ -137,8 +156,13 @@ export interface CVData {
   phone: string | null;
   location: string | null;
   linkedin_url: string | null;
-  portfolio_url: string | null;
-  website_url: string | null;
+  github_url: string | null;
+  /** Extra labeled links (portfolio, website, Behance, etc.) beyond linkedin/github. */
+  links: ProfileLink[];
+  /** @deprecated Use `links`. Kept for backward-compat. */
+  portfolio_url?: string | null;
+  /** @deprecated Use `links`. Kept for backward-compat. */
+  website_url?: string | null;
   /** Used only for PDF/HTML preview rendering to include/exclude CV sections. */
   section_visibility?: CVSectionVisibility;
   /** Full postal / mailing address (separate from short location line). */
@@ -177,7 +201,8 @@ export interface CVData {
     name: string;
     description: string | null;
     tech_stack: string[];
-    url: string | null;
+    links: EntryLink[];
+    url?: string | null;
     start_date: string | null;
     end_date: string | null;
   }>;
@@ -187,7 +212,8 @@ export interface CVData {
     issuer: string | null;
     issue_date: string | null;
     expiry_date: string | null;
-    url: string | null;
+    links: EntryLink[];
+    url?: string | null;
   }>;
   languages: Array<{
     id: string;
@@ -218,8 +244,13 @@ export interface CVProfile {
   phone: string | null;
   location: string | null;
   linkedin_url: string | null;
-  portfolio_url: string | null;
-  website_url: string | null;
+  github_url: string | null;
+  /** Extra labeled links (portfolio, website, Behance, etc.) beyond linkedin/github. */
+  links: ProfileLink[];
+  /** @deprecated Use `links`. Kept for backward-compat. */
+  portfolio_url?: string | null;
+  /** @deprecated Use `links`. Kept for backward-compat. */
+  website_url?: string | null;
   address?: string | null;
   photo_url?: string | null;
   summary: string | null;
@@ -430,8 +461,10 @@ export interface JobSpecificCV {
   phone: string | null;
   location: string | null;
   linkedin_url: string | null;
-  portfolio_url: string | null;
-  website_url: string | null;
+  github_url: string | null;
+  links: ProfileLink[];
+  portfolio_url?: string | null;
+  website_url?: string | null;
   summary: string | null;
   experience: ExperienceEntry[];
   education: EducationEntry[];

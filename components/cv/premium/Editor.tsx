@@ -246,7 +246,7 @@ export function Editor({ value, onChange, activeSection }: EditorProps) {
               onClick={() =>
                 update({
                   ...value,
-                  projects: [...projects, { id: generateId(), name: '', description: '', tech_stack: [], url: null, start_date: null, end_date: null }],
+                  projects: [...projects, { id: generateId(), name: '', description: '', tech_stack: [], links: [], start_date: null, end_date: null }],
                 })
               }
             >
@@ -316,7 +316,7 @@ export function Editor({ value, onChange, activeSection }: EditorProps) {
         <section className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-slate-900">Certifications</h2>
-            <Button variant="secondary" size="sm" onClick={() => update({ ...value, certifications: [...certs, { id: generateId(), name: '', issuer: '', issue_date: '', expiry_date: null, url: null }] })}>
+            <Button variant="secondary" size="sm" onClick={() => update({ ...value, certifications: [...certs, { id: generateId(), name: '', issuer: '', issue_date: '', expiry_date: null, links: [] }] })}>
               Add certification
             </Button>
           </div>

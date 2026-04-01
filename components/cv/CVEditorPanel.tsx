@@ -9,6 +9,7 @@ import type {
   EducationEntry,
   ExperienceEntry,
   LanguageEntry,
+  ProfileLink,
   ProjectEntry,
   ReferralEntry,
   SkillGroup,
@@ -62,8 +63,8 @@ export function CVEditorPanel({
   const [phone, setPhone] = useState(value.phone ?? '');
   const [location, setLocation] = useState(value.location ?? '');
   const [linkedin_url, setLi] = useState(value.linkedin_url ?? '');
-  const [portfolio_url, setPortfolio] = useState(value.portfolio_url ?? '');
-  const [website_url, setWebsite] = useState(value.website_url ?? '');
+  const [github_url, setGithub] = useState(value.github_url ?? '');
+  const [links, setLinks] = useState<ProfileLink[]>(value.links ?? []);
   const [address, setAddress] = useState(value.address ?? '');
   const [photo_url, setPhotoUrl] = useState(value.photo_url ?? '');
   const [summary, setSummary] = useState(value.summary ?? '');
@@ -105,8 +106,8 @@ export function CVEditorPanel({
     setPhone(value.phone ?? '');
     setLocation(value.location ?? '');
     setLi(value.linkedin_url ?? '');
-    setPortfolio(value.portfolio_url ?? '');
-    setWebsite(value.website_url ?? '');
+    setGithub(value.github_url ?? '');
+    setLinks(value.links ?? []);
     setAddress(value.address ?? '');
     setPhotoUrl(value.photo_url ?? '');
     setSummary(value.summary ?? '');
@@ -131,8 +132,8 @@ export function CVEditorPanel({
         phone,
         location,
         linkedin_url,
-        portfolio_url,
-        website_url,
+        github_url,
+        links,
         section_visibility,
         address,
         photo_url,
@@ -157,8 +158,8 @@ export function CVEditorPanel({
       phone,
       location,
       linkedin_url,
-      portfolio_url,
-      website_url,
+      github_url,
+      links,
       section_visibility,
       address,
       photo_url,
@@ -247,10 +248,10 @@ export function CVEditorPanel({
         onLocation={(v) => { setLocation(v); emitChange({ location: v }); }}
         linkedin_url={linkedin_url}
         onLinkedinUrl={(v) => { setLi(v); emitChange({ linkedin_url: v }); }}
-        portfolio_url={portfolio_url}
-        onPortfolioUrl={(v) => { setPortfolio(v); emitChange({ portfolio_url: v }); }}
-        website_url={website_url}
-        onWebsiteUrl={(v) => { setWebsite(v); emitChange({ website_url: v }); }}
+        github_url={github_url}
+        onGithubUrl={(v) => { setGithub(v); emitChange({ github_url: v }); }}
+        links={links}
+        onLinksChange={(v) => { setLinks(v); emitChange({ links: v }); }}
         address={address}
         onAddress={(v) => { setAddress(v); emitChange({ address: v }); }}
         photo_url={photo_url}

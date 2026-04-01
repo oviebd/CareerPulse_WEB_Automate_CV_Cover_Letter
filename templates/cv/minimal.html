@@ -96,7 +96,7 @@
       <div class="proj-card">
         <strong>{{name}}</strong>
         {{#if description}}<div class="muted" style="margin-top:4pt;">{{description}}</div>{{/if}}
-        {{#if url}}<div class="muted" style="margin-top:4pt;"><a href="{{url}}" target="_blank" rel="noopener noreferrer">{{url_label}}</a></div>{{/if}}
+        {{#if links.length}}<div class="muted" style="margin-top:4pt;">{{#each links}}<a href="{{url}}" target="_blank" rel="noopener noreferrer">{{label}}</a> {{/each}}</div>{{/if}}
       </div>
       {{/each}}
     </div>
@@ -106,7 +106,7 @@
     <div class="sp-section">
       <div class="sec-label">Certifications</div>
       {{#each certifications}}
-      <div class="muted" style="margin-bottom:6pt;">{{name}}{{#if issuer}} — {{issuer}}{{/if}}{{#if url}} · <a href="{{url}}" target="_blank" rel="noopener noreferrer">{{url_label}}</a>{{/if}}</div>
+      <div class="muted" style="margin-bottom:6pt;">{{name}}{{#if issuer}} — {{issuer}}{{/if}}{{#each links}} · <a href="{{url}}" target="_blank" rel="noopener noreferrer">{{label}}</a>{{/each}}</div>
       {{/each}}
     </div>
     {{/if}}

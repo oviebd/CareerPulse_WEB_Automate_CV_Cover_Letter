@@ -57,8 +57,8 @@
           {{#if phone}}<span>📞 {{phone}}</span>{{/if}}
           {{#if location}}<span>📍 {{location}}</span>{{/if}}
           {{#if linkedin_url}}<span><a href="{{linkedin_url}}" target="_blank" rel="noopener noreferrer">LinkedIn</a></span>{{/if}}
-          {{#if portfolio_url}}<span><a href="{{portfolio_url}}" target="_blank" rel="noopener noreferrer">Portfolio</a></span>{{/if}}
-          {{#if website_url}}<span><a href="{{website_url}}" target="_blank" rel="noopener noreferrer">Website</a></span>{{/if}}
+          {{#if github_url}}<span><a href="{{github_url}}" target="_blank" rel="noopener noreferrer">GitHub</a></span>{{/if}}
+          {{#each links}}<span><a href="{{url}}" target="_blank" rel="noopener noreferrer">{{label}}</a></span>{{/each}}
         </div>
       </div>
     </div>
@@ -116,7 +116,7 @@
     {{#each projects}}
     <div class="proj-card">
       <div class="proj-name">{{name}}</div>
-      <div class="proj-meta">{{formatDate start_date}}{{#if end_date}} – {{formatDate end_date}}{{/if}}{{#if url}} · <a href="{{url}}" target="_blank" rel="noopener noreferrer">{{url_label}}</a>{{/if}}</div>
+      <div class="proj-meta">{{formatDate start_date}}{{#if end_date}} – {{formatDate end_date}}{{/if}}{{#each links}} · <a href="{{url}}" target="_blank" rel="noopener noreferrer">{{label}}</a>{{/each}}</div>
       {{#if description}}<div class="proj-desc">{{description}}</div>{{/if}}
       {{#if tech_stack.length}}<div class="proj-meta">{{join tech_stack}}</div>{{/if}}
     </div>
@@ -126,7 +126,7 @@
     {{#if certifications.length}}
     <div class="section-title">Certifications</div>
     {{#each certifications}}
-    <div class="cert-row">{{name}}{{#if issuer}} — {{issuer}}{{/if}}{{#if issue_date}} · {{formatDate issue_date}}{{/if}}{{#if url}} · <a href="{{url}}" target="_blank" rel="noopener noreferrer">{{url_label}}</a>{{/if}}</div>
+    <div class="cert-row">{{name}}{{#if issuer}} — {{issuer}}{{/if}}{{#if issue_date}} · {{formatDate issue_date}}{{/if}}{{#each links}} · <a href="{{url}}" target="_blank" rel="noopener noreferrer">{{label}}</a>{{/each}}</div>
     {{/each}}
     {{/if}}
 

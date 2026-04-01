@@ -10,6 +10,11 @@ import { normalizeExtractedCV } from '@/lib/cv-parse-payload';
 import { rateLimitHit } from '@/lib/rate-limit';
 import { resolveEffectiveTier } from '@/lib/dev-subscription';
 import { TIER_LIMITS } from '@/types';
+import {
+  extractPdfHyperlinks,
+  extractDocxHyperlinks,
+  formatHyperlinksForPrompt,
+} from '@/lib/cv-hyperlinks';
 
 function isAllowedStorageUrl(url: string): boolean {
   try {
@@ -85,17 +90,30 @@ export async function POST(request: Request) {
     }
 
     let rawText = '';
+    let hyperlinkPromptSection = '';
+    const uint8 = new Uint8Array(buf);
+
     if (kind === 'pdf') {
-      const parser = new PDFParse({ data: new Uint8Array(buf) });
-      try {
-        const textResult = await parser.getText();
-        rawText = textResult.text;
-      } finally {
-        await parser.destroy();
-      }
+      const [textResult, hyperlinks] = await Promise.all([
+        (async () => {
+          const parser = new PDFParse({ data: uint8 });
+          try {
+            return await parser.getText();
+          } finally {
+            await parser.destroy();
+          }
+        })(),
+        extractPdfHyperlinks(uint8).catch(() => []),
+      ]);
+      rawText = textResult.text;
+      hyperlinkPromptSection = formatHyperlinksForPrompt(hyperlinks);
     } else {
-      const { value } = await mammoth.extractRawText({ buffer: buf });
-      rawText = value;
+      const [textResult, hyperlinks] = await Promise.all([
+        mammoth.extractRawText({ buffer: buf }),
+        extractDocxHyperlinks(buf).catch(() => []),
+      ]);
+      rawText = textResult.value;
+      hyperlinkPromptSection = formatHyperlinksForPrompt(hyperlinks);
     }
 
     if (!rawText.trim()) {
@@ -104,7 +122,7 @@ export async function POST(request: Request) {
 
     let parsed: Record<string, unknown>;
     try {
-      const extracted = await extractCVFromText(rawText);
+      const extracted = await extractCVFromText(rawText, hyperlinkPromptSection);
       parsed = normalizeExtractedCV(extracted as Record<string, unknown>);
     } catch (e) {
       console.error('Claude extract failed', e);

@@ -40,8 +40,8 @@ function previewPayloadFromProfile(d: CVProfile): Record<string, unknown> {
     phone: d.phone,
     location: d.location,
     linkedin_url: d.linkedin_url,
-    portfolio_url: d.portfolio_url,
-    website_url: d.website_url,
+    github_url: d.github_url,
+    links: d.links ?? [],
     address: d.address ?? null,
     photo_url: d.photo_url ?? null,
     summary: d.summary,
@@ -67,8 +67,8 @@ function draftFromJobSpecificCV(j: JobSpecificCV): CVProfile {
     phone: j.phone,
     location: j.location,
     linkedin_url: j.linkedin_url,
-    portfolio_url: j.portfolio_url,
-    website_url: j.website_url,
+    github_url: j.github_url,
+    links: j.links ?? [],
     address: null,
     photo_url: null,
     summary: j.summary,
@@ -238,8 +238,8 @@ export default function CVTemplatePreviewPage() {
           phone: draft.phone,
           location: draft.location,
           linkedin_url: draft.linkedin_url,
-          portfolio_url: draft.portfolio_url,
-          website_url: draft.website_url,
+          github_url: draft.github_url,
+          links: draft.links ?? [],
           summary: draft.summary,
           experience: draft.experience,
           education: draft.education,
@@ -280,8 +280,8 @@ export default function CVTemplatePreviewPage() {
         phone: draft.phone,
         location: draft.location,
         linkedin_url: draft.linkedin_url,
-        portfolio_url: draft.portfolio_url,
-        website_url: draft.website_url,
+        github_url: draft.github_url,
+        links: draft.links ?? [],
         address: draft.address,
         photo_url: draft.photo_url,
         summary: draft.summary,
@@ -341,8 +341,8 @@ export default function CVTemplatePreviewPage() {
               phone: draft.phone,
               location: draft.location,
               linkedin_url: draft.linkedin_url,
-              portfolio_url: draft.portfolio_url,
-              website_url: draft.website_url,
+              github_url: draft.github_url,
+              links: draft.links ?? [],
               summary: draft.summary,
               experience: draft.experience,
               education: draft.education,
@@ -362,8 +362,8 @@ export default function CVTemplatePreviewPage() {
               phone: draft.phone,
               location: draft.location,
               linkedin_url: draft.linkedin_url,
-              portfolio_url: draft.portfolio_url,
-              website_url: draft.website_url,
+              github_url: draft.github_url,
+              links: draft.links ?? [],
               address: draft.address,
               photo_url: draft.photo_url,
               summary: draft.summary,
@@ -649,10 +649,10 @@ export default function CVTemplatePreviewPage() {
             onLocation={(v) => setDraft({ ...draft, location: v })}
             linkedin_url={draft.linkedin_url ?? ''}
             onLinkedinUrl={(v) => setDraft({ ...draft, linkedin_url: v })}
-            portfolio_url={draft.portfolio_url ?? ''}
-            onPortfolioUrl={(v) => setDraft({ ...draft, portfolio_url: v })}
-            website_url={draft.website_url ?? ''}
-            onWebsiteUrl={(v) => setDraft({ ...draft, website_url: v })}
+            github_url={draft.github_url ?? ''}
+            onGithubUrl={(v) => setDraft({ ...draft, github_url: v })}
+            links={draft.links ?? []}
+            onLinksChange={(v) => setDraft({ ...draft, links: v })}
             address={draft.address ?? ''}
             onAddress={(v) => setDraft({ ...draft, address: v })}
             photo_url={draft.photo_url ?? ''}

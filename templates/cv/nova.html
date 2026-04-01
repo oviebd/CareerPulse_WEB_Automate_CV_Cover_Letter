@@ -269,9 +269,9 @@
           {{#if email}}<li><span class="contact-label">Email</span><a href="mailto:{{email}}">{{email}}</a></li>{{/if}}
           {{#if phone}}<li><span class="contact-label">Phone</span>{{phone}}</li>{{/if}}
           {{#if location}}<li><span class="contact-label">Location</span>{{location}}</li>{{/if}}
-          {{#if website_url}}<li><span class="contact-label">Web</span><a href="{{website_url}}" target="_blank" rel="noopener noreferrer">{{website_url}}</a></li>{{/if}}
           {{#if linkedin_url}}<li><span class="contact-label">LinkedIn</span><a href="{{linkedin_url}}" target="_blank" rel="noopener noreferrer">Profile</a></li>{{/if}}
-          {{#if portfolio_url}}<li><span class="contact-label">Portfolio</span><a href="{{portfolio_url}}" target="_blank" rel="noopener noreferrer">Link</a></li>{{/if}}
+          {{#if github_url}}<li><span class="contact-label">GitHub</span><a href="{{github_url}}" target="_blank" rel="noopener noreferrer">Profile</a></li>{{/if}}
+          {{#each links}}<li><span class="contact-label">{{label}}</span><a href="{{url}}" target="_blank" rel="noopener noreferrer">Link</a></li>{{/each}}
           {{#if address}}<li><span class="contact-label">Address</span><span style="white-space:pre-wrap;">{{address}}</span></li>{{/if}}
         </ul>
       </div>
@@ -362,7 +362,7 @@
         {{#if tech_stack.length}}
         <div class="proj-tags">{{#each tech_stack}}<span class="proj-tag">{{this}}</span>{{/each}}</div>
         {{/if}}
-        {{#if url}}<div class="proj-desc" style="margin-top:3pt;"><a href="{{url}}" target="_blank" rel="noopener noreferrer">{{url_label}}</a></div>{{/if}}
+        {{#if links.length}}<div class="proj-desc" style="margin-top:3pt;">{{#each links}}<a href="{{url}}" target="_blank" rel="noopener noreferrer">{{label}}</a> {{/each}}</div>{{/if}}
       </div>
       {{/each}}
     </div>
