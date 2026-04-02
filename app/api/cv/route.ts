@@ -156,6 +156,26 @@ export async function PATCH(request: Request) {
         .select()
         .single();
       if (error) {
+        // Fallback for missing columns (e.g. github_url not yet in DB)
+        if (error.code === 'PGRST204' || error.message?.includes('column')) {
+          const fallbackPayload = { ...payload };
+          // List of columns that might be missing in older schemas
+          const possiblyMissing = ['github_url', 'linkedin_url', 'links'];
+          for (const col of possiblyMissing) {
+            if (error.message?.includes(`'${col}'`) || error.details?.includes(`'${col}'`)) {
+              delete (fallbackPayload as any)[col];
+            }
+          }
+          // If we deleted something, retry
+          if (Object.keys(fallbackPayload).length < Object.keys(payload).length) {
+             const { data: retryData, error: retryErr } = await supabase
+              .from('cv_profiles')
+              .insert({ user_id: user.id, ...fallbackPayload })
+              .select()
+              .single();
+             if (!retryErr) return NextResponse.json({ cvProfile: retryData });
+          }
+        }
         console.error('cv PATCH insert', error);
         return NextResponse.json({ error: 'update_failed' }, { status: 500 });
       }
@@ -187,6 +207,26 @@ export async function PATCH(request: Request) {
       .single();
 
     if (error) {
+      // Fallback for missing columns on update
+      if (error.code === 'PGRST204' || error.message?.includes('column')) {
+        const fallbackPayload = { ...payload };
+        const possiblyMissing = ['github_url', 'linkedin_url', 'links'];
+        for (const col of possiblyMissing) {
+          if (error.message?.includes(`'${col}'`) || error.details?.includes(`'${col}'`)) {
+            delete (fallbackPayload as any)[col];
+          }
+        }
+        if (Object.keys(fallbackPayload).length < Object.keys(payload).length) {
+           const { data: retryData, error: retryErr } = await supabase
+            .from('cv_profiles')
+            .update(fallbackPayload)
+            .eq('user_id', user.id)
+            .eq('id', targetId)
+            .select()
+            .single();
+           if (!retryErr) return NextResponse.json({ cvProfile: retryData });
+        }
+      }
       console.error('cv PATCH', error);
       return NextResponse.json({ error: 'update_failed' }, { status: 500 });
     }

@@ -73,7 +73,7 @@ export function CVEditor() {
   }, []);
 
   useEffect(() => {
-    if (draftActive) return;
+    if (draftActive || isNew) return;
     if (!coreVersionsLoading && coreVersions.length > 0) {
       const latestId = coreVersions[0]?.id ?? null;
       const requestedId =
@@ -83,6 +83,43 @@ export function CVEditor() {
       setSelectedCoreCvId((prev) => (prev ? prev : requestedId ?? latestId));
     }
   }, [coreVersionsLoading, coreVersions, draftActive, coreCvIdFromQuery]);
+
+  const isNew = searchParams.get('new') === '1';
+
+  useEffect(() => {
+    if (isNew && typeof window !== 'undefined') {
+      const emptyCv = {
+        full_name: '',
+        professional_title: '',
+        email: '',
+        phone: '',
+        location: '',
+        linkedin_url: '',
+        github_url: '',
+        links: [],
+        address: '',
+        photo_url: null,
+        summary: '',
+        section_visibility: {},
+        experience: [],
+        education: [],
+        skills: [],
+        projects: [],
+        certifications: [],
+        languages: [],
+        awards: [],
+        referrals: [],
+      };
+      sessionStorage.setItem('cv_draft', JSON.stringify(emptyCv));
+      sessionStorage.setItem('cv_draft_force_overwrite', '0');
+      window.dispatchEvent(new Event('cv_draft_updated'));
+
+      // Clean up URL to avoid re-triggering on manual refresh if they've already started editing
+      const url = new URL(window.location.href);
+      url.searchParams.delete('new');
+      window.history.replaceState({}, '', url.toString());
+    }
+  }, [isNew]);
 
   useEffect(() => {
     // Reset initialization when the user changes versions (or a draft appears).

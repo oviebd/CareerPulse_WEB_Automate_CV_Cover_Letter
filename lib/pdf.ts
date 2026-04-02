@@ -737,12 +737,11 @@ export async function exportCV(
     const { id: _i, user_id: _u, ...rest } = snapshot;
     cv = { ...cv, ...rest } as CVProfile;
   }
+  // We'll allow a basic render even if incomplete so the preview works
+  // as soon as the user starts typing their name.
   if (!cv.full_name?.trim()) {
-    throw new Error('CV_INCOMPLETE');
-  }
-  const experiences = Array.isArray(cv.experience) ? cv.experience : [];
-  if (experiences.length < 1) {
-    throw new Error('CV_INCOMPLETE');
+    // If name is missing, we still render but with a placeholder (or empty)
+    // instead of throwing CV_INCOMPLETE to avoid breaking the preview.
   }
 
   const watermark = tier === 'free';
@@ -752,6 +751,7 @@ export async function exportCV(
   });
   const html = renderTemplate(templateId, cvData);
   const pdf = await generatePDF(html);
-  const filename = `cv-${slugifyName(cv.full_name)}-${templateId}.pdf`;
+  const nameSlug = slugifyName(cv.full_name ?? 'untitled');
+  const filename = `cv-${nameSlug}-${templateId}.pdf`;
   return { pdf, filename };
 }

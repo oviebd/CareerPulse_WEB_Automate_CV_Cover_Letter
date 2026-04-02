@@ -175,26 +175,44 @@ export default function CVOverviewPage() {
         </Link>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-3">
         <Card className="p-4" hoverable>
           <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-700"><Upload className="h-5 w-5" /></span>
           <h2 className="font-semibold">Upload</h2>
           <p className="mt-2 text-sm text-[var(--color-muted)]">
             PDF or DOCX up to 10MB. We extract structure with AI.
           </p>
-          <Link href="/cv/upload" className={`${primary} mt-4 inline-flex`}>
-            Upload CV
-          </Link>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link href="/cv/upload" className={primary}>
+              Upload CV
+            </Link>
+          </div>
         </Card>
+
+        <Card className="p-4" hoverable>
+          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100 text-indigo-700"><LayoutTemplate className="h-5 w-5" /></span>
+          <h2 className="font-semibold">Build from Scratch</h2>
+          <p className="mt-2 text-sm text-[var(--color-muted)]">
+            Start with a fresh template and fill in your details manually.
+          </p>
+          <div className="mt-4">
+            <Link href="/cv/edit?new=1" className={primary}>
+              Build CV
+            </Link>
+          </div>
+        </Card>
+
         <Card className="p-4" hoverable>
           <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"><Wand2 className="h-5 w-5" /></span>
           <h2 className="font-semibold">Tailor for a Job</h2>
           <p className="mt-2 text-sm text-[var(--color-muted)]">
             Paste a job description and AI will optimise your CV for that role.
           </p>
-          <Link href="/cv/optimise" className={`${primary} mt-4 inline-flex`}>
-            Tailor My CV
-          </Link>
+          <div className="mt-4">
+            <Link href="/cv/optimise" className={primary}>
+              Tailor My CV
+            </Link>
+          </div>
         </Card>
       </div>
 
