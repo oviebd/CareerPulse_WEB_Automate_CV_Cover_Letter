@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { LayoutDashboard, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -68,6 +68,13 @@ const PROFICIENCY_OPTIONS = [
 const SWATCHES = ['#6C63FF', '#00D4A8', '#2563EB', '#7c3aed', '#dc2626', '#0f172a', '#10b981', '#f59e0b'];
 const FONTS = ['Inter', 'Manrope', 'DM Sans', 'Lora', 'Outfit', 'Roboto'];
 
+export type AiJobContext = {
+  jobTitle?: string | null;
+  companyName?: string | null;
+  jobDescription?: string | null;
+  keywords?: string[];
+};
+
 type Props = {
   tab: CVFormTab;
   onTabChange: (id: string) => void;
@@ -117,6 +124,8 @@ type Props = {
   /** When true, the CVSectionVisibilityPanel is omitted. */
   hideVisibilityPanel?: boolean;
   highlightedKeywords?: string[];
+  /** Job-specific context injected into "Rewrite with AI" requests. */
+  aiJobContext?: AiJobContext;
   atsBySection?: Record<string, { score: number; suggestions: string[] }>;
   templates?: any[]; // Using any for brevity or import CVTemplate if preferred
   selectedTemplateId?: string;
@@ -144,7 +153,7 @@ function HighlightedText({ text, keywords }: { text: string; keywords: string[] 
         regex.test(part) ? (
           <mark
             key={i}
-            className="rounded-sm bg-[var(--color-accent-gold)]/35 px-0.5 text-inherit"
+            className="rounded-sm bg-[var(--color-accent-mint)]/15 px-0.5 text-inherit"
           >
             {part}
           </mark>
@@ -218,6 +227,7 @@ export function CVFormFields(props: Props) {
     hideTabBar,
     hideVisibilityPanel,
     highlightedKeywords,
+    aiJobContext,
     atsBySection,
     templates = [],
     selectedTemplateId,
@@ -236,6 +246,32 @@ export function CVFormFields(props: Props) {
     ? TAB_DEFS.filter((t) => !hiddenTabs.includes(t.id))
     : TAB_DEFS;
   const kw = highlightedKeywords ?? [];
+  const jobContextText = useMemo(() => {
+    if (!aiJobContext) return '';
+
+    const MAX_CHARS = 1200;
+    const lines: string[] = [];
+    if (aiJobContext.jobTitle) lines.push(`Job title: ${aiJobContext.jobTitle}`);
+    if (aiJobContext.companyName) lines.push(`Company: ${aiJobContext.companyName}`);
+    if (aiJobContext.keywords?.length) {
+      const keywords = aiJobContext.keywords.slice(0, 20).join(', ');
+      lines.push(`Target keywords: ${keywords}`);
+    }
+    if (aiJobContext.jobDescription) {
+      const raw = aiJobContext.jobDescription.trim();
+      lines.push(
+        `Job description: ${
+          raw.length > MAX_CHARS ? `${raw.slice(0, MAX_CHARS)}...` : raw
+        }`
+      );
+    }
+    return lines.join('\n');
+  }, [aiJobContext]);
+
+  const mergeExtraContext = (fieldExtraContext?: string) => {
+    const pieces = [jobContextText, fieldExtraContext?.trim() ?? ''].filter(Boolean);
+    return pieces.join('\n');
+  };
   const atsSectionKeyByTab: Partial<Record<CVFormTab, string>> = {
     header: 'header',
     summary: 'summary',
@@ -506,6 +542,7 @@ export function CVFormFields(props: Props) {
                     section: 'Header',
                     inputLabel: 'Full address',
                     sourceText: address ?? '',
+                    extraContext: mergeExtraContext(),
                     onApply: onAddress,
                   })
                 }
@@ -531,6 +568,7 @@ export function CVFormFields(props: Props) {
                     section: 'Summary',
                     inputLabel: 'Summary',
                     sourceText: summary ?? '',
+                    extraContext: mergeExtraContext(),
                     onApply: onSummary,
                   })
                 }
@@ -636,7 +674,7 @@ export function CVFormFields(props: Props) {
                         section: 'Experience',
                         inputLabel: `${ex.title || 'Role'} description`,
                         sourceText: ex.description ?? '',
-                        extraContext: `Company: ${ex.company || 'N/A'}`,
+                        extraContext: mergeExtraContext(`Company: ${ex.company || 'N/A'}`),
                         onApply: (value) => {
                           const n = [...experience];
                           n[i] = { ...ex, description: value || null };
@@ -672,7 +710,7 @@ export function CVFormFields(props: Props) {
                               section: 'Experience',
                               inputLabel: `${ex.title || 'Role'} bullet ${bi + 1}`,
                               sourceText: bullet,
-                              extraContext: `Company: ${ex.company || 'N/A'}`,
+                              extraContext: mergeExtraContext(`Company: ${ex.company || 'N/A'}`),
                               onApply: (value) => {
                                 const n = [...experience];
                                 const nextBullets = [...(ex.bullets ?? [])];
@@ -842,6 +880,7 @@ export function CVFormFields(props: Props) {
                         section: 'Education',
                         inputLabel: `${ed.institution || 'Education'} notes`,
                         sourceText: ed.description ?? '',
+                        extraContext: mergeExtraContext(),
                         onApply: (value) => {
                           const n = [...education];
                           n[i] = { ...ed, description: value || null };
@@ -922,6 +961,7 @@ export function CVFormFields(props: Props) {
                         section: 'Skills',
                         inputLabel: `${g.category} skills (one per line)`,
                         sourceText: g.items.join('\n'),
+                        extraContext: mergeExtraContext(),
                         onApply: (value) => {
                           const n = [...skills];
                           n[i] = {
@@ -1013,6 +1053,7 @@ export function CVFormFields(props: Props) {
                         section: 'Projects',
                         inputLabel: `${p.name || 'Project'} description`,
                         sourceText: p.description ?? '',
+                        extraContext: mergeExtraContext(),
                         onApply: (value) => {
                           const n = [...projects];
                           n[i] = { ...p, description: value };
@@ -1043,6 +1084,7 @@ export function CVFormFields(props: Props) {
                         section: 'Projects',
                         inputLabel: `${p.name || 'Project'} tech stack (one per line)`,
                         sourceText: (p.tech_stack ?? []).join('\n'),
+                        extraContext: mergeExtraContext(),
                         onApply: (value) => {
                           const n = [...projects];
                           n[i] = {
@@ -1512,6 +1554,7 @@ export function CVFormFields(props: Props) {
                         section: 'Awards',
                         inputLabel: `${a.title || 'Award'} description`,
                         sourceText: a.description ?? '',
+                        extraContext: mergeExtraContext(),
                         onApply: (value) => {
                           const n = [...awards];
                           n[i] = { ...a, description: value || null };

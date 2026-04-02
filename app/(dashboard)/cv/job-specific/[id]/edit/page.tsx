@@ -10,7 +10,7 @@ import { Select } from '@/components/ui/select';
 import { CVEditorPanel } from '@/components/cv/CVEditorPanel';
 import { Sidebar } from '@/components/cv/premium/Sidebar';
 import { PreviewPanel } from '@/components/cv/premium/PreviewPanel';
-import { ATSIndicator } from '@/components/cv/premium/ATSIndicator';
+import { ATSCircularScore } from '@/components/cv/premium/ATSCircularScore';
 import { JobKeywordsBanner } from '@/components/cv/premium/JobKeywordsBanner';
 import type { CVFormTab } from '@/components/cv/CVFormFields';
 import {
@@ -25,11 +25,10 @@ import type { CVData } from '@/types';
 import type { CVTemplate, SubscriptionTier } from '@/types';
 import { canUseTemplate } from '@/lib/subscription';
 import { buildATSReport } from '@/lib/cv-ats';
-import { isKeywordPresentInCv } from '@/lib/cv-keyword-presence';
 import { cloneCvData } from '@/lib/cv-clone';
 import { useToast } from '@/components/ui/toast';
 import { Undo2, Redo2, ChevronDown, ChevronUp } from 'lucide-react';
-import { CV_FORM_CARD, CV_SHELL_HEADER } from '@/lib/cv-editor-styles';
+import { CV_FORM_CARD } from '@/lib/cv-editor-styles';
 
 function previewPayloadFromCVData(d: CVData): Record<string, unknown> {
   return {
@@ -101,11 +100,6 @@ function patchFromCvDataWithJobMeta(
 }
 
 /** Payload for PATCH /api/cv (core profile), matching core editor save. */
-function atsLabel(score: number): string {
-  if (score >= 85) return 'Interview Ready';
-  if (score >= 65) return 'Strong';
-  return 'Beginner';
-}
 
 function coreCvPatchFromDraft(
   data: CVData,
@@ -148,7 +142,6 @@ export default function JobCVEditPage() {
   const archive = useArchiveJobSpecificCV();
   const { data: coreVersions = [], isLoading: coreVersionsLoading } = useCoreCVVersions();
   const [showJD, setShowJD] = useState(false);
-  const [atsKeywordsOpen, setAtsKeywordsOpen] = useState(false);
 
   const { tier } = useSubscription();
   const { toast } = useToast();
@@ -163,12 +156,10 @@ export default function JobCVEditPage() {
   const [previewBusy, setPreviewBusy] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [editorTab, setEditorTab] = useState<CVFormTab>('header');
-  const [rightTab, setRightTab] = useState<'preview' | 'design'>('preview');
   const [zoom, setZoom] = useState(100);
   const [page, setPage] = useState(1);
   const [fontFamily, setFontFamily] = useState('Inter');
   const [autosaveState, setAutosaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
-  const [prevAtsScore, setPrevAtsScore] = useState(0);
   const [targetCoreCvId, setTargetCoreCvId] = useState<string | null>(null);
   const [savingCore, setSavingCore] = useState(false);
 
@@ -367,10 +358,15 @@ export default function JobCVEditPage() {
         return;
       }
       const blob = await res.blob();
-      const nextUrl = URL.createObjectURL(blob);
+      const rawUrl = URL.createObjectURL(blob);
+      // Hide PDF chrome for a cleaner in-app preview (match core editor).
+      const decoratedUrl = `${rawUrl}#toolbar=0&navpanes=0&scrollbar=0`;
       setPreviewPdfUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev);
-        return nextUrl;
+        if (prev) {
+          const originalUrl = prev.split('#')[0];
+          URL.revokeObjectURL(originalUrl);
+        }
+        return decoratedUrl;
       });
     } finally {
       setPreviewBusy(false);
@@ -388,7 +384,7 @@ export default function JobCVEditPage() {
   useEffect(() => {
     return () => {
       setPreviewPdfUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev);
+        if (prev) URL.revokeObjectURL(prev.split('#')[0]);
         return '';
       });
     };
@@ -512,18 +508,18 @@ export default function JobCVEditPage() {
   }, [id, archive, toast, router]);
 
   const keywords = jobCV?.keywords_added ?? [];
+  const aiJobContext = useMemo(
+    () => ({
+      jobTitle: jobCV?.job_title ?? null,
+      companyName: jobCV?.company_name ?? null,
+      jobDescription: jobCV?.job_description ?? null,
+      keywords: jobCV?.keywords_added ?? [],
+    }),
+    [jobCV]
+  );
   const ats = draft
     ? buildATSReport(draft, keywords)
     : { score: 0, summary: '', suggestions: [], sections: {} };
-
-  const keywordMatchedCount = useMemo(() => {
-    if (!draft || !keywords.length) return 0;
-    return keywords.filter((k) => isKeywordPresentInCv(k, draft)).length;
-  }, [keywords, draft]);
-
-  useEffect(() => {
-    setPrevAtsScore((prev) => (ats.score === prev ? prev : ats.score));
-  }, [ats.score]);
 
   if (isLoading || !draft || !jobCV) {
     return (
@@ -542,7 +538,7 @@ export default function JobCVEditPage() {
 
   return (
     <div className="mx-auto max-w-[1650px] space-y-4">
-      <div className={CV_SHELL_HEADER}>
+      <div className="glass-panel z-20 rounded-card border border-[var(--color-border)] p-3 backdrop-blur-xl">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <Link
@@ -673,91 +669,55 @@ export default function JobCVEditPage() {
         ) : null}
       </div>
 
-      <div className="overflow-hidden rounded-card border border-[var(--color-border)] bg-[var(--color-surface)]/90 shadow-sm backdrop-blur-sm">
-        <button
-          type="button"
-          className="flex w-full flex-wrap items-center justify-between gap-3 p-4 text-left sm:p-5"
-          onClick={() => setAtsKeywordsOpen((v) => !v)}
-          aria-expanded={atsKeywordsOpen}
-        >
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">ATS &amp; keywords</span>
-            <span className="font-mono text-xl font-bold tabular-nums text-[var(--color-text-primary)]">{ats.score}/100</span>
-            <span className="rounded-badge border border-[var(--color-border)] bg-white/[0.06] px-2.5 py-0.5 text-xs font-medium text-[var(--color-text-primary)]">
-              {atsLabel(ats.score)}
-            </span>
-            {keywords.length > 0 ? (
-              <span className="text-sm text-[var(--color-muted)]">
-                <span className="font-semibold font-mono text-[var(--color-accent-mint)]">{keywordMatchedCount}</span>
-                <span> / {keywords.length}</span>
-                <span> role keywords in CV</span>
-              </span>
-            ) : (
-              <span className="text-sm text-[var(--color-muted)]">No role keywords for this job</span>
-            )}
-          </div>
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--color-border)] bg-white/[0.04] text-[var(--color-muted)]">
-            {atsKeywordsOpen ? <ChevronUp className="h-4 w-4" aria-hidden /> : <ChevronDown className="h-4 w-4" aria-hidden />}
-          </span>
-        </button>
-        {atsKeywordsOpen ? (
-          <div className="border-t border-[var(--color-border)] px-4 pb-4 pt-2 sm:px-5 sm:pb-5">
-            <ATSIndicator
-              embedded
-              score={ats.score}
-              previousScore={prevAtsScore}
-              suggestions={ats.suggestions}
-            />
-            {keywords.length > 0 ? (
-              <div className="mt-4 border-t border-[var(--color-border)] pt-4">
-                <JobKeywordsBanner embedded keywords={keywords} cv={draft} />
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_630px]">
+        <div className="min-w-0">
+          <div className="grid gap-4 xl:grid-cols-[260px_1fr]">
+            <Sidebar activeSection={editorTab} onSelect={setEditorTab} />
+            <div className="space-y-3">
+              <div className={CV_FORM_CARD}>
+                <CVEditorPanel
+                  value={draft}
+                  onChange={handleChange}
+                  activeTab={editorTab}
+                  onActiveTabChange={setEditorTab}
+                  highlightedKeywords={keywords}
+                  aiJobContext={aiJobContext}
+                  hideAtsBanner
+                  hideFormTabBar
+                  hideVisibilityPanel
+                  hideKeywordsBanner={keywords.length > 0}
+                  templates={templates}
+                  selectedTemplateId={selectedTemplateId}
+                  onTemplateChange={(nextId: string) => {
+                    setSelectedTemplateId(nextId);
+                    update({
+                      preferred_template_id: nextId,
+                      accent_color: accent,
+                      font_family: fontFamily,
+                    });
+                  }}
+                  accent={accent}
+                  onAccentChange={(c: string) => {
+                    setAccent(c);
+                    update({
+                      accent_color: c,
+                      preferred_template_id: selectedTemplateId,
+                      font_family: fontFamily,
+                    });
+                  }}
+                  fontFamily={fontFamily}
+                  onFontFamilyChange={(next) => {
+                    setFontFamily(next);
+                    update({ font_family: next });
+                  }}
+                />
               </div>
-            ) : null}
-          </div>
-        ) : null}
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-[260px_minmax(0,1fr)_420px]">
-        <Sidebar activeSection={editorTab} onSelect={setEditorTab} />
-        <div className="space-y-3">
-          <div className={CV_FORM_CARD}>
-            <CVEditorPanel
-              value={draft}
-              onChange={handleChange}
-              activeTab={editorTab}
-              onActiveTabChange={setEditorTab}
-              highlightedKeywords={keywords}
-              hideAtsBanner
-              hideFormTabBar
-              hideKeywordsBanner={keywords.length > 0}
-              templates={templates}
-              selectedTemplateId={selectedTemplateId}
-              onTemplateChange={(nextId: string) => {
-                setSelectedTemplateId(nextId);
-                update({
-                  preferred_template_id: nextId,
-                  accent_color: accent,
-                  font_family: fontFamily,
-                });
-              }}
-              accent={accent}
-              onAccentChange={(c: string) => {
-                setAccent(c);
-                update({
-                  accent_color: c,
-                  preferred_template_id: selectedTemplateId,
-                  font_family: fontFamily,
-                });
-              }}
-              fontFamily={fontFamily}
-              onFontFamilyChange={(next) => {
-                setFontFamily(next);
-                update({ font_family: next });
-              }}
-            />
+            </div>
           </div>
         </div>
-        <div className="space-y-3">
+        <div className="space-y-3 xl:sticky xl:top-24">
+          <ATSCircularScore score={ats.score} suggestions={ats.suggestions} />
+          {keywords.length > 0 ? <JobKeywordsBanner keywords={keywords} cv={draft} /> : null}
           <PreviewPanel
             previewPdfUrl={previewPdfUrl}
             previewBusy={previewBusy}

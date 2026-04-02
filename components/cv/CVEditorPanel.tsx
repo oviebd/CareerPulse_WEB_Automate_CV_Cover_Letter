@@ -14,7 +14,7 @@ import type {
   ReferralEntry,
   SkillGroup,
 } from '@/types';
-import { CVFormFields, type CVFormTab } from '@/components/cv/CVFormFields';
+import { CVFormFields, type CVFormTab, type AiJobContext } from '@/components/cv/CVFormFields';
 import { Progress } from '@/components/ui/progress';
 import { buildATSReport } from '@/lib/cv-ats';
 
@@ -24,6 +24,8 @@ export interface CVEditorPanelProps {
   mode?: 'full' | 'compact';
   readOnly?: boolean;
   highlightedKeywords?: string[];
+  /** Job-specific context injected into "Rewrite with AI" requests. */
+  aiJobContext?: AiJobContext;
   /** Controlled section tab (sync with side nav). */
   activeTab?: CVFormTab;
   onActiveTabChange?: (tab: CVFormTab) => void;
@@ -53,6 +55,7 @@ export function CVEditorPanel({
   mode = 'full',
   readOnly = false,
   highlightedKeywords,
+  aiJobContext,
   activeTab: activeTabProp,
   onActiveTabChange,
   hideAtsBanner = false,
@@ -307,6 +310,7 @@ export function CVEditorPanel({
         hideVisibilityPanel={hideVisibilityPanel}
         highlightedKeywords={highlightedKeywords}
         atsBySection={ats.sections}
+        aiJobContext={aiJobContext}
         templates={templates}
         selectedTemplateId={selectedTemplateId}
         onTemplateChange={onTemplateChange}
