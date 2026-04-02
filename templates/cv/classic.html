@@ -2,17 +2,19 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family={{font_family_url}}:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
     @page { size: A4; margin: 14mm 16mm; }
     * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    body { margin: 0; padding: 0; font-family: 'Inter', Georgia, serif; color: #1a1a2e; background: #fff; }
+    body { margin: 0; padding: 0; font-family: '{{font_family}}', sans-serif; color: #1a1a2e; background: #fff; }
     .page { width: 100%; min-height: auto; padding: 0; position: relative; font-size: 10pt; line-height: 1.45; }
-    h1 { font-family: 'Inter', Arial, sans-serif; font-size: 22pt; font-weight: 700; margin: 0; color: #1a1a2e; text-align: left; }
+    h1 { font-family: '{{font_family}}', sans-serif; font-size: 22pt; font-weight: 700; margin: 0; color: #1a1a2e; text-align: left; }
     .subtitle { font-size: 12pt; color: #64748b; margin-top: 4pt; }
-    .contact-row { font-family: 'Inter', Arial, sans-serif; font-size: 9pt; color: #475569; margin-top: 10pt; padding-bottom: 10pt; border-bottom: 1pt solid #e2e8f0; }
+    .contact-row { font-family: '{{font_family}}', sans-serif; font-size: 9pt; color: #475569; margin-top: 10pt; padding-bottom: 10pt; border-bottom: 1pt solid #e2e8f0; }
     .contact-row span { margin-right: 10pt; }
-    .section-title { font-family: 'Inter', Arial, sans-serif; font-size: 11pt; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: {{accent_color}}; margin: 16pt 0 8pt; padding-bottom: 4pt; border-bottom: 1pt solid {{accent_color}}; }
+    .section-title { font-family: '{{font_family}}', sans-serif; font-size: 11pt; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: {{accent_color}}; margin: 16pt 0 8pt; padding-bottom: 4pt; border-bottom: 1pt solid {{accent_color}}; }
     .summary { font-size: 10pt; line-height: 1.5; color: #334155; }
     .exp-card { page-break-inside: avoid; margin-bottom: 12pt; }
     .exp-line { display: flex; justify-content: space-between; align-items: baseline; gap: 8pt; }

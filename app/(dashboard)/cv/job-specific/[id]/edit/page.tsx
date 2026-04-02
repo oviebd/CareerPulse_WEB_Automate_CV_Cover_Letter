@@ -56,7 +56,12 @@ function previewPayloadFromCVData(d: CVData): Record<string, unknown> {
   };
 }
 
-function patchFromCvData(data: CVData, selectedTemplateId: string, accent: string) {
+function patchFromCvData(
+  data: CVData,
+  selectedTemplateId: string,
+  accent: string,
+  fontFamily: string
+) {
   return {
     full_name: data.full_name,
     professional_title: data.professional_title,
@@ -76,6 +81,7 @@ function patchFromCvData(data: CVData, selectedTemplateId: string, accent: strin
     awards: data.awards,
     preferred_template_id: selectedTemplateId,
     accent_color: accent,
+    font_family: fontFamily,
   };
 }
 
@@ -83,11 +89,12 @@ function patchFromCvDataWithJobMeta(
   data: CVData,
   selectedTemplateId: string,
   accent: string,
+  fontFamily: string,
   jobTitle: string | null | undefined,
   companyName: string | null | undefined
 ) {
   return {
-    ...patchFromCvData(data, selectedTemplateId, accent),
+    ...patchFromCvData(data, selectedTemplateId, accent, fontFamily),
     job_title: jobTitle ?? null,
     company_name: companyName ?? null,
   };
@@ -100,7 +107,11 @@ function atsLabel(score: number): string {
   return 'Beginner';
 }
 
-function coreCvPatchFromDraft(data: CVData, preferredTemplateId: string) {
+function coreCvPatchFromDraft(
+  data: CVData,
+  preferredTemplateId: string,
+  fontFamily: string
+) {
   return {
     full_name: data.full_name,
     professional_title: data.professional_title,
@@ -124,6 +135,7 @@ function coreCvPatchFromDraft(data: CVData, preferredTemplateId: string) {
     referrals: (data.referrals ?? []).slice(0, 2),
     awards: data.awards,
     preferred_cv_template_id: preferredTemplateId,
+    font_family: fontFamily,
   };
 }
 
@@ -231,6 +243,7 @@ export default function JobCVEditPage() {
     });
     setSelectedTemplateId(jobCV.preferred_template_id ?? 'classic');
     setAccent(jobCV.accent_color ?? '#6C63FF');
+    setFontFamily(jobCV.font_family ?? 'Inter');
     setUndoPast([]);
     setUndoFuture([]);
     burstStartRef.current = null;
@@ -260,6 +273,7 @@ export default function JobCVEditPage() {
             data,
             selectedTemplateId,
             accent,
+            fontFamily,
             jobCV?.job_title,
             jobCV?.company_name
           )
@@ -267,7 +281,7 @@ export default function JobCVEditPage() {
         return data;
       });
     },
-    [update, selectedTemplateId, accent, jobCV?.job_title, jobCV?.company_name]
+    [update, selectedTemplateId, accent, fontFamily, jobCV?.job_title, jobCV?.company_name]
   );
 
   const undo = useCallback(() => {
@@ -286,13 +300,14 @@ export default function JobCVEditPage() {
           next,
           selectedTemplateId,
           accent,
+          fontFamily,
           jobCV?.job_title,
           jobCV?.company_name
         )
       );
       return p.slice(0, -1);
     });
-  }, [update, selectedTemplateId, accent, jobCV?.job_title, jobCV?.company_name]);
+  }, [update, selectedTemplateId, accent, fontFamily, jobCV?.job_title, jobCV?.company_name]);
 
   const redo = useCallback(() => {
     setUndoFuture((f) => {
@@ -310,13 +325,14 @@ export default function JobCVEditPage() {
           next,
           selectedTemplateId,
           accent,
+          fontFamily,
           jobCV?.job_title,
           jobCV?.company_name
         )
       );
       return f.slice(1);
     });
-  }, [update, selectedTemplateId, accent, jobCV?.job_title, jobCV?.company_name]);
+  }, [update, selectedTemplateId, accent, fontFamily, jobCV?.job_title, jobCV?.company_name]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -342,6 +358,7 @@ export default function JobCVEditPage() {
           job_cv_id: id,
           template_id: selectedTemplateId,
           accent_color: accent,
+          font_family: fontFamily,
           cv_snapshot: previewPayloadFromCVData(draft),
         }),
       });
@@ -358,7 +375,7 @@ export default function JobCVEditPage() {
     } finally {
       setPreviewBusy(false);
     }
-  }, [draft, selectedTemplateId, accent, id]);
+  }, [draft, selectedTemplateId, accent, id, fontFamily]);
 
   useEffect(() => {
     if (!draft || templatesLoading) return;
@@ -400,6 +417,7 @@ export default function JobCVEditPage() {
           job_cv_id: id,
           template_id: selectedTemplateId,
           accent_color: accent,
+          font_family: fontFamily,
           cv_snapshot: previewPayloadFromCVData(draft),
         }),
       });
@@ -417,7 +435,7 @@ export default function JobCVEditPage() {
     } finally {
       setExporting(false);
     }
-  }, [accent, allowed, draft, id, selectedTemplateId, toast]);
+  }, [accent, allowed, draft, id, selectedTemplateId, toast, fontFamily]);
 
   useEffect(() => {
     if (templatesLoading || !templates.length) return;
@@ -443,6 +461,7 @@ export default function JobCVEditPage() {
           draft,
           selectedTemplateId,
           accent,
+          fontFamily,
           jobCV?.job_title ?? '',
           jobCV?.company_name ?? null
         )
@@ -451,7 +470,7 @@ export default function JobCVEditPage() {
     } catch {
       toast('Could not save job CV.', 'error');
     }
-  }, [draft, saveImmediately, selectedTemplateId, accent, toast, jobCV]);
+  }, [draft, saveImmediately, selectedTemplateId, accent, toast, jobCV, fontFamily]);
 
   const updateCoreCvFromJob = useCallback(async () => {
     if (!draft || !targetCoreCvId) {
@@ -465,7 +484,7 @@ export default function JobCVEditPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           core_cv_id: targetCoreCvId,
-          ...coreCvPatchFromDraft(draft, selectedTemplateId),
+          ...coreCvPatchFromDraft(draft, selectedTemplateId, fontFamily),
         }),
       });
       if (!res.ok) {
@@ -478,7 +497,7 @@ export default function JobCVEditPage() {
     } finally {
       setSavingCore(false);
     }
-  }, [draft, targetCoreCvId, selectedTemplateId, toast, queryClient]);
+  }, [draft, targetCoreCvId, selectedTemplateId, toast, queryClient, fontFamily]);
 
   const deleteJobCv = useCallback(async () => {
     if (!id) return;
@@ -711,32 +730,41 @@ export default function JobCVEditPage() {
               hideAtsBanner
               hideFormTabBar
               hideKeywordsBanner={keywords.length > 0}
+              templates={templates}
+              selectedTemplateId={selectedTemplateId}
+              onTemplateChange={(nextId: string) => {
+                setSelectedTemplateId(nextId);
+                update({
+                  preferred_template_id: nextId,
+                  accent_color: accent,
+                  font_family: fontFamily,
+                });
+              }}
+              accent={accent}
+              onAccentChange={(c: string) => {
+                setAccent(c);
+                update({
+                  accent_color: c,
+                  preferred_template_id: selectedTemplateId,
+                  font_family: fontFamily,
+                });
+              }}
+              fontFamily={fontFamily}
+              onFontFamilyChange={(next) => {
+                setFontFamily(next);
+                update({ font_family: next });
+              }}
             />
           </div>
         </div>
         <div className="space-y-3">
           <PreviewPanel
-            activeTab={rightTab}
-            onTabChange={setRightTab}
             previewPdfUrl={previewPdfUrl}
             previewBusy={previewBusy}
             zoom={zoom}
             onZoomChange={setZoom}
             currentPage={page}
             onPageChange={setPage}
-            selectedTemplateId={selectedTemplateId}
-            templates={templates}
-            onTemplateChange={(nextId) => {
-              setSelectedTemplateId(nextId);
-              update({ preferred_template_id: nextId, accent_color: accent });
-            }}
-            accent={accent}
-            onAccentChange={(c) => {
-              setAccent(c);
-              update({ accent_color: c, preferred_template_id: selectedTemplateId });
-            }}
-            fontFamily={fontFamily}
-            onFontFamilyChange={setFontFamily}
           />
           {!templatesLoading && !allowed && templateMeta ? (
             <p className="rounded-xl border border-[var(--color-accent-gold)]/35 bg-[var(--color-accent-gold)]/10 px-3 py-2 text-sm text-[var(--color-accent-gold)]">

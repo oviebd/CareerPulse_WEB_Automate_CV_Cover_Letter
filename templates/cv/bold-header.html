@@ -2,14 +2,16 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family={{font_family_url}}:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@600;700&display=swap');
     @page { size: A4; margin: 8mm; }
     * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    body { margin: 0; font-family: 'Inter', Arial, sans-serif; color: #0f172a; background: #fff; }
+    body { margin: 0; font-family: '{{font_family}}', Arial, sans-serif; color: #0f172a; background: #fff; }
     .page { width: 100%; min-height: auto; position: relative; }
     .header { background: {{accent_color}}; padding: 28pt 32pt; color: #fff; min-height: 22vh; }
-    .header h1 { font-family: 'Poppins', 'Inter', sans-serif; font-size: 24pt; font-weight: 700; margin: 0; color: #fff; }
+    .header h1 { font-family: '{{font_family}}', sans-serif; font-size: 24pt; font-weight: 700; margin: 0; color: #fff; }
     .header .subtitle { font-size: 11pt; opacity: 0.85; margin-top: 6pt; color: #fff; }
     .header .contact { font-size: 9pt; opacity: 0.9; margin-top: 12pt; color: #fff; }
     .body { display: flex; flex-direction: row; align-items: flex-start; padding: 16pt 14pt 20pt; font-size: 10pt; line-height: 1.45; }

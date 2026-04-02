@@ -14,6 +14,8 @@ import {
   User,
   Wand2,
   X,
+  ChevronsLeft,
+  ChevronsRight,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -88,11 +90,13 @@ function NavLinkContent({
   item,
   pathname,
   isFree,
+  collapsed,
   onNavigate,
 }: {
   item: NavItem;
   pathname: string;
   isFree: boolean;
+  collapsed?: boolean;
   onNavigate?: () => void;
 }) {
   const Icon = item.icon;
@@ -100,42 +104,47 @@ function NavLinkContent({
   if (item.children) {
     return (
       <div className="space-y-1">
-        <div className="flex items-center gap-2 px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-muted)]">
-          <Icon className="h-3.5 w-3.5" aria-hidden />
-          {item.label}
+        <div className={cn(
+          "flex items-center gap-2 px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-muted)]",
+          collapsed && "justify-center px-0"
+        )}>
+          <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          {!collapsed && item.label}
         </div>
-        <div className="space-y-0.5 border-l border-[var(--color-border)] pl-2 ml-3">
-          {item.children.map((child) => {
-            const ChildIcon = child.icon;
-            const childActive =
-              item.href === '/cv'
-                ? isCvChildActive(pathname, child.href)
-                : item.href === '/cover-letters'
-                  ? isCoverLetterChildActive(pathname, child.href)
-                  : pathname === child.href || pathname.startsWith(`${child.href}/`);
-            return (
-              <Link
-                key={child.href}
-                href={child.href}
-                onClick={onNavigate}
-                className={cn(
-                  'flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-all duration-200',
-                  childActive
-                    ? 'bg-[var(--color-primary-100)] text-[var(--color-primary-400)]'
-                    : 'text-[var(--color-muted)] hover:bg-white/[0.04] hover:text-[var(--color-text-primary)]'
-                )}
-              >
-                <ChildIcon className="h-4 w-4 shrink-0 opacity-90" />
-                <span className="min-w-0 flex-1 truncate">{child.label}</span>
-                {child.proOnly && isFree ? (
-                  <span className="shrink-0 rounded-badge bg-[var(--color-accent-gold)]/20 px-2 py-0.5 text-[10px] font-semibold text-[var(--color-accent-gold)]">
-                    Pro
-                  </span>
-                ) : null}
-              </Link>
-            );
-          })}
-        </div>
+        {!collapsed && (
+          <div className="space-y-0.5 border-l border-[var(--color-border)] pl-2 ml-3">
+            {item.children.map((child) => {
+              const ChildIcon = child.icon;
+              const childActive =
+                item.href === '/cv'
+                  ? isCvChildActive(pathname, child.href)
+                  : item.href === '/cover-letters'
+                    ? isCoverLetterChildActive(pathname, child.href)
+                    : pathname === child.href || pathname.startsWith(`${child.href}/`);
+              return (
+                <Link
+                  key={child.href}
+                  href={child.href}
+                  onClick={onNavigate}
+                  className={cn(
+                    'flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-all duration-200',
+                    childActive
+                      ? 'bg-[var(--color-primary-100)] text-[var(--color-primary-400)]'
+                      : 'text-[var(--color-muted)] hover:bg-white/[0.04] hover:text-[var(--color-text-primary)]'
+                  )}
+                >
+                  <ChildIcon className="h-4 w-4 shrink-0 opacity-90" />
+                  <span className="min-w-0 flex-1 truncate">{child.label}</span>
+                  {child.proOnly && isFree ? (
+                    <span className="shrink-0 rounded-badge bg-[var(--color-accent-gold)]/20 px-2 py-0.5 text-[10px] font-semibold text-[var(--color-accent-gold)]">
+                      Pro
+                    </span>
+                  ) : null}
+                </Link>
+              );
+            })}
+          </div>
+        )}
       </div>
     );
   }
@@ -145,15 +154,17 @@ function NavLinkContent({
     <Link
       href={item.href}
       onClick={onNavigate}
+      title={collapsed ? item.label : undefined}
       className={cn(
         'flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 active:scale-[0.99]',
+        collapsed ? "justify-center px-0" : "px-3",
         active
           ? 'bg-[var(--color-primary-100)] text-[var(--color-primary-400)] shadow-[0_0_0_1px_rgba(108,99,255,0.2)]'
           : 'text-[var(--color-muted)] hover:bg-white/[0.04] hover:text-[var(--color-text-primary)]'
       )}
     >
       <Icon className="h-4 w-4 shrink-0" />
-      {item.label}
+      {!collapsed && item.label}
     </Link>
   );
 }
@@ -162,7 +173,7 @@ export function AppHeader() {
   const pathname = usePathname();
   const { tier } = useSubscription();
   const isFree = tier === 'free';
-  const { mobileMenuOpen, setMobileMenuOpen, toggleMobileMenu } = useUIStore();
+  const { mobileMenuOpen, setMobileMenuOpen, toggleMobileMenu, sidebarCollapsed, toggleSidebar } = useUIStore();
   const navRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -172,30 +183,65 @@ export function AppHeader() {
   const brand = (
     <Link
       href="/dashboard"
-      className="flex items-center gap-2 font-display text-sm font-semibold tracking-tight text-[var(--color-text-primary)] transition hover:opacity-90"
+      className={cn(
+        "flex items-center gap-2 font-display text-sm font-semibold tracking-tight text-[var(--color-text-primary)] transition hover:opacity-90",
+        sidebarCollapsed && "justify-center"
+      )}
       onClick={() => setMobileMenuOpen(false)}
     >
-      <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-[var(--color-primary-500)] to-[var(--color-accent-mint)] text-xs font-bold text-white shadow-md">
+      <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[var(--color-primary-500)] to-[var(--color-accent-mint)] text-xs font-bold text-white shadow-md">
         CP
       </span>
-      <span className="hidden sm:inline">CareerPulse</span>
+      {!sidebarCollapsed && <span className="hidden sm:inline">CareerPulse</span>}
     </Link>
   );
 
   return (
     <>
       {/* Desktop: fixed sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-[var(--color-border)] bg-[var(--color-surface)]/90 backdrop-blur-xl lg:flex">
-        <div className="flex h-16 shrink-0 items-center border-b border-[var(--color-border)] px-4">
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-[var(--color-border)] bg-[var(--color-surface)]/90 backdrop-blur-xl transition-all duration-300 lg:flex",
+          sidebarCollapsed ? "w-20" : "w-64"
+        )}
+      >
+        <div className={cn(
+          "flex h-16 shrink-0 items-center justify-between border-b border-[var(--color-border)] px-4 transition-all duration-300",
+          sidebarCollapsed && "justify-center px-0"
+        )}>
           {brand}
+          <button
+            type="button"
+            className={cn(
+              "group rounded-btn flex items-center justify-center p-2 text-[var(--color-muted)] transition-all hover:bg-white/[0.06] hover:text-[var(--color-text-primary)] active:scale-90",
+              sidebarCollapsed ? "mt-2" : ""
+            )}
+            onClick={toggleSidebar}
+            title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            {sidebarCollapsed ? (
+              <ChevronsRight className="h-4 w-4 animate-pulse duration-2000" />
+            ) : (
+              <ChevronsLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
+            )}
+          </button>
         </div>
         <nav ref={navRef} className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
           {nav.map((item) => (
-            <NavLinkContent key={item.href} item={item} pathname={pathname} isFree={isFree} />
+            <NavLinkContent
+              key={item.href}
+              item={item}
+              pathname={pathname}
+              isFree={isFree}
+              collapsed={sidebarCollapsed}
+            />
           ))}
         </nav>
         <div className="shrink-0 border-t border-[var(--color-border)] p-3">
-          <div className="flex items-center justify-end gap-2">
+          <div className={cn(
+            "flex items-center justify-center",
+            !sidebarCollapsed && "justify-end"
+          )}>
             <ProfileMenu />
           </div>
         </div>

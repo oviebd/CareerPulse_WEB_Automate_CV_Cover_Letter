@@ -2,8 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family={{font_family_url}}:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap');
     @page { size: A4; margin: 14mm 18mm; }
     * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     :root {
@@ -19,7 +21,7 @@
     }
     html, body { margin: 0; padding: 0; }
     body {
-      font-family: 'Outfit', 'Helvetica Neue', Arial, sans-serif;
+      font-family: '{{font_family}}', 'Helvetica Neue', Arial, sans-serif;
       font-size: 10pt;
       line-height: 1.35;
       color: var(--body);

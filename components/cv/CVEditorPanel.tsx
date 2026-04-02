@@ -33,6 +33,18 @@ export interface CVEditorPanelProps {
   hideFormTabBar?: boolean;
   /** Hide the inline keyword chips strip (parent renders a custom keywords UI). */
   hideKeywordsBanner?: boolean;
+  hideVisibilityPanel?: boolean;
+  templates?: any[];
+  selectedTemplateId?: string;
+  onTemplateChange?: (id: string) => void;
+  accent?: string;
+  onAccentChange?: (color: string) => void;
+  fontFamily?: string;
+  onFontFamilyChange?: (font: string) => void;
+  coreVersions?: any[];
+  selectedCoreCvId?: string | null;
+  onSelectedCoreCvIdChange?: (id: string) => void;
+  coreVersionsLoading?: boolean;
 }
 
 export function CVEditorPanel({
@@ -46,6 +58,18 @@ export function CVEditorPanel({
   hideAtsBanner = false,
   hideFormTabBar = false,
   hideKeywordsBanner = false,
+  hideVisibilityPanel = false,
+  templates = [],
+  selectedTemplateId,
+  onTemplateChange,
+  accent,
+  onAccentChange,
+  fontFamily,
+  onFontFamilyChange,
+  coreVersions = [],
+  selectedCoreCvId,
+  onSelectedCoreCvIdChange,
+  coreVersionsLoading = false,
 }: CVEditorPanelProps) {
   const [internalTab, setInternalTab] = useState<CVFormTab>('header');
   const isTabControlled = activeTabProp !== undefined && onActiveTabChange !== undefined;
@@ -280,8 +304,20 @@ export function CVEditorPanel({
         awards={awards}
         onAwardsChange={(v) => { setAwards(v); emitChange({ awards: v }); }}
         hiddenTabs={mode === 'compact' ? undefined : undefined}
+        hideVisibilityPanel={hideVisibilityPanel}
         highlightedKeywords={highlightedKeywords}
         atsBySection={ats.sections}
+        templates={templates}
+        selectedTemplateId={selectedTemplateId}
+        onTemplateChange={onTemplateChange}
+        accent={accent}
+        onAccentChange={onAccentChange}
+        fontFamily={fontFamily}
+        onFontFamilyChange={onFontFamilyChange}
+        coreVersions={coreVersions}
+        selectedCoreCvId={selectedCoreCvId}
+        onSelectedCoreCvIdChange={onSelectedCoreCvIdChange}
+        coreVersionsLoading={coreVersionsLoading}
       />
     </div>
   );

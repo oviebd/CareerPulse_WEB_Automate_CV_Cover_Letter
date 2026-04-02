@@ -35,6 +35,7 @@ type ExportBody = {
   applicant_email?: string | null;
   applicant_phone?: string | null;
   applicant_location?: string | null;
+  font_family?: string;
 };
 
 export async function POST(request: Request) {
@@ -107,7 +108,9 @@ export async function POST(request: Request) {
             user.id,
             templateId,
             jobCvAccent,
-            snapshot
+            snapshot,
+            null,
+            body.font_family ?? jobCv.font_family
           );
           const companySlug = (jobCv.company_name ?? '')
             .toLowerCase()
@@ -156,7 +159,8 @@ export async function POST(request: Request) {
           templateId,
           accent,
           snapshot,
-          coreCvId
+          coreCvId,
+          body.font_family
         );
         return new NextResponse(new Uint8Array(pdf), {
           status: 200,

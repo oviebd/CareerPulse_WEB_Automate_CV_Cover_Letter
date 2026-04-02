@@ -2,13 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family={{font_family_url}}:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap');
     @page { size: A4; margin: 18mm 20mm; }
     * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    body { margin: 0; font-family: 'DM Sans', Arial, sans-serif; color: #111; background: #fff; }
+    body { margin: 0; font-family: '{{font_family}}', Arial, sans-serif; color: #111; background: #fff; }
     .page { width: 100%; min-height: auto; padding: 0; position: relative; font-size: 10pt; line-height: 1.45; }
-    h1 { font-family: 'DM Sans', Arial, sans-serif; font-size: 28pt; font-weight: 300; margin: 0; color: {{accent_color}}; letter-spacing: -0.02em; }
+    h1 { font-family: '{{font_family}}', Arial, sans-serif; font-size: 28pt; font-weight: 300; margin: 0; color: {{accent_color}}; letter-spacing: -0.02em; }
     .title { font-size: 11pt; color: #555; margin-top: 8pt; }
     .contact { font-size: 9pt; color: #555; margin-top: 12pt; }
     .sp-section { margin-top: 20pt; }

@@ -552,6 +552,7 @@ export function renderTemplate(templateId: string, cvData: CVData): string {
     certifications: normalizedCertifications,
     languages: cvData.languages ?? [],
     awards: cvData.awards ?? [],
+    font_family_url: (cvData.font_family ?? 'Inter').replace(/\s+/g, '+'),
   };
   return renderRecursive(html, [root]);
 }
@@ -667,6 +668,7 @@ export function cvProfileToCVData(
     awards,
     referrals,
     accent_color: options.accent_color ?? '#6C63FF',
+    font_family: row.font_family ?? 'Inter',
     watermark: options.watermark ?? false,
   };
   return applyCvSectionVisibility(base, row.section_visibility);
@@ -677,7 +679,8 @@ export async function exportCV(
   templateId: string,
   accentColor?: string,
   snapshot?: Partial<CVProfile> | null,
-  coreCvId?: string | null
+  coreCvId?: string | null,
+  fontFamily?: string
 ): Promise<{ pdf: Buffer; filename: string }> {
   const supabase = createAdminClient();
   const { data: profile, error: pErr } = await supabase
@@ -749,6 +752,7 @@ export async function exportCV(
     accent_color: accentColor ?? '#6C63FF',
     watermark,
   });
+  if (fontFamily) cvData.font_family = fontFamily;
   const html = renderTemplate(templateId, cvData);
   const pdf = await generatePDF(html);
   const nameSlug = slugifyName(cv.full_name ?? 'untitled');

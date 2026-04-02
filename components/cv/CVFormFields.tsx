@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { LayoutDashboard, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -23,10 +24,12 @@ import { CVPhotoField } from '@/components/cv/CVPhotoField';
 import { CVSectionVisibilityPanel } from '@/components/cv/CVSectionVisibilityPanel';
 import { CVRewriteWithAIModal } from '@/components/cv/CVRewriteWithAIModal';
 import { CvAtsPolishButton } from '@/components/cv/CvAtsPolishButton';
+import { TemplateThumbnail } from '@/components/cv/TemplateThumbnail';
 import { cn, generateId } from '@/lib/utils';
 import { CV_FORM_CARD as FORM_CARD } from '@/lib/cv-editor-styles';
 
 export type CVFormTab =
+  | 'design'
   | 'header'
   | 'summary'
   | 'experience'
@@ -61,6 +64,9 @@ const PROFICIENCY_OPTIONS = [
   { value: 'intermediate', label: 'Intermediate' },
   { value: 'basic', label: 'Basic' },
 ];
+
+const SWATCHES = ['#6C63FF', '#00D4A8', '#2563EB', '#7c3aed', '#dc2626', '#0f172a', '#10b981', '#f59e0b'];
+const FONTS = ['Inter', 'Manrope', 'DM Sans', 'Lora', 'Outfit', 'Roboto'];
 
 type Props = {
   tab: CVFormTab;
@@ -108,8 +114,21 @@ type Props = {
   hiddenTabs?: CVFormTab[];
   /** When true, horizontal tab pills are hidden (e.g. when using a side nav). */
   hideTabBar?: boolean;
+  /** When true, the CVSectionVisibilityPanel is omitted. */
+  hideVisibilityPanel?: boolean;
   highlightedKeywords?: string[];
   atsBySection?: Record<string, { score: number; suggestions: string[] }>;
+  templates?: any[]; // Using any for brevity or import CVTemplate if preferred
+  selectedTemplateId?: string;
+  onTemplateChange?: (id: string) => void;
+  accent?: string;
+  onAccentChange?: (color: string) => void;
+  fontFamily?: string;
+  onFontFamilyChange?: (font: string) => void;
+  coreVersions?: any[];
+  selectedCoreCvId?: string | null;
+  onSelectedCoreCvIdChange?: (id: string) => void;
+  coreVersionsLoading?: boolean;
 };
 
 function HighlightedText({ text, keywords }: { text: string; keywords: string[] }) {
@@ -138,6 +157,7 @@ function HighlightedText({ text, keywords }: { text: string; keywords: string[] 
 }
 
 const TAB_DEFS: { id: CVFormTab; label: string }[] = [
+  { id: 'design', label: 'Layout & Design' },
   { id: 'header', label: 'Header & contact' },
   { id: 'summary', label: 'Summary' },
   { id: 'experience', label: 'Experience' },
@@ -196,8 +216,20 @@ export function CVFormFields(props: Props) {
     onAwardsChange,
     hiddenTabs,
     hideTabBar,
+    hideVisibilityPanel,
     highlightedKeywords,
     atsBySection,
+    templates = [],
+    selectedTemplateId,
+    onTemplateChange,
+    accent = '#6C63FF',
+    onAccentChange,
+    fontFamily = 'Inter',
+    onFontFamilyChange,
+    coreVersions = [],
+    selectedCoreCvId,
+    onSelectedCoreCvIdChange,
+    coreVersionsLoading = false,
   } = props;
 
   const visibleTabs = hiddenTabs
@@ -224,12 +256,14 @@ export function CVFormFields(props: Props) {
 
   return (
     <div className="space-y-5">
-      <div className={FORM_CARD}>
-        <CVSectionVisibilityPanel
-          visibility={sectionVisibility}
-          onChange={onSectionVisibilityChange}
-        />
-      </div>
+      {!hideVisibilityPanel && (
+        <div className={FORM_CARD}>
+          <CVSectionVisibilityPanel
+            visibility={sectionVisibility}
+            onChange={onSectionVisibilityChange}
+          />
+        </div>
+      )}
       {hideTabBar ? null : <Tabs value={tab} onChange={onTabChange} tabs={visibleTabs} />}
       <div className="pt-4">
         {activeAts ? (
@@ -251,6 +285,132 @@ export function CVFormFields(props: Props) {
             ) : (
               <p className="mt-2 text-sm text-[var(--color-muted)]">This section is already ATS-friendly.</p>
             )}
+          </div>
+        ) : null}
+
+        {tab === 'design' ? (
+          <div className="space-y-6">
+            {/* Header */}
+            <div className={cn("mb-6 flex items-center gap-3", FORM_CARD)}>
+              <div className="rounded-xl bg-[var(--color-primary-100)] p-2.5 text-[var(--color-primary-400)]">
+                <LayoutDashboard className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">Layout & Style</h2>
+                <p className="text-sm text-[var(--color-muted)]">Configure your CV's visual identity and structure.</p>
+              </div>
+            </div>
+
+            {/* Template Selection */}
+            <div className={FORM_CARD}>
+              <p className="mb-4 text-sm font-semibold text-[var(--color-text-primary)] uppercase tracking-wider text-xs">
+                Select Template
+              </p>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {templates.map((template) => (
+                  <button
+                    key={template.id}
+                    type="button"
+                    onClick={() => onTemplateChange?.(template.id)}
+                    className={cn(
+                      'group relative aspect-[3/4] overflow-hidden rounded-xl border-2 transition-all duration-300',
+                      selectedTemplateId === template.id
+                        ? 'border-[var(--color-primary-400)] shadow-lg shadow-[var(--color-primary-400)]/20'
+                        : 'border-[var(--color-border)] hover:border-[var(--color-border-hover)]'
+                    )}
+                  >
+                    <TemplateThumbnail
+                      templateId={template.id}
+                      accent={accent}
+                      name={template.name}
+                      className="absolute inset-0 h-full w-full grayscale-[0.1] opacity-90 transition-all duration-500 group-hover:scale-110 group-hover:grayscale-0 group-hover:opacity-100"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent flex flex-col justify-end p-3 transition-opacity duration-300 group-hover:from-black/90">
+                      <p className={cn(
+                        "text-[10px] font-bold uppercase tracking-widest transition-colors",
+                        selectedTemplateId === template.id ? "text-[var(--color-primary-400)]" : "text-white"
+                      )}>
+                        {template.name}
+                      </p>
+                      <p className="text-[8px] text-white/80">{template.category}</p>
+                    </div>
+                    {selectedTemplateId === template.id && (
+                      <div className="absolute top-2 right-2 rounded-full bg-[var(--color-primary-400)] p-1">
+                        <svg className="h-2 w-2 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Typography & Color */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className={FORM_CARD}>
+                <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)]">
+                  Accent Color
+                </p>
+                <div className="flex flex-wrap gap-2.5">
+                  {SWATCHES.map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      className={cn(
+                        'h-9 w-9 rounded-full ring-2 ring-offset-2 ring-offset-[var(--color-background)] transition-all duration-300 transform hover:scale-110',
+                        accent === color ? 'ring-[var(--color-primary-400)]' : 'ring-transparent'
+                      )}
+                      style={{ backgroundColor: color }}
+                      onClick={() => onAccentChange?.(color)}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div className={FORM_CARD}>
+                <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)]">
+                  Typography
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {FONTS.map((font) => (
+                    <button
+                      key={font}
+                      type="button"
+                      onClick={() => onFontFamilyChange?.(font)}
+                      className={cn(
+                        'rounded-xl border px-3 py-2.5 text-sm transition-all duration-200',
+                        fontFamily === font
+                          ? 'border-[var(--color-primary-400)]/50 bg-[var(--color-primary-100)]/40 font-semibold text-[var(--color-text-primary)]'
+                          : 'border-[var(--color-border)] text-[var(--color-muted)] hover:border-[var(--color-border-hover)] hover:text-[var(--color-text-primary)]'
+                      )}
+                      style={{ fontFamily: font }}
+                    >
+                      {font}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Layout Settings */}
+            <div className={FORM_CARD}>
+              <div className="mb-4">
+                 <h3 className="text-sm font-semibold text-[var(--color-text-primary)] uppercase tracking-wider text-xs">Section Visibility</h3>
+                 <p className="text-xs text-[var(--color-muted)] mt-1">Configure which sections appear on your final CV.</p>
+              </div>
+              <CVSectionVisibilityPanel
+                visibility={sectionVisibility}
+                onChange={onSectionVisibilityChange}
+              />
+            </div>
+
+            <div className={FORM_CARD}>
+               <p className="mb-2 text-sm font-medium text-[var(--color-text-primary)]">Pro Tip</p>
+               <p className="text-sm text-[var(--color-muted)]">
+                 Hiding a section here only removes it from the exported PDF and the live preview. Your data remains safe and can be re-enabled at any time.
+               </p>
+            </div>
           </div>
         ) : null}
 

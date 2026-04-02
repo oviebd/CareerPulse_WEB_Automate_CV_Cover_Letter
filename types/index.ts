@@ -229,6 +229,7 @@ export interface CVData {
   }>;
   referrals: ReferralEntry[];
   accent_color?: string;
+  font_family?: string;
   watermark?: boolean;
   /** Precomputed in renderTemplate for pipe-separated contact (optional). */
   contact_line?: string;
@@ -268,6 +269,7 @@ export interface CVProfile {
   original_cv_file_url: string | null;
   preferred_cv_template_id: string;
   preferred_cl_template_id: string;
+  font_family?: string;
   created_at: string;
   updated_at: string;
 }
@@ -480,6 +482,7 @@ export interface JobSpecificCV {
 
   preferred_template_id: string | null;
   accent_color: string;
+  font_family?: string;
 
   is_archived: boolean;
   job_application_id: string | null;

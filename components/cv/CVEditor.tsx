@@ -6,11 +6,10 @@ import { useCVProfile, useCoreCVVersions } from '@/hooks/useCV';
 import { useSubscription } from '@/hooks/useSubscription';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Select } from '@/components/ui/select';
 import { CVEditorPanel } from '@/components/cv/CVEditorPanel';
 import { Sidebar } from '@/components/cv/premium/Sidebar';
 import { PreviewPanel } from '@/components/cv/premium/PreviewPanel';
-import { ATSIndicator } from '@/components/cv/premium/ATSIndicator';
+import { ATSCircularScore } from '@/components/cv/premium/ATSCircularScore';
 import type { CVFormTab } from '@/components/cv/CVFormFields';
 import { FeatureGate, TemplateGate } from '@/components/shared/FeatureGate';
 import { useToast } from '@/components/ui/toast';
@@ -18,11 +17,12 @@ import type { CVData } from '@/types';
 import type { CVTemplate, SubscriptionTier } from '@/types';
 import { canUseTemplate } from '@/lib/subscription';
 import { buildATSReport } from '@/lib/cv-ats';
-import { formatDate } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { CV_FORM_CARD, CV_SHELL_HEADER } from '@/lib/cv-editor-styles';
 import { cloneCvData } from '@/lib/cv-clone';
 import { useSearchParams } from 'next/navigation';
 import { Undo2, Redo2 } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 function previewPayloadFromCVData(d: CVData): Record<string, unknown> {
   return {
@@ -136,7 +136,6 @@ export function CVEditor() {
   const [settingDefault, setSettingDefault] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [editorTab, setEditorTab] = useState<CVFormTab>('header');
-  const [rightTab, setRightTab] = useState<'preview' | 'design'>('preview');
   const [zoom, setZoom] = useState(100);
   const [page, setPage] = useState(1);
   const [fontFamily, setFontFamily] = useState('Inter');
@@ -182,6 +181,7 @@ export function CVEditor() {
     if (!cv || initialized.current) return;
     initialized.current = true;
     setSelectedTemplateId(cv.preferred_cv_template_id ?? 'classic');
+    setFontFamily(cv.font_family ?? 'Inter');
     setUndoPast([]);
     setUndoFuture([]);
     burstStartRef.current = null;
@@ -289,6 +289,7 @@ export function CVEditor() {
           id: cv?.id,
           template_id: selectedTemplateId,
           accent_color: accent,
+          font_family: fontFamily,
           cv_snapshot: previewPayloadFromCVData(cvData),
         }),
       });
@@ -297,15 +298,19 @@ export function CVEditor() {
         return;
       }
       const blob = await res.blob();
-      const nextUrl = URL.createObjectURL(blob);
+      const rawUrl = URL.createObjectURL(blob);
+      const decoratedUrl = `${rawUrl}#toolbar=0&navpanes=0&scrollbar=0`;
       setPreviewPdfUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev);
-        return nextUrl;
+        if (prev) {
+          const originalUrl = prev.split('#')[0];
+          URL.revokeObjectURL(originalUrl);
+        }
+        return decoratedUrl;
       });
     } finally {
       setPreviewBusy(false);
     }
-  }, [selectedTemplateId, cvData, accent, cv?.id]);
+  }, [selectedTemplateId, cvData, accent, cv?.id, fontFamily]);
 
   useEffect(() => {
     if (!selectedTemplateId || !cvData || templatesLoading) return;
@@ -325,7 +330,10 @@ export function CVEditor() {
   useEffect(() => {
     return () => {
       setPreviewPdfUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev);
+        if (prev) {
+          const originalUrl = prev.split('#')[0];
+          URL.revokeObjectURL(originalUrl);
+        }
         return '';
       });
     };
@@ -389,6 +397,7 @@ export function CVEditor() {
         certifications: cvData.certifications,
         referrals: (cvData.referrals ?? []).slice(0, 2),
         awards: cvData.awards,
+        font_family: fontFamily,
       }),
     });
     if (res.ok) {
@@ -431,6 +440,7 @@ export function CVEditor() {
           id: cv?.id,
           template_id: selectedTemplateId,
           accent_color: accent,
+          font_family: fontFamily,
           cv_snapshot: previewPayloadFromCVData(cvData),
         }),
       });
@@ -513,77 +523,58 @@ export function CVEditor() {
             {saveState === 'saved' || autosaveState === 'saved' ? 'Saved ✓' : autosaveState === 'saving' ? 'Saving…' : ''}
           </span>
         </div>
-      </div>
-      <div className="mt-3">
-        <ATSIndicator score={ats.score} previousScore={prevAtsScore} suggestions={ats.suggestions} />
-      </div>
-      </div>
+       </div>
+     </div>
 
-      <div className="grid gap-4 xl:grid-cols-[260px_minmax(0,1fr)_420px]">
-        <Sidebar activeSection={editorTab} onSelect={setEditorTab} />
-        <div className="space-y-3">
-          <div className={CV_FORM_CARD}>
-            <CVEditorPanel
-              value={cvData}
-              onChange={handleChange}
-              activeTab={editorTab}
-              onActiveTabChange={setEditorTab}
-              hideAtsBanner
-              hideFormTabBar
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_630px]">
+        <div className="min-w-0">
+          <div className="grid gap-4 xl:grid-cols-[260px_1fr]">
+            <Sidebar 
+              activeSection={editorTab} 
+              onSelect={setEditorTab} 
+              coreVersions={coreVersions}
+              selectedCoreCvId={selectedCoreCvId}
+              onSelectedCoreCvIdChange={setSelectedCoreCvId}
+              coreVersionsLoading={coreVersionsLoading}
             />
-          </div>
-          <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-muted)]">
-            <span>Version: {selectedCoreCvId ? selectedCoreCvId.slice(0, 8) : 'draft'}</span>
-            {draftActive ? (
-              <span className="rounded-badge border border-[var(--color-accent-gold)]/40 bg-[var(--color-accent-gold)]/15 px-2 py-0.5 text-[var(--color-accent-gold)]">
-                Draft mode
-              </span>
-            ) : null}
+            <div className="space-y-3">
+              <div className="space-y-3">
+                <div className={CV_FORM_CARD}>
+                  <CVEditorPanel
+                    value={cvData}
+                    onChange={handleChange}
+                    activeTab={editorTab}
+                    onActiveTabChange={setEditorTab}
+                    hideAtsBanner
+                    hideFormTabBar
+                    hideVisibilityPanel
+                    templates={templates}
+                    selectedTemplateId={selectedTemplateId}
+                    onTemplateChange={setSelectedTemplateId}
+                    accent={accent}
+                    onAccentChange={setAccent}
+                    fontFamily={fontFamily}
+                    onFontFamilyChange={setFontFamily}
+                    coreVersions={coreVersions}
+                    selectedCoreCvId={selectedCoreCvId}
+                    onSelectedCoreCvIdChange={setSelectedCoreCvId}
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-        <div className="space-y-3">
-          <div className={CV_FORM_CARD}>
-            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
-              Core CV version
-            </p>
-            <Select
-              label={coreVersionsLoading ? 'Loading…' : 'Select saved core CV'}
-              value={selectedCoreCvId ?? ''}
-              disabled={draftActive || coreVersionsLoading || coreVersions.length === 0}
-              options={coreVersions.map((v) => ({
-                value: v.id,
-                label: `${v.full_name ?? 'Core CV'} · ${formatDate(v.created_at)}`,
-              }))}
-              onChange={(e) => setSelectedCoreCvId(e.target.value)}
-            />
-            {draftActive ? (
-              <p className="mt-2 text-sm text-[var(--color-muted)]">
-                You have an upload draft. Press <strong>Save</strong> to create a new version.
-              </p>
-            ) : null}
-          </div>
+
+        <div className="space-y-3 xl:sticky xl:top-24">
+          <ATSCircularScore score={ats.score} suggestions={ats.suggestions} />
           <PreviewPanel
-            activeTab={rightTab}
-            onTabChange={setRightTab}
             previewPdfUrl={previewPdfUrl}
             previewBusy={previewBusy}
             zoom={zoom}
             onZoomChange={setZoom}
             currentPage={page}
             onPageChange={setPage}
-            selectedTemplateId={selectedTemplateId}
-            templates={templates}
-            onTemplateChange={setSelectedTemplateId}
-            accent={accent}
-            onAccentChange={setAccent}
-            fontFamily={fontFamily}
-            onFontFamilyChange={setFontFamily}
           />
-          <TemplateGate availableTiers={(templateMeta?.available_tiers ?? []) as SubscriptionTier[]} userTier={tier}>
-            <Button variant="secondary" size="sm" loading={settingDefault} disabled={!allowed || draftActive} onClick={() => void setPreferredTemplate()}>
-              Set as default template
-            </Button>
-          </TemplateGate>
           <FeatureGate requiredTier={['pro', 'premium', 'career']} userTier={tier}>
             <p className="text-xs text-[var(--color-muted)]">Pro settings unlocked</p>
           </FeatureGate>

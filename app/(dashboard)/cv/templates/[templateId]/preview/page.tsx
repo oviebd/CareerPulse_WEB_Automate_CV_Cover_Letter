@@ -556,18 +556,6 @@ export default function CVTemplatePreviewPage() {
         <div className="flex flex-wrap items-center gap-2">
           {!isJobMode ? (
             <Button
-              variant="secondary"
-              size="sm"
-              loading={settingDefault}
-              disabled={!allowed || draftActive}
-              onClick={() => void setPreferredTemplate()}
-            >
-              Set as default
-            </Button>
-          ) : null}
-
-          {!isJobMode ? (
-            <Button
               variant="primary"
               size="sm"
               loading={saveState === 'saving'}
