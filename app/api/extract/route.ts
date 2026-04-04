@@ -66,7 +66,7 @@ export async function POST(request: Request) {
 
     if (uploadLimit !== Number.POSITIVE_INFINITY && !body.force) {
       const { count } = await supabase
-        .from('cv_profiles')
+        .from('cvs')
         .select('id', { count: 'exact' })
         .eq('user_id', user.id);
       const existingCount = typeof count === 'number' ? count : 0;
@@ -134,18 +134,25 @@ export async function POST(request: Request) {
     );
 
     // IMPORTANT: extract-only endpoint.
-    // It must not persist anything to `cv_profiles`.
+    // It must not persist anything to `cvs`.
     const { data: existing } = await supabase
-      .from('cv_profiles')
-      .select('id, preferred_cv_template_id, preferred_cl_template_id, created_at, updated_at')
+      .from('cvs')
+      .select('id, preferred_template_id, created_at, updated_at')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 
+    const { data: profileRow } = await supabase
+      .from('profiles')
+      .select('preferred_cl_template_id')
+      .eq('id', user.id)
+      .maybeSingle();
+
     const cvProfile = {
       id: existing?.id ?? randomUUID(),
       user_id: user.id,
+      name: 'Imported CV',
       ...parsed,
       // Ensure arrays exist (editor expects them).
       experience: (parsed.experience ?? []) as unknown[],
@@ -161,8 +168,10 @@ export async function POST(request: Request) {
       is_complete: isComplete,
       // Do not store PDF location in DB (pdf is extract-only).
       original_cv_file_url: null,
-      preferred_cv_template_id: existing?.preferred_cv_template_id ?? 'classic',
-      preferred_cl_template_id: existing?.preferred_cl_template_id ?? 'cl-classic',
+      preferred_template_id: (existing as { preferred_template_id?: string } | null)?.preferred_template_id ?? 'classic',
+      preferred_cl_template_id:
+        (profileRow as { preferred_cl_template_id?: string } | null)?.preferred_cl_template_id ??
+        'cl-classic',
       created_at: existing?.created_at ?? new Date().toISOString(),
       updated_at: existing?.updated_at ?? new Date().toISOString(),
     };

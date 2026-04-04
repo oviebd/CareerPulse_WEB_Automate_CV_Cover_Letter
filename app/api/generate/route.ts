@@ -78,13 +78,16 @@ export async function POST(request: Request) {
       throw e;
     }
 
-    const { data: cvRow, error: cvErr } = await supabase
-      .from('cv_profiles')
+    const { data: cvRows, error: cvErr } = await supabase
+      .from('cvs')
       .select('*')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(40);
+    const cvRow =
+      (cvRows ?? []).find(
+        (r) => !Array.isArray(r.job_ids) || (r.job_ids as string[]).length === 0
+      ) ?? cvRows?.[0];
     if (cvErr || !cvRow) {
       return NextResponse.json({ error: 'cv_profile_required' }, { status: 400 });
     }
@@ -136,18 +139,17 @@ export async function POST(request: Request) {
           const inputTokens = usage?.input_tokens ?? null;
           const outputTokens = usage?.output_tokens ?? null;
 
+          const letterName = `${jobTitle} — ${companyName}`.slice(0, 200);
           const { data: inserted, error: insErr } = await supabase
             .from('cover_letters')
             .insert({
               user_id: user.id,
-              job_title: jobTitle,
-              company_name: companyName,
+              name: letterName,
               applicant_name: cvRow.full_name ?? null,
               applicant_role: cvRow.professional_title ?? null,
               applicant_email: cvRow.email ?? null,
               applicant_phone: cvRow.phone ?? null,
               applicant_location: cvRow.location ?? null,
-              job_description: body.jobDescription,
               tone,
               length,
               specific_emphasis: body.specificEmphasis?.trim() || null,
@@ -158,6 +160,7 @@ export async function POST(request: Request) {
               output_tokens: outputTokens,
               ats_keywords_found: [],
               ats_keywords_missing: [],
+              job_ids: [],
             })
             .select('id')
             .single();

@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCVProfile, useCoreCVVersions } from '@/hooks/useCV';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
+import { useCVEditor } from '@/hooks/useCVEditor';
 import { useSubscription } from '@/hooks/useSubscription';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -11,18 +12,15 @@ import { Sidebar } from '@/components/cv/premium/Sidebar';
 import { PreviewPanel } from '@/components/cv/premium/PreviewPanel';
 import { ATSCircularScore } from '@/components/cv/premium/ATSCircularScore';
 import type { CVFormTab } from '@/components/cv/CVFormFields';
-import { FeatureGate, TemplateGate } from '@/components/shared/FeatureGate';
+import { FeatureGate } from '@/components/shared/FeatureGate';
 import { useToast } from '@/components/ui/toast';
 import type { CVData } from '@/types';
 import type { CVTemplate, SubscriptionTier } from '@/types';
 import { canUseTemplate } from '@/lib/subscription';
 import { buildATSReport } from '@/lib/cv-ats';
-import { cn } from '@/lib/utils';
 import { CV_FORM_CARD, CV_SHELL_HEADER } from '@/lib/cv-editor-styles';
 import { cloneCvData } from '@/lib/cv-clone';
-import { useSearchParams } from 'next/navigation';
 import { Undo2, Redo2 } from 'lucide-react';
-import { motion } from 'framer-motion';
 
 function previewPayloadFromCVData(d: CVData): Record<string, unknown> {
   return {
@@ -37,7 +35,6 @@ function previewPayloadFromCVData(d: CVData): Record<string, unknown> {
     address: d.address ?? null,
     photo_url: d.photo_url ?? null,
     summary: d.summary,
-    // Used by applyCvSectionVisibility() during HTML/PDF rendering.
     section_visibility: d.section_visibility ?? {},
     experience: d.experience ?? [],
     education: d.education ?? [],
@@ -51,16 +48,34 @@ function previewPayloadFromCVData(d: CVData): Record<string, unknown> {
 }
 
 export function CVEditor() {
-  const queryClient = useQueryClient();
-  const { data: coreVersions = [], isLoading: coreVersionsLoading } = useCoreCVVersions();
-  const [selectedCoreCvId, setSelectedCoreCvId] = useState<string | null>(null);
+  const router = useRouter();
+  const params = useParams();
   const searchParams = useSearchParams();
+  const routeId = typeof params?.id === 'string' ? params.id : undefined;
   const coreCvIdFromQuery = searchParams.get('core_cv_id');
 
-  const { data: cv, isLoading, refetch } = useCVProfile(selectedCoreCvId);
-  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
-  const [cvData, setCvData] = useState<CVData | null>(null);
-  const initialized = useRef(false);
+  useEffect(() => {
+    if (coreCvIdFromQuery) {
+      router.replace(`/cv/edit/${encodeURIComponent(coreCvIdFromQuery)}`);
+    }
+  }, [coreCvIdFromQuery, router]);
+
+  const {
+    cv,
+    cvId,
+    isSaving,
+    saveError,
+    loadError,
+    isLoading,
+    isDirty,
+    saveButtonLabel,
+    handleSave,
+    editorState,
+    setEditorState,
+    reloadFromServer,
+  } = useCVEditor({ cvIdFromRoute: routeId });
+
+  const queryClient = useQueryClient();
 
   const [draftActive, setDraftActive] = useState(false);
   useEffect(() => {
@@ -71,18 +86,6 @@ export function CVEditor() {
     window.addEventListener('cv_draft_updated', onUpdate);
     return () => window.removeEventListener('cv_draft_updated', onUpdate);
   }, []);
-
-  useEffect(() => {
-    if (draftActive || isNew) return;
-    if (!coreVersionsLoading && coreVersions.length > 0) {
-      const latestId = coreVersions[0]?.id ?? null;
-      const requestedId =
-        coreCvIdFromQuery && coreVersions.some((v) => v.id === coreCvIdFromQuery)
-          ? coreCvIdFromQuery
-          : null;
-      setSelectedCoreCvId((prev) => (prev ? prev : requestedId ?? latestId));
-    }
-  }, [coreVersionsLoading, coreVersions, draftActive, coreCvIdFromQuery]);
 
   const isNew = searchParams.get('new') === '1';
 
@@ -113,24 +116,41 @@ export function CVEditor() {
       sessionStorage.setItem('cv_draft', JSON.stringify(emptyCv));
       sessionStorage.setItem('cv_draft_force_overwrite', '0');
       window.dispatchEvent(new Event('cv_draft_updated'));
-
-      // Clean up URL to avoid re-triggering on manual refresh if they've already started editing
       const url = new URL(window.location.href);
       url.searchParams.delete('new');
       window.history.replaceState({}, '', url.toString());
     }
   }, [isNew]);
 
-  useEffect(() => {
-    // Reset initialization when the user changes versions (or a draft appears).
-    initialized.current = false;
-  }, [selectedCoreCvId, draftActive]);
-
   const { toast } = useToast();
   const { tier } = useSubscription();
 
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('classic');
-  const [accent, setAccent] = useState('#6C63FF');
+  const cvData = editorState.cvData;
+  const selectedTemplateId = editorState.preferred_template_id;
+  const accent = editorState.accent_color;
+  const fontFamily = editorState.font_family;
+
+  const setSelectedTemplateId = useCallback(
+    (id: string) => {
+      setEditorState((prev) => ({ ...prev, preferred_template_id: id }));
+    },
+    [setEditorState]
+  );
+
+  const setAccent = useCallback(
+    (v: string) => {
+      setEditorState((prev) => ({ ...prev, accent_color: v }));
+    },
+    [setEditorState]
+  );
+
+  const setFontFamily = useCallback(
+    (v: string) => {
+      setEditorState((prev) => ({ ...prev, font_family: v }));
+    },
+    [setEditorState]
+  );
+
   const [previewPdfUrl, setPreviewPdfUrl] = useState<string>('');
   const [previewBusy, setPreviewBusy] = useState(false);
   const [settingDefault, setSettingDefault] = useState(false);
@@ -138,9 +158,7 @@ export function CVEditor() {
   const [editorTab, setEditorTab] = useState<CVFormTab>('header');
   const [zoom, setZoom] = useState(100);
   const [page, setPage] = useState(1);
-  const [fontFamily, setFontFamily] = useState('Inter');
   const [autosaveState, setAutosaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
-  const [prevAtsScore, setPrevAtsScore] = useState(0);
   const [undoPast, setUndoPast] = useState<CVData[]>([]);
   const [undoFuture, setUndoFuture] = useState<CVData[]>([]);
   const burstStartRef = useRef<CVData | null>(null);
@@ -156,7 +174,7 @@ export function CVEditor() {
       allowUndoHistoryRef.current = true;
     }, 900);
     return () => window.clearTimeout(t);
-  }, [selectedCoreCvId, cv?.id]);
+  }, [routeId, cvId]);
 
   const { data: templates = [], isLoading: templatesLoading } = useQuery({
     queryKey: ['cv-templates'],
@@ -177,58 +195,29 @@ export function CVEditor() {
     ? canUseTemplate(templateMeta.available_tiers as SubscriptionTier[], tier)
     : false;
 
-  useEffect(() => {
-    if (!cv || initialized.current) return;
-    initialized.current = true;
-    setSelectedTemplateId(cv.preferred_cv_template_id ?? 'classic');
-    setFontFamily(cv.font_family ?? 'Inter');
-    setUndoPast([]);
-    setUndoFuture([]);
-    burstStartRef.current = null;
-    setCvData({
-      full_name: cv.full_name ?? null,
-      professional_title: cv.professional_title ?? null,
-      email: cv.email ?? null,
-      phone: cv.phone ?? null,
-      location: cv.location ?? null,
-      linkedin_url: cv.linkedin_url ?? null,
-      github_url: cv.github_url ?? null,
-      links: cv.links ?? [],
-      address: cv.address ?? null,
-      photo_url: cv.photo_url ?? null,
-      summary: cv.summary ?? null,
-      section_visibility: cv.section_visibility ?? {},
-      experience: cv.experience ?? [],
-      education: cv.education ?? [],
-      skills: cv.skills ?? [],
-      projects: cv.projects ?? [],
-      certifications: cv.certifications ?? [],
-      languages: cv.languages ?? [],
-      awards: cv.awards ?? [],
-      referrals: cv.referrals ?? [],
-    });
-  }, [cv]);
-
-  const handleChange = useCallback((data: CVData) => {
-    setCvData((prev) => {
-      if (prev && !skipHistoryRef.current && allowUndoHistoryRef.current) {
-        if (burstStartRef.current === null) {
-          burstStartRef.current = cloneCvData(prev);
-        }
-        if (historyDebounceRef.current) clearTimeout(historyDebounceRef.current);
-        historyDebounceRef.current = setTimeout(() => {
-          const snapshot = burstStartRef.current;
-          burstStartRef.current = null;
-          if (snapshot) {
-            setUndoPast((p) => [...p.slice(-49), snapshot]);
-            setUndoFuture([]);
+  const handleChange = useCallback(
+    (data: CVData) => {
+      setEditorState((prev) => {
+        if (!skipHistoryRef.current && allowUndoHistoryRef.current) {
+          if (burstStartRef.current === null) {
+            burstStartRef.current = cloneCvData(prev.cvData);
           }
-        }, 550);
-      }
-      skipHistoryRef.current = false;
-      return data;
-    });
-  }, []);
+          if (historyDebounceRef.current) clearTimeout(historyDebounceRef.current);
+          historyDebounceRef.current = setTimeout(() => {
+            const snapshot = burstStartRef.current;
+            burstStartRef.current = null;
+            if (snapshot) {
+              setUndoPast((p) => [...p.slice(-49), snapshot]);
+              setUndoFuture([]);
+            }
+          }, 550);
+        }
+        skipHistoryRef.current = false;
+        return { ...prev, cvData: data };
+      });
+    },
+    [setEditorState]
+  );
 
   const undo = useCallback(() => {
     setUndoPast((p) => {
@@ -239,10 +228,10 @@ export function CVEditor() {
       burstStartRef.current = null;
       const cur = cvDataRef.current;
       if (cur) setUndoFuture((f) => [cloneCvData(cur), ...f].slice(0, 50));
-      setCvData(cloneCvData(snapshot));
+      setEditorState((prev) => ({ ...prev, cvData: cloneCvData(snapshot) }));
       return p.slice(0, -1);
     });
-  }, []);
+  }, [setEditorState]);
 
   const redo = useCallback(() => {
     setUndoFuture((f) => {
@@ -253,10 +242,10 @@ export function CVEditor() {
       burstStartRef.current = null;
       const cur = cvDataRef.current;
       if (cur) setUndoPast((p) => [...p.slice(-49), cloneCvData(cur)]);
-      setCvData(cloneCvData(next));
+      setEditorState((prev) => ({ ...prev, cvData: cloneCvData(next) }));
       return f.slice(1);
     });
-  }, []);
+  }, [setEditorState]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -273,9 +262,8 @@ export function CVEditor() {
   useEffect(() => {
     if (templatesLoading || !templates.length) return;
     if (templates.some((t) => t.id === selectedTemplateId)) return;
-    // Fallback if the saved preferred template was deleted/changed.
     setSelectedTemplateId(templates[0].id);
-  }, [templatesLoading, templates, selectedTemplateId]);
+  }, [templatesLoading, templates, selectedTemplateId, setSelectedTemplateId]);
 
   const refreshPreview = useCallback(async () => {
     if (!selectedTemplateId || !cvData) return;
@@ -286,7 +274,7 @@ export function CVEditor() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: 'cv',
-          id: cv?.id,
+          id: cvId ?? undefined,
           template_id: selectedTemplateId,
           accent_color: accent,
           font_family: fontFamily,
@@ -310,7 +298,7 @@ export function CVEditor() {
     } finally {
       setPreviewBusy(false);
     }
-  }, [selectedTemplateId, cvData, accent, cv?.id, fontFamily]);
+  }, [selectedTemplateId, cvData, accent, cvId, fontFamily]);
 
   useEffect(() => {
     if (!selectedTemplateId || !cvData || templatesLoading) return;
@@ -323,8 +311,8 @@ export function CVEditor() {
   useEffect(() => {
     if (!cvData) return;
     setAutosaveState('saving');
-    const t = window.setTimeout(() => setAutosaveState('saved'), 500);
-    return () => window.clearTimeout(t);
+    const tm = window.setTimeout(() => setAutosaveState('saved'), 500);
+    return () => window.clearTimeout(tm);
   }, [cvData]);
 
   useEffect(() => {
@@ -340,88 +328,35 @@ export function CVEditor() {
   }, []);
 
   async function setPreferredTemplate() {
-    if (!cv || !selectedTemplateId) return;
+    if (!cvId || !selectedTemplateId) {
+      toast('Save your CV first to set a default template.', 'error');
+      return;
+    }
     if (draftActive) {
       toast('Press Save first to persist your core CV.', 'error');
       return;
     }
     setSettingDefault(true);
     try {
-      const supabase = createClient();
-      await supabase
-        .from('cv_profiles')
-        .update({ preferred_cv_template_id: selectedTemplateId })
-        .eq('id', cv.id);
+      const res = await fetch(`/api/cvs/${cvId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ preferred_template_id: selectedTemplateId }),
+      });
+      if (!res.ok) throw new Error('update_failed');
       toast('Default template updated.', 'success');
-      void refetch();
-    } catch (e) {
+      void queryClient.invalidateQueries({ queryKey: ['cv-versions'] });
+      void reloadFromServer();
+    } catch {
       toast('Could not update template.', 'error');
     } finally {
       setSettingDefault(false);
     }
   }
 
-  async function save() {
-    if (!cvData) return;
-    setSaveState('saving');
-
-    const forceOverwrite =
-      sessionStorage.getItem('cv_draft_force_overwrite') === '1';
-    const res = await fetch('/api/cv', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        core_cv_id: draftActive ? undefined : selectedCoreCvId,
-        create_new: draftActive,
-        force_overwrite_existing: forceOverwrite,
-        preferred_cv_template_id: draftActive ? selectedTemplateId : undefined,
-        full_name: cvData.full_name,
-        professional_title: cvData.professional_title,
-        email: cvData.email,
-        phone: cvData.phone,
-        location: cvData.location,
-        linkedin_url: cvData.linkedin_url,
-        github_url: cvData.github_url,
-        links: cvData.links ?? [],
-        address: cvData.address,
-        photo_url: cvData.photo_url || null,
-        summary: cvData.summary,
-        // Ensure we never persist uploaded PDFs; we only keep extracted info.
-        original_cv_file_url: null,
-        section_visibility: cvData.section_visibility ?? {},
-        experience: cvData.experience,
-        education: cvData.education,
-        skills: cvData.skills,
-        projects: cvData.projects,
-        languages: cvData.languages,
-        certifications: cvData.certifications,
-        referrals: (cvData.referrals ?? []).slice(0, 2),
-        awards: cvData.awards,
-        font_family: fontFamily,
-      }),
-    });
-    if (res.ok) {
-      setSaveState('saved');
-      // Persist has completed; draft is no longer needed.
-      try {
-        sessionStorage.removeItem('cv_draft');
-        sessionStorage.removeItem('cv_draft_force_overwrite');
-        window.dispatchEvent(new Event('cv_draft_updated'));
-      } catch {
-        // ignore
-      }
-      try {
-        const json = (await res.json()) as { cvProfile?: { id?: string } };
-        if (json.cvProfile?.id) setSelectedCoreCvId(json.cvProfile.id);
-      } catch {
-        // ignore
-      }
-      void queryClient.invalidateQueries({ queryKey: ['cv-versions'] });
-      void refetch();
-      setTimeout(() => setSaveState('idle'), 2000);
-    } else {
-      setSaveState('idle');
-    }
+  async function onSaveClick() {
+    await handleSave();
+    void queryClient.invalidateQueries({ queryKey: ['cv-versions'] });
   }
 
   async function exportPdf() {
@@ -437,7 +372,7 @@ export function CVEditor() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: 'cv',
-          id: cv?.id,
+          id: cvId ?? undefined,
           template_id: selectedTemplateId,
           accent_color: accent,
           font_family: fontFamily,
@@ -463,11 +398,19 @@ export function CVEditor() {
   const ats = cvData
     ? buildATSReport(cvData)
     : { score: 0, summary: '', suggestions: [], sections: {} };
-  useEffect(() => {
-    setPrevAtsScore((prev) => (ats.score === prev ? prev : ats.score));
-  }, [ats.score]);
 
-  if (isLoading || !cvData) {
+  if (loadError) {
+    return (
+      <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-900">
+        <p className="font-medium">{loadError}</p>
+        <Button variant="secondary" size="sm" className="mt-3" onClick={() => void reloadFromServer()}>
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
+  if (isLoading) {
     return <p className="text-sm text-[var(--color-muted)]">Loading profile…</p>;
   }
 
@@ -475,68 +418,70 @@ export function CVEditor() {
     <div className="mx-auto max-w-[1650px] space-y-4">
       <div className={CV_SHELL_HEADER}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="font-display text-2xl font-semibold text-[var(--color-text-primary)]">Edit CV</h1>
-          <p className="mt-1 text-sm text-[var(--color-muted)]">
-            Editor-first CV writing with live ATS feedback and preview.
-          </p>
+          <div>
+            <h1 className="font-display text-2xl font-semibold text-[var(--color-text-primary)]">Edit CV</h1>
+            <p className="mt-1 text-sm text-[var(--color-muted)]">
+              Editor-first CV writing with live ATS feedback and preview.
+            </p>
+            {isDirty ? (
+              <p className="mt-1 text-xs text-amber-700/90">Unsaved changes</p>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={!undoPast.length}
+              onClick={undo}
+              icon={<Undo2 className="h-4 w-4" />}
+              title="Undo (⌘Z)"
+            >
+              Undo
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={!undoFuture.length}
+              onClick={redo}
+              icon={<Redo2 className="h-4 w-4" />}
+              title="Redo (⌘⇧Z)"
+            >
+              Redo
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              loading={isSaving}
+              disabled={isSaving}
+              onClick={() => void onSaveClick()}
+            >
+              {saveButtonLabel}
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              loading={exporting}
+              disabled={!allowed}
+              onClick={() => void exportPdf()}
+            >
+              Export PDF
+            </Button>
+            <span className="text-xs text-[var(--color-muted)]">
+              {!isDirty && (autosaveState === 'saved' || autosaveState === 'saving')
+                ? 'Saved ✓'
+                : autosaveState === 'saving'
+                  ? 'Saving…'
+                  : ''}
+            </span>
+            {saveError ? <span className="text-xs text-red-600">{saveError}</span> : null}
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={!undoPast.length}
-            onClick={undo}
-            icon={<Undo2 className="h-4 w-4" />}
-            title="Undo (⌘Z)"
-          >
-            Undo
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={!undoFuture.length}
-            onClick={redo}
-            icon={<Redo2 className="h-4 w-4" />}
-            title="Redo (⌘⇧Z)"
-          >
-            Redo
-          </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            loading={saveState === 'saving'}
-            onClick={() => void save()}
-          >
-            Save
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            loading={exporting}
-            disabled={!allowed}
-            onClick={() => void exportPdf()}
-          >
-            Export PDF
-          </Button>
-          <span className="text-xs text-[var(--color-muted)]">
-            {saveState === 'saved' || autosaveState === 'saved' ? 'Saved ✓' : autosaveState === 'saving' ? 'Saving…' : ''}
-          </span>
-        </div>
-       </div>
-     </div>
+      </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_630px]">
         <div className="min-w-0">
           <div className="grid gap-4 xl:grid-cols-[260px_1fr]">
-            <Sidebar 
-              activeSection={editorTab} 
-              onSelect={setEditorTab} 
-              coreVersions={coreVersions}
-              selectedCoreCvId={selectedCoreCvId}
-              onSelectedCoreCvIdChange={setSelectedCoreCvId}
-              coreVersionsLoading={coreVersionsLoading}
-            />
+            <Sidebar activeSection={editorTab} onSelect={setEditorTab} />
             <div className="space-y-3">
               <div className="space-y-3">
                 <div className={CV_FORM_CARD}>
@@ -555,9 +500,6 @@ export function CVEditor() {
                     onAccentChange={setAccent}
                     fontFamily={fontFamily}
                     onFontFamilyChange={setFontFamily}
-                    coreVersions={coreVersions}
-                    selectedCoreCvId={selectedCoreCvId}
-                    onSelectedCoreCvIdChange={setSelectedCoreCvId}
                   />
                 </div>
               </div>

@@ -13,9 +13,10 @@ export async function GET() {
     }
 
     const { data, error } = await supabase
-      .from('cv_profiles')
-      .select('id, full_name, completion_percentage, is_complete, created_at, preferred_cv_template_id')
+      .from('cvs')
+      .select('id, name, full_name, completion_percentage, is_complete, created_at, preferred_template_id')
       .eq('user_id', user.id)
+      .eq('is_archived', false)
       .order('created_at', { ascending: false });
 
     if (error) {

@@ -10,7 +10,8 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import { memo, useCallback, useMemo, useState } from 'react';
-import type { ApplicationStatus, JobApplication, WorkType } from '@/types';
+import type { WorkType } from '@/types';
+import type { Job, JobStatus } from '@/types/database';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,14 +23,11 @@ import {
 } from '@/hooks/useTracker';
 import { formatDate } from '@/lib/utils';
 
-const COLUMNS: { id: ApplicationStatus; label: string }[] = [
+const COLUMNS: { id: JobStatus; label: string }[] = [
   { id: 'saved', label: 'Saved' },
   { id: 'applied', label: 'Applied' },
-  { id: 'phone_screen', label: 'Phone' },
-  { id: 'interview', label: 'Interview' },
-  { id: 'technical', label: 'Technical' },
-  { id: 'final_round', label: 'Final' },
-  { id: 'offer', label: 'Offer' },
+  { id: 'interviewing', label: 'Interviewing' },
+  { id: 'offered', label: 'Offer' },
   { id: 'rejected', label: 'Rejected' },
   { id: 'withdrawn', label: 'Withdrawn' },
 ];
@@ -39,7 +37,7 @@ const Column = memo(function Column({
   count,
   children,
 }: {
-  status: ApplicationStatus;
+  status: JobStatus;
   count: number;
   children: React.ReactNode;
 }) {
@@ -63,7 +61,7 @@ const Column = memo(function Column({
   );
 });
 
-const AppCard = memo(function AppCard({ app }: { app: JobApplication }) {
+const AppCard = memo(function AppCard({ app }: { app: Job }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: app.id,
     data: { status: app.status },
@@ -100,12 +98,12 @@ export function TrackerBoard() {
   const { data: apps = [] } = useJobApplications();
   const updateStatus = useUpdateApplicationStatus();
   const createApp = useUpsertJobApplication();
-  const [selected, setSelected] = useState<JobApplication | null>(null);
+  const [selected, setSelected] = useState<Job | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   const onDragEnd = useCallback(
     (e: DragEndEvent) => {
-      const overId = e.over?.id as ApplicationStatus | undefined;
+      const overId = e.over?.id as JobStatus | undefined;
       const activeId = e.active.id as string;
       if (!overId || !activeId) return;
       updateStatus.mutate({ id: activeId, status: overId });
@@ -115,7 +113,7 @@ export function TrackerBoard() {
 
   const { total, thisWeek, grouped } = useMemo(() => {
     const now = Date.now();
-    const g = new Map<ApplicationStatus, JobApplication[]>();
+    const g = new Map<JobStatus, Job[]>();
     let t = 0;
     let tw = 0;
     for (const a of apps) {
@@ -183,7 +181,7 @@ export function ApplicationDrawer({
   app,
   onClose,
 }: {
-  app: JobApplication | null;
+  app: Job | null;
   onClose: () => void;
 }) {
   const upsert = useUpsertJobApplication();

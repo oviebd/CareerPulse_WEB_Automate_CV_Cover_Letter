@@ -4,15 +4,17 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
 import type { CVProfile } from '@/types';
+import { dbRowToCvProfile } from '@/lib/cv-mapper';
 import { useEffect, useState } from 'react';
 
 export type CoreCVVersion = {
   id: string;
+  name: string;
   full_name: string | null;
   completion_percentage: number;
   is_complete: boolean;
   created_at: string;
-  preferred_cv_template_id: string | null;
+  preferred_template_id: string | null;
 };
 
 export function useCoreCVVersions() {
@@ -21,10 +23,18 @@ export function useCoreCVVersions() {
     queryKey: ['cv-versions', userId],
     enabled: !!userId,
     queryFn: async (): Promise<CoreCVVersion[]> => {
-      const res = await fetch('/api/cv/versions', { method: 'GET' });
+      const res = await fetch('/api/cvs?generalOnly=true');
       if (!res.ok) throw new Error('Failed to fetch core CV versions');
-      const json = await res.json() as { versions: CoreCVVersion[] };
-      return json.versions ?? [];
+      const json = (await res.json()) as CVProfile[];
+      return (json ?? []).map((v) => ({
+        id: v.id,
+        name: v.name ?? 'Untitled CV',
+        full_name: v.full_name,
+        completion_percentage: v.completion_percentage,
+        is_complete: v.is_complete,
+        created_at: v.created_at,
+        preferred_template_id: v.preferred_template_id ?? null,
+      }));
     },
     staleTime: 30_000,
   });
@@ -46,7 +56,6 @@ export function useCVProfile(coreCvId?: string | null) {
     }
     try {
       const parsed = JSON.parse(raw) as CVProfile & { user_id?: string };
-      // Safety: ignore drafts created for another user (shouldn't happen, but cheap to guard).
       if (userId && parsed.user_id && parsed.user_id !== userId) {
         setDraft(null);
       } else {
@@ -78,20 +87,32 @@ export function useCVProfile(coreCvId?: string | null) {
     queryFn: async (): Promise<CVProfile | null> => {
       if (!userId) return null;
       const supabase = createClient();
-      let q = supabase.from('cv_profiles').select('*').eq('user_id', userId);
       if (coreCvId) {
-        q = q.eq('id', coreCvId);
-      } else {
-        q = q.order('created_at', { ascending: false }).limit(1);
+        const { data, error } = await supabase
+          .from('cvs')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('id', coreCvId)
+          .maybeSingle();
+        if (error) throw error;
+        return data ? dbRowToCvProfile(data as Record<string, unknown>) : null;
       }
-      const { data, error } = await q.maybeSingle();
+      const { data: rows, error } = await supabase
+        .from('cvs')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('is_archived', false)
+        .order('created_at', { ascending: false })
+        .limit(40);
       if (error) throw error;
-      return data as CVProfile | null;
+      const list = (rows ?? []) as Record<string, unknown>[];
+      const general = list.find(
+        (r) => !Array.isArray(r.job_ids) || (r.job_ids as string[]).length === 0
+      );
+      return general ? dbRowToCvProfile(general) : null;
     },
     enabled: !!userId && draftLoaded,
     staleTime: 5 * 60 * 1000,
-    // If the user uploaded a CV, always prefer the draft over the DB row
-    // (otherwise the editor will show the previously saved version).
     select: (data) => draft ?? data ?? null,
     initialData: draft ?? undefined,
   });
@@ -102,7 +123,9 @@ export function useDeleteCoreCVVersion() {
   const userId = useAuthStore((s) => s.user?.id);
   return useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`/api/cv/versions/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/cvs/${encodeURIComponent(id)}?hard=true`, {
+        method: 'DELETE',
+      });
       if (!res.ok) throw new Error('Failed to delete core CV version');
       return res.json() as Promise<{ ok: boolean }>;
     },

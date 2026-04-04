@@ -128,7 +128,7 @@ function coreCvPatchFromDraft(
     certifications: data.certifications,
     referrals: (data.referrals ?? []).slice(0, 2),
     awards: data.awards,
-    preferred_cv_template_id: preferredTemplateId,
+    preferred_template_id: preferredTemplateId,
     font_family: fontFamily,
   };
 }

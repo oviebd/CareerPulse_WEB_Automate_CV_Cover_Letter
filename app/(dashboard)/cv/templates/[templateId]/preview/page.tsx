@@ -61,6 +61,7 @@ function draftFromJobSpecificCV(j: JobSpecificCV): CVProfile {
   return {
     id: j.id,
     user_id: j.user_id,
+    name: j.name ?? 'Tailored CV',
     full_name: j.full_name,
     professional_title: j.professional_title,
     email: j.email,
@@ -84,7 +85,7 @@ function draftFromJobSpecificCV(j: JobSpecificCV): CVProfile {
     is_complete: false,
     completion_percentage: 0,
     original_cv_file_url: null,
-    preferred_cv_template_id: j.preferred_template_id ?? 'classic',
+    preferred_template_id: j.preferred_template_id ?? 'classic',
     preferred_cl_template_id: 'cl-classic',
     created_at: j.created_at,
     updated_at: j.updated_at,
@@ -273,7 +274,7 @@ export default function CVTemplatePreviewPage() {
         core_cv_id: draftActive ? undefined : selectedCoreCvId,
         create_new: draftActive,
         force_overwrite_existing: forceOverwrite,
-        preferred_cv_template_id: draftActive ? templateId : undefined,
+        preferred_template_id: draftActive ? templateId : undefined,
         full_name: draft.full_name,
         professional_title: draft.professional_title,
         email: draft.email,
@@ -401,8 +402,8 @@ export default function CVTemplatePreviewPage() {
     setSettingDefault(true);
     const supabase = createClient();
     await supabase
-      .from('cv_profiles')
-      .update({ preferred_cv_template_id: templateId })
+      .from('cvs')
+      .update({ preferred_template_id: templateId })
       .eq('id', cv.id);
     setSettingDefault(false);
     toast('Default template updated.', 'success');

@@ -67,13 +67,28 @@ export async function POST(request: Request) {
       // Job-specific CV export
       if (body.job_cv_id) {
         const { data: jobCv, error: jErr } = await supabase
-          .from('job_specific_cvs')
+          .from('cvs')
           .select('*')
           .eq('id', body.job_cv_id)
           .eq('user_id', user.id)
           .maybeSingle();
         if (jErr || !jobCv) {
           return NextResponse.json({ error: 'not_found' }, { status: 404 });
+        }
+        const jobIds = (jobCv.job_ids as string[] | null) ?? [];
+        let resolvedCompany = '';
+        let resolvedTitle = 'role';
+        if (jobIds.length > 0) {
+          const { data: jobRow } = await supabase
+            .from('jobs')
+            .select('company_name, job_title')
+            .eq('id', jobIds[0])
+            .eq('user_id', user.id)
+            .maybeSingle();
+          if (jobRow) {
+            resolvedCompany = jobRow.company_name ?? '';
+            resolvedTitle = jobRow.job_title ?? 'role';
+          }
         }
         const templateId =
           body.template_id ?? body.templateId ?? jobCv.preferred_template_id ?? 'classic';
@@ -112,11 +127,11 @@ export async function POST(request: Request) {
             null,
             body.font_family ?? jobCv.font_family
           );
-          const companySlug = (jobCv.company_name ?? '')
+          const companySlug = resolvedCompany
             .toLowerCase()
             .replace(/[^a-z0-9]+/g, '-')
             .replace(/^-|-$/g, '');
-          const titleSlug = jobCv.job_title
+          const titleSlug = resolvedTitle
             .toLowerCase()
             .replace(/[^a-z0-9]+/g, '-')
             .replace(/^-|-$/g, '');
@@ -145,7 +160,7 @@ export async function POST(request: Request) {
         const snapshot = body.cv_snapshot ?? null;
         if (!snapshot && coreCvId) {
           const { data: cvRow, error: cvRowErr } = await supabase
-            .from('cv_profiles')
+            .from('cvs')
             .select('id')
             .eq('user_id', user.id)
             .eq('id', coreCvId)
@@ -223,14 +238,29 @@ export async function POST(request: Request) {
     }
 
     const cl = letter as CoverLetter;
+    const jobIds = (cl.job_ids as string[] | undefined) ?? [];
+    let resolvedCompany: string | null = null;
+    let resolvedJobTitle: string | null = null;
+    if (jobIds.length > 0) {
+      const { data: jobRow } = await supabase
+        .from('jobs')
+        .select('company_name, job_title')
+        .eq('id', jobIds[0])
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (jobRow) {
+        resolvedCompany = jobRow.company_name ?? null;
+        resolvedJobTitle = jobRow.job_title ?? null;
+      }
+    }
     const contentForExport =
-      typeof body.content === 'string' ? body.content : cl.content;
+      typeof body.content === 'string' ? body.content : cl.content ?? '';
     const companyName =
       typeof body.company_name === 'string'
         ? body.company_name
-        : cl.company_name;
+        : resolvedCompany;
     const jobTitle =
-      typeof body.job_title === 'string' ? body.job_title : cl.job_title;
+      typeof body.job_title === 'string' ? body.job_title : resolvedJobTitle;
     const applicantName =
       typeof body.applicant_name === 'string'
         ? body.applicant_name
@@ -251,13 +281,16 @@ export async function POST(request: Request) {
       typeof body.applicant_location === 'string'
         ? body.applicant_location
         : cl.applicant_location;
-    const { data: cvForLetter } = await supabase
-      .from('cv_profiles')
+    const { data: cvRows } = await supabase
+      .from('cvs')
       .select('*')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(40);
+    const cvForLetter =
+      (cvRows ?? []).find(
+        (r) => !Array.isArray(r.job_ids) || (r.job_ids as string[]).length === 0
+      ) ?? cvRows?.[0];
 
     if (format === 'docx') {
       const doc = new Document({

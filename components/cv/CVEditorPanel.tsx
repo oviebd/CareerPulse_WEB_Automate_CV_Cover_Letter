@@ -43,10 +43,6 @@ export interface CVEditorPanelProps {
   onAccentChange?: (color: string) => void;
   fontFamily?: string;
   onFontFamilyChange?: (font: string) => void;
-  coreVersions?: any[];
-  selectedCoreCvId?: string | null;
-  onSelectedCoreCvIdChange?: (id: string) => void;
-  coreVersionsLoading?: boolean;
 }
 
 export function CVEditorPanel({
@@ -69,10 +65,6 @@ export function CVEditorPanel({
   onAccentChange,
   fontFamily,
   onFontFamilyChange,
-  coreVersions = [],
-  selectedCoreCvId,
-  onSelectedCoreCvIdChange,
-  coreVersionsLoading = false,
 }: CVEditorPanelProps) {
   const [internalTab, setInternalTab] = useState<CVFormTab>('header');
   const isTabControlled = activeTabProp !== undefined && onActiveTabChange !== undefined;
@@ -318,10 +310,6 @@ export function CVEditorPanel({
         onAccentChange={onAccentChange}
         fontFamily={fontFamily}
         onFontFamilyChange={onFontFamilyChange}
-        coreVersions={coreVersions}
-        selectedCoreCvId={selectedCoreCvId}
-        onSelectedCoreCvIdChange={onSelectedCoreCvIdChange}
-        coreVersionsLoading={coreVersionsLoading}
       />
     </div>
   );

@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { CoverLetterPrintPreviewFrame } from '@/components/cover-letter/CoverLetterPrintPreviewFrame';
 import { TemplateGate } from '@/components/shared/FeatureGate';
-import { useCVProfile } from '@/hooks/useCV';
+import { useAuthStore } from '@/stores/useAuthStore';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useToast } from '@/components/ui/toast';
 import type { CVTemplate, SubscriptionTier } from '@/types';
@@ -20,7 +20,7 @@ const SWATCHES = ['#2563EB', '#0d9488', '#7c3aed', '#dc2626', '#0f172a'];
 
 export default function CoverLetterTemplatesPage() {
   const { toast } = useToast();
-  const { data: cv } = useCVProfile();
+  const userId = useAuthStore((s) => s.user?.id);
   const { tier } = useSubscription();
   const [color, setColor] = useState('#2563EB');
 
@@ -39,15 +39,19 @@ export default function CoverLetterTemplatesPage() {
   });
 
   async function setPreferredTemplate(id: string) {
-    if (!cv) {
-      toast('Create your CV profile first.', 'error');
+    if (!userId) {
+      toast('Sign in to save a default template.', 'error');
       return;
     }
     const supabase = createClient();
-    await supabase
-      .from('cv_profiles')
+    const { error } = await supabase
+      .from('profiles')
       .update({ preferred_cl_template_id: id })
-      .eq('id', cv.id);
+      .eq('id', userId);
+    if (error) {
+      toast('Could not save default (add preferred_cl_template_id to profiles if missing).', 'error');
+      return;
+    }
     toast('Default cover letter template updated.', 'success');
   }
 
@@ -120,7 +124,7 @@ export default function CoverLetterTemplatesPage() {
                     <Button
                       variant="secondary"
                       size="sm"
-                      disabled={!cv || !allowed}
+                      disabled={!userId || !allowed}
                       onClick={() => void setPreferredTemplate(t.id)}
                     >
                       Use as default

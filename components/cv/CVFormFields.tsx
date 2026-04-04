@@ -134,10 +134,6 @@ type Props = {
   onAccentChange?: (color: string) => void;
   fontFamily?: string;
   onFontFamilyChange?: (font: string) => void;
-  coreVersions?: any[];
-  selectedCoreCvId?: string | null;
-  onSelectedCoreCvIdChange?: (id: string) => void;
-  coreVersionsLoading?: boolean;
 };
 
 function HighlightedText({ text, keywords }: { text: string; keywords: string[] }) {
@@ -236,10 +232,6 @@ export function CVFormFields(props: Props) {
     onAccentChange,
     fontFamily = 'Inter',
     onFontFamilyChange,
-    coreVersions = [],
-    selectedCoreCvId,
-    onSelectedCoreCvIdChange,
-    coreVersionsLoading = false,
   } = props;
 
   const visibleTabs = hiddenTabs

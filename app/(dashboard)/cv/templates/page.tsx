@@ -113,8 +113,8 @@ export default function CVTemplatesPage() {
     }
     const supabase = createClient();
     await supabase
-      .from('cv_profiles')
-      .update({ preferred_cv_template_id: id })
+      .from('cvs')
+      .update({ preferred_template_id: id })
       .eq('id', cv.id);
     toast('Default template updated.', 'success');
   }

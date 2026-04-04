@@ -712,7 +712,7 @@ export async function exportCV(
   let cvRow: CVProfile | null = null;
   if (coreCvId) {
     const { data, error } = await supabase
-      .from('cv_profiles')
+      .from('cvs')
       .select('*')
       .eq('user_id', userId)
       .eq('id', coreCvId)
@@ -720,7 +720,7 @@ export async function exportCV(
     if (!error && data) cvRow = data as CVProfile;
   } else {
     const { data, error } = await supabase
-      .from('cv_profiles')
+      .from('cvs')
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })

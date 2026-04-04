@@ -53,7 +53,7 @@ function CoreCVRow({
         </div>
       </div>
       <div className="flex items-center gap-2 shrink-0">
-        <Link href={`/cv/edit?core_cv_id=${encodeURIComponent(cv.id)}`}>
+        <Link href={`/cv/edit/${encodeURIComponent(cv.id)}`}>
           <Button variant="ghost" size="sm">
             Edit
           </Button>

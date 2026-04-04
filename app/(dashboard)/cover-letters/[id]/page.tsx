@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
+import { useAuthStore } from '@/stores/useAuthStore';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { LayoutTemplate } from 'lucide-react';
@@ -23,6 +24,7 @@ import { createClient } from '@/lib/supabase/client';
 import { canUseTemplate } from '@/lib/subscription';
 import { formatDate } from '@/lib/utils';
 import type { CVTemplate, SubscriptionTier } from '@/types';
+import type { Job } from '@/types/database';
 
 const SWATCHES = ['#2563EB', '#0d9488', '#7c3aed', '#dc2626', '#0f172a'];
 
@@ -31,6 +33,24 @@ export default function CoverLetterDetailPage() {
   const id = typeof params.id === 'string' ? params.id : '';
   const { toast } = useToast();
   const { data: letter, isLoading } = useCoverLetter(id);
+  const userId = useAuthStore((s) => s.user?.id);
+  const jobId = letter?.job_ids?.[0];
+  const { data: linkedJob } = useQuery({
+    queryKey: ['job', jobId, userId],
+    queryFn: async (): Promise<Job | null> => {
+      if (!jobId || !userId) return null;
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('jobs')
+        .select('*')
+        .eq('id', jobId)
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (error) throw error;
+      return (data as Job) ?? null;
+    },
+    enabled: Boolean(jobId) && Boolean(userId),
+  });
   const { tier } = useSubscription();
   const updateLetter = useUpdateCoverLetter();
 
@@ -48,6 +68,7 @@ export default function CoverLetterDetailPage() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [showAiRewriteModal, setShowAiRewriteModal] = useState(false);
   const initLetterIdRef = useRef<string | null>(null);
+  const jobSyncedForLetterRef = useRef<string | null>(null);
   const previewUrlRef = useRef<string | null>(null);
 
   const { data: templates = [] } = useQuery({
@@ -68,17 +89,26 @@ export default function CoverLetterDetailPage() {
     if (!letter) return;
     if (initLetterIdRef.current !== letter.id) {
       initLetterIdRef.current = letter.id;
-      setDraftContent(letter.content);
+      jobSyncedForLetterRef.current = null;
+      setDraftContent(letter.content ?? '');
       setDraftTemplateId(letter.template_id?.trim() || 'cl-classic');
-      setDraftCompanyName(letter.company_name ?? '');
-      setDraftJobTitle(letter.job_title ?? '');
       setDraftApplicantName(letter.applicant_name ?? '');
       setDraftApplicantRole(letter.applicant_role ?? '');
       setDraftApplicantEmail(letter.applicant_email ?? '');
       setDraftApplicantPhone(letter.applicant_phone ?? '');
       setDraftApplicantLocation(letter.applicant_location ?? '');
+      setDraftCompanyName('');
+      setDraftJobTitle('');
     }
   }, [letter]);
+
+  useEffect(() => {
+    if (!letter || !linkedJob) return;
+    if (jobSyncedForLetterRef.current === letter.id) return;
+    jobSyncedForLetterRef.current = letter.id;
+    setDraftCompanyName(linkedJob.company_name);
+    setDraftJobTitle(linkedJob.job_title);
+  }, [letter, linkedJob]);
 
   useEffect(() => {
     return () => {
@@ -162,10 +192,10 @@ export default function CoverLetterDetailPage() {
 
   const isDirty =
     letter &&
-    (draftContent !== letter.content ||
+    (draftContent !== (letter.content ?? '') ||
       draftTemplateId !== (letter.template_id?.trim() || 'cl-classic') ||
-      draftCompanyName !== (letter.company_name ?? '') ||
-      draftJobTitle !== (letter.job_title ?? '') ||
+      draftCompanyName !== (linkedJob?.company_name ?? '') ||
+      draftJobTitle !== (linkedJob?.job_title ?? '') ||
       draftApplicantName !== (letter.applicant_name ?? '') ||
       draftApplicantRole !== (letter.applicant_role ?? '') ||
       draftApplicantEmail !== (letter.applicant_email ?? '') ||
@@ -187,14 +217,24 @@ export default function CoverLetterDetailPage() {
         id: letter.id,
         content: draftContent,
         template_id: draftTemplateId,
-        company_name: draftCompanyName.trim() || null,
-        job_title: draftJobTitle.trim() || null,
         applicant_name: draftApplicantName.trim() || null,
         applicant_role: draftApplicantRole.trim() || null,
         applicant_email: draftApplicantEmail.trim() || null,
         applicant_phone: draftApplicantPhone.trim() || null,
         applicant_location: draftApplicantLocation.trim() || null,
       });
+      if (letter.job_ids?.[0]) {
+        const supabase = createClient();
+        const { error: jobErr } = await supabase
+          .from('jobs')
+          .update({
+            company_name: draftCompanyName.trim() || 'Company',
+            job_title: draftJobTitle.trim() || 'Role',
+          })
+          .eq('id', letter.job_ids[0])
+          .eq('user_id', userId ?? '');
+        if (jobErr) throw jobErr;
+      }
       toast('Cover letter saved.', 'success');
     } catch {
       toast('Could not save.', 'error');
@@ -256,9 +296,11 @@ export default function CoverLetterDetailPage() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="font-display text-2xl font-bold">
-            {letter.company_name || 'Company'}
+            {linkedJob?.company_name || letter.name || 'Cover letter'}
           </h1>
-          <p className="text-[var(--color-muted)]">{letter.job_title}</p>
+          <p className="text-[var(--color-muted)]">
+            {linkedJob?.job_title || letter.applicant_role || ''}
+          </p>
           <p className="mt-2 text-xs text-[var(--color-muted)]">
             {formatDate(letter.created_at)}
           </p>
@@ -401,7 +443,7 @@ export default function CoverLetterDetailPage() {
         section="Cover letter"
         inputLabel="Letter text"
         sourceText={draftContent}
-        extraContext={`${letter.job_title || ''} ${letter.company_name || ''}`.trim()}
+        extraContext={`${linkedJob?.job_title || ''} ${linkedJob?.company_name || ''}`.trim()}
         onSelectSuggestion={(value) => setDraftContent(value)}
       />
     </div>

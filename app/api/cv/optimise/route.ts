@@ -141,20 +141,54 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data: cvRow, error: cvErr } = body.core_cv_id
-      ? await supabase
-          .from('cv_profiles')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('id', body.core_cv_id)
-          .maybeSingle()
-      : await supabase
-          .from('cv_profiles')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+    type CvRow = {
+      full_name?: string | null;
+      professional_title?: string | null;
+      email?: string | null;
+      phone?: string | null;
+      location?: string | null;
+      linkedin_url?: string | null;
+      github_url?: string | null;
+      links?: unknown;
+      address?: string | null;
+      photo_url?: string | null;
+      summary?: string | null;
+      experience?: unknown;
+      education?: unknown;
+      skills?: unknown;
+      projects?: unknown;
+      certifications?: unknown;
+      languages?: unknown;
+      awards?: unknown;
+      referrals?: unknown;
+      job_ids?: string[] | null;
+    };
+
+    let cvRow: CvRow | null = null;
+    let cvErr = null as { message: string } | null;
+    if (body.core_cv_id) {
+      const r = await supabase
+        .from('cvs')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('id', body.core_cv_id)
+        .maybeSingle();
+      cvErr = r.error;
+      cvRow = r.data as CvRow | null;
+    } else {
+      const r = await supabase
+        .from('cvs')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(40);
+      cvErr = r.error;
+      const rows = (r.data ?? []) as CvRow[];
+      cvRow =
+        rows.find((row) => !Array.isArray(row.job_ids) || row.job_ids.length === 0) ??
+        rows[0] ??
+        null;
+    }
     if (cvErr || !cvRow) {
       return NextResponse.json(
         { error: 'Please complete your CV profile before generating a job-specific version.' },
@@ -173,7 +207,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const cvData: CVData = {
+    const cvData = {
       full_name: cvRow.full_name ?? null,
       professional_title: cvRow.professional_title ?? null,
       email: cvRow.email ?? null,
@@ -181,19 +215,19 @@ export async function POST(request: Request) {
       location: cvRow.location ?? null,
       linkedin_url: cvRow.linkedin_url ?? null,
       github_url: cvRow.github_url ?? null,
-      links: cvRow.links ?? [],
+      links: (cvRow.links ?? []) as CVData['links'],
       address: cvRow.address ?? null,
       photo_url: cvRow.photo_url ?? null,
       summary: cvRow.summary ?? null,
-      experience: cvRow.experience ?? [],
-      education: cvRow.education ?? [],
-      skills: cvRow.skills ?? [],
-      projects: cvRow.projects ?? [],
-      certifications: cvRow.certifications ?? [],
-      languages: cvRow.languages ?? [],
-      awards: cvRow.awards ?? [],
-      referrals: cvRow.referrals ?? [],
-    };
+      experience: (cvRow.experience ?? []) as CVData['experience'],
+      education: (cvRow.education ?? []) as CVData['education'],
+      skills: (cvRow.skills ?? []) as CVData['skills'],
+      projects: (cvRow.projects ?? []) as CVData['projects'],
+      certifications: (cvRow.certifications ?? []) as CVData['certifications'],
+      languages: (cvRow.languages ?? []) as CVData['languages'],
+      awards: (cvRow.awards ?? []) as CVData['awards'],
+      referrals: (cvRow.referrals ?? []) as CVData['referrals'],
+    } satisfies CVData;
 
     const jobDescription = body.job_description.trim();
     const jobTitle = body.job_title.trim();

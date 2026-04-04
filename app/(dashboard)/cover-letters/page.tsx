@@ -49,8 +49,10 @@ export default function CoverLettersPage() {
             className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 transition hover:border-[var(--color-border-hover)] hover:bg-[var(--color-surface-2)]"
           >
             <Link href={`/cover-letters/${l.id}`} className="min-w-0 flex-1">
-              <div className="font-medium">{l.company_name || 'Company'}</div>
-              <div className="text-sm text-[var(--color-muted)]">{l.job_title || 'Role'}</div>
+              <div className="font-medium">{l.name || 'Cover letter'}</div>
+              <div className="text-sm text-[var(--color-muted)]">
+                {l.applicant_role || '—'}
+              </div>
               <div className="mt-1 text-xs text-[var(--color-muted)]">{formatDate(l.created_at)}</div>
             </Link>
             <div className="flex flex-wrap items-center gap-2">

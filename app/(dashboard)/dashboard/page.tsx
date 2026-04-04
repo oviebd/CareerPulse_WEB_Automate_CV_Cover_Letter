@@ -101,7 +101,7 @@ export default function DashboardPage() {
               </motion.div>
               <p className="mt-2 text-xs text-[var(--color-muted)]">
                 Updated {formatDate(cv.updated_at)} · Template{' '}
-                {cv.preferred_cv_template_id}
+                {cv.preferred_template_id}
               </p>
               <Link
                 href="/cv/edit"
@@ -164,8 +164,8 @@ export default function DashboardPage() {
                   className="flex items-center justify-between rounded-lg border border-[var(--color-border)] p-3 text-sm transition hover:bg-white/[0.04]"
                 >
                   <div>
-                    <div className="font-medium">{l.company_name || 'Company'}</div>
-                    <div className="text-[var(--color-muted)]">{l.job_title || 'Role'}</div>
+                    <div className="font-medium">{l.name || 'Cover letter'}</div>
+                    <div className="text-[var(--color-muted)]">{l.applicant_role || '—'}</div>
                   </div>
                   <div className="text-right">
                     {l.ats_score != null ? (

@@ -146,23 +146,42 @@ export async function POST(request: Request) {
       .eq('id', user.id)
       .maybeSingle();
 
-    const { data: cvForLetter } = await supabase
-      .from('cv_profiles')
+    const { data: cvRows } = await supabase
+      .from('cvs')
       .select('*')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(40);
+    const cvForLetter =
+      (cvRows ?? []).find(
+        (r) => !Array.isArray(r.job_ids) || (r.job_ids as string[]).length === 0
+      ) ?? cvRows?.[0];
+
+    const jobIds = (cl.job_ids as string[] | undefined) ?? [];
+    let resolvedCompany: string | null = null;
+    let resolvedJobTitle: string | null = null;
+    if (jobIds.length > 0) {
+      const { data: jobRow } = await supabase
+        .from('jobs')
+        .select('company_name, job_title')
+        .eq('id', jobIds[0])
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (jobRow) {
+        resolvedCompany = jobRow.company_name ?? null;
+        resolvedJobTitle = jobRow.job_title ?? null;
+      }
+    }
 
     const content =
-      typeof body.content === 'string' ? body.content : cl.content;
+      typeof body.content === 'string' ? body.content : cl.content ?? '';
     const accent = body.accent_color?.trim() || '#2563EB';
     const companyName =
       typeof body.company_name === 'string'
         ? body.company_name
-        : cl.company_name;
+        : resolvedCompany;
     const jobTitle =
-      typeof body.job_title === 'string' ? body.job_title : cl.job_title;
+      typeof body.job_title === 'string' ? body.job_title : resolvedJobTitle;
     const applicantName =
       typeof body.applicant_name === 'string'
         ? body.applicant_name

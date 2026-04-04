@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     const coreCvId = url.searchParams.get('core_cv_id');
 
     const baseQuery = supabase
-      .from('cv_profiles')
+      .from('cvs')
       .select('*')
       .eq('user_id', user.id);
 
@@ -61,6 +61,12 @@ export async function PATCH(request: Request) {
     delete patchBody.force_overwrite_existing;
 
     const patch = patchBody;
+    if (patch.preferred_cv_template_id && patch.preferred_template_id === undefined) {
+      patch.preferred_template_id = patch.preferred_cv_template_id;
+      delete patch.preferred_cv_template_id;
+    }
+    delete patch.preferred_cl_template_id;
+
     const forbidden = ['id', 'user_id', 'created_at'];
     for (const k of forbidden) delete patch[k];
 
@@ -76,7 +82,7 @@ export async function PATCH(request: Request) {
 
     const getLatest = async () => {
       const { data: row, error: rowErr } = await supabase
-        .from('cv_profiles')
+        .from('cvs')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
@@ -90,7 +96,7 @@ export async function PATCH(request: Request) {
     if (!createNew) {
       if (coreCvId) {
         const { data: row, error: rowErr } = await supabase
-          .from('cv_profiles')
+          .from('cvs')
           .select('*')
           .eq('user_id', user.id)
           .eq('id', coreCvId)
@@ -114,6 +120,11 @@ export async function PATCH(request: Request) {
     };
 
     if (createNew || !current) {
+      const p = payload as Record<string, unknown>;
+      if (!p.name || !String(p.name).trim()) {
+        const fn = typeof p.full_name === 'string' ? p.full_name.trim() : '';
+        p.name = fn || 'Untitled CV';
+      }
       if (forceOverwriteExisting) {
         const { data: prof, error: profErr } = await supabase
           .from('profiles')
@@ -126,7 +137,7 @@ export async function PATCH(request: Request) {
         const uploadLimit = TIER_LIMITS[tier].cvUploads;
         if (uploadLimit !== Number.POSITIVE_INFINITY) {
           const { data: rows } = await supabase
-            .from('cv_profiles')
+            .from('cvs')
             .select('id')
             .eq('user_id', user.id)
             .order('created_at', { ascending: false });
@@ -137,13 +148,13 @@ export async function PATCH(request: Request) {
           const keepIds = (rows ?? []).slice(0, keepCount).map((r) => r.id);
           if (keepIds.length > 0) {
             await supabase
-              .from('cv_profiles')
+              .from('cvs')
               .delete()
               .eq('user_id', user.id)
               .not('id', 'in', keepIds);
           } else {
             await supabase
-              .from('cv_profiles')
+              .from('cvs')
               .delete()
               .eq('user_id', user.id);
           }
@@ -151,7 +162,7 @@ export async function PATCH(request: Request) {
       }
 
       const { data, error } = await supabase
-        .from('cv_profiles')
+        .from('cvs')
         .insert({ user_id: user.id, ...payload })
         .select()
         .single();
@@ -169,7 +180,7 @@ export async function PATCH(request: Request) {
           // If we deleted something, retry
           if (Object.keys(fallbackPayload).length < Object.keys(payload).length) {
              const { data: retryData, error: retryErr } = await supabase
-              .from('cv_profiles')
+              .from('cvs')
               .insert({ user_id: user.id, ...fallbackPayload })
               .select()
               .single();
@@ -187,7 +198,7 @@ export async function PATCH(request: Request) {
     if (!targetId) {
       // Shouldn't happen, but fallback to insert.
       const { data, error } = await supabase
-        .from('cv_profiles')
+        .from('cvs')
         .insert({ user_id: user.id, ...payload })
         .select()
         .single();
@@ -199,7 +210,7 @@ export async function PATCH(request: Request) {
     }
 
     const { data, error } = await supabase
-      .from('cv_profiles')
+      .from('cvs')
       .update(payload)
       .eq('user_id', user.id)
       .eq('id', targetId)
@@ -218,7 +229,7 @@ export async function PATCH(request: Request) {
         }
         if (Object.keys(fallbackPayload).length < Object.keys(payload).length) {
            const { data: retryData, error: retryErr } = await supabase
-            .from('cv_profiles')
+            .from('cvs')
             .update(fallbackPayload)
             .eq('user_id', user.id)
             .eq('id', targetId)

@@ -8,16 +8,19 @@ export type CoverLetterTone =
   | 'concise'
   | 'formal';
 export type CoverLetterLength = 'short' | 'medium' | 'long';
-export type ApplicationStatus =
-  | 'saved'
-  | 'applied'
-  | 'phone_screen'
-  | 'interview'
-  | 'technical'
-  | 'final_round'
-  | 'offer'
-  | 'rejected'
-  | 'withdrawn';
+
+export type {
+  CV as CVRow,
+  CoverLetter,
+  Job,
+  JobStatus,
+} from './database';
+
+export type { CVUpdate, CVInsert, JobInsert, JobUpdate, CoverLetterUpdate } from './database';
+
+/** @deprecated Use JobStatus from ./database */
+export type ApplicationStatus = import('./database').JobStatus;
+
 export type WorkType = 'remote' | 'hybrid' | 'onsite';
 export type Priority = 'low' | 'medium' | 'high';
 export type TemplateType = 'cv' | 'cover_letter';
@@ -33,6 +36,8 @@ export interface Profile {
   subscription_expires_at: string | null;
   trial_ends_at: string | null;
   is_onboarded: boolean;
+  /** Default cover letter template id (see migration 011 on `profiles`) */
+  preferred_cl_template_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -235,10 +240,12 @@ export interface CVData {
   contact_line?: string;
 }
 
-// CV Profile
+// CV Profile (editor + PDF — JSONB arrays use app shapes: SkillGroup, etc.)
 export interface CVProfile {
   id: string;
   user_id: string;
+  /** Display name for this CV version */
+  name: string;
   full_name: string | null;
   professional_title: string | null;
   email: string | null;
@@ -267,73 +274,22 @@ export interface CVProfile {
   is_complete: boolean;
   completion_percentage: number;
   original_cv_file_url: string | null;
-  preferred_cv_template_id: string;
-  preferred_cl_template_id: string;
+  preferred_template_id: string;
   font_family?: string;
+  accent_color?: string;
+  /** Not stored on `cvs`; optional hint from extract / profile for cover letter defaults */
+  preferred_cl_template_id?: string;
+  job_ids?: string[];
+  ai_changes_summary?: string | null;
+  keywords_added?: string[];
+  bullets_improved?: number;
+  is_archived?: boolean;
   created_at: string;
   updated_at: string;
 }
 
-// Cover Letter
-export interface CoverLetter {
-  id: string;
-  user_id: string;
-  job_title: string | null;
-  company_name: string | null;
-  applicant_name: string | null;
-  applicant_role: string | null;
-  applicant_email: string | null;
-  applicant_phone: string | null;
-  applicant_location: string | null;
-  job_description: string;
-  tone: CoverLetterTone;
-  length: CoverLetterLength;
-  specific_emphasis: string | null;
-  content: string;
-  ats_score: number | null;
-  ats_keywords_found: string[];
-  ats_keywords_missing: string[];
-  ats_summary: string | null;
-  template_id: string;
-  pdf_url: string | null;
-  docx_url: string | null;
-  share_token: string | null;
-  is_favourited: boolean;
-  generation_model: string | null;
-  input_tokens: number | null;
-  output_tokens: number | null;
-  job_application_id: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-// Job Application
-export interface JobApplication {
-  id: string;
-  user_id: string;
-  company_name: string;
-  job_title: string;
-  job_url: string | null;
-  job_description: string | null;
-  location: string | null;
-  salary_min: number | null;
-  salary_max: number | null;
-  salary_currency: string;
-  work_type: WorkType | null;
-  status: ApplicationStatus;
-  saved_at: string;
-  applied_at: string | null;
-  interview_at: string | null;
-  offer_at: string | null;
-  deadline: string | null;
-  notes: string | null;
-  contact_name: string | null;
-  contact_email: string | null;
-  priority: Priority;
-  is_starred: boolean;
-  created_at: string;
-  updated_at: string;
-}
+/** @deprecated Alias for Job — use Job */
+export type JobApplication = import('./database').Job;
 
 // CV Template
 export interface CVTemplate {
@@ -448,45 +404,11 @@ export const PRICING = {
 
 export type PricingPlanKey = keyof typeof PRICING;
 
-// Job-specific CV (tailored snapshot for a particular role)
-export interface JobSpecificCV {
-  id: string;
-  user_id: string;
-
+/** Tailored CV row (`cvs` with non-empty `job_ids`) plus joined job context for UI */
+export type JobSpecificCV = Omit<CVProfile, 'preferred_template_id'> & {
+  preferred_template_id: string | null;
   job_title: string;
   company_name: string | null;
   job_description: string;
-
-  full_name: string | null;
-  professional_title: string | null;
-  email: string | null;
-  phone: string | null;
-  location: string | null;
-  linkedin_url: string | null;
-  github_url: string | null;
-  links: ProfileLink[];
-  portfolio_url?: string | null;
-  website_url?: string | null;
-  summary: string | null;
-  experience: ExperienceEntry[];
-  education: EducationEntry[];
-  skills: SkillGroup[];
-  projects: ProjectEntry[];
-  certifications: CertificationEntry[];
-  languages: LanguageEntry[];
-  awards: AwardEntry[];
-
-  ai_changes_summary: string | null;
-  keywords_added: string[];
-  bullets_improved: number;
-
-  preferred_template_id: string | null;
   accent_color: string;
-  font_family?: string;
-
-  is_archived: boolean;
-  job_application_id: string | null;
-
-  created_at: string;
-  updated_at: string;
-}
+};

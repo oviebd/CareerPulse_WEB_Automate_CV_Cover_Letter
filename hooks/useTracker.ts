@@ -3,22 +3,22 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
-import type { ApplicationStatus, JobApplication } from '@/types';
+import type { Job, JobStatus } from '@/types/database';
 
 export function useJobApplications() {
   const userId = useAuthStore((s) => s.user?.id);
   return useQuery({
     queryKey: ['job-applications', userId],
-    queryFn: async (): Promise<JobApplication[]> => {
+    queryFn: async (): Promise<Job[]> => {
       if (!userId) return [];
       const supabase = createClient();
       const { data, error } = await supabase
-        .from('job_applications')
+        .from('jobs')
         .select('*')
         .eq('user_id', userId)
         .order('updated_at', { ascending: false });
       if (error) throw error;
-      return (data ?? []) as JobApplication[];
+      return (data ?? []) as Job[];
     },
     enabled: !!userId,
     staleTime: 60 * 1000,
@@ -33,11 +33,11 @@ export function useUpdateApplicationStatus() {
       status,
     }: {
       id: string;
-      status: ApplicationStatus;
+      status: JobStatus;
     }) => {
       const supabase = createClient();
       const { error } = await supabase
-        .from('job_applications')
+        .from('jobs')
         .update({ status })
         .eq('id', id);
       if (error) throw error;
@@ -52,33 +52,30 @@ export function useUpsertJobApplication() {
   const qc = useQueryClient();
   const userId = useAuthStore((s) => s.user?.id);
   return useMutation({
-    mutationFn: async (
-      payload: Partial<JobApplication> & { company_name: string; job_title: string }
-    ) => {
+    mutationFn: async (payload: Partial<Job> & { company_name: string; job_title: string }) => {
       if (!userId) throw new Error('Unauthorized');
       const supabase = createClient();
       if (payload.id) {
         const { data, error } = await supabase
-          .from('job_applications')
+          .from('jobs')
           .update(payload)
           .eq('id', payload.id)
           .eq('user_id', userId)
           .select()
           .single();
         if (error) throw error;
-        return data as JobApplication;
+        return data as Job;
       }
       const { data, error } = await supabase
-        .from('job_applications')
+        .from('jobs')
         .insert({ ...payload, user_id: userId })
         .select()
         .single();
       if (error) throw error;
-      return data as JobApplication;
+      return data as Job;
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['job-applications'] });
     },
   });
 }
-

@@ -15,7 +15,7 @@ export async function DELETE(_request: Request, { params }: RouteContext) {
     }
 
     const { error } = await supabase
-      .from('cv_profiles')
+      .from('cvs')
       .delete()
       .eq('id', id)
       .eq('user_id', user.id);

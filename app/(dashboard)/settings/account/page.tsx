@@ -28,9 +28,9 @@ export default function AccountSettingsPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     const [cv, letters, apps] = await Promise.all([
-      supabase.from('cv_profiles').select('*').eq('user_id', user.id),
+      supabase.from('cvs').select('*').eq('user_id', user.id),
       supabase.from('cover_letters').select('*').eq('user_id', user.id),
-      supabase.from('job_applications').select('*').eq('user_id', user.id),
+      supabase.from('jobs').select('*').eq('user_id', user.id),
     ]);
     const blob = new Blob(
       [JSON.stringify({ cv: cv.data, cover_letters: letters.data, applications: apps.data }, null, 2)],
