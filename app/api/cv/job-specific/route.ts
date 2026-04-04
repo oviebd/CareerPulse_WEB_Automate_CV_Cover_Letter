@@ -3,6 +3,14 @@ import { createClient } from '@/lib/supabase/server';
 import { dbRowToCvProfile } from '@/lib/cv-mapper';
 import type { Job } from '@/types/database';
 
+function normalizeKeywordsInput(input: unknown): string[] {
+  if (!Array.isArray(input)) return [];
+  return input
+    .filter((k): k is string => typeof k === 'string')
+    .map((k) => k.trim())
+    .filter(Boolean);
+}
+
 async function enrichJobCv(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
@@ -24,7 +32,8 @@ async function enrichJobCv(
       const j = job as Job;
       jobTitle = j.job_title;
       companyName = j.company_name;
-      jobDescription = j.job_description ?? '';
+      const kw = Array.isArray(j.keywords) ? j.keywords : [];
+      jobDescription = kw.length ? kw.join(', ') : '';
     }
   }
   return {
@@ -86,13 +95,6 @@ export async function POST(request: Request) {
 
     const body = (await request.json()) as Record<string, unknown>;
 
-    if (!body.job_description) {
-      return NextResponse.json(
-        { error: 'job_description is required' },
-        { status: 422 }
-      );
-    }
-
     const cv_data = body.cv_data as Record<string, unknown> | undefined;
     if (!cv_data) {
       return NextResponse.json(
@@ -101,7 +103,114 @@ export async function POST(request: Request) {
       );
     }
 
-    const jobDescription = String(body.job_description ?? '').trim();
+    /** Save optimised CV as a new core CV (no job link) */
+    if (body.save_without_job === true) {
+      const cvName =
+        typeof body.name === 'string' && body.name.trim()
+          ? body.name.trim()
+          : 'Tailored CV';
+
+      const { data, error } = await supabase
+        .from('cvs')
+        .insert({
+          user_id: user.id,
+          name: cvName,
+          job_ids: [],
+          full_name: cv_data.full_name ?? null,
+          professional_title: cv_data.professional_title ?? null,
+          email: cv_data.email ?? null,
+          phone: cv_data.phone ?? null,
+          location: cv_data.location ?? null,
+          linkedin_url: cv_data.linkedin_url ?? null,
+          github_url: cv_data.github_url ?? null,
+          links: cv_data.links ?? [],
+          summary: cv_data.summary ?? null,
+          experience: cv_data.experience ?? [],
+          education: cv_data.education ?? [],
+          skills: cv_data.skills ?? [],
+          projects: cv_data.projects ?? [],
+          certifications: cv_data.certifications ?? [],
+          languages: cv_data.languages ?? [],
+          awards: cv_data.awards ?? [],
+          referrals: cv_data.referrals ?? [],
+          ai_changes_summary: body.ai_changes_summary ?? null,
+          keywords_added: body.keywords_added ?? [],
+          bullets_improved: body.bullets_improved ?? 0,
+          preferred_template_id: body.preferred_template_id ?? 'classic',
+          accent_color: body.accent_color ?? '#6C63FF',
+          font_family: (cv_data as { font_family?: string }).font_family ?? 'Inter',
+        })
+        .select('id')
+        .single();
+
+      if (error) {
+        console.error('job-specific POST cv (no job)', error);
+        return NextResponse.json({ error: 'save_failed' }, { status: 500 });
+      }
+
+      return NextResponse.json({ id: data.id }, { status: 201 });
+    }
+
+    const existingJobId =
+      typeof body.existing_job_id === 'string' ? body.existing_job_id.trim() : '';
+
+    if (existingJobId) {
+      const { data: jobRow, error: jobLookupErr } = await supabase
+        .from('jobs')
+        .select('id, job_title, company_name')
+        .eq('id', existingJobId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (jobLookupErr || !jobRow) {
+        return NextResponse.json({ error: 'job_not_found' }, { status: 404 });
+      }
+
+      const resolvedJobTitle = String(jobRow.job_title ?? '').trim() || 'Untitled role';
+      const resolvedCompanyName = String(jobRow.company_name ?? '').trim() || 'Company';
+      const cvName = `${resolvedJobTitle} — ${resolvedCompanyName}`;
+
+      const { data, error } = await supabase
+        .from('cvs')
+        .insert({
+          user_id: user.id,
+          name: cvName,
+          job_ids: [existingJobId],
+          full_name: cv_data.full_name ?? null,
+          professional_title: cv_data.professional_title ?? null,
+          email: cv_data.email ?? null,
+          phone: cv_data.phone ?? null,
+          location: cv_data.location ?? null,
+          linkedin_url: cv_data.linkedin_url ?? null,
+          github_url: cv_data.github_url ?? null,
+          links: cv_data.links ?? [],
+          summary: cv_data.summary ?? null,
+          experience: cv_data.experience ?? [],
+          education: cv_data.education ?? [],
+          skills: cv_data.skills ?? [],
+          projects: cv_data.projects ?? [],
+          certifications: cv_data.certifications ?? [],
+          languages: cv_data.languages ?? [],
+          awards: cv_data.awards ?? [],
+          referrals: cv_data.referrals ?? [],
+          ai_changes_summary: body.ai_changes_summary ?? null,
+          keywords_added: body.keywords_added ?? [],
+          bullets_improved: body.bullets_improved ?? 0,
+          preferred_template_id: body.preferred_template_id ?? 'classic',
+          accent_color: body.accent_color ?? '#6C63FF',
+          font_family: (cv_data as { font_family?: string }).font_family ?? 'Inter',
+        })
+        .select('id')
+        .single();
+
+      if (error) {
+        console.error('job-specific POST cv', error);
+        return NextResponse.json({ error: 'save_failed' }, { status: 500 });
+      }
+
+      return NextResponse.json({ id: data.id }, { status: 201 });
+    }
+
+    const keywords = normalizeKeywordsInput(body.keywords ?? body.keywords_added);
     const resolvedJobTitle = String(body.job_title ?? '').trim();
     const resolvedCompanyName = String(body.company_name ?? '').trim();
     if (!resolvedJobTitle || !resolvedCompanyName) {
@@ -129,7 +238,7 @@ export async function POST(request: Request) {
           .update({
             company_name: resolvedCompanyName,
             job_title: resolvedJobTitle,
-            job_description: jobDescription,
+            keywords,
           })
           .eq('id', legacyJobId)
           .eq('user_id', user.id);
@@ -142,7 +251,7 @@ export async function POST(request: Request) {
             user_id: user.id,
             company_name: resolvedCompanyName,
             job_title: resolvedJobTitle,
-            job_description: jobDescription,
+            keywords,
           })
           .select('id')
           .single();
@@ -159,7 +268,7 @@ export async function POST(request: Request) {
           user_id: user.id,
           company_name: resolvedCompanyName,
           job_title: resolvedJobTitle,
-          job_description: jobDescription,
+          keywords,
         })
         .select('id')
         .single();

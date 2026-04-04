@@ -20,11 +20,12 @@ export function useJobSpecificCVs() {
   });
 }
 
-export function useJobSpecificCV(id: string) {
+export function useJobSpecificCV(id: string | undefined) {
   const userId = useAuthStore((s) => s.user?.id);
   return useQuery({
     queryKey: ['job-specific-cv', id],
     queryFn: async (): Promise<JobSpecificCV | null> => {
+      if (!id) return null;
       const res = await fetch(`/api/cv/job-specific/${id}`);
       if (!res.ok) throw new Error('Failed to fetch job CV');
       const json = await res.json();
@@ -39,9 +40,9 @@ export function useSaveJobSpecificCV() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (body: {
-      job_title: string;
+      job_title?: string;
       company_name?: string | null;
-      job_description: string;
+      job_description?: string;
       cv_data: Record<string, unknown>;
       ai_changes_summary?: string | null;
       keywords_added?: string[];
@@ -49,6 +50,11 @@ export function useSaveJobSpecificCV() {
       preferred_template_id?: string | null;
       accent_color?: string;
       job_application_id?: string | null;
+      /** Job row already created (e.g. via POST /api/jobs) */
+      existing_job_id?: string | null;
+      /** Save tailored content as a core CV with no job link */
+      save_without_job?: boolean;
+      name?: string;
     }): Promise<{ id: string }> => {
       const res = await fetch('/api/cv/job-specific', {
         method: 'POST',
@@ -64,7 +70,7 @@ export function useSaveJobSpecificCV() {
   });
 }
 
-export function useUpdateJobSpecificCV(id: string) {
+export function useUpdateJobSpecificCV(id: string | undefined) {
   const qc = useQueryClient();
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -72,6 +78,9 @@ export function useUpdateJobSpecificCV(id: string) {
 
   const mutation = useMutation({
     mutationFn: async (patch: Record<string, unknown>) => {
+      if (!id) {
+        return {};
+      }
       const res = await fetch(`/api/cv/job-specific/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -82,12 +91,13 @@ export function useUpdateJobSpecificCV(id: string) {
     },
     onSuccess: () => {
       setLastSaved(new Date());
-      void qc.invalidateQueries({ queryKey: ['job-specific-cv', id] });
+      if (id) void qc.invalidateQueries({ queryKey: ['job-specific-cv', id] });
     },
   });
 
   const update = useCallback(
     (patch: Record<string, unknown>) => {
+      if (!id) return;
       pendingRef.current = patch;
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => {
@@ -97,12 +107,15 @@ export function useUpdateJobSpecificCV(id: string) {
         }
       }, 1500);
     },
-    [mutation]
+    [mutation, id]
   );
 
   /** Clears debounce and persists immediately (e.g. explicit Save). */
   const saveImmediately = useCallback(
     async (patch: Record<string, unknown>) => {
+      if (!id) {
+        return;
+      }
       if (timerRef.current) {
         clearTimeout(timerRef.current);
         timerRef.current = null;
@@ -110,18 +123,18 @@ export function useUpdateJobSpecificCV(id: string) {
       pendingRef.current = null;
       return mutation.mutateAsync(patch);
     },
-    [mutation]
+    [mutation, id]
   );
 
   useEffect(() => {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
-      if (pendingRef.current) {
+      if (id && pendingRef.current) {
         mutation.mutate(pendingRef.current);
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [id]);
 
   return {
     update,

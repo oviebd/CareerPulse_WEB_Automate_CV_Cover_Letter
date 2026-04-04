@@ -1,10 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import {
-  CLAUDE_MODEL,
-  generateCoverLetterStream,
-  scoreATS,
-} from '@/lib/claude';
+import { generateCoverLetterStream, scoreATS } from '@/lib/claude';
 import { rateLimitHit } from '@/lib/rate-limit';
 import { resolveEffectiveTier } from '@/lib/dev-subscription';
 import {
@@ -103,8 +99,6 @@ export async function POST(request: Request) {
       body.length && LENGTHS.includes(body.length) ? body.length : 'medium';
     const companyName = body.companyName?.trim() || 'the company';
     const jobTitle = body.jobTitle?.trim() || 'the role';
-    const templateId = body.templateId?.trim() || 'cl-classic';
-
     const stream = generateCoverLetterStream({
       cvProfile: cvRow,
       jobDescription: body.jobDescription,
@@ -134,62 +128,11 @@ export async function POST(request: Request) {
             }
           }
 
-          const final = await stream.finalMessage();
-          const usage = final.usage;
-          const inputTokens = usage?.input_tokens ?? null;
-          const outputTokens = usage?.output_tokens ?? null;
-
-          const letterName = `${jobTitle} — ${companyName}`.slice(0, 200);
-          const { data: inserted, error: insErr } = await supabase
-            .from('cover_letters')
-            .insert({
-              user_id: user.id,
-              name: letterName,
-              applicant_name: cvRow.full_name ?? null,
-              applicant_role: cvRow.professional_title ?? null,
-              applicant_email: cvRow.email ?? null,
-              applicant_phone: cvRow.phone ?? null,
-              applicant_location: cvRow.location ?? null,
-              tone,
-              length,
-              specific_emphasis: body.specificEmphasis?.trim() || null,
-              content: fullText,
-              template_id: templateId,
-              generation_model: CLAUDE_MODEL,
-              input_tokens: inputTokens,
-              output_tokens: outputTokens,
-              ats_keywords_found: [],
-              ats_keywords_missing: [],
-              job_ids: [],
-            })
-            .select('id')
-            .single();
-
-          if (insErr) {
-            console.error('cover letter insert', insErr);
-            controller.enqueue(
-              encoder.encode(
-                `data: ${JSON.stringify({ error: 'save_failed' })}\n\n`
-              )
-            );
-            controller.close();
-            return;
-          }
-
-          const letterId = inserted.id;
+          await stream.finalMessage();
 
           if (canAccessFeature(tier, 'atsAccess')) {
             try {
-              const ats = await scoreATS(body.jobDescription!, fullText);
-              await supabase
-                .from('cover_letters')
-                .update({
-                  ats_score: ats.score,
-                  ats_keywords_found: ats.keywords_found,
-                  ats_keywords_missing: ats.keywords_missing,
-                  ats_summary: ats.summary,
-                })
-                .eq('id', letterId);
+              await scoreATS(body.jobDescription!, fullText);
             } catch (atsErr) {
               console.error('ATS scoring failed', atsErr);
             }
@@ -197,7 +140,7 @@ export async function POST(request: Request) {
 
           controller.enqueue(
             encoder.encode(
-              `data: ${JSON.stringify({ done: true, id: letterId })}\n\n`
+              `data: ${JSON.stringify({ done: true, id: null })}\n\n`
             )
           );
           controller.close();

@@ -152,7 +152,10 @@ export interface Job {
   company_name: string;
   job_title: string;
   job_url: string | null;
-  job_description: string | null;
+  /** AI-generated summary for UI/tracker — never sent to CV/CL generation prompts */
+  job_summary: string | null;
+  /** ATS / role keywords only — full JD is never stored */
+  keywords: string[];
   location: string | null;
   salary_min: number | null;
   salary_max: number | null;
@@ -176,6 +179,19 @@ export interface Job {
 export type JobInsert = Pick<Job, 'company_name' | 'job_title'> &
   Partial<Omit<Job, 'id' | 'user_id' | 'created_at' | 'updated_at'>>;
 export type JobUpdate = Partial<Omit<Job, 'id' | 'user_id' | 'created_at'>>;
+
+/** User's tracked application row (join with `jobs` for role metadata) */
+export interface AppliedJob {
+  id: string;
+  user_id: string;
+  job_id: string;
+  status: JobStatus;
+  notes: string | null;
+  applied_at: string | null;
+  created_at: string;
+  updated_at: string;
+  job?: Job;
+}
 
 export interface CoverLetter {
   id: string;
@@ -207,6 +223,7 @@ export interface CoverLetter {
   updated_at: string;
 }
 
-export type CoverLetterInsert = Pick<CoverLetter, 'name'> &
-  Partial<Omit<CoverLetter, 'id' | 'user_id' | 'created_at' | 'updated_at'>>;
+export type CoverLetterInsert = Partial<
+  Omit<CoverLetter, 'id' | 'created_at' | 'updated_at'>
+> & { user_id: string };
 export type CoverLetterUpdate = Partial<Omit<CoverLetter, 'id' | 'user_id' | 'created_at'>>;

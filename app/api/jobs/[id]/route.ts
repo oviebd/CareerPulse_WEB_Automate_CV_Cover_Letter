@@ -22,6 +22,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     delete raw.id;
     delete raw.user_id;
     delete raw.created_at;
+    delete raw.job_description;
     const patch = stripUndefined(raw);
 
     const { data, error } = await supabase

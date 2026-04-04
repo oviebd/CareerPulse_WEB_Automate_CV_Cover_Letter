@@ -103,21 +103,10 @@ export function generateCoverLetterStream(params: {
   tone: CoverLetterTone;
   length: CoverLetterLength;
   specificEmphasis: string;
+  candidateNameFromCv?: string | null;
 }) {
   const wordTargets = { short: 200, medium: 350, long: 500 };
-  const experienceText = (params.cvProfile.experience || [])
-    .map(
-      (e) =>
-        `${e.title} at ${e.company} (${e.start_date}–${e.is_current ? 'Present' : e.end_date})\n${e.bullets.join('\n')}`
-    )
-    .join('\n\n');
-  const skillsText = (params.cvProfile.skills || [])
-    .flatMap((s) => s.items)
-    .join(', ');
-  const projectsText = (params.cvProfile.projects || [])
-    .map((p) => `${p.name}: ${p.description}`)
-    .join('\n');
-
+  const userContent = buildCoverLetterUserContent(params, wordTargets);
   return claude.messages.stream({
     model: CLAUDE_MODEL,
     max_tokens: 1000,
@@ -126,10 +115,71 @@ export function generateCoverLetterStream(params: {
     messages: [
       {
         role: 'user',
-        content: `CANDIDATE PROFILE:\nName: ${params.cvProfile.full_name}\nTitle: ${params.cvProfile.professional_title}\nSummary: ${params.cvProfile.summary}\n\nWork Experience:\n${experienceText}\n\nKey Skills: ${skillsText}\n\nNotable Projects: ${projectsText}\n\n---\n\nJOB DESCRIPTION:\n${params.jobDescription}\n\n---\n\nINSTRUCTIONS:\n- Company: ${params.companyName}\n- Job Title: ${params.jobTitle}\n- Tone: ${params.tone} (professional=formal but warm; confident=assertive,direct; creative=engaging; concise=brief,punchy; formal=traditional)\n- Target length: ~${wordTargets[params.length]} words\n- Special emphasis: ${params.specificEmphasis || 'None'}\n- Maximize ATS relevance as much as possible using clear, role-relevant wording from the job description and candidate profile.\n- Use only evidence present in the candidate profile. Do not invent achievements, responsibilities, technologies, or numbers.\n\nWrite the cover letter body now.`,
+        content: userContent,
       },
     ],
   });
+}
+
+function buildCoverLetterUserContent(
+  params: {
+    cvProfile: Partial<CVProfile>;
+    jobDescription: string;
+    companyName: string;
+    jobTitle: string;
+    tone: CoverLetterTone;
+    length: CoverLetterLength;
+    specificEmphasis: string;
+    /** From `cvs.full_name` for this generation — overrides `cvProfile.full_name` when set */
+    candidateNameFromCv?: string | null;
+  },
+  wordTargets: Record<CoverLetterLength, number>
+): string {
+  const trimmedFromRow = params.candidateNameFromCv?.trim();
+  const trimmedFromProfile = params.cvProfile.full_name?.trim();
+  const candidateLabel =
+    trimmedFromRow || trimmedFromProfile || 'the candidate';
+
+  const experienceText = (params.cvProfile.experience || [])
+    .map(
+      (e) =>
+        `${e.title} at ${e.company} (${e.start_date}–${e.is_current ? 'Present' : e.end_date})\n${(e.bullets ?? []).join('\n')}`
+    )
+    .join('\n\n');
+  const skillsText = (params.cvProfile.skills || [])
+    .flatMap((s) => s.items ?? [])
+    .join(', ');
+  const projectsText = (params.cvProfile.projects || [])
+    .map((p) => `${p.name}: ${p.description ?? ''}`)
+    .join('\n');
+
+  return `CANDIDATE PROFILE:\nCandidate name (from CV record): ${candidateLabel}\nProfessional title: ${params.cvProfile.professional_title ?? ''}\nSummary: ${params.cvProfile.summary ?? ''}\n\nWork Experience:\n${experienceText}\n\nKey Skills: ${skillsText}\n\nNotable Projects: ${projectsText}\n\n---\n\nJOB DESCRIPTION:\n${params.jobDescription}\n\n---\n\nINSTRUCTIONS:\n- Company: ${params.companyName}\n- Job Title: ${params.jobTitle}\n- Tone: ${params.tone} (professional=formal but warm; confident=assertive,direct; creative=engaging; concise=brief,punchy; formal=traditional)\n- Target length: ~${wordTargets[params.length]} words\n- Special emphasis: ${params.specificEmphasis || 'None'}\n- Write in the first person as this candidate. Use the candidate name above for any self-reference; if it is "the candidate", write naturally without a proper name.\n- Maximize ATS relevance as much as possible using clear, role-relevant wording from the job description and candidate profile.\n- Use only evidence present in the candidate profile. Do not invent achievements, responsibilities, technologies, or numbers.\n\nWrite the cover letter body now.`;
+}
+
+/** Non-streaming cover letter body (same prompt as `generateCoverLetterStream`). */
+export async function generateCoverLetterText(params: {
+  cvProfile: Partial<CVProfile>;
+  jobDescription: string;
+  companyName: string;
+  jobTitle: string;
+  tone: CoverLetterTone;
+  length: CoverLetterLength;
+  specificEmphasis: string;
+  candidateNameFromCv?: string | null;
+}): Promise<string> {
+  const wordTargets = { short: 200, medium: 350, long: 500 };
+  const userContent = buildCoverLetterUserContent(params, wordTargets);
+  const message = await withRetry(() =>
+    claude.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: 1000,
+      system:
+        'You are a professional career coach and expert cover letter writer. Write compelling, tailored, authentic, ATS-optimized cover letters. Return only the cover letter body text — no subject line, no "Dear Hiring Manager" header, no sign-off. Those are handled by the template. Never fabricate facts, achievements, tools, or metrics.',
+      messages: [{ role: 'user', content: userContent }],
+    })
+  );
+  const block = message.content[0];
+  return block.type === 'text' ? block.text.trim() : '';
 }
 
 export async function scoreATS(

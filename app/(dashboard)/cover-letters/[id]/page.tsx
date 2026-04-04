@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/useAuthStore';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
@@ -25,14 +25,21 @@ import { canUseTemplate } from '@/lib/subscription';
 import { formatDate } from '@/lib/utils';
 import type { CVTemplate, SubscriptionTier } from '@/types';
 import type { Job } from '@/types/database';
+import { useOptimiseDraftStore } from '@/stores/useOptimiseDraftStore';
+import {
+  useOptimiseEditDraftStore,
+  type CoverLetterOptimiseEditDraft,
+} from '@/stores/useOptimiseEditDraftStore';
 
 const SWATCHES = ['#2563EB', '#0d9488', '#7c3aed', '#dc2626', '#0f172a'];
 
 export default function CoverLetterDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const id = typeof params.id === 'string' ? params.id : '';
+  const isDraftMode = id === 'draft';
   const { toast } = useToast();
-  const { data: letter, isLoading } = useCoverLetter(id);
+  const { data: letter, isLoading } = useCoverLetter(isDraftMode ? undefined : id);
   const userId = useAuthStore((s) => s.user?.id);
   const jobId = letter?.job_ids?.[0];
   const { data: linkedJob } = useQuery({
@@ -67,6 +74,10 @@ export default function CoverLetterDetailPage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [showAiRewriteModal, setShowAiRewriteModal] = useState(false);
+  const [draftClMeta, setDraftClMeta] = useState<CoverLetterOptimiseEditDraft | null>(
+    null
+  );
+  const [draftSaveBusy, setDraftSaveBusy] = useState(false);
   const initLetterIdRef = useRef<string | null>(null);
   const jobSyncedForLetterRef = useRef<string | null>(null);
   const previewUrlRef = useRef<string | null>(null);
@@ -85,8 +96,45 @@ export default function CoverLetterDetailPage() {
     staleTime: 10 * 60 * 1000,
   });
 
+  useEffect(() => {
+    if (!isDraftMode) return;
+    const payload = useOptimiseEditDraftStore.getState().clEditDraft;
+    if (!payload?.content?.trim() || !payload.originalCvId) {
+      router.replace('/cv/optimise/result');
+      return;
+    }
+    setDraftClMeta(payload);
+    setDraftContent(payload.content);
+    setDraftTemplateId(payload.templateId?.trim() || 'cl-classic');
+    setDraftCompanyName(payload.companyName ?? '');
+    setDraftJobTitle(payload.jobTitle ?? '');
+  }, [isDraftMode, router]);
+
+  useEffect(() => {
+    if (!isDraftMode || !draftClMeta?.originalCvId) return;
+    const supabase = createClient();
+    const cvId = draftClMeta.originalCvId;
+    let cancelled = false;
+    void (async () => {
+      const { data } = await supabase
+        .from('cvs')
+        .select('full_name, professional_title, email, phone, location')
+        .eq('id', cvId)
+        .maybeSingle();
+      if (cancelled || !data) return;
+      setDraftApplicantName((prev) => prev || (data.full_name ?? ''));
+      setDraftApplicantRole((prev) => prev || (data.professional_title ?? ''));
+      setDraftApplicantEmail((prev) => prev || (data.email ?? ''));
+      setDraftApplicantPhone((prev) => prev || (data.phone ?? ''));
+      setDraftApplicantLocation((prev) => prev || (data.location ?? ''));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isDraftMode, draftClMeta?.originalCvId]);
+
   useLayoutEffect(() => {
-    if (!letter) return;
+    if (isDraftMode || !letter) return;
     if (initLetterIdRef.current !== letter.id) {
       initLetterIdRef.current = letter.id;
       jobSyncedForLetterRef.current = null;
@@ -103,7 +151,7 @@ export default function CoverLetterDetailPage() {
   }, [letter]);
 
   useEffect(() => {
-    if (!letter || !linkedJob) return;
+    if (isDraftMode || !letter || !linkedJob) return;
     if (jobSyncedForLetterRef.current === letter.id) return;
     jobSyncedForLetterRef.current = letter.id;
     setDraftCompanyName(linkedJob.company_name);
@@ -120,6 +168,44 @@ export default function CoverLetterDetailPage() {
   }, []);
 
   const refreshPreview = useCallback(async () => {
+    if (isDraftMode) {
+      if (!draftClMeta?.originalCvId) return;
+      setPreviewLoading(true);
+      try {
+        const res = await fetch('/api/cover-letter/preview-html', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content: draftContent,
+            template_id: draftTemplateId,
+            accent_color: accent,
+            company_name: draftCompanyName || null,
+            job_title: draftJobTitle || null,
+            original_cv_id: draftClMeta.originalCvId,
+            applicant_name: draftApplicantName,
+            applicant_role: draftApplicantRole,
+            applicant_email: draftApplicantEmail,
+            applicant_phone: draftApplicantPhone,
+            applicant_location: draftApplicantLocation,
+          }),
+        });
+        const text = await res.text();
+        if (!res.ok) {
+          toast('Preview could not be updated.', 'error');
+          return;
+        }
+        if (previewUrlRef.current) {
+          URL.revokeObjectURL(previewUrlRef.current);
+        }
+        const blob = new Blob([text], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        previewUrlRef.current = url;
+        setPreviewUrl(url);
+      } finally {
+        setPreviewLoading(false);
+      }
+      return;
+    }
     if (!letter) return;
     setPreviewLoading(true);
     try {
@@ -156,6 +242,8 @@ export default function CoverLetterDetailPage() {
       setPreviewLoading(false);
     }
   }, [
+    isDraftMode,
+    draftClMeta,
     letter,
     draftContent,
     draftTemplateId,
@@ -167,16 +255,19 @@ export default function CoverLetterDetailPage() {
     draftApplicantEmail,
     draftApplicantPhone,
     draftApplicantLocation,
+    toast,
   ]);
 
   useEffect(() => {
-    if (!letter) return;
+    if ((!letter && !isDraftMode) || (isDraftMode && !draftClMeta)) return;
     const t = window.setTimeout(() => {
       void refreshPreview();
     }, 400);
     return () => window.clearTimeout(t);
   }, [
     letter,
+    isDraftMode,
+    draftClMeta,
     draftContent,
     draftTemplateId,
     accent,
@@ -191,18 +282,74 @@ export default function CoverLetterDetailPage() {
   ]);
 
   const isDirty =
-    letter &&
-    (draftContent !== (letter.content ?? '') ||
-      draftTemplateId !== (letter.template_id?.trim() || 'cl-classic') ||
-      draftCompanyName !== (linkedJob?.company_name ?? '') ||
-      draftJobTitle !== (linkedJob?.job_title ?? '') ||
-      draftApplicantName !== (letter.applicant_name ?? '') ||
-      draftApplicantRole !== (letter.applicant_role ?? '') ||
-      draftApplicantEmail !== (letter.applicant_email ?? '') ||
-      draftApplicantPhone !== (letter.applicant_phone ?? '') ||
-      draftApplicantLocation !== (letter.applicant_location ?? ''));
+    (isDraftMode && draftClMeta && draftContent.trim().length > 0) ||
+    (!isDraftMode &&
+      letter &&
+      (draftContent !== (letter.content ?? '') ||
+        draftTemplateId !== (letter.template_id?.trim() || 'cl-classic') ||
+        draftCompanyName !== (linkedJob?.company_name ?? '') ||
+        draftJobTitle !== (linkedJob?.job_title ?? '') ||
+        draftApplicantName !== (letter.applicant_name ?? '') ||
+        draftApplicantRole !== (letter.applicant_role ?? '') ||
+        draftApplicantEmail !== (letter.applicant_email ?? '') ||
+        draftApplicantPhone !== (letter.applicant_phone ?? '') ||
+        draftApplicantLocation !== (letter.applicant_location ?? '')));
 
   async function handleSave() {
+    if (isDraftMode) {
+      if (!draftClMeta) return;
+      const tmpl = templates.find((x) => x.id === draftTemplateId);
+      if (
+        tmpl &&
+        !canUseTemplate(tmpl.available_tiers as SubscriptionTier[], tier)
+      ) {
+        toast('Upgrade your plan to use this template.', 'error');
+        return;
+      }
+      setDraftSaveBusy(true);
+      try {
+        const res = await fetch('/api/cover-letters', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content: draftContent,
+            tone: draftClMeta.tone ?? 'professional',
+            length: draftClMeta.length ?? 'medium',
+            template_id: draftTemplateId,
+            specific_emphasis: draftClMeta.emphasis?.trim() || null,
+            applicant_name: draftApplicantName.trim() || null,
+            applicant_role: draftApplicantRole.trim() || null,
+            applicant_email: draftApplicantEmail.trim() || null,
+            applicant_phone: draftApplicantPhone.trim() || null,
+            applicant_location: draftApplicantLocation.trim() || null,
+            job_ids: draftClMeta.savedJobId ? [draftClMeta.savedJobId] : [],
+          }),
+        });
+        if (!res.ok) {
+          const errText = await res.text();
+          console.error('cover-letters POST', errText);
+          toast('Could not save cover letter.', 'error');
+          return;
+        }
+        const created = (await res.json()) as { id: string };
+        useOptimiseEditDraftStore.getState().setClEditDraft(null);
+        const d = useOptimiseDraftStore.getState().draft;
+        if (d) {
+          useOptimiseDraftStore.getState().setDraft({
+            ...d,
+            savedCoverLetterId: created.id,
+          });
+        }
+        toast('Cover letter saved.', 'success');
+        router.replace(`/cover-letters/${created.id}`);
+      } catch (e) {
+        console.error(e);
+        toast('Could not save.', 'error');
+      } finally {
+        setDraftSaveBusy(false);
+      }
+      return;
+    }
     if (!letter) return;
     const tmpl = templates.find((x) => x.id === draftTemplateId);
     if (
@@ -242,6 +389,10 @@ export default function CoverLetterDetailPage() {
   }
 
   async function handleExportPdf() {
+    if (isDraftMode) {
+      toast('Save your cover letter first to export PDF.', 'error');
+      return;
+    }
     if (!letter) return;
     const res = await fetch('/api/export', {
       method: 'POST',
@@ -269,10 +420,10 @@ export default function CoverLetterDetailPage() {
     toast(j.error === 'invalid_template' ? 'This template is not available.' : 'Export failed.', 'error');
   }
 
-  if (isLoading) {
+  if ((!isDraftMode && isLoading) || (isDraftMode && !draftClMeta)) {
     return <p className="text-sm text-[var(--color-muted)]">Loading…</p>;
   }
-  if (!letter) {
+  if (!isDraftMode && !letter) {
     return <p className="text-sm">Not found.</p>;
   }
 
@@ -290,28 +441,37 @@ export default function CoverLetterDetailPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
+      {isDraftMode ? (
+        <div className="rounded-xl border border-[var(--color-accent-gold)]/40 bg-[var(--color-accent-gold)]/10 px-4 py-3 text-sm text-[var(--color-text-primary)]">
+          You are editing an unsaved draft from optimise. Save to store this letter and enable PDF export.
+        </div>
+      ) : null}
       <Link href="/cover-letters" className="text-sm text-[var(--color-primary)]">
         ← Back
       </Link>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="font-display text-2xl font-bold">
-            {linkedJob?.company_name || letter.name || 'Cover letter'}
+            {linkedJob?.company_name ||
+              draftCompanyName ||
+              letter?.name ||
+              'Cover letter'}
           </h1>
           <p className="text-[var(--color-muted)]">
-            {linkedJob?.job_title || letter.applicant_role || ''}
+            {linkedJob?.job_title || draftJobTitle || letter?.applicant_role || ''}
           </p>
           <p className="mt-2 text-xs text-[var(--color-muted)]">
-            {formatDate(letter.created_at)}
+            {letter ? formatDate(letter.created_at) : 'Unsaved draft'}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {letter.ats_score != null ? (
+          {!isDraftMode && letter?.ats_score != null ? (
             <Badge variant="success">ATS {letter.ats_score}</Badge>
           ) : null}
           <Button
             variant="secondary"
             size="sm"
+            disabled={isDraftMode}
             onClick={() => void handleExportPdf()}
           >
             Export PDF
@@ -319,7 +479,7 @@ export default function CoverLetterDetailPage() {
           <Button
             variant="primary"
             size="sm"
-            loading={updateLetter.isPending}
+            loading={isDraftMode ? draftSaveBusy : updateLetter.isPending}
             disabled={!isDirty}
             onClick={() => void handleSave()}
           >

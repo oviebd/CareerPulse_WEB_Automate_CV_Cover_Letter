@@ -82,6 +82,8 @@ export async function GET(request: Request) {
 
 type PostBody = {
   cover_letter_id?: string;
+  /** Base CV row id — required for draft preview when cover_letter_id is omitted */
+  original_cv_id?: string;
   content?: string;
   template_id?: string;
   accent_color?: string;
@@ -106,8 +108,99 @@ export async function POST(request: Request) {
 
     const body = (await request.json()) as PostBody;
     const letterId = body.cover_letter_id?.trim();
+    const originalCvId =
+      typeof body.original_cv_id === 'string' ? body.original_cv_id.trim() : '';
+
+    /** Draft preview: optimise result page before the letter is saved */
     if (!letterId) {
-      return NextResponse.json({ error: 'invalid_body' }, { status: 400 });
+      const draftContent = typeof body.content === 'string' ? body.content : '';
+      if (!draftContent.trim() || !originalCvId) {
+        return NextResponse.json(
+          { error: 'Provide cover_letter_id or (content + original_cv_id)' },
+          { status: 400 }
+        );
+      }
+
+      const { data: baseCv, error: cvErr } = await supabase
+        .from('cvs')
+        .select(
+          'full_name, professional_title, email, phone, location, linkedin_url'
+        )
+        .eq('id', originalCvId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (cvErr || !baseCv) {
+        return NextResponse.json({ error: 'cv_not_found' }, { status: 404 });
+      }
+
+      const templateId = (body.template_id?.trim() || 'cl-classic').trim();
+      if (!isValidCoverLetterTemplateId(templateId)) {
+        return NextResponse.json({ error: 'invalid_template' }, { status: 400 });
+      }
+
+      const { data: tmpl, error: tmplErr } = await supabase
+        .from('cv_templates')
+        .select('id')
+        .eq('id', templateId)
+        .eq('type', 'cover_letter')
+        .maybeSingle();
+      if (tmplErr || !tmpl) {
+        return NextResponse.json({ error: 'template_not_found' }, { status: 404 });
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('subscription_tier')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      const accent = body.accent_color?.trim() || '#2563EB';
+      const companyName =
+        typeof body.company_name === 'string' ? body.company_name : null;
+      const jobTitle = typeof body.job_title === 'string' ? body.job_title : null;
+      const applicantName =
+        typeof body.applicant_name === 'string' ? body.applicant_name : undefined;
+      const applicantRole =
+        typeof body.applicant_role === 'string' ? body.applicant_role : undefined;
+      const applicantEmail =
+        typeof body.applicant_email === 'string' ? body.applicant_email : undefined;
+      const applicantPhone =
+        typeof body.applicant_phone === 'string' ? body.applicant_phone : undefined;
+      const applicantLocation =
+        typeof body.applicant_location === 'string'
+          ? body.applicant_location
+          : undefined;
+
+      const templatePath = path.join(
+        process.cwd(),
+        'templates',
+        'cover-letter',
+        `${templateId}.html`
+      );
+      const templateHtml = await readFile(templatePath, 'utf-8');
+      const vars = buildCoverLetterVariables(baseCv, {
+        content: draftContent,
+        company_name: companyName,
+        job_title: jobTitle,
+        applicant_name: applicantName,
+        applicant_role: applicantRole,
+        applicant_email: applicantEmail,
+        applicant_phone: applicantPhone,
+        applicant_location: applicantLocation,
+      }, accent);
+      const html = renderCoverLetterPageHtml(
+        templateHtml,
+        vars,
+        profile?.subscription_tier,
+        { preview: true }
+      );
+      return new NextResponse(html, {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'no-store',
+        },
+      });
     }
 
     const { data: letter, error: leErr } = await supabase

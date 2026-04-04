@@ -40,12 +40,43 @@ export async function POST(request: Request) {
     } = await supabase.auth.getUser();
     if (!user) return err('Unauthorized', 'UNAUTHORIZED', 401);
 
-    const body = (await request.json().catch(() => ({}))) as { name?: string };
-    const name = typeof body.name === 'string' && body.name.trim() ? body.name.trim() : 'Untitled Cover Letter';
+    const body = (await request.json().catch(() => ({}))) as {
+      content?: string;
+      tone?: string | null;
+      length?: string | null;
+      template_id?: string | null;
+      specific_emphasis?: string | null;
+      applicant_name?: string | null;
+      applicant_role?: string | null;
+      applicant_email?: string | null;
+      applicant_phone?: string | null;
+      applicant_location?: string | null;
+      job_ids?: string[];
+    };
+    if (typeof body.content !== 'string') {
+      return err('content is required', 'VALIDATION', 422);
+    }
+
+    const jobIds = Array.isArray(body.job_ids)
+      ? body.job_ids.filter((x): x is string => typeof x === 'string')
+      : [];
 
     const { data, error } = await supabase
       .from('cover_letters')
-      .insert({ user_id: user.id, name })
+      .insert({
+        user_id: user.id,
+        content: body.content,
+        tone: body.tone ?? null,
+        length: body.length ?? null,
+        template_id: body.template_id?.trim() || 'cl-classic',
+        specific_emphasis: body.specific_emphasis?.trim() || null,
+        applicant_name: body.applicant_name?.trim() || null,
+        applicant_role: body.applicant_role?.trim() || null,
+        applicant_email: body.applicant_email?.trim() || null,
+        applicant_phone: body.applicant_phone?.trim() || null,
+        applicant_location: body.applicant_location?.trim() || null,
+        job_ids: jobIds,
+      })
       .select()
       .single();
     if (error) {

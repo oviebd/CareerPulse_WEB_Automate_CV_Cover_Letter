@@ -17,6 +17,7 @@ import {
   useJobSpecificCV,
   useUpdateJobSpecificCV,
   useArchiveJobSpecificCV,
+  useSaveJobSpecificCV,
 } from '@/hooks/useJobSpecificCVs';
 import { useCoreCVVersions } from '@/hooks/useCV';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -29,6 +30,12 @@ import { cloneCvData } from '@/lib/cv-clone';
 import { useToast } from '@/components/ui/toast';
 import { Undo2, Redo2, ChevronDown, ChevronUp } from 'lucide-react';
 import { CV_FORM_CARD } from '@/lib/cv-editor-styles';
+import { parseOptimisedCvText, optimisedCvJsonToCvData } from '@/lib/optimise-result';
+import { useOptimiseDraftStore } from '@/stores/useOptimiseDraftStore';
+import {
+  useOptimiseEditDraftStore,
+  type CvOptimiseEditDraft,
+} from '@/stores/useOptimiseEditDraftStore';
 
 function previewPayloadFromCVData(d: CVData): Record<string, unknown> {
   return {
@@ -134,11 +141,18 @@ function coreCvPatchFromDraft(
 }
 
 export default function JobCVEditPage() {
-  const { id } = useParams<{ id: string }>();
+  const params = useParams<{ id: string }>();
+  const id = typeof params?.id === 'string' ? params.id : '';
+  const isDraftMode = id === 'draft';
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { data: jobCV, isLoading } = useJobSpecificCV(id);
-  const { update, saveImmediately, isSaving, lastSaved } = useUpdateJobSpecificCV(id);
+  const { data: jobCV, isLoading: jobCvLoading } = useJobSpecificCV(
+    isDraftMode ? undefined : id
+  );
+  const { update, saveImmediately, isSaving, lastSaved } = useUpdateJobSpecificCV(
+    isDraftMode ? undefined : id
+  );
+  const saveNewJobCv = useSaveJobSpecificCV();
   const archive = useArchiveJobSpecificCV();
   const { data: coreVersions = [], isLoading: coreVersionsLoading } = useCoreCVVersions();
   const [showJD, setShowJD] = useState(false);
@@ -162,6 +176,8 @@ export default function JobCVEditPage() {
   const [autosaveState, setAutosaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [targetCoreCvId, setTargetCoreCvId] = useState<string | null>(null);
   const [savingCore, setSavingCore] = useState(false);
+
+  const [draftMeta, setDraftMeta] = useState<CvOptimiseEditDraft | null>(null);
 
   const [undoPast, setUndoPast] = useState<CVData[]>([]);
   const [undoFuture, setUndoFuture] = useState<CVData[]>([]);
@@ -196,6 +212,10 @@ export default function JobCVEditPage() {
     );
   }, [templateMeta, tier]);
 
+  const jobTitle = jobCV?.job_title ?? draftMeta?.jobTitle ?? '';
+  const companyName = jobCV?.company_name ?? draftMeta?.companyName ?? null;
+  const keywords = jobCV?.keywords_added ?? draftMeta?.extractedKeywords ?? [];
+
   useEffect(() => {
     allowUndoHistoryRef.current = false;
     const t = window.setTimeout(() => {
@@ -209,7 +229,36 @@ export default function JobCVEditPage() {
   }, [id]);
 
   useEffect(() => {
-    if (!jobCV || draft) return;
+    if (!isDraftMode) {
+      setDraftMeta(null);
+    }
+  }, [isDraftMode, id]);
+
+  useEffect(() => {
+    if (!isDraftMode) return;
+    const payload = useOptimiseEditDraftStore.getState().cvEditDraft;
+    if (!payload?.cvContent?.trim()) {
+      router.replace('/cv/optimise/result');
+      return;
+    }
+    setDraftMeta(payload);
+    const parsed = parseOptimisedCvText(payload.cvContent);
+    if (!parsed.ok) {
+      toast(parsed.message, 'error');
+      router.replace('/cv/optimise/result');
+      return;
+    }
+    setDraft(optimisedCvJsonToCvData(parsed.object));
+    setSelectedTemplateId('classic');
+    setAccent('#6C63FF');
+    setFontFamily('Inter');
+    setUndoPast([]);
+    setUndoFuture([]);
+    burstStartRef.current = null;
+  }, [isDraftMode, router, toast]);
+
+  useEffect(() => {
+    if (isDraftMode || !jobCV || draft) return;
     setDraft({
       full_name: jobCV.full_name ?? null,
       professional_title: jobCV.professional_title ?? null,
@@ -259,20 +308,30 @@ export default function JobCVEditPage() {
           }, 550);
         }
         skipHistoryRef.current = false;
-        update(
-          patchFromCvDataWithJobMeta(
-            data,
-            selectedTemplateId,
-            accent,
-            fontFamily,
-            jobCV?.job_title,
-            jobCV?.company_name
-          )
-        );
+        if (!isDraftMode) {
+          update(
+            patchFromCvDataWithJobMeta(
+              data,
+              selectedTemplateId,
+              accent,
+              fontFamily,
+              jobTitle,
+              companyName
+            )
+          );
+        }
         return data;
       });
     },
-    [update, selectedTemplateId, accent, fontFamily, jobCV?.job_title, jobCV?.company_name]
+    [
+      update,
+      selectedTemplateId,
+      accent,
+      fontFamily,
+      jobTitle,
+      companyName,
+      isDraftMode,
+    ]
   );
 
   const undo = useCallback(() => {
@@ -286,19 +345,29 @@ export default function JobCVEditPage() {
       if (cur) setUndoFuture((f) => [cloneCvData(cur), ...f].slice(0, 50));
       const next = cloneCvData(snapshot);
       setDraft(next);
-      update(
-        patchFromCvDataWithJobMeta(
-          next,
-          selectedTemplateId,
-          accent,
-          fontFamily,
-          jobCV?.job_title,
-          jobCV?.company_name
-        )
-      );
+      if (!isDraftMode) {
+        update(
+          patchFromCvDataWithJobMeta(
+            next,
+            selectedTemplateId,
+            accent,
+            fontFamily,
+            jobTitle,
+            companyName
+          )
+        );
+      }
       return p.slice(0, -1);
     });
-  }, [update, selectedTemplateId, accent, fontFamily, jobCV?.job_title, jobCV?.company_name]);
+  }, [
+    update,
+    selectedTemplateId,
+    accent,
+    fontFamily,
+    jobTitle,
+    companyName,
+    isDraftMode,
+  ]);
 
   const redo = useCallback(() => {
     setUndoFuture((f) => {
@@ -311,19 +380,29 @@ export default function JobCVEditPage() {
       if (cur) setUndoPast((p) => [...p.slice(-49), cloneCvData(cur)]);
       const next = cloneCvData(nextSnap);
       setDraft(next);
-      update(
-        patchFromCvDataWithJobMeta(
-          next,
-          selectedTemplateId,
-          accent,
-          fontFamily,
-          jobCV?.job_title,
-          jobCV?.company_name
-        )
-      );
+      if (!isDraftMode) {
+        update(
+          patchFromCvDataWithJobMeta(
+            next,
+            selectedTemplateId,
+            accent,
+            fontFamily,
+            jobTitle,
+            companyName
+          )
+        );
+      }
       return f.slice(1);
     });
-  }, [update, selectedTemplateId, accent, fontFamily, jobCV?.job_title, jobCV?.company_name]);
+  }, [
+    update,
+    selectedTemplateId,
+    accent,
+    fontFamily,
+    jobTitle,
+    companyName,
+    isDraftMode,
+  ]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -344,14 +423,24 @@ export default function JobCVEditPage() {
       const res = await fetch('/api/export', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'cv',
-          job_cv_id: id,
-          template_id: selectedTemplateId,
-          accent_color: accent,
-          font_family: fontFamily,
-          cv_snapshot: previewPayloadFromCVData(draft),
-        }),
+        body: JSON.stringify(
+          isDraftMode
+            ? {
+                type: 'cv',
+                template_id: selectedTemplateId,
+                accent_color: accent,
+                font_family: fontFamily,
+                cv_snapshot: previewPayloadFromCVData(draft),
+              }
+            : {
+                type: 'cv',
+                job_cv_id: id,
+                template_id: selectedTemplateId,
+                accent_color: accent,
+                font_family: fontFamily,
+                cv_snapshot: previewPayloadFromCVData(draft),
+              }
+        ),
       });
       if (!res.ok) {
         setPreviewPdfUrl('');
@@ -371,7 +460,7 @@ export default function JobCVEditPage() {
     } finally {
       setPreviewBusy(false);
     }
-  }, [draft, selectedTemplateId, accent, id, fontFamily]);
+  }, [draft, selectedTemplateId, accent, id, fontFamily, isDraftMode]);
 
   useEffect(() => {
     if (!draft || templatesLoading) return;
@@ -408,14 +497,24 @@ export default function JobCVEditPage() {
       const res = await fetch('/api/export', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'cv',
-          job_cv_id: id,
-          template_id: selectedTemplateId,
-          accent_color: accent,
-          font_family: fontFamily,
-          cv_snapshot: previewPayloadFromCVData(draft),
-        }),
+        body: JSON.stringify(
+          isDraftMode
+            ? {
+                type: 'cv',
+                template_id: selectedTemplateId,
+                accent_color: accent,
+                font_family: fontFamily,
+                cv_snapshot: previewPayloadFromCVData(draft),
+              }
+            : {
+                type: 'cv',
+                job_cv_id: id,
+                template_id: selectedTemplateId,
+                accent_color: accent,
+                font_family: fontFamily,
+                cv_snapshot: previewPayloadFromCVData(draft),
+              }
+        ),
       });
       if (!res.ok) {
         if (res.status === 422) {
@@ -431,7 +530,7 @@ export default function JobCVEditPage() {
     } finally {
       setExporting(false);
     }
-  }, [accent, allowed, draft, id, selectedTemplateId, toast, fontFamily]);
+  }, [accent, allowed, draft, id, selectedTemplateId, toast, fontFamily, isDraftMode]);
 
   useEffect(() => {
     if (templatesLoading || !templates.length) return;
@@ -451,6 +550,41 @@ export default function JobCVEditPage() {
 
   const saveJobCv = useCallback(async () => {
     if (!draft) return;
+    if (isDraftMode) {
+      if (!draftMeta) return;
+      try {
+        const { id: newId } = await saveNewJobCv.mutateAsync({
+          save_without_job: !draftMeta.savedJobId,
+          existing_job_id: draftMeta.savedJobId ?? undefined,
+          cv_data: {
+            ...patchFromCvData(draft, selectedTemplateId, accent, fontFamily),
+            referrals: draft.referrals ?? [],
+          },
+          name:
+            draftMeta.jobTitle?.trim() && draftMeta.companyName?.trim()
+              ? `${draftMeta.jobTitle.trim()} — ${draftMeta.companyName.trim()}`
+              : 'Tailored CV',
+          ai_changes_summary: draftMeta.aiChangesSummary ?? null,
+          keywords_added: draftMeta.extractedKeywords ?? [],
+          bullets_improved: draftMeta.bulletsImproved ?? 0,
+          preferred_template_id: selectedTemplateId,
+          accent_color: accent,
+        });
+        useOptimiseEditDraftStore.getState().setCvEditDraft(null);
+        const optim = useOptimiseDraftStore.getState().draft;
+        if (optim) {
+          useOptimiseDraftStore.getState().setDraft({
+            ...optim,
+            savedCvId: newId,
+          });
+        }
+        toast('Job CV saved.', 'success');
+        router.replace(`/cv/job-specific/${newId}/edit`);
+      } catch {
+        toast('Could not save job CV.', 'error');
+      }
+      return;
+    }
     try {
       await saveImmediately(
         patchFromCvDataWithJobMeta(
@@ -458,15 +592,28 @@ export default function JobCVEditPage() {
           selectedTemplateId,
           accent,
           fontFamily,
-          jobCV?.job_title ?? '',
-          jobCV?.company_name ?? null
+          jobTitle,
+          companyName
         )
       );
       toast('Job CV saved.', 'success');
     } catch {
       toast('Could not save job CV.', 'error');
     }
-  }, [draft, saveImmediately, selectedTemplateId, accent, toast, jobCV, fontFamily]);
+  }, [
+    draft,
+    isDraftMode,
+    draftMeta,
+    saveNewJobCv,
+    saveImmediately,
+    selectedTemplateId,
+    accent,
+    fontFamily,
+    jobTitle,
+    companyName,
+    toast,
+    router,
+  ]);
 
   const updateCoreCvFromJob = useCallback(async () => {
     if (!draft || !targetCoreCvId) {
@@ -496,7 +643,7 @@ export default function JobCVEditPage() {
   }, [draft, targetCoreCvId, selectedTemplateId, toast, queryClient, fontFamily]);
 
   const deleteJobCv = useCallback(async () => {
-    if (!id) return;
+    if (!id || isDraftMode) return;
     if (!window.confirm('Delete this job-specific CV?')) return;
     try {
       await archive.mutateAsync(id);
@@ -505,23 +652,36 @@ export default function JobCVEditPage() {
     } catch {
       toast('Could not delete job CV.', 'error');
     }
-  }, [id, archive, toast, router]);
+  }, [id, archive, toast, router, isDraftMode]);
 
-  const keywords = jobCV?.keywords_added ?? [];
   const aiJobContext = useMemo(
     () => ({
-      jobTitle: jobCV?.job_title ?? null,
-      companyName: jobCV?.company_name ?? null,
-      jobDescription: jobCV?.job_description ?? null,
-      keywords: jobCV?.keywords_added ?? [],
+      jobTitle: jobTitle || null,
+      companyName,
+      jobDescription:
+        jobCV?.job_description?.trim() ||
+        (keywords.length ? keywords.join(', ') : null),
+      keywords,
     }),
-    [jobCV]
+    [jobTitle, companyName, jobCV?.job_description, keywords]
   );
   const ats = draft
     ? buildATSReport(draft, keywords)
     : { score: 0, summary: '', suggestions: [], sections: {} };
 
-  if (isLoading || !draft || !jobCV) {
+  const pageLoading =
+    (isDraftMode && (!draft || !draftMeta)) ||
+    (!isDraftMode && (jobCvLoading || !jobCV || !draft));
+
+  if (pageLoading) {
+    return (
+      <div className="mx-auto max-w-4xl space-y-4">
+        <p className="text-sm text-[var(--color-muted)]">Loading…</p>
+      </div>
+    );
+  }
+
+  if (!draft) {
     return (
       <div className="mx-auto max-w-4xl space-y-4">
         <p className="text-sm text-[var(--color-muted)]">Loading…</p>
@@ -538,6 +698,11 @@ export default function JobCVEditPage() {
 
   return (
     <div className="mx-auto max-w-[1650px] space-y-4">
+      {isDraftMode ? (
+        <div className="rounded-xl border border-[var(--color-accent-gold)]/40 bg-[var(--color-accent-gold)]/10 px-4 py-3 text-sm text-[var(--color-text-primary)]">
+          You are editing an unsaved draft from optimise. Use Save to store this CV to your account.
+        </div>
+      ) : null}
       <div className="glass-panel z-20 rounded-card border border-[var(--color-border)] p-3 backdrop-blur-xl">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -549,8 +714,8 @@ export default function JobCVEditPage() {
             </Link>
             <h1 className="font-display text-2xl font-semibold text-[var(--color-text-primary)]">Edit job CV</h1>
             <p className="mt-1 text-sm font-medium text-[var(--color-text-primary)]">
-              {jobCV.job_title || 'Target Role'}
-              {jobCV.company_name ? ` at ${jobCV.company_name}` : ''}
+              {jobTitle || 'Target Role'}
+              {companyName ? ` at ${companyName}` : ''}
             </p>
             <p className="mt-1 text-sm text-[var(--color-muted)]">
               Same editor as your core CV — live ATS feedback, preview, and undo.
@@ -581,7 +746,7 @@ export default function JobCVEditPage() {
               <Button
                 variant="primary"
                 size="sm"
-                loading={isSaving}
+                loading={isDraftMode ? saveNewJobCv.isPending : isSaving}
                 onClick={() => void saveJobCv()}
               >
                 Save
@@ -595,15 +760,17 @@ export default function JobCVEditPage() {
               >
                 Export PDF
               </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                loading={archive.isPending}
-                className="border-[var(--color-accent-coral)]/40 text-[var(--color-accent-coral)] hover:bg-[var(--color-accent-coral)]/10"
-                onClick={() => void deleteJobCv()}
-              >
-                Delete
-              </Button>
+              {!isDraftMode ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  loading={archive.isPending}
+                  className="border-[var(--color-accent-coral)]/40 text-[var(--color-accent-coral)] hover:bg-[var(--color-accent-coral)]/10"
+                  onClick={() => void deleteJobCv()}
+                >
+                  Delete
+                </Button>
+              ) : null}
               <span className="text-xs text-[var(--color-muted)]">{saveLabel}</span>
             </div>
             <div className="flex w-full flex-col gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]/80 p-3 backdrop-blur-sm sm:max-w-md sm:flex-row sm:items-end">
@@ -651,9 +818,9 @@ export default function JobCVEditPage() {
           aria-expanded={showJD}
         >
           <div className="min-w-0 flex-1">
-            <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">Job description</span>
+            <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">Job keywords</span>
             <p className="mt-1 text-sm text-[var(--color-muted)]">
-              {showJD ? 'Full job description' : 'Expand to view full job description'}
+              {showJD ? 'Keywords stored for this role' : 'Expand to view stored keywords'}
             </p>
           </div>
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--color-border)] bg-white/[0.04] text-[var(--color-muted)]">
@@ -663,7 +830,8 @@ export default function JobCVEditPage() {
         {showJD ? (
           <div className="border-t border-[var(--color-border)] px-4 pb-4 pt-2 sm:px-5 sm:pb-5">
             <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-xl border border-[var(--color-border)] bg-[var(--color-input-bg)] p-4 font-mono text-xs leading-relaxed text-[var(--color-text-primary)] shadow-inner">
-              {jobCV.job_description || 'No job description provided.'}
+              {jobCV?.job_description ||
+                (keywords.length ? keywords.join(', ') : 'No keywords stored for this job.')}
             </pre>
           </div>
         ) : null}
@@ -690,25 +858,31 @@ export default function JobCVEditPage() {
                   selectedTemplateId={selectedTemplateId}
                   onTemplateChange={(nextId: string) => {
                     setSelectedTemplateId(nextId);
-                    update({
-                      preferred_template_id: nextId,
-                      accent_color: accent,
-                      font_family: fontFamily,
-                    });
+                    if (!isDraftMode) {
+                      update({
+                        preferred_template_id: nextId,
+                        accent_color: accent,
+                        font_family: fontFamily,
+                      });
+                    }
                   }}
                   accent={accent}
                   onAccentChange={(c: string) => {
                     setAccent(c);
-                    update({
-                      accent_color: c,
-                      preferred_template_id: selectedTemplateId,
-                      font_family: fontFamily,
-                    });
+                    if (!isDraftMode) {
+                      update({
+                        accent_color: c,
+                        preferred_template_id: selectedTemplateId,
+                        font_family: fontFamily,
+                      });
+                    }
                   }}
                   fontFamily={fontFamily}
                   onFontFamilyChange={(next) => {
                     setFontFamily(next);
-                    update({ font_family: next });
+                    if (!isDraftMode) {
+                      update({ font_family: next });
+                    }
                   }}
                 />
               </div>

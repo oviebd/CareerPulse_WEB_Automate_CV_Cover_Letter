@@ -38,6 +38,14 @@ export async function GET(request: Request) {
   }
 }
 
+function normalizeKeywords(input: unknown): string[] {
+  if (!Array.isArray(input)) return [];
+  return input
+    .filter((k): k is string => typeof k === 'string')
+    .map((k) => k.trim())
+    .filter(Boolean);
+}
+
 export async function POST(request: Request) {
   try {
     const supabase = await createClient();
@@ -47,14 +55,26 @@ export async function POST(request: Request) {
     if (!user) return err('Unauthorized', 'UNAUTHORIZED', 401);
 
     const body = (await request.json()) as Record<string, unknown>;
-    const company_name = body.company_name;
-    const job_title = body.job_title;
-    if (typeof company_name !== 'string' || !company_name.trim()) {
-      return err('company_name is required', 'VALIDATION', 400);
-    }
-    if (typeof job_title !== 'string' || !job_title.trim()) {
-      return err('job_title is required', 'VALIDATION', 400);
-    }
+
+    const titleRaw =
+      (typeof body.title === 'string' && body.title) ||
+      (typeof body.job_title === 'string' && body.job_title) ||
+      '';
+    const companyRaw =
+      (typeof body.company === 'string' && body.company) ||
+      (typeof body.company_name === 'string' && body.company_name) ||
+      '';
+    const job_title = titleRaw.trim() || 'Untitled role';
+    const company_name = companyRaw.trim() || 'Company';
+    const job_url =
+      typeof body.url === 'string'
+        ? body.url.trim() || null
+        : typeof body.job_url === 'string'
+          ? body.job_url.trim() || null
+          : null;
+    const keywords = normalizeKeywords(body.keywords);
+    const job_summary =
+      typeof body.job_summary === 'string' ? body.job_summary.trim() || null : null;
 
     delete body.id;
     delete body.user_id;
@@ -62,9 +82,27 @@ export async function POST(request: Request) {
     delete body.updated_at;
 
     const payload = stripUndefined(body) as Record<string, unknown>;
+    delete payload.title;
+    delete payload.company;
+    delete payload.url;
+    delete payload.keywords;
+    delete payload.job_summary;
+    delete payload.job_title;
+    delete payload.company_name;
+    delete payload.job_url;
+    delete (payload as Record<string, unknown>).job_description;
+
     const { data, error } = await supabase
       .from('jobs')
-      .insert({ ...payload, user_id: user.id, company_name: company_name.trim(), job_title: job_title.trim() })
+      .insert({
+        ...payload,
+        user_id: user.id,
+        company_name,
+        job_title,
+        job_url,
+        keywords,
+        job_summary,
+      })
       .select()
       .single();
     if (error) {

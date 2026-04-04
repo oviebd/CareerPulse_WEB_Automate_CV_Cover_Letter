@@ -9,7 +9,6 @@ import { Progress } from '@/components/ui/progress';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useToast } from '@/components/ui/toast';
 import { canAccessFeature } from '@/lib/subscription';
-import { createClient } from '@/lib/supabase/client';
 import type { CoverLetterLength, CoverLetterTone } from '@/types';
 
 const TONES: { id: CoverLetterTone; label: string }[] = [
@@ -40,17 +39,12 @@ export function GenerateCoverLetterForm() {
     missing: string[];
   } | null>(null);
 
-  const streamRef = useRef('');
-  const rafRef = useRef<number | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    return () => { abortRef.current?.abort(); };
-  }, []);
-
-  const flushStream = useCallback(() => {
-    setStreaming(streamRef.current);
-    rafRef.current = null;
+    return () => {
+      abortRef.current?.abort();
+    };
   }, []);
 
   async function generate() {
@@ -58,97 +52,65 @@ export function GenerateCoverLetterForm() {
     abortRef.current = new AbortController();
     setLoading(true);
     setStreaming('');
-    streamRef.current = '';
     setLetterId(null);
     setAts(null);
-    const res = await fetch('/api/generate', {
+    const res = await fetch('/api/cv/optimise', {
       method: 'POST',
       signal: abortRef.current.signal,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        jobDescription,
-        companyName,
-        jobTitle,
+        job_description: jobDescription.trim(),
+        company_name: companyName.trim() || undefined,
+        job_title: jobTitle.trim() || undefined,
+        generationType: 'coverLetter',
         tone,
         length,
-        specificEmphasis: emphasis,
-        templateId,
+        specific_emphasis: emphasis.trim() || undefined,
       }),
     });
-    if (res.status === 402) {
-      const j = await res.json();
-      toast(`Limit reached (${j.limit}/month). Upgrade to continue.`, 'error');
+    if (res.status === 403) {
+      const j = await res.json().catch(() => ({}));
+      toast(
+        typeof j.message === 'string' ? j.message : 'Upgrade required for this feature.',
+        'error'
+      );
       setLoading(false);
       return;
     }
-    if (!res.ok || !res.body) {
-      toast('Generation failed. Try again.', 'error');
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      toast(typeof j.error === 'string' ? j.error : 'Generation failed. Try again.', 'error');
       setLoading(false);
       return;
     }
-    const reader = res.body.getReader();
-    const dec = new TextDecoder();
-    let buf = '';
-    let savedId: string | null = null;
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += dec.decode(value, { stream: true });
-      const parts = buf.split('\n\n');
-      buf = parts.pop() ?? '';
-      for (const block of parts) {
-        const line = block.trim();
-        if (!line.startsWith('data:')) continue;
-        const payload = line.replace(/^data:\s*/, '');
-        try {
-          const data = JSON.parse(payload) as {
-            text?: string;
-            done?: boolean;
-            id?: string;
-            error?: string;
-          };
-          if (data.text) {
-            streamRef.current += data.text;
-            if (!rafRef.current) {
-              rafRef.current = requestAnimationFrame(flushStream);
-            }
-          }
-          if (data.done && data.id) {
-            savedId = data.id;
-            setLetterId(data.id);
-          }
-          if (data.error) {
-            toast('Save step failed.', 'error');
-          }
-        } catch {
-          /* ignore partial json */
-        }
-      }
-    }
-    if (rafRef.current) {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
-    }
-    setStreaming(streamRef.current);
+    const data = (await res.json()) as { coverLetter?: string };
+    const text = data.coverLetter?.trim() ?? '';
+    setStreaming(text);
     setLoading(false);
-    if (savedId && canAccessFeature(tier, 'atsAccess')) {
-      const supabase = createClient();
-      for (let i = 0; i < 8; i++) {
-        await new Promise((r) => setTimeout(r, 600));
-        const { data } = await supabase
-          .from('cover_letters')
-          .select('ats_score, ats_summary, ats_keywords_found, ats_keywords_missing')
-          .eq('id', savedId)
-          .maybeSingle();
-        if (data?.ats_score != null) {
+
+    if (text && canAccessFeature(tier, 'atsAccess')) {
+      try {
+        const scoreRes = await fetch('/api/cover-letter/score-ats', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jobDescription, coverLetter: text }),
+        });
+        if (scoreRes.ok) {
+          const atsData = (await scoreRes.json()) as {
+            score: number;
+            summary: string;
+            found: string[];
+            missing: string[];
+          };
           setAts({
-            score: data.ats_score,
-            summary: data.ats_summary ?? '',
-            found: (data.ats_keywords_found as string[]) ?? [],
-            missing: (data.ats_keywords_missing as string[]) ?? [],
+            score: atsData.score,
+            summary: atsData.summary,
+            found: atsData.found,
+            missing: atsData.missing,
           });
-          break;
         }
+      } catch {
+        /* optional ATS */
       }
     }
   }
@@ -218,11 +180,39 @@ export function GenerateCoverLetterForm() {
         <Button
           variant="primary"
           loading={loading}
-          disabled={!jobDescription.trim()}
+          disabled={!jobDescription.trim() || jobDescription.trim().length < 100}
           onClick={() => void generate()}
         >
           Generate
         </Button>
+        {streaming.trim() && !letterId ? (
+          <Button
+            variant="secondary"
+            onClick={async () => {
+              const res = await fetch('/api/cover-letters', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  name: `${jobTitle || 'Role'} — ${companyName || 'Company'}`.slice(0, 200),
+                  content: streaming,
+                  tone,
+                  length,
+                  template_id: templateId,
+                  specific_emphasis: emphasis.trim() || null,
+                }),
+              });
+              if (!res.ok) {
+                toast('Could not save cover letter.', 'error');
+                return;
+              }
+              const data = (await res.json()) as { id: string };
+              setLetterId(data.id);
+              toast('Saved to your cover letters.', 'success');
+            }}
+          >
+            Save to library
+          </Button>
+        ) : null}
       </div>
       <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
         {!streaming && !loading ? (
@@ -233,7 +223,7 @@ export function GenerateCoverLetterForm() {
           className="min-h-[320px] w-full resize-y rounded-lg border border-[var(--color-border)] p-3 text-sm"
           value={streaming}
           readOnly
-          placeholder="Streaming output…"
+          placeholder="Generated cover letter…"
         />
         {letterId ? (
           <div className="mt-4 flex flex-wrap gap-2">
@@ -260,7 +250,10 @@ export function GenerateCoverLetterForm() {
                     templateId,
                   }),
                 });
-                if (!res.ok) { toast('PDF export failed.', 'error'); return; }
+                if (!res.ok) {
+                  toast('PDF export failed.', 'error');
+                  return;
+                }
                 const j = await res.json();
                 if (j.pdfUrl) window.open(j.pdfUrl, '_blank');
               }}
@@ -281,7 +274,10 @@ export function GenerateCoverLetterForm() {
                     format: 'docx',
                   }),
                 });
-                if (!res.ok) { toast('DOCX export failed.', 'error'); return; }
+                if (!res.ok) {
+                  toast('DOCX export failed.', 'error');
+                  return;
+                }
                 const j = await res.json();
                 if (j.docxUrl) window.open(j.docxUrl, '_blank');
               }}
@@ -315,8 +311,6 @@ export function GenerateCoverLetterForm() {
               ))}
             </div>
           </div>
-        ) : canAccessFeature(tier, 'atsAccess') && letterId && !ats ? (
-          <p className="mt-4 text-xs text-[var(--color-muted)]">Calculating ATS score…</p>
         ) : null}
       </div>
     </div>

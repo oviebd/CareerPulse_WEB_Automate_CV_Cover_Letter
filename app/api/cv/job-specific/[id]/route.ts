@@ -26,7 +26,8 @@ async function enrichOne(
       const j = job as Job;
       jobTitle = j.job_title;
       companyName = j.company_name;
-      jobDescription = j.job_description ?? '';
+      const kw = Array.isArray(j.keywords) ? j.keywords : [];
+      jobDescription = kw.length ? kw.join(', ') : '';
     }
   }
   return {
@@ -87,8 +88,9 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     const patch = (await request.json()) as Record<string, unknown>;
     const forbidden = ['id', 'user_id', 'created_at'];
     for (const k of forbidden) delete patch[k];
+    delete patch.job_description;
 
-    if (patch.job_title != null || patch.company_name != null || patch.job_description != null) {
+    if (patch.job_title != null || patch.company_name != null || patch.keywords != null) {
       const { data: cvRow } = await supabase
         .from('cvs')
         .select('job_ids')
@@ -97,6 +99,10 @@ export async function PATCH(request: Request, { params }: RouteContext) {
         .maybeSingle();
       const jids = (cvRow?.job_ids as string[] | undefined) ?? [];
       if (jids.length > 0) {
+        const kwPatch =
+          Array.isArray(patch.keywords) && patch.keywords.every((x) => typeof x === 'string')
+            ? (patch.keywords as string[])
+            : undefined;
         await supabase
           .from('jobs')
           .update({
@@ -104,16 +110,14 @@ export async function PATCH(request: Request, { params }: RouteContext) {
               ? { company_name: patch.company_name }
               : {}),
             ...(typeof patch.job_title === 'string' ? { job_title: patch.job_title } : {}),
-            ...(typeof patch.job_description === 'string'
-              ? { job_description: patch.job_description }
-              : {}),
+            ...(kwPatch ? { keywords: kwPatch } : {}),
           })
           .eq('id', jids[0])
           .eq('user_id', user.id);
       }
       delete patch.job_title;
       delete patch.company_name;
-      delete patch.job_description;
+      delete patch.keywords;
     }
 
     const { data, error } = await supabase

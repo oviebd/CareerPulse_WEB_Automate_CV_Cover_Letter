@@ -14,7 +14,52 @@ export type {
   CoverLetter,
   Job,
   JobStatus,
+  AppliedJob,
 } from './database';
+
+/** Structured output from POST /api/jobs/analyze */
+export interface JobAnalysisResult {
+  jobTitle: string | null;
+  company: string | null;
+  shortDescription: string;
+  keyRequirements: string[];
+  region: string | null;
+  workType: 'remote' | 'onsite' | 'hybrid' | null;
+  matchPercentage: number;
+  whyGoodFit: string[];
+  whyNotGoodFit: string[];
+  keywords: string[];
+  jobSummary: string;
+}
+
+export type GenerationType = 'cv' | 'coverLetter' | 'both';
+
+/** Client-only draft after optimise/analyse — persisted only after explicit Save */
+export interface DraftResult {
+  cv?: string;
+  coverLetter?: string;
+  generationType: GenerationType;
+  jobDescription: string;
+  jobUrl: string | null;
+  analysis: JobAnalysisResult | null;
+  originalCvId: string;
+  savedJobId: string | null;
+  savedCvId: string | null;
+  /** When only a cover letter was saved, or alongside CV */
+  savedCoverLetterId?: string | null;
+  isTracked: boolean;
+  /** CV optimise extras */
+  extractedKeywords?: string[];
+  jobTitle?: string | null;
+  companyName?: string | null;
+  aiChangesSummary?: string;
+  bulletsImproved?: number;
+  warnings?: string[];
+  /** Cover letter generation options */
+  coverLetterTone?: CoverLetterTone;
+  coverLetterLength?: CoverLetterLength;
+  coverLetterEmphasis?: string;
+}
 
 export type { CVUpdate, CVInsert, JobInsert, JobUpdate, CoverLetterUpdate } from './database';
 
@@ -404,11 +449,28 @@ export const PRICING = {
 
 export type PricingPlanKey = keyof typeof PRICING;
 
+/** In-memory draft after AI optimise — not persisted until the user saves */
+export interface DraftOptimisedCV {
+  cvContent: string;
+  originalCvId: string;
+  jobDescription: string;
+  jobUrl: string | null;
+  extractedKeywords: string[];
+  jobTitle: string | null;
+  companyName: string | null;
+  generatedAt: Date;
+  /** Optional extras for UI (not required for persistence) */
+  aiChangesSummary?: string;
+  bulletsImproved?: number;
+  warnings?: string[];
+}
+
 /** Tailored CV row (`cvs` with non-empty `job_ids`) plus joined job context for UI */
 export type JobSpecificCV = Omit<CVProfile, 'preferred_template_id'> & {
   preferred_template_id: string | null;
   job_title: string;
   company_name: string | null;
+  /** Derived from stored job keywords (full JD is never stored) */
   job_description: string;
   accent_color: string;
 };

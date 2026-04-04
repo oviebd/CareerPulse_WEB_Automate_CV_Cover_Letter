@@ -1,16 +1,31 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { CLAUDE_MODEL } from '@/lib/claude';
+import { CLAUDE_MODEL, generateCoverLetterText } from '@/lib/claude';
 import { rateLimitHit } from '@/lib/rate-limit';
 import { resolveEffectiveTier } from '@/lib/dev-subscription';
 import { canAccessFeature } from '@/lib/subscription';
 import Anthropic from '@anthropic-ai/sdk';
-import type { CVData } from '@/types';
+import type {
+  CVData,
+  CoverLetterLength,
+  CoverLetterTone,
+  CVProfile,
+  GenerationType,
+} from '@/types';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
 
 const claude = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+const TONES: CoverLetterTone[] = [
+  'professional',
+  'confident',
+  'creative',
+  'concise',
+  'formal',
+];
+const LENGTHS: CoverLetterLength[] = ['short', 'medium', 'long'];
 
 async function withRetry<T>(
   fn: () => Promise<T>,
@@ -35,6 +50,8 @@ interface OptimisedCVResponse {
   ai_changes_summary: string;
   keywords_added: string[];
   bullets_improved: number;
+  inferred_job_title?: string | null;
+  inferred_company_name?: string | null;
 }
 
 function validateOptimisedCV(
@@ -85,6 +102,171 @@ function validateOptimisedCV(
   return { valid: warnings.length === 0, warnings };
 }
 
+type CvRow = {
+  full_name?: string | null;
+  professional_title?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  location?: string | null;
+  linkedin_url?: string | null;
+  github_url?: string | null;
+  links?: unknown;
+  address?: string | null;
+  photo_url?: string | null;
+  summary?: string | null;
+  experience?: unknown;
+  education?: unknown;
+  skills?: unknown;
+  projects?: unknown;
+  certifications?: unknown;
+  languages?: unknown;
+  awards?: unknown;
+  referrals?: unknown;
+  job_ids?: string[] | null;
+};
+
+function rowToCvData(cvRow: CvRow): CVData {
+  return {
+    full_name: cvRow.full_name ?? null,
+    professional_title: cvRow.professional_title ?? null,
+    email: cvRow.email ?? null,
+    phone: cvRow.phone ?? null,
+    location: cvRow.location ?? null,
+    linkedin_url: cvRow.linkedin_url ?? null,
+    github_url: cvRow.github_url ?? null,
+    links: (cvRow.links ?? []) as CVData['links'],
+    address: cvRow.address ?? null,
+    photo_url: cvRow.photo_url ?? null,
+    summary: cvRow.summary ?? null,
+    experience: (cvRow.experience ?? []) as CVData['experience'],
+    education: (cvRow.education ?? []) as CVData['education'],
+    skills: (cvRow.skills ?? []) as CVData['skills'],
+    projects: (cvRow.projects ?? []) as CVData['projects'],
+    certifications: (cvRow.certifications ?? []) as CVData['certifications'],
+    languages: (cvRow.languages ?? []) as CVData['languages'],
+    awards: (cvRow.awards ?? []) as CVData['awards'],
+    referrals: (cvRow.referrals ?? []) as CVData['referrals'],
+  } satisfies CVData;
+}
+
+async function generateOptimisedCvJson(params: {
+  cvData: CVData;
+  jobDescription: string;
+  jobTitleInput: string;
+  companyInput: string;
+}): Promise<{
+  cvContent: string;
+  extractedKeywords: string[];
+  jobTitle: string | null;
+  companyName: string | null;
+  ai_changes_summary: string;
+  bullets_improved: number;
+  warnings: string[];
+}> {
+  const { cvData, jobDescription, jobTitleInput, companyInput } = params;
+  const displayTitle = jobTitleInput || '(infer from job description)';
+  const displayCompany = companyInput || '(infer from job description)';
+
+  const systemPrompt = `You are an expert CV/resume optimiser and career coach with 15 years of experience helping candidates get shortlisted for competitive roles.
+
+Your task is to optimise a candidate's existing CV for a specific job description. You must follow these rules absolutely:
+
+RULES — READ CAREFULLY:
+0. Primary objective: maximize ATS match to the target job description as much as possible while remaining 100% truthful to the candidate's existing CV.
+1. You may ONLY use information that already exists in the candidate's CV. Never invent, fabricate, or assume any experience, skill, qualification, or achievement.
+2. You may NOT add new jobs, companies, education institutions, or certifications that are not already in the CV.
+3. You may NOT change job titles, company names, education institution names, or dates.
+4. You MAY: reorder bullet points within an experience entry to lead with the most relevant ones.
+5. You MAY: rewrite bullet points to use stronger action verbs and quantification — but only based on what the original bullet already says. Do not add numbers or metrics that aren't implied by the original.
+6. You MAY: add relevant keywords from the job description into bullet points naturally — only if the underlying experience genuinely supports the keyword.
+7. You MAY: rewrite the professional summary to align with the target role — using only the candidate's actual experience.
+8. You MAY: reorder skill items within a category to put the most job-relevant skills first.
+9. You MAY: add skills to the skills list ONLY if they are clearly evidenced in the candidate's experience bullets or projects.
+10. Keep the tone professional and consistent throughout.
+11. Prefer ATS-friendly wording: clear role terms, standard job titles, and explicit tools/skills already evidenced in the CV.
+
+Return ONLY a valid JSON object matching the exact schema provided. No preamble, no explanation, no markdown fences.`;
+
+  const userPrompt = `CANDIDATE'S CURRENT CV:
+${JSON.stringify(cvData, null, 2)}
+
+TARGET JOB:
+Title: ${displayTitle}
+Company: ${displayCompany}
+
+Job Description:
+${jobDescription}
+
+Optimise the candidate's CV for this role. Return a JSON object with:
+{
+  "optimised_cv": { ...same schema as input CV... },
+  "ai_changes_summary": "Concise human-readable summary of what was changed and why (2-4 sentences)",
+  "keywords_added": ["keyword1", "keyword2"],
+  "bullets_improved": <number of bullets rewritten>,
+  "inferred_job_title": "If Title was not provided above, infer the role title from the job description; otherwise use the provided title.",
+  "inferred_company_name": "If Company was not provided above, infer the employer name from the job description if clearly stated; otherwise null or a reasonable guess."
+}`;
+
+  const message = await withRetry(() =>
+    claude.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: 8192,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userPrompt }],
+    })
+  );
+
+  const block = message.content[0];
+  const rawText = block.type === 'text' ? block.text : '';
+  const clean = rawText.replace(/```json|```/g, '').trim();
+
+  let parsed: OptimisedCVResponse;
+  try {
+    parsed = JSON.parse(clean) as OptimisedCVResponse;
+  } catch {
+    console.error('Failed to parse AI response:', clean.slice(0, 500));
+    throw new Error('AI_PARSE');
+  }
+
+  if (!parsed.optimised_cv) {
+    throw new Error('AI_INCOMPLETE');
+  }
+
+  const { warnings } = validateOptimisedCV(cvData, parsed.optimised_cv);
+
+  let extractedKeywords: string[] = [];
+  try {
+    const k = parsed.keywords_added;
+    if (Array.isArray(k)) {
+      extractedKeywords = k
+        .filter((x): x is string => typeof x === 'string')
+        .map((s) => s.trim())
+        .filter(Boolean);
+    }
+  } catch {
+    extractedKeywords = [];
+  }
+
+  const jobTitle: string | null = jobTitleInput
+    ? jobTitleInput
+    : parsed.inferred_job_title?.trim() || null;
+  const companyName: string | null = companyInput
+    ? companyInput
+    : parsed.inferred_company_name?.trim() || null;
+
+  const cvContent = JSON.stringify(parsed.optimised_cv);
+
+  return {
+    cvContent,
+    extractedKeywords,
+    jobTitle,
+    companyName,
+    ai_changes_summary: parsed.ai_changes_summary ?? '',
+    bullets_improved: parsed.bullets_improved ?? 0,
+    warnings,
+  };
+}
+
 export async function POST(request: Request) {
   try {
     const supabase = await createClient();
@@ -104,24 +286,46 @@ export async function POST(request: Request) {
       company_name?: string;
       job_description?: string;
       core_cv_id?: string;
+      generationType?: GenerationType;
+      generation_type?: GenerationType;
+      tone?: CoverLetterTone;
+      length?: CoverLetterLength;
+      specific_emphasis?: string;
+      specificEmphasis?: string;
     };
 
-    if (!body.job_description?.trim() || body.job_description.trim().length < 100) {
-      return NextResponse.json(
-        {
-          error:
-            'Please paste the full job description for best results.',
-        },
-        { status: 422 }
-      );
+    const generationType: GenerationType =
+      body.generationType ?? body.generation_type ?? 'cv';
+
+    if (generationType !== 'cv' && generationType !== 'coverLetter' && generationType !== 'both') {
+      return NextResponse.json({ error: 'Invalid generationType' }, { status: 422 });
     }
 
-    if (!body.job_title?.trim() || !body.company_name?.trim()) {
-      return NextResponse.json(
-        { error: 'Job title and company name are required.' },
-        { status: 422 }
-      );
+    const needsJd =
+      generationType === 'cv' ||
+      generationType === 'coverLetter' ||
+      generationType === 'both';
+    if (needsJd) {
+      const jd = body.job_description?.trim() ?? '';
+      if (!jd || jd.length < 100) {
+        return NextResponse.json(
+          {
+            error:
+              'Please paste the full job description for best results.',
+          },
+          { status: 422 }
+        );
+      }
     }
+
+    const jobTitleInput = body.job_title?.trim() ?? '';
+    const companyInput = body.company_name?.trim() ?? '';
+    const tone =
+      body.tone && TONES.includes(body.tone) ? body.tone : 'professional';
+    const length =
+      body.length && LENGTHS.includes(body.length) ? body.length : 'medium';
+    const emphasis =
+      body.specific_emphasis?.trim() ?? body.specificEmphasis?.trim() ?? '';
 
     const { data: prof } = await supabase
       .from('profiles')
@@ -140,29 +344,6 @@ export async function POST(request: Request) {
         { status: 403 }
       );
     }
-
-    type CvRow = {
-      full_name?: string | null;
-      professional_title?: string | null;
-      email?: string | null;
-      phone?: string | null;
-      location?: string | null;
-      linkedin_url?: string | null;
-      github_url?: string | null;
-      links?: unknown;
-      address?: string | null;
-      photo_url?: string | null;
-      summary?: string | null;
-      experience?: unknown;
-      education?: unknown;
-      skills?: unknown;
-      projects?: unknown;
-      certifications?: unknown;
-      languages?: unknown;
-      awards?: unknown;
-      referrals?: unknown;
-      job_ids?: string[] | null;
-    };
 
     let cvRow: CvRow | null = null;
     let cvErr = null as { message: string } | null;
@@ -207,112 +388,125 @@ export async function POST(request: Request) {
       );
     }
 
-    const cvData = {
-      full_name: cvRow.full_name ?? null,
-      professional_title: cvRow.professional_title ?? null,
-      email: cvRow.email ?? null,
-      phone: cvRow.phone ?? null,
-      location: cvRow.location ?? null,
-      linkedin_url: cvRow.linkedin_url ?? null,
-      github_url: cvRow.github_url ?? null,
-      links: (cvRow.links ?? []) as CVData['links'],
-      address: cvRow.address ?? null,
-      photo_url: cvRow.photo_url ?? null,
-      summary: cvRow.summary ?? null,
-      experience: (cvRow.experience ?? []) as CVData['experience'],
-      education: (cvRow.education ?? []) as CVData['education'],
-      skills: (cvRow.skills ?? []) as CVData['skills'],
-      projects: (cvRow.projects ?? []) as CVData['projects'],
-      certifications: (cvRow.certifications ?? []) as CVData['certifications'],
-      languages: (cvRow.languages ?? []) as CVData['languages'],
-      awards: (cvRow.awards ?? []) as CVData['awards'],
-      referrals: (cvRow.referrals ?? []) as CVData['referrals'],
-    } satisfies CVData;
+    const cvData = rowToCvData(cvRow);
+    const jobDescription = (body.job_description ?? '').trim();
+    const clProfile = cvRow as unknown as Partial<CVProfile>;
+    const candidateNameFromCv = cvRow.full_name?.trim() || null;
 
-    const jobDescription = body.job_description.trim();
-    const jobTitle = body.job_title.trim();
-    const companyName = body.company_name.trim();
+    const companyForCl = companyInput || 'the company';
+    const titleForCl = jobTitleInput || 'the role';
 
-    const systemPrompt = `You are an expert CV/resume optimiser and career coach with 15 years of experience helping candidates get shortlisted for competitive roles.
+    const basePayload = {
+      generationType,
+      coverLetterTone: tone,
+      coverLetterLength: length,
+    };
 
-Your task is to optimise a candidate's existing CV for a specific job description. You must follow these rules absolutely:
+    if (generationType === 'coverLetter') {
+      const coverLetter = await generateCoverLetterText({
+        cvProfile: clProfile,
+        jobDescription,
+        companyName: companyForCl,
+        jobTitle: titleForCl,
+        tone,
+        length,
+        specificEmphasis: emphasis,
+        candidateNameFromCv,
+      });
+      return NextResponse.json({
+        ...basePayload,
+        coverLetter,
+        cv: undefined,
+        cvContent: undefined,
+      });
+    }
 
-RULES — READ CAREFULLY:
-0. Primary objective: maximize ATS match to the target job description as much as possible while remaining 100% truthful to the candidate's existing CV.
-1. You may ONLY use information that already exists in the candidate's CV. Never invent, fabricate, or assume any experience, skill, qualification, or achievement.
-2. You may NOT add new jobs, companies, education institutions, or certifications that are not already in the CV.
-3. You may NOT change job titles, company names, education institution names, or dates.
-4. You MAY: reorder bullet points within an experience entry to lead with the most relevant ones.
-5. You MAY: rewrite bullet points to use stronger action verbs and quantification — but only based on what the original bullet already says. Do not add numbers or metrics that aren't implied by the original.
-6. You MAY: add relevant keywords from the job description into bullet points naturally — only if the underlying experience genuinely supports the keyword.
-7. You MAY: rewrite the professional summary to align with the target role — using only the candidate's actual experience.
-8. You MAY: reorder skill items within a category to put the most job-relevant skills first.
-9. You MAY: add skills to the skills list ONLY if they are clearly evidenced in the candidate's experience bullets or projects.
-10. Keep the tone professional and consistent throughout.
-11. Prefer ATS-friendly wording: clear role terms, standard job titles, and explicit tools/skills already evidenced in the CV.
+    if (generationType === 'both') {
+      try {
+        const [cvPart, coverLetter] = await Promise.all([
+          generateOptimisedCvJson({
+            cvData,
+            jobDescription,
+            jobTitleInput,
+            companyInput,
+          }),
+          generateCoverLetterText({
+            cvProfile: clProfile,
+            jobDescription,
+            companyName: companyForCl,
+            jobTitle: titleForCl,
+            tone,
+            length,
+            specificEmphasis: emphasis,
+            candidateNameFromCv,
+          }),
+        ]);
 
-Return ONLY a valid JSON object matching the exact schema provided. No preamble, no explanation, no markdown fences.`;
+        return NextResponse.json({
+          ...basePayload,
+          cv: cvPart.cvContent,
+          cvContent: cvPart.cvContent,
+          coverLetter,
+          extractedKeywords: cvPart.extractedKeywords,
+          jobTitle: cvPart.jobTitle,
+          companyName: cvPart.companyName,
+          ai_changes_summary: cvPart.ai_changes_summary,
+          bullets_improved: cvPart.bullets_improved,
+          warnings: cvPart.warnings,
+        });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : '';
+        if (msg === 'AI_PARSE') {
+          return NextResponse.json(
+            { error: 'AI returned invalid response. Please try again.' },
+            { status: 502 }
+          );
+        }
+        if (msg === 'AI_INCOMPLETE') {
+          return NextResponse.json(
+            { error: 'AI returned incomplete response. Please try again.' },
+            { status: 502 }
+          );
+        }
+        throw e;
+      }
+    }
 
-    const userPrompt = `CANDIDATE'S CURRENT CV:
-${JSON.stringify(cvData, null, 2)}
-
-TARGET JOB:
-Title: ${jobTitle}
-Company: ${companyName}
-
-Job Description:
-${jobDescription}
-
-Optimise the candidate's CV for this role. Return a JSON object with:
-{
-  "optimised_cv": { ...same schema as input CV... },
-  "ai_changes_summary": "Concise human-readable summary of what was changed and why (2-4 sentences)",
-  "keywords_added": ["keyword1", "keyword2"],
-  "bullets_improved": <number of bullets rewritten>
-}`;
-
-    const message = await withRetry(() =>
-      claude.messages.create({
-        model: CLAUDE_MODEL,
-        max_tokens: 8192,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: userPrompt }],
-      })
-    );
-
-    const block = message.content[0];
-    const rawText = block.type === 'text' ? block.text : '';
-    const clean = rawText.replace(/```json|```/g, '').trim();
-
-    let parsed: OptimisedCVResponse;
+    // generationType === 'cv'
     try {
-      parsed = JSON.parse(clean) as OptimisedCVResponse;
-    } catch {
-      console.error('Failed to parse AI response:', clean.slice(0, 500));
-      return NextResponse.json(
-        { error: 'AI returned invalid response. Please try again.' },
-        { status: 502 }
-      );
+      const cvPart = await generateOptimisedCvJson({
+        cvData,
+        jobDescription,
+        jobTitleInput,
+        companyInput,
+      });
+      return NextResponse.json({
+        ...basePayload,
+        cv: cvPart.cvContent,
+        cvContent: cvPart.cvContent,
+        extractedKeywords: cvPart.extractedKeywords,
+        jobTitle: cvPart.jobTitle,
+        companyName: cvPart.companyName,
+        ai_changes_summary: cvPart.ai_changes_summary,
+        bullets_improved: cvPart.bullets_improved,
+        warnings: cvPart.warnings,
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '';
+      if (msg === 'AI_PARSE') {
+        return NextResponse.json(
+          { error: 'AI returned invalid response. Please try again.' },
+          { status: 502 }
+        );
+      }
+      if (msg === 'AI_INCOMPLETE') {
+        return NextResponse.json(
+          { error: 'AI returned incomplete response. Please try again.' },
+          { status: 502 }
+        );
+      }
+      throw e;
     }
-
-    if (!parsed.optimised_cv) {
-      return NextResponse.json(
-        { error: 'AI returned incomplete response. Please try again.' },
-        { status: 502 }
-      );
-    }
-
-    const { warnings } = validateOptimisedCV(cvData, parsed.optimised_cv);
-
-    return NextResponse.json({
-      optimised_cv: parsed.optimised_cv,
-      ai_changes_summary: parsed.ai_changes_summary ?? '',
-      keywords_added: parsed.keywords_added ?? [],
-      bullets_improved: parsed.bullets_improved ?? 0,
-      resolved_job_title: jobTitle,
-      resolved_company_name: companyName,
-      warnings,
-    });
   } catch (e) {
     console.error('cv optimise', e);
     return NextResponse.json(
