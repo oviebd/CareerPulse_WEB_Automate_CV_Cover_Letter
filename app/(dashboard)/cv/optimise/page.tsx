@@ -2,7 +2,7 @@
  * OPTIMISE FLOW (internal analysis summary)
  * - Next.js 14 app router; dashboard routes under app/(dashboard)/cv/optimise.
  * - Generation: POST /api/cv/optimise uses CLAUDE_MODEL (ANTHROPIC_MODEL); optional POST /api/jobs/analyze uses CV_ANALYZER_API_MODEL (Haiku).
- * - Results are passed to /cv/optimise/result via zustand store useOptimiseDraftStore (no localStorage).
+ * - Results: useOptimiseDraftStore + useOptimiseEditDraftStore (Zustand). With JD → /cv/job-specific/draft/edit; without JD → /cv/optimise/result.
  * - DB: jobs (job_title, company_name, job_url, keywords JSONB, job_summary); applied_jobs links user↔job; cvs/cover_letters via save-optimised.
  * - Cover letter standalone page uses the same optimise API with generationType coverLetter (GenerateCoverLetterForm).
  */
@@ -23,6 +23,7 @@ import { useToast } from '@/components/ui/toast';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useCoreCVVersions } from '@/hooks/useCV';
 import { useOptimiseDraftStore } from '@/stores/useOptimiseDraftStore';
+import { useOptimiseEditDraftStore } from '@/stores/useOptimiseEditDraftStore';
 import type { DraftResult, GenerationType, JobAnalysisResult } from '@/types';
 import { cn, formatDate } from '@/lib/utils';
 
@@ -50,6 +51,7 @@ export default function CVOptimisePage() {
   const { tier } = useSubscription();
   const { toast } = useToast();
   const setOptimiseDraft = useOptimiseDraftStore((s) => s.setDraft);
+  const setCvEditDraft = useOptimiseEditDraftStore((s) => s.setCvEditDraft);
   const { data: coreVersions = [], isLoading: coreVersionsLoading } = useCoreCVVersions();
 
   const [jobTitle, setJobTitle] = useState('');
@@ -166,7 +168,33 @@ export default function CVOptimisePage() {
         warnings: data.warnings,
       };
       setOptimiseDraft(draft);
-      router.push('/cv/optimise/result');
+      const hasJd = jobDescription.trim().length > 0;
+      if (hasJd) {
+        setCvEditDraft({
+          cvContent: draft.cv ?? '',
+          coverLetter: draft.coverLetter,
+          generationType: draft.generationType,
+          originalCvId: draft.originalCvId,
+          jobTitle: draft.jobTitle ?? draft.analysis?.jobTitle ?? null,
+          companyName: draft.companyName ?? draft.analysis?.company ?? null,
+          jobDescription: draft.jobDescription,
+          jobUrl: draft.jobUrl,
+          analysis: draft.analysis,
+          savedJobId: null,
+          savedCvId: null,
+          savedCoverLetterId: null,
+          extractedKeywords: draft.extractedKeywords ?? [],
+          aiChangesSummary: draft.aiChangesSummary ?? null,
+          bulletsImproved: draft.bulletsImproved ?? 0,
+          isTracked: false,
+          coverLetterTone: draft.coverLetterTone,
+          coverLetterLength: draft.coverLetterLength,
+          coverLetterEmphasis: draft.coverLetterEmphasis ?? null,
+        });
+        router.push('/cv/job-specific/draft/edit');
+      } else {
+        router.push('/cv/optimise/result');
+      }
     } catch {
       toast('Something went wrong. Please try again.', 'error');
     } finally {
@@ -182,6 +210,7 @@ export default function CVOptimisePage() {
     analysis,
     router,
     setOptimiseDraft,
+    setCvEditDraft,
     toast,
   ]);
 

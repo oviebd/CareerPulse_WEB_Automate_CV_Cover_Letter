@@ -13,25 +13,42 @@ import { PreviewPanel } from '@/components/cv/premium/PreviewPanel';
 import { ATSCircularScore } from '@/components/cv/premium/ATSCircularScore';
 import { JobKeywordsBanner } from '@/components/cv/premium/JobKeywordsBanner';
 import type { CVFormTab } from '@/components/cv/CVFormFields';
-import {
-  useJobSpecificCV,
-  useUpdateJobSpecificCV,
-  useArchiveJobSpecificCV,
-  useSaveJobSpecificCV,
-} from '@/hooks/useJobSpecificCVs';
+import { useJobSpecificCV, useArchiveJobSpecificCV } from '@/hooks/useJobSpecificCVs';
 import { useCoreCVVersions } from '@/hooks/useCV';
 import { useSubscription } from '@/hooks/useSubscription';
-import { formatDate } from '@/lib/utils';
+import { formatDate, cn } from '@/lib/utils';
 import type { CVData } from '@/types';
 import type { CVTemplate, SubscriptionTier } from '@/types';
 import { canUseTemplate } from '@/lib/subscription';
 import { buildATSReport } from '@/lib/cv-ats';
 import { cloneCvData } from '@/lib/cv-clone';
 import { useToast } from '@/components/ui/toast';
-import { Undo2, Redo2, ChevronDown, ChevronUp } from 'lucide-react';
 import { CV_FORM_CARD } from '@/lib/cv-editor-styles';
-import { parseOptimisedCvText, optimisedCvJsonToCvData } from '@/lib/optimise-result';
+import {
+  parseOptimisedCvText,
+  optimisedCvJsonToCvData,
+  cvDataToOptimisedCvJson,
+} from '@/lib/optimise-result';
 import { useOptimiseDraftStore } from '@/stores/useOptimiseDraftStore';
+import type { AppliedJobTrackStatus, GenerationType } from '@/types';
+import { JOB_STATUS_LABELS, JOB_STATUS_COLORS } from '@/types';
+import { computeCvDiffSections, summarizeDiff } from '@/lib/cv-diff';
+import type { CVProfile } from '@/types';
+import { Modal } from '@/components/ui/modal';
+import { Tabs } from '@/components/ui/tabs';
+import {
+  Loader2,
+  GitCompareArrows,
+  MapPin,
+  Building2,
+  AlertTriangle,
+  Undo2,
+  Redo2,
+  ChevronDown,
+  ChevronUp,
+} from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
 import {
   useOptimiseEditDraftStore,
   type CvOptimiseEditDraft,
@@ -108,6 +125,43 @@ function patchFromCvDataWithJobMeta(
 
 /** Payload for PATCH /api/cv (core profile), matching core editor save. */
 
+function cvProfileToCvData(profile: CVProfile): CVData {
+  return {
+    full_name: profile.full_name,
+    professional_title: profile.professional_title,
+    email: profile.email,
+    phone: profile.phone,
+    location: profile.location,
+    linkedin_url: profile.linkedin_url,
+    github_url: profile.github_url,
+    links: profile.links ?? [],
+    address: profile.address ?? null,
+    photo_url: profile.photo_url ?? null,
+    summary: profile.summary,
+    section_visibility: profile.section_visibility ?? {},
+    experience: profile.experience as CVData['experience'],
+    education: profile.education as CVData['education'],
+    skills: profile.skills as CVData['skills'],
+    projects: profile.projects as CVData['projects'],
+    certifications: profile.certifications as CVData['certifications'],
+    languages: profile.languages as CVData['languages'],
+    awards: profile.awards as CVData['awards'],
+    referrals: profile.referrals ?? [],
+  };
+}
+
+const TRACK_STATUS_OPTIONS: AppliedJobTrackStatus[] = [
+  'apply_later',
+  'applied',
+  'interviewing',
+  'technical_test',
+  'offer_received',
+  'negotiating',
+  'rejected',
+  'withdrawn',
+  'ghosted',
+];
+
 function coreCvPatchFromDraft(
   data: CVData,
   preferredTemplateId: string,
@@ -149,10 +203,6 @@ export default function JobCVEditPage() {
   const { data: jobCV, isLoading: jobCvLoading } = useJobSpecificCV(
     isDraftMode ? undefined : id
   );
-  const { update, saveImmediately, isSaving, lastSaved } = useUpdateJobSpecificCV(
-    isDraftMode ? undefined : id
-  );
-  const saveNewJobCv = useSaveJobSpecificCV();
   const archive = useArchiveJobSpecificCV();
   const { data: coreVersions = [], isLoading: coreVersionsLoading } = useCoreCVVersions();
   const [showJD, setShowJD] = useState(false);
@@ -178,6 +228,24 @@ export default function JobCVEditPage() {
   const [savingCore, setSavingCore] = useState(false);
 
   const [draftMeta, setDraftMeta] = useState<CvOptimiseEditDraft | null>(null);
+  const [sessionSavedJobId, setSessionSavedJobId] = useState<string | null>(null);
+  const [sessionSavedCvId, setSessionSavedCvId] = useState<string | null>(null);
+  const [coverLetterText, setCoverLetterText] = useState('');
+  const [documentTab, setDocumentTab] = useState<'cv' | 'coverLetter'>('cv');
+  const [trackPopupOpen, setTrackPopupOpen] = useState(false);
+  const [diffOpen, setDiffOpen] = useState(false);
+  const [diffLoading, setDiffLoading] = useState(false);
+  const [diffError, setDiffError] = useState<string | null>(null);
+  const [diffSections, setDiffSections] = useState<
+    ReturnType<typeof computeCvDiffSections>
+  >([]);
+  const [trackPopupSaving, setTrackPopupSaving] = useState(false);
+  const [pageSaveState, setPageSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [uncollapsedDiffSections, setUncollapsedDiffSections] = useState<Record<string, boolean>>(
+    {}
+  );
+  const [analysisOpen, setAnalysisOpen] = useState(false);
+  const [pendingTrackStatus, setPendingTrackStatus] = useState<AppliedJobTrackStatus | null>(null);
 
   const [undoPast, setUndoPast] = useState<CVData[]>([]);
   const [undoFuture, setUndoFuture] = useState<CVData[]>([]);
@@ -216,6 +284,30 @@ export default function JobCVEditPage() {
   const companyName = jobCV?.company_name ?? draftMeta?.companyName ?? null;
   const keywords = jobCV?.keywords_added ?? draftMeta?.extractedKeywords ?? [];
 
+  const genType: GenerationType = isDraftMode
+    ? draftMeta?.generationType ?? 'cv'
+    : 'cv';
+
+  const effectiveJobId = isDraftMode
+    ? sessionSavedJobId ?? draftMeta?.savedJobId ?? null
+    : (jobCV as { job_ids?: string[] } | null | undefined)?.job_ids?.[0] ?? null;
+
+  const { data: appliedTrack } = useQuery({
+    queryKey: ['applied-job-detail', effectiveJobId],
+    queryFn: async () => {
+      const res = await fetch(`/api/applied-jobs/${effectiveJobId}`);
+      if (!res.ok) throw new Error('track_fetch_failed');
+      return res.json() as Promise<{
+        tracked: boolean;
+        status: AppliedJobTrackStatus | null;
+      }>;
+    },
+    enabled: Boolean(effectiveJobId),
+    staleTime: 30_000,
+  });
+
+  const trackStatus: AppliedJobTrackStatus | null = appliedTrack?.status ?? null;
+
   useEffect(() => {
     allowUndoHistoryRef.current = false;
     const t = window.setTimeout(() => {
@@ -242,6 +334,9 @@ export default function JobCVEditPage() {
       return;
     }
     setDraftMeta(payload);
+    setSessionSavedJobId(payload.savedJobId ?? null);
+    setSessionSavedCvId(payload.savedCvId ?? null);
+    setCoverLetterText(payload.coverLetter ?? '');
     const parsed = parseOptimisedCvText(payload.cvContent);
     if (!parsed.ok) {
       toast(parsed.message, 'error');
@@ -308,30 +403,10 @@ export default function JobCVEditPage() {
           }, 550);
         }
         skipHistoryRef.current = false;
-        if (!isDraftMode) {
-          update(
-            patchFromCvDataWithJobMeta(
-              data,
-              selectedTemplateId,
-              accent,
-              fontFamily,
-              jobTitle,
-              companyName
-            )
-          );
-        }
         return data;
       });
     },
-    [
-      update,
-      selectedTemplateId,
-      accent,
-      fontFamily,
-      jobTitle,
-      companyName,
-      isDraftMode,
-    ]
+    []
   );
 
   const undo = useCallback(() => {
@@ -345,29 +420,9 @@ export default function JobCVEditPage() {
       if (cur) setUndoFuture((f) => [cloneCvData(cur), ...f].slice(0, 50));
       const next = cloneCvData(snapshot);
       setDraft(next);
-      if (!isDraftMode) {
-        update(
-          patchFromCvDataWithJobMeta(
-            next,
-            selectedTemplateId,
-            accent,
-            fontFamily,
-            jobTitle,
-            companyName
-          )
-        );
-      }
       return p.slice(0, -1);
     });
-  }, [
-    update,
-    selectedTemplateId,
-    accent,
-    fontFamily,
-    jobTitle,
-    companyName,
-    isDraftMode,
-  ]);
+  }, []);
 
   const redo = useCallback(() => {
     setUndoFuture((f) => {
@@ -380,29 +435,9 @@ export default function JobCVEditPage() {
       if (cur) setUndoPast((p) => [...p.slice(-49), cloneCvData(cur)]);
       const next = cloneCvData(nextSnap);
       setDraft(next);
-      if (!isDraftMode) {
-        update(
-          patchFromCvDataWithJobMeta(
-            next,
-            selectedTemplateId,
-            accent,
-            fontFamily,
-            jobTitle,
-            companyName
-          )
-        );
-      }
       return f.slice(1);
     });
-  }, [
-    update,
-    selectedTemplateId,
-    accent,
-    fontFamily,
-    jobTitle,
-    companyName,
-    isDraftMode,
-  ]);
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -550,69 +585,275 @@ export default function JobCVEditPage() {
 
   const saveJobCv = useCallback(async () => {
     if (!draft) return;
-    if (isDraftMode) {
-      if (!draftMeta) return;
-      try {
-        const { id: newId } = await saveNewJobCv.mutateAsync({
-          save_without_job: !draftMeta.savedJobId,
-          existing_job_id: draftMeta.savedJobId ?? undefined,
-          cv_data: {
-            ...patchFromCvData(draft, selectedTemplateId, accent, fontFamily),
-            referrals: draft.referrals ?? [],
-          },
-          name:
-            draftMeta.jobTitle?.trim() && draftMeta.companyName?.trim()
-              ? `${draftMeta.jobTitle.trim()} — ${draftMeta.companyName.trim()}`
-              : 'Tailored CV',
-          ai_changes_summary: draftMeta.aiChangesSummary ?? null,
-          keywords_added: draftMeta.extractedKeywords ?? [],
-          bullets_improved: draftMeta.bulletsImproved ?? 0,
-          preferred_template_id: selectedTemplateId,
-          accent_color: accent,
-        });
-        useOptimiseEditDraftStore.getState().setCvEditDraft(null);
-        const optim = useOptimiseDraftStore.getState().draft;
-        if (optim) {
-          useOptimiseDraftStore.getState().setDraft({
-            ...optim,
-            savedCvId: newId,
-          });
-        }
-        toast('Job CV saved.', 'success');
-        router.replace(`/cv/job-specific/${newId}/edit`);
-      } catch {
-        toast('Could not save job CV.', 'error');
-      }
-      return;
-    }
+    if (isDraftMode && !draftMeta) return;
+
+    setPageSaveState('saving');
     try {
-      await saveImmediately(
-        patchFromCvDataWithJobMeta(
-          draft,
-          selectedTemplateId,
-          accent,
-          fontFamily,
-          jobTitle,
-          companyName
-        )
-      );
-      toast('Job CV saved.', 'success');
+      const gen = genType;
+      const cvContent = cvDataToOptimisedCvJson(draft);
+      const cl =
+        gen === 'coverLetter' || gen === 'both' ? coverLetterText.trim() : '';
+
+      if (isDraftMode && draftMeta) {
+        let jobId = sessionSavedJobId ?? draftMeta.savedJobId ?? null;
+        let cvId = sessionSavedCvId ?? draftMeta.savedCvId ?? null;
+
+        if (!cvId) {
+          if (!jobId) {
+            const jobRes = await fetch('/api/jobs/save', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                url: draftMeta.jobUrl || undefined,
+                keywords: draftMeta.analysis?.keywords?.length
+                  ? draftMeta.analysis.keywords
+                  : draftMeta.extractedKeywords ?? [],
+                jobSummary: draftMeta.analysis?.jobSummary ?? '',
+                title: draftMeta.analysis?.jobTitle ?? draftMeta.jobTitle ?? undefined,
+                company: draftMeta.analysis?.company ?? draftMeta.companyName ?? undefined,
+              }),
+            });
+            if (!jobRes.ok) {
+              toast('Failed to save job.', 'error');
+              setPageSaveState('idle');
+              return;
+            }
+            const jobJson = (await jobRes.json()) as { id: string };
+            jobId = jobJson.id;
+            setSessionSavedJobId(jobId);
+          }
+
+          const soRes = await fetch('/api/cvs/save-optimised', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              cvContent: gen !== 'coverLetter' ? cvContent : undefined,
+              coverLetterContent: gen !== 'cv' ? cl : undefined,
+              originalCvId: draftMeta.originalCvId,
+              jobId,
+              generationType: gen,
+              ai_changes_summary: draftMeta.aiChangesSummary ?? null,
+              keywords_added: draftMeta.extractedKeywords ?? [],
+              bullets_improved: draftMeta.bulletsImproved ?? 0,
+              coverLetterTone: draftMeta.coverLetterTone,
+              coverLetterLength: draftMeta.coverLetterLength,
+              coverLetterEmphasis: draftMeta.coverLetterEmphasis ?? null,
+            }),
+          });
+          if (!soRes.ok) {
+            toast('Failed to save CV.', 'error');
+            setPageSaveState('idle');
+            return;
+          }
+          const soJson = (await soRes.json()) as {
+            cvId: string | null;
+            coverLetterId: string | null;
+          };
+          cvId = soJson.cvId;
+          if (cvId) setSessionSavedCvId(cvId);
+          const optim = useOptimiseDraftStore.getState().draft;
+          if (optim) {
+            useOptimiseDraftStore.getState().setDraft({
+              ...optim,
+              savedJobId: jobId,
+              savedCvId: cvId,
+              savedCoverLetterId: soJson.coverLetterId,
+            });
+          }
+          useOptimiseEditDraftStore.getState().setCvEditDraft({
+            ...draftMeta,
+            savedJobId: jobId,
+            savedCvId: cvId,
+            savedCoverLetterId: soJson.coverLetterId ?? undefined,
+          });
+
+          if (trackStatus && jobId) {
+            const tr = await fetch(`/api/applied-jobs/${jobId}`);
+            const trJson = (await tr.json()) as { tracked?: boolean };
+            if (!trJson.tracked) {
+              await fetch('/api/applied-jobs', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ jobId, status: trackStatus }),
+              });
+            }
+          }
+
+          toast('CV saved successfully', 'success');
+          if (cvId) {
+            useOptimiseEditDraftStore.getState().setCvEditDraft(null);
+            router.replace(`/cv/job-specific/${cvId}/edit`);
+          }
+        } else {
+          const patchRes = await fetch(`/api/cvs/${cvId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              cvContent,
+              coverLetterContent: gen !== 'cv' ? cl : undefined,
+            }),
+          });
+          if (!patchRes.ok) {
+            toast('Could not save changes.', 'error');
+            setPageSaveState('idle');
+            return;
+          }
+          toast('Changes saved', 'success');
+          void queryClient.invalidateQueries({ queryKey: ['applied-job-detail'] });
+        }
+      } else if (!isDraftMode) {
+        const patchRes = await fetch(`/api/cvs/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            cvContent,
+            coverLetterContent: gen !== 'cv' ? cl : undefined,
+          }),
+        });
+        if (!patchRes.ok) {
+          toast('Could not save changes.', 'error');
+          setPageSaveState('idle');
+          return;
+        }
+        toast('Changes saved', 'success');
+        void queryClient.invalidateQueries({ queryKey: ['job-specific-cv', id] });
+      }
+
+      setPageSaveState('saved');
+      window.setTimeout(() => setPageSaveState('idle'), 1800);
     } catch {
-      toast('Could not save job CV.', 'error');
+      toast('Could not save.', 'error');
+      setPageSaveState('idle');
     }
   }, [
     draft,
     isDraftMode,
     draftMeta,
-    saveNewJobCv,
-    saveImmediately,
-    selectedTemplateId,
-    accent,
-    fontFamily,
-    jobTitle,
-    companyName,
+    genType,
+    coverLetterText,
+    sessionSavedJobId,
+    sessionSavedCvId,
+    trackStatus,
     toast,
     router,
+    queryClient,
+    id,
+  ]);
+
+  const openDiffViewer = useCallback(async () => {
+    if (!draft) return;
+    const oid =
+      draftMeta?.originalCvId ?? targetCoreCvId ?? coreVersions[0]?.id ?? null;
+    if (!oid) {
+      setDiffError('Could not load original CV for comparison. Please try again.');
+      setDiffSections([]);
+      setDiffOpen(true);
+      return;
+    }
+    setDiffLoading(true);
+    setDiffError(null);
+    try {
+      const res = await fetch(`/api/cvs/${oid}`);
+      if (!res.ok) {
+        setDiffError('Could not load original CV for comparison. Please try again.');
+        setDiffSections([]);
+        setDiffOpen(true);
+        return;
+      }
+      const profile = (await res.json()) as CVProfile;
+      const origJson = cvDataToOptimisedCvJson(cvProfileToCvData(profile));
+      const tailoredJson = cvDataToOptimisedCvJson(draft);
+      setDiffSections(computeCvDiffSections(origJson, tailoredJson));
+      setDiffOpen(true);
+    } catch {
+      setDiffError('Could not load original CV for comparison. Please try again.');
+      setDiffSections([]);
+      setDiffOpen(true);
+    } finally {
+      setDiffLoading(false);
+    }
+  }, [draft, draftMeta?.originalCvId, targetCoreCvId, coreVersions]);
+
+  const handleTrackPopupSave = useCallback(async () => {
+    if (!pendingTrackStatus || !draftMeta) return;
+    setTrackPopupSaving(true);
+    try {
+      let jobId = sessionSavedJobId ?? draftMeta.savedJobId ?? effectiveJobId ?? null;
+      if (!jobId) {
+        const jobRes = await fetch('/api/jobs/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url: draftMeta.jobUrl || undefined,
+            keywords: draftMeta.analysis?.keywords?.length
+              ? draftMeta.analysis.keywords
+              : draftMeta.extractedKeywords ?? [],
+            jobSummary: draftMeta.analysis?.jobSummary ?? '',
+            title: draftMeta.analysis?.jobTitle ?? draftMeta.jobTitle ?? undefined,
+            company: draftMeta.analysis?.company ?? draftMeta.companyName ?? undefined,
+          }),
+        });
+        if (!jobRes.ok) {
+          toast('Could not save job.', 'error');
+          return;
+        }
+        const j = (await jobRes.json()) as { id: string };
+        jobId = j.id;
+        setSessionSavedJobId(jobId);
+        const od = useOptimiseDraftStore.getState().draft;
+        if (od) {
+          useOptimiseDraftStore.getState().setDraft({ ...od, savedJobId: jobId });
+        }
+        useOptimiseEditDraftStore.getState().setCvEditDraft({
+          ...draftMeta,
+          savedJobId: jobId,
+        });
+      }
+
+      const tr = await fetch(`/api/applied-jobs/${jobId}`);
+      const trJson = (await tr.json()) as {
+        tracked?: boolean;
+        status?: AppliedJobTrackStatus | null;
+      };
+
+      if (trJson.tracked) {
+        const patchRes = await fetch(`/api/applied-jobs/${jobId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: pendingTrackStatus }),
+        });
+        if (!patchRes.ok) {
+          toast('Could not update status.', 'error');
+          return;
+        }
+        toast(`Status updated to ${JOB_STATUS_LABELS[pendingTrackStatus]}`, 'success');
+      } else {
+        const postRes = await fetch('/api/applied-jobs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jobId, status: pendingTrackStatus }),
+        });
+        if (!postRes.ok) {
+          toast('Could not track job.', 'error');
+          return;
+        }
+        toast(`Job tracked as ${JOB_STATUS_LABELS[pendingTrackStatus]}`, 'success');
+      }
+      void queryClient.invalidateQueries({ queryKey: ['applied-job-detail'] });
+      void queryClient.invalidateQueries({ queryKey: ['job-applications'] });
+      setTrackPopupOpen(false);
+    } catch {
+      toast('Something went wrong.', 'error');
+    } finally {
+      setTrackPopupSaving(false);
+    }
+  }, [
+    pendingTrackStatus,
+    draftMeta,
+    sessionSavedJobId,
+    effectiveJobId,
+    toast,
+    queryClient,
   ]);
 
   const updateCoreCvFromJob = useCallback(async () => {
@@ -689,47 +930,91 @@ export default function JobCVEditPage() {
     );
   }
 
+  const displayCompany =
+    companyName ??
+    draftMeta?.companyName ??
+    draftMeta?.analysis?.company ??
+    '—';
+  const displayJobTitle =
+    jobTitle || draftMeta?.jobTitle || draftMeta?.analysis?.jobTitle || '—';
+
+  const trackButtonLabel = (() => {
+    if (!trackStatus) return 'Track Job';
+    return JOB_STATUS_LABELS[trackStatus] ?? String(trackStatus);
+  })();
+
+  const trackColorKey = trackStatus ? JOB_STATUS_COLORS[trackStatus] : 'slate';
+  const trackRing: Record<typeof trackColorKey, string> = {
+    slate: 'border-slate-400 text-slate-700',
+    blue: 'border-blue-500 text-blue-700',
+    indigo: 'border-indigo-500 text-indigo-700',
+    amber: 'border-amber-500 text-amber-800',
+    orange: 'border-orange-500 text-orange-800',
+    green: 'border-emerald-500 text-emerald-800',
+    teal: 'border-teal-500 text-teal-800',
+    red: 'border-red-500 text-red-700',
+    gray: 'border-slate-400 text-slate-700',
+  };
+
+  const isUnsavedDraft =
+    isDraftMode && !sessionSavedCvId && !(draftMeta?.savedCvId ?? null);
+
   const saveLabel =
-    isSaving || autosaveState === 'saving'
+    pageSaveState === 'saving'
       ? 'Saving…'
-      : lastSaved || autosaveState === 'saved'
-        ? `Saved ${lastSaved ? lastSaved.toLocaleTimeString() : '✓'}`
+      : pageSaveState === 'saved'
+        ? 'Saved ✓'
         : '';
 
   return (
-    <div className="mx-auto max-w-[1650px] space-y-4">
-      {isDraftMode ? (
-        <div className="rounded-xl border border-[var(--color-accent-gold)]/40 bg-[var(--color-accent-gold)]/10 px-4 py-3 text-sm text-[var(--color-text-primary)]">
-          You are editing an unsaved draft from optimise. Use Save to store this CV to your account.
-        </div>
-      ) : null}
-      <div className="glass-panel z-20 rounded-card border border-[var(--color-border)] p-3 backdrop-blur-xl">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <Link
-              href="/cv/job-specific"
-              className="inline-flex text-sm font-medium text-[var(--color-primary)] transition hover:text-[var(--color-primary-400)]"
-            >
-              ← All Job CVs
-            </Link>
-            <h1 className="font-display text-2xl font-semibold text-[var(--color-text-primary)]">Edit job CV</h1>
+    <div className="mx-auto max-w-[1650px] space-y-4 pb-24 md:pb-4">
+      <div className="glass-panel z-20 rounded-card border border-[var(--color-border)] p-4 backdrop-blur-xl">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-3">
+              <Link
+                href={isDraftMode ? '/cv/optimise' : '/cv/job-specific'}
+                className="inline-flex text-sm font-medium text-[var(--color-primary)] hover:underline"
+              >
+                ← Back
+              </Link>
+              {isUnsavedDraft ? (
+                <span className="rounded-full border border-amber-400/80 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900">
+                  Unsaved draft
+                </span>
+              ) : null}
+            </div>
+            <h1 className="mt-2 font-display text-2xl font-semibold text-[var(--color-text-primary)]">
+              Job-Tailored CV
+            </h1>
             <p className="mt-1 text-sm font-medium text-[var(--color-text-primary)]">
-              {jobTitle || 'Target Role'}
-              {companyName ? ` at ${companyName}` : ''}
+              {displayCompany} · {displayJobTitle}
             </p>
             <p className="mt-1 text-sm text-[var(--color-muted)]">
-              Same editor as your core CV — live ATS feedback, preview, and undo.
+              Live ATS feedback, preview, and undo — nothing is stored until you save.
             </p>
           </div>
-          <div className="flex w-full flex-col gap-3 sm:w-auto sm:items-end">
-            <div className="flex flex-wrap items-center gap-2 sm:justify-end sm:gap-3">
+          <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+            <button
+              type="button"
+              onClick={() => {
+                setPendingTrackStatus(trackStatus ?? 'apply_later');
+                setTrackPopupOpen(true);
+              }}
+              className={cn(
+                'rounded-full border-2 px-4 py-1.5 text-xs font-semibold transition',
+                trackRing[trackColorKey]
+              )}
+            >
+              {trackButtonLabel}
+            </button>
+            <div className="hidden items-center gap-2 md:flex">
               <Button
                 variant="secondary"
                 size="sm"
                 disabled={!undoPast.length}
                 onClick={undo}
                 icon={<Undo2 className="h-4 w-4" />}
-                title="Undo (⌘Z)"
               >
                 Undo
               </Button>
@@ -739,17 +1024,26 @@ export default function JobCVEditPage() {
                 disabled={!undoFuture.length}
                 onClick={redo}
                 icon={<Redo2 className="h-4 w-4" />}
-                title="Redo (⌘⇧Z)"
               >
                 Redo
               </Button>
               <Button
+                variant="ghost"
+                size="sm"
+                disabled={diffLoading}
+                onClick={() => void openDiffViewer()}
+                icon={<GitCompareArrows className="h-4 w-4" />}
+              >
+                See Differences
+              </Button>
+              <Button
                 variant="primary"
                 size="sm"
-                loading={isDraftMode ? saveNewJobCv.isPending : isSaving}
+                loading={pageSaveState === 'saving'}
+                disabled={pageSaveState === 'saving'}
                 onClick={() => void saveJobCv()}
               >
-                Save
+                {pageSaveState === 'saving' ? 'Saving…' : pageSaveState === 'saved' ? 'Saved ✓' : 'Save'}
               </Button>
               <Button
                 variant="secondary"
@@ -765,49 +1059,153 @@ export default function JobCVEditPage() {
                   variant="secondary"
                   size="sm"
                   loading={archive.isPending}
-                  className="border-[var(--color-accent-coral)]/40 text-[var(--color-accent-coral)] hover:bg-[var(--color-accent-coral)]/10"
+                  className="border-[var(--color-accent-coral)]/40 text-[var(--color-accent-coral)]"
                   onClick={() => void deleteJobCv()}
                 >
                   Delete
                 </Button>
               ) : null}
-              <span className="text-xs text-[var(--color-muted)]">{saveLabel}</span>
+              {saveLabel ? (
+                <span className="text-xs text-[var(--color-muted)]">{saveLabel}</span>
+              ) : null}
             </div>
-            <div className="flex w-full flex-col gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]/80 p-3 backdrop-blur-sm sm:max-w-md sm:flex-row sm:items-end">
-              <div className="min-w-0 flex-1">
-                <Select
-                  label="Core CV version"
-                  value={targetCoreCvId ?? ''}
-                  disabled={coreVersionsLoading || coreVersions.length === 0}
-                  options={
-                    coreVersions.length
-                      ? coreVersions.map((v) => ({
-                          value: v.id,
-                          label: `${v.full_name ?? 'Core CV'} · ${formatDate(v.created_at)}`,
-                        }))
-                      : [{ value: '', label: coreVersionsLoading ? 'Loading…' : 'No core CV yet' }]
-                  }
-                  onChange={(e) => setTargetCoreCvId(e.target.value || null)}
-                />
-              </div>
-              <Button
-                variant="secondary"
-                size="sm"
-                className="shrink-0 sm:mb-0.5"
-                loading={savingCore}
-                disabled={!draft || !targetCoreCvId || !coreVersions.length}
-                onClick={() => void updateCoreCvFromJob()}
-                title="Apply this editor content to the selected core CV. Does not modify this job CV."
-              >
-                Update core CV
-              </Button>
-            </div>
-            <p className="max-w-md text-right text-[10px] leading-snug text-[var(--color-muted)] sm:self-end">
-              Update core CV copies your current fields into the profile you pick. This job-specific CV stays as-is until
-              you use Save.
-            </p>
           </div>
         </div>
+
+        {genType === 'both' ? (
+          <div className="mt-4 flex flex-col gap-3 border-t border-[var(--color-border)] pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <Tabs
+              className="max-w-md"
+              tabs={[
+                { id: 'cv', label: 'CV' },
+                { id: 'coverLetter', label: 'Cover Letter' },
+              ]}
+              value={documentTab}
+              onChange={(tid) => setDocumentTab(tid as 'cv' | 'coverLetter')}
+            />
+            <div className="flex flex-wrap items-center gap-2 md:hidden">
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={diffLoading}
+                onClick={() => void openDiffViewer()}
+                icon={<GitCompareArrows className="h-4 w-4" />}
+              >
+                See Differences
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                loading={pageSaveState === 'saving'}
+                onClick={() => void saveJobCv()}
+              >
+                Save
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      {draftMeta?.analysis ? (
+        <div className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]">
+          <button
+            type="button"
+            className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm"
+            onClick={() => setAnalysisOpen((v) => !v)}
+          >
+            <span className="text-[var(--color-muted)]">
+              <span className="mr-1">📍</span>
+              {draftMeta.analysis.region ?? '—'} · {draftMeta.analysis.workType ?? '—'} · Match:{' '}
+              {draftMeta.analysis.matchPercentage}%
+            </span>
+            <ChevronDown
+              className={cn('h-4 w-4 shrink-0 transition', analysisOpen && 'rotate-180')}
+            />
+          </button>
+          {analysisOpen ? (
+            <div className="space-y-4 border-t border-[var(--color-border)] px-4 py-4 text-sm">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="flex items-start gap-2">
+                  <Building2 className="mt-0.5 h-5 w-5 text-[var(--color-muted)]" />
+                  <div>
+                    <p className="font-display font-semibold">
+                      {[draftMeta.analysis.jobTitle, draftMeta.analysis.company]
+                        .filter(Boolean)
+                        .join(' at ') || 'Role analysis'}
+                    </p>
+                  </div>
+                </div>
+                {draftMeta.analysis.workType ? (
+                  <Badge variant="default" className="capitalize">
+                    {draftMeta.analysis.workType}
+                  </Badge>
+                ) : null}
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase text-[var(--color-muted)]">Key requirements</p>
+                <ul className="mt-2 list-inside list-disc space-y-1">
+                  {draftMeta.analysis.keyRequirements.slice(0, 8).map((r) => (
+                    <li key={r}>{r}</li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase text-emerald-800">Why you&apos;re a good fit</p>
+                <ul className="mt-2 list-inside list-disc space-y-1">
+                  {draftMeta.analysis.whyGoodFit.map((x) => (
+                    <li key={x}>{x}</li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <p className="flex items-center gap-1 text-xs font-semibold uppercase text-amber-800">
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  Gaps to address
+                </p>
+                <ul className="mt-2 list-inside list-disc space-y-1">
+                  {draftMeta.analysis.whyNotGoodFit.map((x) => (
+                    <li key={x}>{x}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]/80 p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <div className="min-w-0 flex-1">
+            <Select
+              label="Core CV version"
+              value={targetCoreCvId ?? ''}
+              disabled={coreVersionsLoading || coreVersions.length === 0}
+              options={
+                coreVersions.length
+                  ? coreVersions.map((v) => ({
+                      value: v.id,
+                      label: `${v.full_name ?? 'Core CV'} · ${formatDate(v.created_at)}`,
+                    }))
+                  : [{ value: '', label: coreVersionsLoading ? 'Loading…' : 'No core CV yet' }]
+              }
+              onChange={(e) => setTargetCoreCvId(e.target.value || null)}
+            />
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="shrink-0"
+            loading={savingCore}
+            disabled={!draft || !targetCoreCvId || !coreVersions.length}
+            onClick={() => void updateCoreCvFromJob()}
+            title="Apply this editor content to the selected core CV. Does not modify this job CV."
+          >
+            Update core CV
+          </Button>
+        </div>
+        <p className="mt-2 text-[10px] leading-snug text-[var(--color-muted)]">
+          Copies your current fields into the selected core profile. This job CV is unchanged until you use Save above.
+        </p>
       </div>
 
       <div className="overflow-hidden rounded-card border border-[var(--color-border)] bg-[var(--color-surface)]/90 shadow-sm backdrop-blur-sm">
@@ -837,76 +1235,240 @@ export default function JobCVEditPage() {
         ) : null}
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_630px]">
+      <div className="relative grid gap-6 xl:grid-cols-[minmax(0,1fr)_630px]">
+        {pageSaveState === 'saving' ? (
+          <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-xl bg-white/75">
+            <Loader2 className="h-10 w-10 animate-spin text-[var(--color-primary)]" />
+          </div>
+        ) : null}
         <div className="min-w-0">
-          <div className="grid gap-4 xl:grid-cols-[260px_1fr]">
-            <Sidebar activeSection={editorTab} onSelect={setEditorTab} />
-            <div className="space-y-3">
-              <div className={CV_FORM_CARD}>
-                <CVEditorPanel
-                  value={draft}
-                  onChange={handleChange}
-                  activeTab={editorTab}
-                  onActiveTabChange={setEditorTab}
-                  highlightedKeywords={keywords}
-                  aiJobContext={aiJobContext}
-                  hideAtsBanner
-                  hideFormTabBar
-                  hideVisibilityPanel
-                  hideKeywordsBanner={keywords.length > 0}
-                  templates={templates}
-                  selectedTemplateId={selectedTemplateId}
-                  onTemplateChange={(nextId: string) => {
-                    setSelectedTemplateId(nextId);
-                    if (!isDraftMode) {
-                      update({
-                        preferred_template_id: nextId,
-                        accent_color: accent,
-                        font_family: fontFamily,
-                      });
-                    }
-                  }}
-                  accent={accent}
-                  onAccentChange={(c: string) => {
-                    setAccent(c);
-                    if (!isDraftMode) {
-                      update({
-                        accent_color: c,
-                        preferred_template_id: selectedTemplateId,
-                        font_family: fontFamily,
-                      });
-                    }
-                  }}
-                  fontFamily={fontFamily}
-                  onFontFamilyChange={(next) => {
-                    setFontFamily(next);
-                    if (!isDraftMode) {
-                      update({ font_family: next });
-                    }
-                  }}
-                />
+          {genType === 'both' && documentTab === 'coverLetter' ? (
+            <div className="rounded-2xl border border-[var(--color-border)] bg-white p-6 shadow-md">
+              <p className="mb-2 text-sm font-semibold">Cover letter</p>
+              <Textarea
+                value={coverLetterText}
+                onChange={(e) => setCoverLetterText(e.target.value)}
+                className="min-h-[420px] text-sm leading-relaxed"
+              />
+            </div>
+          ) : (
+            <div className="grid gap-4 xl:grid-cols-[260px_1fr]">
+              <Sidebar activeSection={editorTab} onSelect={setEditorTab} />
+              <div className="space-y-3">
+                <div className={CV_FORM_CARD}>
+                  <CVEditorPanel
+                    value={draft}
+                    onChange={handleChange}
+                    activeTab={editorTab}
+                    onActiveTabChange={setEditorTab}
+                    highlightedKeywords={keywords}
+                    aiJobContext={aiJobContext}
+                    hideAtsBanner
+                    hideFormTabBar
+                    hideVisibilityPanel
+                    hideKeywordsBanner={keywords.length > 0}
+                    templates={templates}
+                    selectedTemplateId={selectedTemplateId}
+                    onTemplateChange={(nextId: string) => {
+                      setSelectedTemplateId(nextId);
+                    }}
+                    accent={accent}
+                    onAccentChange={(c: string) => {
+                      setAccent(c);
+                    }}
+                    fontFamily={fontFamily}
+                    onFontFamilyChange={(next) => {
+                      setFontFamily(next);
+                    }}
+                  />
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
         <div className="space-y-3 xl:sticky xl:top-24">
-          <ATSCircularScore score={ats.score} suggestions={ats.suggestions} />
-          {keywords.length > 0 ? <JobKeywordsBanner keywords={keywords} cv={draft} /> : null}
-          <PreviewPanel
-            previewPdfUrl={previewPdfUrl}
-            previewBusy={previewBusy}
-            zoom={zoom}
-            onZoomChange={setZoom}
-            currentPage={page}
-            onPageChange={setPage}
-          />
-          {!templatesLoading && !allowed && templateMeta ? (
-            <p className="rounded-xl border border-[var(--color-accent-gold)]/35 bg-[var(--color-accent-gold)]/10 px-3 py-2 text-sm text-[var(--color-accent-gold)]">
-              You can preview this layout with your data here. Upgrade to export with this template.
+          {genType === 'both' && documentTab === 'coverLetter' ? (
+            <p className="text-sm text-[var(--color-muted)]">
+              Export cover letter to PDF from the cover letter page after you save.
             </p>
-          ) : null}
+          ) : (
+            <>
+              <ATSCircularScore score={ats.score} suggestions={ats.suggestions} />
+              {keywords.length > 0 ? <JobKeywordsBanner keywords={keywords} cv={draft} /> : null}
+              <PreviewPanel
+                previewPdfUrl={previewPdfUrl}
+                previewBusy={previewBusy}
+                zoom={zoom}
+                onZoomChange={setZoom}
+                currentPage={page}
+                onPageChange={setPage}
+              />
+              {!templatesLoading && !allowed && templateMeta ? (
+                <p className="rounded-xl border border-[var(--color-accent-gold)]/35 bg-[var(--color-accent-gold)]/10 px-3 py-2 text-sm text-[var(--color-accent-gold)]">
+                  You can preview this layout with your data here. Upgrade to export with this template.
+                </p>
+              ) : null}
+            </>
+          )}
         </div>
       </div>
+
+      <div className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-2 border-t border-[var(--color-border)] bg-[var(--color-surface)]/95 p-3 backdrop-blur-md md:hidden">
+        <button
+          type="button"
+          onClick={() => {
+            setPendingTrackStatus(trackStatus ?? 'apply_later');
+            setTrackPopupOpen(true);
+          }}
+          className={cn(
+            'rounded-full border-2 px-3 py-2 text-xs font-semibold',
+            trackRing[trackColorKey]
+          )}
+        >
+          {trackButtonLabel}
+        </button>
+        <Button
+          variant="primary"
+          size="sm"
+          loading={pageSaveState === 'saving'}
+          onClick={() => void saveJobCv()}
+        >
+          {pageSaveState === 'saving' ? 'Saving…' : 'Save'}
+        </Button>
+      </div>
+
+      <Modal
+        isOpen={trackPopupOpen}
+        onClose={() => setTrackPopupOpen(false)}
+        title="Track This Job"
+        className="max-w-3xl"
+      >
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          {TRACK_STATUS_OPTIONS.map((s) => {
+            const col = JOB_STATUS_COLORS[s];
+            const active = pendingTrackStatus === s;
+            const ring =
+              col === 'blue'
+                ? 'border-blue-500 bg-blue-500/15'
+                : col === 'indigo'
+                  ? 'border-indigo-500 bg-indigo-500/15'
+                  : col === 'amber'
+                    ? 'border-amber-500 bg-amber-500/15'
+                    : col === 'orange'
+                      ? 'border-orange-500 bg-orange-500/15'
+                      : col === 'green'
+                        ? 'border-emerald-500 bg-emerald-500/15'
+                        : col === 'teal'
+                          ? 'border-teal-500 bg-teal-500/15'
+                          : col === 'red'
+                            ? 'border-red-500 bg-red-500/15'
+                            : 'border-slate-400 bg-slate-500/10';
+            return (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setPendingTrackStatus(s)}
+                className={cn(
+                  'rounded-xl border-2 p-3 text-left text-sm font-medium transition',
+                  active ? ring : 'border-[var(--color-border)] hover:bg-[var(--color-input-bg)]'
+                )}
+              >
+                {JOB_STATUS_LABELS[s]}
+              </button>
+            );
+          })}
+        </div>
+        <div className="mt-6 flex justify-end gap-2">
+          <Button variant="ghost" size="sm" onClick={() => setTrackPopupOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            loading={trackPopupSaving}
+            disabled={!pendingTrackStatus}
+            onClick={() => void handleTrackPopupSave()}
+          >
+            Save
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={diffOpen}
+        onClose={() => setDiffOpen(false)}
+        title="CV Differences"
+        className="max-h-[min(92vh,900px)] max-w-4xl overflow-hidden"
+      >
+        <p className="mb-4 text-sm text-[var(--color-muted)]">
+          Comparing: Your Core CV → Tailored CV
+          {(() => {
+            const st = summarizeDiff(diffSections);
+            return (
+              <span className="ml-2 font-medium text-[var(--color-text-primary)]">
+                {st.sectionsChanged} sections changed, {st.additions} additions, {st.removals} removals
+              </span>
+            );
+          })()}
+        </p>
+        {diffLoading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-[var(--color-primary)]" />
+          </div>
+        ) : diffError ? (
+          <p className="text-sm text-red-600">{diffError}</p>
+        ) : (
+          <div className="max-h-[min(70vh,720px)] space-y-6 overflow-y-auto pr-1">
+            {diffSections.map((sec) => (
+              <div key={sec.sectionName}>
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <h3 className="font-display text-sm font-bold uppercase tracking-wide text-[var(--color-text-primary)]">
+                    {sec.sectionName}
+                  </h3>
+                  {!sec.hasChanges ? (
+                    <button
+                      type="button"
+                      className="text-xs font-medium text-[var(--color-primary)]"
+                      onClick={() =>
+                        setUncollapsedDiffSections((m) => ({
+                          ...m,
+                          [sec.sectionName]: !m[sec.sectionName],
+                        }))
+                      }
+                    >
+                      {uncollapsedDiffSections[sec.sectionName] ? 'Hide' : 'Show'} unchanged
+                    </button>
+                  ) : null}
+                </div>
+                {!sec.hasChanges && !uncollapsedDiffSections[sec.sectionName] ? (
+                  <p className="text-xs text-[var(--color-muted)]">No changes in this section.</p>
+                ) : (
+                  <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-input-bg)] p-3 text-sm">
+                    {sec.changes.map((ch, i) => (
+                      <div
+                        key={`${sec.sectionName}-${i}`}
+                        className={cn(
+                          'mb-2 flex gap-2 rounded-md border-l-2 pl-2 last:mb-0',
+                          ch.type === 'removed' &&
+                            'border-red-500 bg-[rgba(239,68,68,0.3)]',
+                          ch.type === 'added' &&
+                            'border-green-500 bg-[rgba(34,197,94,0.3)]',
+                          ch.type === 'unchanged' && 'border-transparent opacity-80'
+                        )}
+                      >
+                        <span className="shrink-0 text-[10px] font-bold uppercase text-[var(--color-muted)]">
+                          {ch.type === 'removed' ? 'Prev' : ch.type === 'added' ? 'New' : '·'}
+                        </span>
+                        <span className="min-w-0 whitespace-pre-wrap">{ch.content}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

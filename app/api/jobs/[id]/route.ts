@@ -9,6 +9,36 @@ function err(msg: string, code: string | undefined, status: number) {
   return NextResponse.json({ error: msg, code }, { status });
 }
 
+export async function GET(_request: Request, { params }: RouteContext) {
+  try {
+    const { id } = await params;
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return err('Unauthorized', 'UNAUTHORIZED', 401);
+
+    const jid = id?.trim();
+    if (!jid) return err('invalid_id', 'INVALID', 400);
+
+    const { data, error } = await supabase
+      .from('jobs')
+      .select('*')
+      .eq('id', jid)
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (error) {
+      console.error('jobs GET [id]', error);
+      return err('Failed to fetch job', 'FETCH_FAILED', 500);
+    }
+    if (!data) return err('Not found', 'NOT_FOUND', 404);
+    return NextResponse.json(data as Job);
+  } catch (e) {
+    console.error('jobs GET [id]', e);
+    return err('Failed to fetch job', 'FETCH_FAILED', 500);
+  }
+}
+
 export async function PATCH(request: Request, { params }: RouteContext) {
   try {
     const { id } = await params;

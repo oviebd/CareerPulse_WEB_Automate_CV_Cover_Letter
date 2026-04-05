@@ -1,5 +1,10 @@
 import { create } from 'zustand';
-import type { CoverLetterLength, CoverLetterTone } from '@/types';
+import type {
+  CoverLetterLength,
+  CoverLetterTone,
+  GenerationType,
+  JobAnalysisResult,
+} from '@/types';
 
 /** Passed from optimise result → job-specific CV editor when nothing is saved yet (Zustand, no URL/localStorage). */
 export interface CvOptimiseEditDraft {
@@ -8,9 +13,20 @@ export interface CvOptimiseEditDraft {
   jobTitle?: string | null;
   companyName?: string | null;
   savedJobId?: string | null;
+  savedCvId?: string | null;
+  savedCoverLetterId?: string | null;
+  coverLetter?: string;
+  generationType?: GenerationType;
+  jobDescription?: string;
+  jobUrl?: string | null;
+  analysis?: JobAnalysisResult | null;
+  isTracked?: boolean;
   aiChangesSummary?: string | null;
   extractedKeywords?: string[];
   bulletsImproved?: number;
+  coverLetterTone?: CoverLetterTone;
+  coverLetterLength?: CoverLetterLength;
+  coverLetterEmphasis?: string | null;
 }
 
 /** Passed from optimise result → cover letter editor when nothing is saved yet. */

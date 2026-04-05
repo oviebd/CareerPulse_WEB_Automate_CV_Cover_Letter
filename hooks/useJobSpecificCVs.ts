@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/useAuthStore';
 import type { JobSpecificCV } from '@/types';
@@ -125,16 +125,6 @@ export function useUpdateJobSpecificCV(id: string | undefined) {
     },
     [mutation, id]
   );
-
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-      if (id && pendingRef.current) {
-        mutation.mutate(pendingRef.current);
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
 
   return {
     update,

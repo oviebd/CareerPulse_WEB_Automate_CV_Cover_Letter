@@ -138,6 +138,7 @@ export function isJobSpecificCV(cv: CV): boolean {
   return cv.job_ids.length > 0;
 }
 
+/** Kanban / `jobs.status` — board column values */
 export type JobStatus =
   | 'saved'
   | 'applied'
@@ -145,6 +146,20 @@ export type JobStatus =
   | 'offered'
   | 'rejected'
   | 'withdrawn';
+
+/** `applied_jobs.status` — granular tracker state (see migration 014) */
+export type AppliedJobTrackStatus =
+  | 'apply_later'
+  | 'applied'
+  | 'interviewing'
+  | 'technical_test'
+  | 'offer_received'
+  | 'negotiating'
+  | 'rejected'
+  | 'withdrawn'
+  | 'ghosted'
+  | 'saved'
+  | 'offered';
 
 export interface Job {
   id: string;
@@ -185,7 +200,7 @@ export interface AppliedJob {
   id: string;
   user_id: string;
   job_id: string;
-  status: JobStatus;
+  status: AppliedJobTrackStatus;
   notes: string | null;
   applied_at: string | null;
   created_at: string;

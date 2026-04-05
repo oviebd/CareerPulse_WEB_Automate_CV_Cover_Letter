@@ -22,6 +22,34 @@ export function parseOptimisedCvText(raw: string | undefined): {
 }
 
 /** Normalise optimise JSON into `CVData` for the job-specific editor (draft mode). */
+/** Serialise editor `CVData` back to the JSON string shape produced by `/api/cv/optimise`. */
+export function cvDataToOptimisedCvJson(data: CVData): string {
+  const o: Record<string, unknown> = {
+    full_name: data.full_name,
+    professional_title: data.professional_title,
+    email: data.email,
+    phone: data.phone,
+    location: data.location,
+    linkedin_url: data.linkedin_url,
+    github_url: data.github_url,
+    links: data.links ?? [],
+    address: data.address,
+    photo_url: data.photo_url,
+    summary: data.summary,
+    section_visibility: data.section_visibility ?? {},
+    experience: data.experience ?? [],
+    education: data.education ?? [],
+    skills: data.skills ?? [],
+    projects: data.projects ?? [],
+    certifications: data.certifications ?? [],
+    languages: data.languages ?? [],
+    awards: data.awards ?? [],
+    referrals: data.referrals ?? [],
+  };
+  if (data.font_family) o.font_family = data.font_family;
+  return JSON.stringify(o);
+}
+
 export function optimisedCvJsonToCvData(raw: Record<string, unknown>): CVData {
   const links = Array.isArray(raw.links) ? (raw.links as CVData['links']) : [];
   const section =

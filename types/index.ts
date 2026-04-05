@@ -1,3 +1,5 @@
+import type { AppliedJobTrackStatus } from './database';
+
 // Subscription tiers
 export type SubscriptionTier = 'free' | 'pro' | 'premium' | 'career';
 export type SubscriptionStatus = 'active' | 'inactive' | 'cancelled' | 'past_due';
@@ -15,6 +17,7 @@ export type {
   Job,
   JobStatus,
   AppliedJob,
+  AppliedJobTrackStatus,
 } from './database';
 
 /** Structured output from POST /api/jobs/analyze */
@@ -65,6 +68,63 @@ export type { CVUpdate, CVInsert, JobInsert, JobUpdate, CoverLetterUpdate } from
 
 /** @deprecated Use JobStatus from ./database */
 export type ApplicationStatus = import('./database').JobStatus;
+
+/** Labels for `applied_jobs.status` (tracker popup + buttons) */
+export const JOB_STATUS_LABELS: Record<AppliedJobTrackStatus, string> = {
+  apply_later: '📌 Apply Later',
+  applied: '✅ Applied',
+  interviewing: '🗣 Interviewing',
+  technical_test: '💻 Technical Test',
+  offer_received: '🎉 Offer Received',
+  negotiating: '🤝 Negotiating',
+  rejected: '❌ Rejected',
+  withdrawn: '🚪 Withdrawn',
+  ghosted: '👻 Ghosted',
+  saved: '💾 Saved',
+  offered: '📬 Offer (legacy)',
+};
+
+/** Tailwind palette keys for outline/badge styling */
+export const JOB_STATUS_COLORS: Record<
+  AppliedJobTrackStatus,
+  'slate' | 'blue' | 'indigo' | 'amber' | 'orange' | 'green' | 'teal' | 'red' | 'gray'
+> = {
+  apply_later: 'blue',
+  applied: 'indigo',
+  interviewing: 'amber',
+  technical_test: 'orange',
+  offer_received: 'green',
+  negotiating: 'teal',
+  rejected: 'red',
+  withdrawn: 'gray',
+  ghosted: 'gray',
+  saved: 'slate',
+  offered: 'green',
+};
+
+/** Diff viewer — section model */
+export interface CVSection {
+  name: string;
+  items: CVSectionItem[];
+}
+
+export interface CVSectionItem {
+  title?: string;
+  subtitle?: string;
+  bullets: string[];
+  dateRange?: string;
+}
+
+export interface CVDiffSection {
+  sectionName: string;
+  changes: CVDiffChange[];
+  hasChanges: boolean;
+}
+
+export interface CVDiffChange {
+  type: 'removed' | 'added' | 'unchanged';
+  content: string;
+}
 
 export type WorkType = 'remote' | 'hybrid' | 'onsite';
 export type Priority = 'low' | 'medium' | 'high';

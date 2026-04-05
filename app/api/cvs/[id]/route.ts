@@ -47,7 +47,23 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     if (!user) return err('Unauthorized', 'UNAUTHORIZED', 401);
 
     const raw = (await request.json()) as Record<string, unknown>;
-    const patch = normalizeCvPatchBody(raw);
+    const cvContentRaw = raw.cvContent;
+    const coverLetterContentRaw = raw.coverLetterContent;
+    delete raw.cvContent;
+    delete raw.coverLetterContent;
+
+    const fromCvJson: Record<string, unknown> = {};
+    if (typeof cvContentRaw === 'string' && cvContentRaw.trim()) {
+      try {
+        const parsed = JSON.parse(cvContentRaw) as Record<string, unknown>;
+        Object.assign(fromCvJson, parsed);
+      } catch {
+        return err('Invalid cvContent JSON', 'INVALID_JSON', 422);
+      }
+    }
+
+    const mergedBody = { ...fromCvJson, ...raw };
+    const patch = normalizeCvPatchBody(mergedBody);
 
     const { data: current, error: curErr } = await supabase
       .from('cvs')
@@ -61,21 +77,94 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     }
     if (!current) return err('Not found', 'NOT_FOUND', 404);
 
-    const withCompletion = mergeAndCompleteCv(current as Record<string, unknown>, patch);
-    const payload = stripUndefined(withCompletion);
+    const hasCvPatch = Object.keys(patch).length > 0;
+    const hasCl =
+      typeof coverLetterContentRaw === 'string' && coverLetterContentRaw.trim().length > 0;
 
-    const { data: updated, error } = await supabase
-      .from('cvs')
-      .update(payload)
-      .eq('id', id)
-      .eq('user_id', user.id)
-      .select()
-      .single();
-    if (error) {
-      console.error('cvs PATCH', error);
+    if (!hasCvPatch && !hasCl) {
+      return err('No valid fields', 'NO_FIELDS', 400);
+    }
+
+    const wantsMinimal =
+      (typeof cvContentRaw === 'string' && cvContentRaw.trim().length > 0) || hasCl;
+
+    let updatedRow: Record<string, unknown> | null = null;
+
+    if (hasCvPatch) {
+      const withCompletion = mergeAndCompleteCv(current as Record<string, unknown>, patch);
+      const payload = stripUndefined(withCompletion);
+
+      const { data: updated, error } = await supabase
+        .from('cvs')
+        .update(payload)
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .select()
+        .single();
+      if (error) {
+        console.error('cvs PATCH', error);
+        return err('Failed to update CV', 'UPDATE_FAILED', 500);
+      }
+      updatedRow = updated as Record<string, unknown>;
+    }
+
+    const now = new Date().toISOString();
+    if (hasCl) {
+      const jids = (current.job_ids as string[] | undefined) ?? [];
+      const firstJob = jids[0];
+      if (firstJob) {
+        const { data: clRow } = await supabase
+          .from('cover_letters')
+          .select('id')
+          .eq('user_id', user.id)
+          .contains('job_ids', [firstJob])
+          .maybeSingle();
+        if (clRow?.id) {
+          await supabase
+            .from('cover_letters')
+            .update({
+              content: (coverLetterContentRaw as string).trim(),
+              updated_at: now,
+            })
+            .eq('id', clRow.id)
+            .eq('user_id', user.id);
+        }
+      }
+      if (!hasCvPatch) {
+        const { data: touched, error: touchErr } = await supabase
+          .from('cvs')
+          .update({ updated_at: now })
+          .eq('id', id)
+          .eq('user_id', user.id)
+          .select()
+          .single();
+        if (!touchErr && touched) {
+          updatedRow = touched as Record<string, unknown>;
+        }
+      }
+    }
+
+    if (!updatedRow && hasCvPatch) {
       return err('Failed to update CV', 'UPDATE_FAILED', 500);
     }
-    return NextResponse.json(dbRowToCvProfile(updated as Record<string, unknown>));
+    if (!updatedRow) {
+      const { data: refetch } = await supabase
+        .from('cvs')
+        .select('*')
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (!refetch) return err('Not found', 'NOT_FOUND', 404);
+      updatedRow = refetch as Record<string, unknown>;
+    }
+
+    if (wantsMinimal) {
+      return NextResponse.json({
+        id: String(updatedRow.id),
+        updated_at: String(updatedRow.updated_at ?? now),
+      });
+    }
+    return NextResponse.json(dbRowToCvProfile(updatedRow));
   } catch (e) {
     console.error('cvs PATCH', e);
     return err('Failed to update CV', 'UPDATE_FAILED', 500);
