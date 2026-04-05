@@ -26,7 +26,7 @@ import { useOptimiseDraftStore } from '@/stores/useOptimiseDraftStore';
 import { useOptimiseEditDraftStore } from '@/stores/useOptimiseEditDraftStore';
 import { parseOptimisedCvText } from '@/lib/optimise-result';
 import { cn } from '@/lib/utils';
-import type { GenerationType } from '@/types';
+import type { GenerationType, JobStatus } from '@/types';
 
 const btnSecondarySm =
   'inline-flex min-w-[88px] items-center justify-center gap-2 rounded-btn border border-[var(--color-border)] bg-[var(--color-glass-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--color-text-primary)] backdrop-blur-sm transition hover:bg-white/[0.06] hover:border-[var(--color-border-hover)] active:scale-[0.98]';
@@ -67,18 +67,20 @@ export default function OptimiseResultPage() {
 
   const savedJobId = draft?.savedJobId ?? null;
 
-  const { data: trackStatus, isLoading: trackCheckLoading } = useQuery({
-    queryKey: ['applied-job-tracked', savedJobId],
-    queryFn: async (): Promise<{ tracked: boolean }> => {
-      const res = await fetch(`/api/applied-jobs/${savedJobId}`);
-      if (!res.ok) throw new Error('track_check_failed');
-      return res.json() as Promise<{ tracked: boolean }>;
+  const { data: savedJobRow, isLoading: trackCheckLoading } = useQuery({
+    queryKey: ['optimise-job-status', savedJobId],
+    queryFn: async (): Promise<{ status: JobStatus }> => {
+      const res = await fetch(`/api/jobs/${savedJobId}`);
+      if (!res.ok) throw new Error('job_fetch_failed');
+      return res.json() as Promise<{ status: JobStatus }>;
     },
     enabled: Boolean(isSaved && savedJobId && draft?.jobDescription?.trim()),
     staleTime: 30 * 1000,
   });
 
-  const tracked = Boolean(trackStatus?.tracked ?? draft?.isTracked);
+  const tracked = savedJobRow
+    ? savedJobRow.status !== 'none'
+    : Boolean(draft?.isTracked);
 
   const gen = draft?.generationType ?? 'cv';
   const cvText = draft?.cv ?? '';
@@ -362,7 +364,7 @@ export default function OptimiseResultPage() {
       await performSave();
       setIsSaved(true);
       toast('Saved successfully', 'success');
-      void qc.invalidateQueries({ queryKey: ['applied-job-tracked'] });
+      void qc.invalidateQueries({ queryKey: ['optimise-job-status'] });
     } catch (e) {
       const m =
         e instanceof Error ? e.message : 'Could not save. Please try again.';
@@ -383,14 +385,14 @@ export default function OptimiseResultPage() {
         setIsSaved(true);
       }
       if (!jobId) throw new Error('Save the job context first, then track.');
-      const res = await fetch('/api/applied-jobs', {
-        method: 'POST',
+      const res = await fetch(`/api/jobs/${jobId}/status`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jobId }),
+        body: JSON.stringify({ status: 'apply_later' as JobStatus }),
       });
       if (!res.ok) {
         const t = await res.text();
-        console.error('applied-jobs POST', t);
+        console.error('jobs status PATCH', t);
         throw new Error('Could not add job to tracker.');
       }
       d = useOptimiseDraftStore.getState().draft;
@@ -398,8 +400,9 @@ export default function OptimiseResultPage() {
     },
     onSuccess: () => {
       toast('Job added to your tracker', 'success');
-      void qc.invalidateQueries({ queryKey: ['applied-job-tracked'] });
+      void qc.invalidateQueries({ queryKey: ['optimise-job-status'] });
       void qc.invalidateQueries({ queryKey: ['job-applications'] });
+      void qc.invalidateQueries({ queryKey: ['tracked-jobs-count'] });
     },
     onError: (error: Error) => {
       toast(
@@ -414,18 +417,23 @@ export default function OptimiseResultPage() {
       const d = useOptimiseDraftStore.getState().draft;
       const jid = d?.savedJobId;
       if (!jid) throw new Error('No saved job to untrack.');
-      const res = await fetch(`/api/applied-jobs/${jid}`, { method: 'DELETE' });
+      const res = await fetch(`/api/jobs/${jid}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'none' as JobStatus }),
+      });
       if (!res.ok) {
         const t = await res.text();
-        console.error('applied-jobs DELETE', t);
+        console.error('jobs status PATCH untrack', t);
         throw new Error('Could not remove from tracker.');
       }
       if (d) setStoreDraft({ ...d, isTracked: false });
     },
     onSuccess: () => {
       toast('Removed from tracker', 'success');
-      void qc.invalidateQueries({ queryKey: ['applied-job-tracked'] });
+      void qc.invalidateQueries({ queryKey: ['optimise-job-status'] });
       void qc.invalidateQueries({ queryKey: ['job-applications'] });
+      void qc.invalidateQueries({ queryKey: ['tracked-jobs-count'] });
     },
     onError: (error: Error) => {
       toast(

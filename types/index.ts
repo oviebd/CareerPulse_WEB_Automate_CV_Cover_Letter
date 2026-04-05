@@ -1,4 +1,4 @@
-import type { AppliedJobTrackStatus } from './database';
+import type { JobStatus } from './database';
 
 // Subscription tiers
 export type SubscriptionTier = 'free' | 'pro' | 'premium' | 'career';
@@ -16,8 +16,8 @@ export type {
   CoverLetter,
   Job,
   JobStatus,
-  AppliedJob,
-  AppliedJobTrackStatus,
+  LinkedCV,
+  LinkedCoverLetter,
 } from './database';
 
 /** Structured output from POST /api/jobs/analyze */
@@ -69,38 +69,106 @@ export type { CVUpdate, CVInsert, JobInsert, JobUpdate, CoverLetterUpdate } from
 /** @deprecated Use JobStatus from ./database */
 export type ApplicationStatus = import('./database').JobStatus;
 
-/** Labels for `applied_jobs.status` (tracker popup + buttons) */
-export const JOB_STATUS_LABELS: Record<AppliedJobTrackStatus, string> = {
-  apply_later: '📌 Apply Later',
-  applied: '✅ Applied',
-  interviewing: '🗣 Interviewing',
-  technical_test: '💻 Technical Test',
-  offer_received: '🎉 Offer Received',
-  negotiating: '🤝 Negotiating',
-  rejected: '❌ Rejected',
-  withdrawn: '🚪 Withdrawn',
-  ghosted: '👻 Ghosted',
-  saved: '💾 Saved',
-  offered: '📬 Offer (legacy)',
+/** UI config for every non-`none` job status (tracker, job CV editor) */
+export const JOB_STATUS_CONFIG: Record<
+  Exclude<JobStatus, 'none'>,
+  {
+    label: string;
+    emoji: string;
+    color: string;
+    bgColor: string;
+    textColor: string;
+    borderClass: string;
+  }
+> = {
+  apply_later: {
+    label: 'Apply Later',
+    emoji: '📌',
+    color: 'blue',
+    bgColor: 'bg-blue-50',
+    textColor: 'text-blue-700',
+    borderClass: 'border-blue-500 text-blue-800',
+  },
+  applied: {
+    label: 'Applied',
+    emoji: '✅',
+    color: 'indigo',
+    bgColor: 'bg-indigo-50',
+    textColor: 'text-indigo-700',
+    borderClass: 'border-indigo-500 text-indigo-800',
+  },
+  interviewing: {
+    label: 'Interviewing',
+    emoji: '🗣',
+    color: 'amber',
+    bgColor: 'bg-amber-50',
+    textColor: 'text-amber-700',
+    borderClass: 'border-amber-500 text-amber-800',
+  },
+  technical_test: {
+    label: 'Technical Test',
+    emoji: '💻',
+    color: 'orange',
+    bgColor: 'bg-orange-50',
+    textColor: 'text-orange-700',
+    borderClass: 'border-orange-500 text-orange-800',
+  },
+  offer_received: {
+    label: 'Offer Received',
+    emoji: '🎉',
+    color: 'green',
+    bgColor: 'bg-green-50',
+    textColor: 'text-green-700',
+    borderClass: 'border-green-500 text-green-800',
+  },
+  negotiating: {
+    label: 'Negotiating',
+    emoji: '🤝',
+    color: 'teal',
+    bgColor: 'bg-teal-50',
+    textColor: 'text-teal-700',
+    borderClass: 'border-teal-500 text-teal-800',
+  },
+  offered: {
+    label: 'Offered',
+    emoji: '🏆',
+    color: 'emerald',
+    bgColor: 'bg-emerald-50',
+    textColor: 'text-emerald-700',
+    borderClass: 'border-emerald-500 text-emerald-800',
+  },
+  rejected: {
+    label: 'Rejected',
+    emoji: '❌',
+    color: 'red',
+    bgColor: 'bg-red-50',
+    textColor: 'text-red-700',
+    borderClass: 'border-red-500 text-red-800',
+  },
+  withdrawn: {
+    label: 'Withdrawn',
+    emoji: '🚪',
+    color: 'gray',
+    bgColor: 'bg-gray-50',
+    textColor: 'text-gray-700',
+    borderClass: 'border-gray-400 text-gray-800',
+  },
+  ghosted: {
+    label: 'Ghosted',
+    emoji: '👻',
+    color: 'slate',
+    bgColor: 'bg-slate-50',
+    textColor: 'text-slate-600',
+    borderClass: 'border-slate-400 text-slate-700',
+  },
 };
 
-/** Tailwind palette keys for outline/badge styling */
-export const JOB_STATUS_COLORS: Record<
-  AppliedJobTrackStatus,
-  'slate' | 'blue' | 'indigo' | 'amber' | 'orange' | 'green' | 'teal' | 'red' | 'gray'
-> = {
-  apply_later: 'blue',
-  applied: 'indigo',
-  interviewing: 'amber',
-  technical_test: 'orange',
-  offer_received: 'green',
-  negotiating: 'teal',
-  rejected: 'red',
-  withdrawn: 'gray',
-  ghosted: 'gray',
-  saved: 'slate',
-  offered: 'green',
-};
+/** Short label with emoji — buttons and toasts */
+export function jobStatusShortLabel(s: JobStatus): string {
+  if (s === 'none') return 'Track Job';
+  const c = JOB_STATUS_CONFIG[s];
+  return `${c.emoji} ${c.label}`;
+}
 
 /** Diff viewer — section model */
 export interface CVSection {

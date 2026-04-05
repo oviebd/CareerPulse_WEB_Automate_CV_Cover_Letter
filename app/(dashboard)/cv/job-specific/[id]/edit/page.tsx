@@ -30,8 +30,9 @@ import {
   cvDataToOptimisedCvJson,
 } from '@/lib/optimise-result';
 import { useOptimiseDraftStore } from '@/stores/useOptimiseDraftStore';
-import type { AppliedJobTrackStatus, GenerationType } from '@/types';
-import { JOB_STATUS_LABELS, JOB_STATUS_COLORS } from '@/types';
+import type { GenerationType, JobStatus } from '@/types';
+import { JOB_STATUS_CONFIG, jobStatusShortLabel } from '@/types';
+import { TRACKABLE_JOB_STATUSES } from '@/lib/job-status';
 import { computeCvDiffSections, summarizeDiff } from '@/lib/cv-diff';
 import type { CVProfile } from '@/types';
 import { Modal } from '@/components/ui/modal';
@@ -150,17 +151,7 @@ function cvProfileToCvData(profile: CVProfile): CVData {
   };
 }
 
-const TRACK_STATUS_OPTIONS: AppliedJobTrackStatus[] = [
-  'apply_later',
-  'applied',
-  'interviewing',
-  'technical_test',
-  'offer_received',
-  'negotiating',
-  'rejected',
-  'withdrawn',
-  'ghosted',
-];
+const TRACK_STATUS_OPTIONS = TRACKABLE_JOB_STATUSES;
 
 function coreCvPatchFromDraft(
   data: CVData,
@@ -245,7 +236,7 @@ export default function JobCVEditPage() {
     {}
   );
   const [analysisOpen, setAnalysisOpen] = useState(false);
-  const [pendingTrackStatus, setPendingTrackStatus] = useState<AppliedJobTrackStatus | null>(null);
+  const [pendingTrackStatus, setPendingTrackStatus] = useState<JobStatus | null>(null);
 
   const [undoPast, setUndoPast] = useState<CVData[]>([]);
   const [undoFuture, setUndoFuture] = useState<CVData[]>([]);
@@ -292,21 +283,18 @@ export default function JobCVEditPage() {
     ? sessionSavedJobId ?? draftMeta?.savedJobId ?? null
     : (jobCV as { job_ids?: string[] } | null | undefined)?.job_ids?.[0] ?? null;
 
-  const { data: appliedTrack } = useQuery({
-    queryKey: ['applied-job-detail', effectiveJobId],
+  const { data: jobRow } = useQuery({
+    queryKey: ['job-detail', effectiveJobId],
     queryFn: async () => {
-      const res = await fetch(`/api/applied-jobs/${effectiveJobId}`);
-      if (!res.ok) throw new Error('track_fetch_failed');
-      return res.json() as Promise<{
-        tracked: boolean;
-        status: AppliedJobTrackStatus | null;
-      }>;
+      const res = await fetch(`/api/jobs/${effectiveJobId}`);
+      if (!res.ok) throw new Error('job_fetch_failed');
+      return res.json() as Promise<{ status: JobStatus }>;
     },
     enabled: Boolean(effectiveJobId),
     staleTime: 30_000,
   });
 
-  const trackStatus: AppliedJobTrackStatus | null = appliedTrack?.status ?? null;
+  const trackStatus: JobStatus | null = jobRow?.status ?? null;
 
   useEffect(() => {
     allowUndoHistoryRef.current = false;
@@ -667,16 +655,12 @@ export default function JobCVEditPage() {
             savedCoverLetterId: soJson.coverLetterId ?? undefined,
           });
 
-          if (trackStatus && jobId) {
-            const tr = await fetch(`/api/applied-jobs/${jobId}`);
-            const trJson = (await tr.json()) as { tracked?: boolean };
-            if (!trJson.tracked) {
-              await fetch('/api/applied-jobs', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ jobId, status: trackStatus }),
-              });
-            }
+          if (trackStatus && trackStatus !== 'none' && jobId) {
+            await fetch(`/api/jobs/${jobId}/status`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ status: trackStatus }),
+            });
           }
 
           toast('CV saved successfully', 'success');
@@ -699,7 +683,7 @@ export default function JobCVEditPage() {
             return;
           }
           toast('Changes saved', 'success');
-          void queryClient.invalidateQueries({ queryKey: ['applied-job-detail'] });
+          void queryClient.invalidateQueries({ queryKey: ['job-detail'] });
         }
       } else if (!isDraftMode) {
         const patchRes = await fetch(`/api/cvs/${id}`, {
@@ -810,37 +794,22 @@ export default function JobCVEditPage() {
         });
       }
 
-      const tr = await fetch(`/api/applied-jobs/${jobId}`);
-      const trJson = (await tr.json()) as {
-        tracked?: boolean;
-        status?: AppliedJobTrackStatus | null;
-      };
-
-      if (trJson.tracked) {
-        const patchRes = await fetch(`/api/applied-jobs/${jobId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: pendingTrackStatus }),
-        });
-        if (!patchRes.ok) {
-          toast('Could not update status.', 'error');
-          return;
-        }
-        toast(`Status updated to ${JOB_STATUS_LABELS[pendingTrackStatus]}`, 'success');
-      } else {
-        const postRes = await fetch('/api/applied-jobs', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ jobId, status: pendingTrackStatus }),
-        });
-        if (!postRes.ok) {
-          toast('Could not track job.', 'error');
-          return;
-        }
-        toast(`Job tracked as ${JOB_STATUS_LABELS[pendingTrackStatus]}`, 'success');
+      const patchRes = await fetch(`/api/jobs/${jobId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: pendingTrackStatus }),
+      });
+      if (!patchRes.ok) {
+        toast('Could not update status.', 'error');
+        return;
       }
-      void queryClient.invalidateQueries({ queryKey: ['applied-job-detail'] });
+      toast(
+        `Status updated to ${JOB_STATUS_CONFIG[pendingTrackStatus as Exclude<JobStatus, 'none'>].label}`,
+        'success'
+      );
+      void queryClient.invalidateQueries({ queryKey: ['job-detail'] });
       void queryClient.invalidateQueries({ queryKey: ['job-applications'] });
+      void queryClient.invalidateQueries({ queryKey: ['tracked-jobs-count'] });
       setTrackPopupOpen(false);
     } catch {
       toast('Something went wrong.', 'error');
@@ -938,23 +907,15 @@ export default function JobCVEditPage() {
   const displayJobTitle =
     jobTitle || draftMeta?.jobTitle || draftMeta?.analysis?.jobTitle || '—';
 
-  const trackButtonLabel = (() => {
-    if (!trackStatus) return 'Track Job';
-    return JOB_STATUS_LABELS[trackStatus] ?? String(trackStatus);
-  })();
+  const trackButtonLabel =
+    !trackStatus || trackStatus === 'none'
+      ? 'Track Job'
+      : jobStatusShortLabel(trackStatus);
 
-  const trackColorKey = trackStatus ? JOB_STATUS_COLORS[trackStatus] : 'slate';
-  const trackRing: Record<typeof trackColorKey, string> = {
-    slate: 'border-slate-400 text-slate-700',
-    blue: 'border-blue-500 text-blue-700',
-    indigo: 'border-indigo-500 text-indigo-700',
-    amber: 'border-amber-500 text-amber-800',
-    orange: 'border-orange-500 text-orange-800',
-    green: 'border-emerald-500 text-emerald-800',
-    teal: 'border-teal-500 text-teal-800',
-    red: 'border-red-500 text-red-700',
-    gray: 'border-slate-400 text-slate-700',
-  };
+  const trackRingClass =
+    trackStatus && trackStatus !== 'none'
+      ? JOB_STATUS_CONFIG[trackStatus].borderClass
+      : 'border-slate-400 text-slate-700';
 
   const isUnsavedDraft =
     isDraftMode && !sessionSavedCvId && !(draftMeta?.savedCvId ?? null);
@@ -998,12 +959,14 @@ export default function JobCVEditPage() {
             <button
               type="button"
               onClick={() => {
-                setPendingTrackStatus(trackStatus ?? 'apply_later');
+                setPendingTrackStatus(
+                  trackStatus && trackStatus !== 'none' ? trackStatus : 'apply_later'
+                );
                 setTrackPopupOpen(true);
               }}
               className={cn(
                 'rounded-full border-2 px-4 py-1.5 text-xs font-semibold transition',
-                trackRing[trackColorKey]
+                trackRingClass
               )}
             >
               {trackButtonLabel}
@@ -1317,12 +1280,14 @@ export default function JobCVEditPage() {
         <button
           type="button"
           onClick={() => {
-            setPendingTrackStatus(trackStatus ?? 'apply_later');
+            setPendingTrackStatus(
+              trackStatus && trackStatus !== 'none' ? trackStatus : 'apply_later'
+            );
             setTrackPopupOpen(true);
           }}
           className={cn(
             'rounded-full border-2 px-3 py-2 text-xs font-semibold',
-            trackRing[trackColorKey]
+            trackRingClass
           )}
         >
           {trackButtonLabel}
@@ -1345,24 +1310,8 @@ export default function JobCVEditPage() {
       >
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
           {TRACK_STATUS_OPTIONS.map((s) => {
-            const col = JOB_STATUS_COLORS[s];
+            const cfg = JOB_STATUS_CONFIG[s];
             const active = pendingTrackStatus === s;
-            const ring =
-              col === 'blue'
-                ? 'border-blue-500 bg-blue-500/15'
-                : col === 'indigo'
-                  ? 'border-indigo-500 bg-indigo-500/15'
-                  : col === 'amber'
-                    ? 'border-amber-500 bg-amber-500/15'
-                    : col === 'orange'
-                      ? 'border-orange-500 bg-orange-500/15'
-                      : col === 'green'
-                        ? 'border-emerald-500 bg-emerald-500/15'
-                        : col === 'teal'
-                          ? 'border-teal-500 bg-teal-500/15'
-                          : col === 'red'
-                            ? 'border-red-500 bg-red-500/15'
-                            : 'border-slate-400 bg-slate-500/10';
             return (
               <button
                 key={s}
@@ -1370,10 +1319,12 @@ export default function JobCVEditPage() {
                 onClick={() => setPendingTrackStatus(s)}
                 className={cn(
                   'rounded-xl border-2 p-3 text-left text-sm font-medium transition',
-                  active ? ring : 'border-[var(--color-border)] hover:bg-[var(--color-input-bg)]'
+                  active
+                    ? cn(cfg.bgColor, cfg.textColor, cfg.borderClass)
+                    : 'border-[var(--color-border)] hover:bg-[var(--color-input-bg)]'
                 )}
               >
-                {JOB_STATUS_LABELS[s]}
+                {cfg.emoji} {cfg.label}
               </button>
             );
           })}

@@ -20,8 +20,17 @@ import { useJobApplications } from '@/hooks/useTracker';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { formatDate } from '@/lib/utils';
-import { TIER_LIMITS } from '@/types';
+import { TIER_LIMITS, JOB_STATUS_CONFIG } from '@/types';
 import { fadeUp, staggerChildren } from '@/lib/animations';
+import type { JobStatus } from '@/types/database';
+
+function trackerStatusLabel(s: string): string {
+  if (s === 'none') return 'None';
+  if (s in JOB_STATUS_CONFIG) {
+    return JOB_STATUS_CONFIG[s as Exclude<JobStatus, 'none'>].label;
+  }
+  return s;
+}
 
 export default function DashboardPage() {
   const reduce = useReducedMotion();
@@ -41,7 +50,9 @@ export default function DashboardPage() {
   const genLimit = TIER_LIMITS[tier].generationsPerMonth;
 
   const { activeApps, usedThisMonth, pct, statusCounts } = useMemo(() => {
-    const active = apps.filter((a) => !['rejected', 'withdrawn'].includes(a.status));
+    const active = apps.filter(
+      (a) => !['rejected', 'withdrawn', 'ghosted'].includes(a.status)
+    );
     const now = new Date();
     const month = now.getMonth();
     const year = now.getFullYear();
@@ -55,7 +66,8 @@ export default function DashboardPage() {
         : Math.min(100, (used / genLimit) * 100);
     const counts: Record<string, number> = {};
     for (const a of apps) {
-      counts[a.status] = (counts[a.status] ?? 0) + 1;
+      const key = a.status;
+      counts[key] = (counts[key] ?? 0) + 1;
     }
     return { activeApps: active, usedThisMonth: used, pct: p, statusCounts: counts };
   }, [apps, letters, genLimit]);
@@ -203,7 +215,7 @@ export default function DashboardPage() {
               {apps.length > 0 ? (
                 <TrackerStatusChart
                   data={Object.entries(statusCounts).map(([name, count]) => ({
-                    name,
+                    name: trackerStatusLabel(name),
                     count,
                   }))}
                 />
@@ -211,7 +223,7 @@ export default function DashboardPage() {
               <div className="mt-3 flex flex-wrap gap-2">
                 {Object.entries(statusCounts).map(([s, n]) => (
                   <Badge key={s} variant="default">
-                    {s}: {n}
+                    {trackerStatusLabel(s)}: {n}
                   </Badge>
                 ))}
               </div>

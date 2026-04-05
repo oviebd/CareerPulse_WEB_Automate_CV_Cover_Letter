@@ -1,9 +1,9 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
 import type { Job, JobStatus } from '@/types/database';
+import { stripUndefined } from '@/lib/queries/strip-undefined';
 
 export function useJobApplications() {
   const userId = useAuthStore((s) => s.user?.id);
@@ -11,24 +11,25 @@ export function useJobApplications() {
     queryKey: ['job-applications', userId],
     queryFn: async (): Promise<Job[]> => {
       if (!userId) return [];
-      const supabase = createClient();
-      const { data: links, error: linkErr } = await supabase
-        .from('applied_jobs')
-        .select('job_id')
-        .eq('user_id', userId);
-      if (linkErr) throw linkErr;
-      const ids = (links ?? [])
-        .map((r: { job_id: string }) => r.job_id)
-        .filter(Boolean);
-      if (ids.length === 0) return [];
-      const { data, error } = await supabase
-        .from('jobs')
-        .select('*')
-        .eq('user_id', userId)
-        .in('id', ids)
-        .order('updated_at', { ascending: false });
-      if (error) throw error;
-      return (data ?? []) as Job[];
+      const res = await fetch('/api/jobs');
+      if (!res.ok) throw new Error('failed');
+      return res.json() as Promise<Job[]>;
+    },
+    enabled: !!userId,
+    staleTime: 60 * 1000,
+  });
+}
+
+export function useTrackedJobsCount() {
+  const userId = useAuthStore((s) => s.user?.id);
+  return useQuery({
+    queryKey: ['tracked-jobs-count', userId],
+    queryFn: async (): Promise<number> => {
+      if (!userId) return 0;
+      const res = await fetch('/api/jobs');
+      if (!res.ok) return 0;
+      const data = (await res.json()) as Job[];
+      return data.length;
     },
     enabled: !!userId,
     staleTime: 60 * 1000,
@@ -38,34 +39,17 @@ export function useJobApplications() {
 export function useUpdateApplicationStatus() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({
-      id,
-      status,
-    }: {
-      id: string;
-      status: JobStatus;
-    }) => {
-      const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error('Unauthorized');
-      const now = new Date().toISOString();
-      const { error } = await supabase
-        .from('jobs')
-        .update({ status, updated_at: now })
-        .eq('id', id)
-        .eq('user_id', user.id);
-      if (error) throw error;
-      const { error: ajErr } = await supabase
-        .from('applied_jobs')
-        .update({ status, updated_at: now })
-        .eq('job_id', id)
-        .eq('user_id', user.id);
-      if (ajErr) throw ajErr;
+    mutationFn: async ({ id, status }: { id: string; status: JobStatus }) => {
+      const res = await fetch(`/api/jobs/${id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) throw new Error('update_failed');
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['job-applications'] });
+      void qc.invalidateQueries({ queryKey: ['tracked-jobs-count'] });
     },
   });
 }
@@ -74,46 +58,38 @@ export function useUpsertJobApplication() {
   const qc = useQueryClient();
   const userId = useAuthStore((s) => s.user?.id);
   return useMutation({
-    mutationFn: async (payload: Partial<Job> & { company_name: string; job_title: string }) => {
+    mutationFn: async (
+      payload: Partial<Job> & { company_name: string; job_title: string }
+    ) => {
       if (!userId) throw new Error('Unauthorized');
-      const supabase = createClient();
-      const now = new Date().toISOString();
       if (payload.id) {
-        const { data, error } = await supabase
-          .from('jobs')
-          .update(payload)
-          .eq('id', payload.id)
-          .eq('user_id', userId)
-          .select()
-          .single();
-        if (error) throw error;
-        if (payload.status != null) {
-          const { error: ajErr } = await supabase
-            .from('applied_jobs')
-            .update({ status: payload.status, updated_at: now })
-            .eq('job_id', payload.id)
-            .eq('user_id', userId);
-          if (ajErr) throw ajErr;
-        }
-        return data as Job;
+        const { id, ...rest } = payload;
+        const patch = stripUndefined(rest as Record<string, unknown>);
+        const res = await fetch(`/api/jobs/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(patch),
+        });
+        if (!res.ok) throw new Error('update_failed');
+        return res.json() as Promise<Job>;
       }
-      const { data, error } = await supabase
-        .from('jobs')
-        .insert({ ...payload, user_id: userId, keywords: payload.keywords ?? [] })
-        .select()
-        .single();
-      if (error) throw error;
-      const job = data as Job;
-      const { error: ajErr } = await supabase.from('applied_jobs').insert({
-        user_id: userId,
-        job_id: job.id,
-        status: job.status,
+      const res = await fetch('/api/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          company_name: payload.company_name,
+          job_title: payload.job_title,
+          job_url: payload.job_url ?? undefined,
+          keywords: payload.keywords ?? [],
+          status: payload.status ?? 'apply_later',
+        }),
       });
-      if (ajErr) throw ajErr;
-      return job;
+      if (!res.ok) throw new Error('create_failed');
+      return res.json() as Promise<Job>;
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['job-applications'] });
+      void qc.invalidateQueries({ queryKey: ['tracked-jobs-count'] });
     },
   });
 }

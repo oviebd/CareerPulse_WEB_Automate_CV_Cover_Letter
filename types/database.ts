@@ -138,28 +138,31 @@ export function isJobSpecificCV(cv: CV): boolean {
   return cv.job_ids.length > 0;
 }
 
-/** Kanban / `jobs.status` — board column values */
+/** `jobs.status` — Postgres enum `job_status` (migration 015) */
 export type JobStatus =
-  | 'saved'
-  | 'applied'
-  | 'interviewing'
-  | 'offered'
-  | 'rejected'
-  | 'withdrawn';
-
-/** `applied_jobs.status` — granular tracker state (see migration 014) */
-export type AppliedJobTrackStatus =
+  | 'none'
   | 'apply_later'
   | 'applied'
   | 'interviewing'
   | 'technical_test'
   | 'offer_received'
   | 'negotiating'
+  | 'offered'
   | 'rejected'
   | 'withdrawn'
-  | 'ghosted'
-  | 'saved'
-  | 'offered';
+  | 'ghosted';
+
+export interface LinkedCV {
+  id: string;
+  title?: string;
+  created_at: string;
+}
+
+export interface LinkedCoverLetter {
+  id: string;
+  title?: string;
+  created_at: string;
+}
 
 export interface Job {
   id: string;
@@ -189,24 +192,14 @@ export interface Job {
   is_starred: boolean;
   created_at: string;
   updated_at: string;
+  /** Populated by GET /api/jobs and GET /api/jobs/[id] when requested */
+  cvs?: LinkedCV[];
+  cover_letters?: LinkedCoverLetter[];
 }
 
 export type JobInsert = Pick<Job, 'company_name' | 'job_title'> &
   Partial<Omit<Job, 'id' | 'user_id' | 'created_at' | 'updated_at'>>;
 export type JobUpdate = Partial<Omit<Job, 'id' | 'user_id' | 'created_at'>>;
-
-/** User's tracked application row (join with `jobs` for role metadata) */
-export interface AppliedJob {
-  id: string;
-  user_id: string;
-  job_id: string;
-  status: AppliedJobTrackStatus;
-  notes: string | null;
-  applied_at: string | null;
-  created_at: string;
-  updated_at: string;
-  job?: Job;
-}
 
 export interface CoverLetter {
   id: string;

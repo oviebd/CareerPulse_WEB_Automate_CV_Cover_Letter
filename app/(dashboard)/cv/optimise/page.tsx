@@ -3,7 +3,7 @@
  * - Next.js 14 app router; dashboard routes under app/(dashboard)/cv/optimise.
  * - Generation: POST /api/cv/optimise uses CLAUDE_MODEL (ANTHROPIC_MODEL); optional POST /api/jobs/analyze uses CV_ANALYZER_API_MODEL (Haiku).
  * - Results: useOptimiseDraftStore + useOptimiseEditDraftStore (Zustand). With JD → /cv/job-specific/draft/edit; without JD → /cv/optimise/result.
- * - DB: jobs (job_title, company_name, job_url, keywords JSONB, job_summary); applied_jobs links user↔job; cvs/cover_letters via save-optimised.
+ * - DB: jobs (job_title, company_name, job_url, keywords JSONB, job_summary, status); cvs/cover_letters via save-optimised (job_ids[]).
  * - Cover letter standalone page uses the same optimise API with generationType coverLetter (GenerateCoverLetterForm).
  */
 

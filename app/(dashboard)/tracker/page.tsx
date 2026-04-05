@@ -27,7 +27,7 @@ export default function TrackerPage() {
   const { tier } = useSubscription();
   return (
     <div className="space-y-6">
-      <h1 className="font-display text-2xl font-bold">Application tracker</h1>
+      <h1 className="font-display text-2xl font-bold">Job Tracker</h1>
       <FeatureGate
         requiredTier={['pro', 'premium', 'career']}
         userTier={tier}

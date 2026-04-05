@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import type { Job } from '@/types/database';
 import { stripUndefined } from '@/lib/queries/strip-undefined';
+import { fetchLinkedDocumentsForJobs } from '@/lib/jobs-linked';
+import { isJobStatus } from '@/lib/job-status';
 
 function err(msg: string, code: string | undefined, status: number) {
   return NextResponse.json({ error: msg, code }, { status });
@@ -16,12 +18,16 @@ export async function GET(request: Request) {
     if (!user) return err('Unauthorized', 'UNAUTHORIZED', 401);
 
     const url = new URL(request.url);
-    const status = url.searchParams.get('status') as Job['status'] | null;
+    const statusFilter = url.searchParams.get('status') as Job['status'] | null;
     const starred = url.searchParams.get('starred');
+    const listAll = url.searchParams.get('all') === '1';
 
     let q = supabase.from('jobs').select('*').eq('user_id', user.id);
-    if (status) {
-      q = q.eq('status', status);
+    if (!listAll) {
+      q = q.neq('status', 'none');
+    }
+    if (statusFilter) {
+      q = q.eq('status', statusFilter);
     }
     if (starred === 'true') {
       q = q.eq('is_starred', true);
@@ -31,7 +37,19 @@ export async function GET(request: Request) {
       console.error('jobs GET', error);
       return err('Failed to list jobs', 'FETCH_FAILED', 500);
     }
-    return NextResponse.json(data ?? []);
+    const rows = (data ?? []) as Job[];
+    const ids = rows.map((j) => j.id);
+    const { cvsByJob, clByJob } = await fetchLinkedDocumentsForJobs(
+      supabase,
+      user.id,
+      ids
+    );
+    const withLinks: Job[] = rows.map((j) => ({
+      ...j,
+      cvs: cvsByJob.get(j.id) ?? [],
+      cover_letters: clByJob.get(j.id) ?? [],
+    }));
+    return NextResponse.json(withLinks);
   } catch (e) {
     console.error('jobs GET', e);
     return err('Failed to list jobs', 'FETCH_FAILED', 500);
@@ -92,6 +110,12 @@ export async function POST(request: Request) {
     delete payload.job_url;
     delete (payload as Record<string, unknown>).job_description;
 
+    let initialStatus: Job['status'] | undefined;
+    if (typeof body.status === 'string' && isJobStatus(body.status.trim())) {
+      initialStatus = body.status.trim() as Job['status'];
+    }
+    delete payload.status;
+
     const { data, error } = await supabase
       .from('jobs')
       .insert({
@@ -102,6 +126,7 @@ export async function POST(request: Request) {
         job_url,
         keywords,
         job_summary,
+        ...(initialStatus ? { status: initialStatus } : {}),
       })
       .select()
       .single();

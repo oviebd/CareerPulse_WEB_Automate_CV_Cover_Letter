@@ -23,6 +23,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ProfileMenu } from '@/components/shared/ProfileMenu';
 import { cn } from '@/lib/utils';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useTrackedJobsCount } from '@/hooks/useTracker';
 import { useUIStore } from '@/stores/useUIStore';
 
 interface NavItem {
@@ -92,12 +93,14 @@ function NavLinkContent({
   isFree,
   collapsed,
   onNavigate,
+  trackerBadge,
 }: {
   item: NavItem;
   pathname: string;
   isFree: boolean;
   collapsed?: boolean;
   onNavigate?: () => void;
+  trackerBadge?: number;
 }) {
   const Icon = item.icon;
 
@@ -157,14 +160,24 @@ function NavLinkContent({
       title={collapsed ? item.label : undefined}
       className={cn(
         'flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 active:scale-[0.99]',
-        collapsed ? "justify-center px-0" : "px-3",
+        collapsed ? 'justify-center px-0' : 'px-3',
         active
           ? 'bg-[var(--color-primary-100)] text-[var(--color-primary-400)] shadow-[0_0_0_1px_rgba(108,99,255,0.2)]'
           : 'text-[var(--color-muted)] hover:bg-white/[0.04] hover:text-[var(--color-text-primary)]'
       )}
     >
       <Icon className="h-4 w-4 shrink-0" />
-      {!collapsed && item.label}
+      {!collapsed && (
+        <span className="min-w-0 flex-1 truncate">{item.label}</span>
+      )}
+      {item.href === '/tracker' &&
+      !collapsed &&
+      typeof trackerBadge === 'number' &&
+      trackerBadge > 0 ? (
+        <span className="shrink-0 rounded-full bg-[var(--color-primary-500)] px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+          {trackerBadge > 99 ? '99+' : trackerBadge}
+        </span>
+      ) : null}
     </Link>
   );
 }
@@ -172,6 +185,7 @@ function NavLinkContent({
 export function AppHeader() {
   const pathname = usePathname();
   const { tier } = useSubscription();
+  const { data: trackerBadge } = useTrackedJobsCount();
   const isFree = tier === 'free';
   const { mobileMenuOpen, setMobileMenuOpen, toggleMobileMenu, sidebarCollapsed, toggleSidebar } = useUIStore();
   const navRef = useRef<HTMLElement>(null);
@@ -234,6 +248,7 @@ export function AppHeader() {
               pathname={pathname}
               isFree={isFree}
               collapsed={sidebarCollapsed}
+              trackerBadge={trackerBadge}
             />
           ))}
         </nav>
@@ -305,6 +320,7 @@ export function AppHeader() {
                     pathname={pathname}
                     isFree={isFree}
                     onNavigate={() => setMobileMenuOpen(false)}
+                    trackerBadge={trackerBadge}
                   />
                 ))}
               </nav>
