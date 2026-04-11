@@ -10,10 +10,15 @@ const ROWS: { key: CVSectionVisibilityKey; label: string }[] = [
   { key: 'education', label: 'Education' },
   { key: 'skills', label: 'Skills' },
   { key: 'projects', label: 'Projects' },
+  { key: 'publications', label: 'Publications' },
+  { key: 'research', label: 'Research' },
   { key: 'languages', label: 'Languages' },
   { key: 'certifications', label: 'Certifications' },
   { key: 'awards', label: 'Awards' },
+  { key: 'volunteer', label: 'Volunteering' },
+  { key: 'interests', label: 'Interests' },
   { key: 'referrals', label: 'References' },
+  { key: 'custom', label: 'Custom sections' },
 ];
 
 type Props = {

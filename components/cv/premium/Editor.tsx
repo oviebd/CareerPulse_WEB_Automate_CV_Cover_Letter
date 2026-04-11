@@ -13,7 +13,7 @@ import {
   CV_SECTION_H2,
   CV_TEXTAREA,
 } from '@/lib/cv-editor-styles';
-import type { CVData, ExperienceEntry } from '@/types';
+import type { CVData, WorkExperience } from '@/types';
 import { ExperienceCard } from '@/components/cv/premium/ExperienceCard';
 import type { CVFormTab } from '@/components/cv/CVFormFields';
 
@@ -129,14 +129,15 @@ export function Editor({ value, onChange, activeSection }: EditorProps) {
                     {
                       id: generateId(),
                       company: '',
-                      title: '',
+                      role: '',
+                      type: 'full-time',
                       location: '',
-                      start_date: '',
-                      end_date: null,
-                      is_current: false,
+                      remote: false,
+                      startDate: '',
+                      endDate: '',
+                      current: false,
                       bullets: [''],
-                      description: null,
-                    } as ExperienceEntry,
+                    } as WorkExperience,
                   ],
                 })
               }
@@ -167,7 +168,9 @@ export function Editor({ value, onChange, activeSection }: EditorProps) {
     }
 
     if (activeSection === 'skills') {
-      const plainSkills = (value.skills ?? []).flatMap((s) => s.items).join(', ');
+      const plainSkills = (value.skills ?? [])
+        .flatMap((s) => s.items.map((it) => (typeof it === 'string' ? it : it.name)))
+        .join(', ');
       return (
         <section className="space-y-3">
           <h2 className={CV_SECTION_H2}>Skills</h2>
@@ -178,7 +181,17 @@ export function Editor({ value, onChange, activeSection }: EditorProps) {
             onChange={(e) =>
               update({
                 ...value,
-                skills: [{ id: value.skills?.[0]?.id ?? generateId(), category: 'technical', items: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) }],
+                skills: [
+                  {
+                    id: value.skills?.[0]?.id ?? generateId(),
+                    category: 'technical',
+                    items: e.target.value
+                      .split(',')
+                      .map((s) => s.trim())
+                      .filter(Boolean)
+                      .map((name) => ({ name })),
+                  },
+                ],
               })
             }
           />
@@ -204,11 +217,10 @@ export function Editor({ value, onChange, activeSection }: EditorProps) {
                       id: generateId(),
                       institution: '',
                       degree: '',
-                      field_of_study: '',
-                      start_date: '',
-                      end_date: null,
-                      gpa: null,
-                      description: null,
+                      field: '',
+                      startDate: '',
+                      endDate: '',
+                      current: false,
                     },
                   ],
                 })
@@ -224,14 +236,14 @@ export function Editor({ value, onChange, activeSection }: EditorProps) {
                 next[idx] = { ...row, institution: e.target.value };
                 update({ ...value, education: next });
               }} />
-              <input className={cn(CV_INPUT, 'mb-2 w-full')} placeholder="Degree and field" value={`${row.degree ?? ''} ${row.field_of_study ?? ''}`.trim()} onChange={(e) => {
+              <input className={cn(CV_INPUT, 'mb-2 w-full')} placeholder="Degree and field" value={`${row.degree ?? ''} ${row.field ?? ''}`.trim()} onChange={(e) => {
                 const next = [...rows];
                 next[idx] = { ...row, degree: e.target.value };
                 update({ ...value, education: next });
               }} />
-              <textarea className={cn(CV_TEXTAREA, 'min-h-[90px]')} placeholder="Key achievements or coursework" value={row.description ?? ''} onChange={(e) => {
+              <textarea className={cn(CV_TEXTAREA, 'min-h-[90px]')} placeholder="Key achievements or coursework" value={row.thesis ?? ''} onChange={(e) => {
                 const next = [...rows];
-                next[idx] = { ...row, description: e.target.value };
+                next[idx] = { ...row, thesis: e.target.value };
                 update({ ...value, education: next });
               }} />
             </div>
@@ -252,7 +264,19 @@ export function Editor({ value, onChange, activeSection }: EditorProps) {
               onClick={() =>
                 update({
                   ...value,
-                  projects: [...projects, { id: generateId(), name: '', description: '', tech_stack: [], links: [], start_date: null, end_date: null }],
+                  projects: [
+                    ...projects,
+                    {
+                      id: generateId(),
+                      name: '',
+                      role: '',
+                      description: '',
+                      bullets: [],
+                      technologies: [],
+                      links: [],
+                      featured: false,
+                    },
+                  ],
                 })
               }
             >
@@ -294,20 +318,32 @@ export function Editor({ value, onChange, activeSection }: EditorProps) {
         <section className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className={CV_SECTION_H2}>Languages</h2>
-            <Button variant="secondary" size="sm" onClick={() => update({ ...value, languages: [...languages, { id: generateId(), language: '', proficiency: 'fluent' }] })}>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() =>
+                update({
+                  ...value,
+                  languages: [...languages, { name: '', proficiency: 'professional' }],
+                })
+              }
+            >
               Add language
             </Button>
           </div>
           {languages.map((lang, idx) => (
-            <div key={lang.id} className={CV_NESTED_CARD}>
-              <input className={cn(CV_INPUT, 'mb-2 w-full')} placeholder="Language" value={lang.language} onChange={(e) => {
+            <div key={`lang-${idx}`} className={CV_NESTED_CARD}>
+              <input className={cn(CV_INPUT, 'mb-2 w-full')} placeholder="Language" value={lang.name} onChange={(e) => {
                 const next = [...languages];
-                next[idx] = { ...lang, language: e.target.value };
+                next[idx] = { ...lang, name: e.target.value };
                 update({ ...value, languages: next });
               }} />
               <input className={cn(CV_INPUT, 'w-full')} placeholder="Proficiency" value={lang.proficiency} onChange={(e) => {
                 const next = [...languages];
-                next[idx] = { ...lang, proficiency: (e.target.value as typeof lang.proficiency) || 'fluent' };
+                next[idx] = {
+                  ...lang,
+                  proficiency: (e.target.value as (typeof lang)['proficiency']) || 'professional',
+                };
                 update({ ...value, languages: next });
               }} />
             </div>
@@ -322,7 +358,19 @@ export function Editor({ value, onChange, activeSection }: EditorProps) {
         <section className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className={CV_SECTION_H2}>Certifications</h2>
-            <Button variant="secondary" size="sm" onClick={() => update({ ...value, certifications: [...certs, { id: generateId(), name: '', issuer: '', issue_date: '', expiry_date: null, links: [] }] })}>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() =>
+                update({
+                  ...value,
+                  certifications: [
+                    ...certs,
+                    { id: generateId(), name: '', issuer: '', date: '', expiry: undefined, url: undefined },
+                  ],
+                })
+              }
+            >
               Add certification
             </Button>
           </div>
@@ -350,7 +398,7 @@ export function Editor({ value, onChange, activeSection }: EditorProps) {
         <section className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className={CV_SECTION_H2}>Awards</h2>
-            <Button variant="secondary" size="sm" onClick={() => update({ ...value, awards: [...awards, { id: generateId(), title: '', issuer: '', date: '', description: '' }] })}>
+            <Button variant="secondary" size="sm" onClick={() => update({ ...value, awards: [...awards, { id: generateId(), title: '', issuer: '', date: '', description: undefined }] })}>
               Add award
             </Button>
           </div>

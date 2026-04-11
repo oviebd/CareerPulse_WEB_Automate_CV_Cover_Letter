@@ -320,98 +320,36 @@ export type CVSectionVisibilityKey =
   | 'languages'
   | 'certifications'
   | 'awards'
-  | 'referrals';
+  | 'referrals'
+  | 'publications'
+  | 'research'
+  | 'volunteer'
+  | 'interests'
+  | 'custom';
 
 export type CVSectionVisibility = Partial<
   Record<CVSectionVisibilityKey, boolean>
 >;
 
-/** Shape passed to CV HTML templates and PDF rendering (JSONB fields normalized). */
-export interface CVData {
-  full_name: string | null;
-  professional_title: string | null;
-  email: string | null;
-  phone: string | null;
-  location: string | null;
-  linkedin_url: string | null;
-  github_url: string | null;
-  /** Extra labeled links (portfolio, website, Behance, etc.) beyond linkedin/github. */
-  links: ProfileLink[];
-  /** @deprecated Use `links`. Kept for backward-compat. */
-  portfolio_url?: string | null;
-  /** @deprecated Use `links`. Kept for backward-compat. */
-  website_url?: string | null;
-  /** Used only for PDF/HTML preview rendering to include/exclude CV sections. */
-  section_visibility?: CVSectionVisibility;
-  /** Full postal / mailing address (separate from short location line). */
-  address: string | null;
-  /** Public URL to profile photo (e.g. Supabase Storage). */
-  photo_url: string | null;
-  summary: string | null;
-  experience: Array<{
-    id: string;
-    company: string;
-    title: string;
-    location: string | null;
-    start_date: string | null;
-    end_date: string | null;
-    is_current: boolean;
-    bullets: string[];
-    description: string | null;
-  }>;
-  education: Array<{
-    id: string;
-    institution: string;
-    degree: string | null;
-    field_of_study: string | null;
-    start_date: string | null;
-    end_date: string | null;
-    gpa: string | null;
-    description: string | null;
-  }>;
-  skills: Array<{
-    id: string;
-    category: 'technical' | 'soft' | 'tools' | 'languages';
-    items: string[];
-  }>;
-  projects: Array<{
-    id: string;
-    name: string;
-    description: string | null;
-    tech_stack: string[];
-    links: EntryLink[];
-    url?: string | null;
-    start_date: string | null;
-    end_date: string | null;
-  }>;
-  certifications: Array<{
-    id: string;
-    name: string;
-    issuer: string | null;
-    issue_date: string | null;
-    expiry_date: string | null;
-    links: EntryLink[];
-    url?: string | null;
-  }>;
-  languages: Array<{
-    id: string;
-    language: string;
-    proficiency: 'native' | 'fluent' | 'advanced' | 'intermediate' | 'basic';
-  }>;
-  awards: Array<{
-    id: string;
-    title: string;
-    issuer: string | null;
-    date: string | null;
-    description: string | null;
-  }>;
-  referrals: ReferralEntry[];
-  accent_color?: string;
-  font_family?: string;
-  watermark?: boolean;
-  /** Precomputed in renderTemplate for pipe-separated contact (optional). */
-  contact_line?: string;
-}
+export type {
+  CVData,
+  TemplateId,
+  CVMeta,
+  PersonalInfo,
+  WorkExperience,
+  Education,
+  SkillSection,
+  SkillItem,
+  Project,
+  Publication,
+  Research,
+  Certification,
+  Award,
+  Volunteer,
+  Language,
+  Reference,
+  CustomSection,
+} from '../src/types/cv.types';
 
 // CV Profile (editor + PDF — JSONB arrays use app shapes: SkillGroup, etc.)
 export interface CVProfile {
@@ -444,6 +382,8 @@ export interface CVProfile {
   awards: AwardEntry[];
   referrals?: ReferralEntry[];
   section_visibility?: CVSectionVisibility;
+  /** Publications, research, volunteer, interests, custom blocks (see `lib/cv-universal-bridge.ts`). */
+  cv_extra?: Record<string, unknown>;
   is_complete: boolean;
   completion_percentage: number;
   original_cv_file_url: string | null;

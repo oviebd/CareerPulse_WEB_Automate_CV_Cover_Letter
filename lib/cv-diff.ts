@@ -18,8 +18,8 @@ function linesFromCvData(data: CVData): { section: string; lines: string[] }[] {
   }
 
   for (const ex of data.experience ?? []) {
-    const header = [ex.title, ex.company].filter(Boolean).join(' — ');
-    const sub = [ex.location, ex.start_date, ex.end_date]
+    const header = [ex.role, ex.company].filter(Boolean).join(' — ');
+    const sub = [ex.location, ex.startDate, ex.endDate]
       .filter(Boolean)
       .join(' · ');
     const lines: string[] = [];
@@ -29,8 +29,8 @@ function linesFromCvData(data: CVData): { section: string; lines: string[] }[] {
       const t = normalizeLine(b);
       if (t) lines.push(`• ${t}`);
     }
-    if (ex.description?.trim()) {
-      lines.push(`Desc: ${normalizeLine(ex.description)}`);
+    if (ex.highlights?.trim()) {
+      lines.push(`Desc: ${normalizeLine(ex.highlights)}`);
     }
     blocks.push({ section: `Experience — ${header || 'Role'}`, lines });
   }
@@ -39,15 +39,17 @@ function linesFromCvData(data: CVData): { section: string; lines: string[] }[] {
     const header = [ed.degree, ed.institution].filter(Boolean).join(' — ');
     const lines: string[] = [];
     if (header) lines.push(`Header: ${header}`);
-    for (const t of [ed.field_of_study, ed.start_date, ed.end_date].filter(Boolean)) {
+    for (const t of [ed.field, ed.startDate, ed.endDate].filter(Boolean)) {
       lines.push(`Meta: ${t}`);
     }
-    if (ed.description?.trim()) lines.push(`Desc: ${normalizeLine(ed.description)}`);
+    if (ed.thesis?.trim()) lines.push(`Desc: ${normalizeLine(ed.thesis)}`);
     blocks.push({ section: `Education — ${header || 'Education'}`, lines });
   }
 
   for (const sg of data.skills ?? []) {
-    const items = (sg.items ?? []).map((x) => normalizeLine(x)).filter(Boolean);
+    const items = (sg.items ?? [])
+      .map((x) => normalizeLine(typeof x === 'string' ? x : x.name))
+      .filter(Boolean);
     if (items.length) {
       blocks.push({
         section: `Skills — ${sg.category}`,
@@ -60,7 +62,7 @@ function linesFromCvData(data: CVData): { section: string; lines: string[] }[] {
     const lines: string[] = [];
     lines.push(`Header: ${p.name}`);
     if (p.description?.trim()) lines.push(`Desc: ${normalizeLine(p.description)}`);
-    for (const t of p.tech_stack ?? []) {
+    for (const t of p.technologies ?? []) {
       const x = normalizeLine(t);
       if (x) lines.push(`Tech: ${x}`);
     }

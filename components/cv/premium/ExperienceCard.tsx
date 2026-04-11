@@ -60,9 +60,9 @@ export function ExperienceCard({ entry, onChange }: ExperienceCardProps) {
         />
         <input
           className={CV_INPUT}
-          placeholder="Role + date"
-          value={entry.title}
-          onChange={(e) => onChange({ ...entry, title: e.target.value })}
+          placeholder="Role title"
+          value={entry.role}
+          onChange={(e) => onChange({ ...entry, role: e.target.value })}
         />
       </div>
 

@@ -5,15 +5,19 @@ import type { ComponentType } from 'react';
 import type { CVFormTab } from '@/components/cv/CVFormFields';
 import {
   Award,
+  BookOpen,
   BriefcaseBusiness,
   FileBadge2,
+  FlaskConical,
   GraduationCap,
+  HeartHandshake,
   IdCard,
   Languages,
-  LayoutDashboard,
+  Layers,
   Lightbulb,
   Palette,
   Sparkles,
+  Tag,
   UserRound,
   Users,
   Wrench,
@@ -26,10 +30,15 @@ const ITEMS: Array<{ id: CVFormTab; label: string; icon: ComponentType<{ classNa
   { id: 'education', label: 'Education', icon: GraduationCap },
   { id: 'skills', label: 'Skills', icon: Wrench },
   { id: 'projects', label: 'Projects', icon: Lightbulb },
+  { id: 'publications', label: 'Publications', icon: BookOpen },
+  { id: 'research', label: 'Research', icon: FlaskConical },
   { id: 'languages', label: 'Languages', icon: Languages },
   { id: 'certifications', label: 'Certifications', icon: FileBadge2 },
   { id: 'references', label: 'References', icon: Users },
   { id: 'awards', label: 'Awards', icon: Award },
+  { id: 'volunteer', label: 'Volunteering', icon: HeartHandshake },
+  { id: 'interests', label: 'Interests', icon: Tag },
+  { id: 'custom', label: 'Custom sections', icon: Layers },
 ];
 
 interface SidebarProps {

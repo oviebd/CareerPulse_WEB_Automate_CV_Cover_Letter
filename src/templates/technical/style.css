@@ -1,0 +1,27 @@
+/* Technical — skill chips + project links */
+.cv-two-col {
+  display: grid;
+  grid-template-columns: 30% 1fr;
+  gap: 14pt;
+}
+.cv-sidebar {
+  font-size: 9pt;
+}
+.cv-tech {
+  font-size: 9pt;
+  color: #0f766e;
+  margin-top: 4pt;
+}
+.tag,
+.cv-tech {
+  font-family: ui-monospace, monospace;
+}
+.skill-name {
+  display: inline-block;
+  background: #ecfeff;
+  border: 1pt solid #99f6e4;
+  border-radius: 4pt;
+  padding: 2pt 6pt;
+  margin: 2pt 4pt 2pt 0;
+  font-size: 8.5pt;
+}

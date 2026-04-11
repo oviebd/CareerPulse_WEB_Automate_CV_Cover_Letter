@@ -12,6 +12,7 @@ import type {
   CVProfile,
   GenerationType,
 } from '@/types';
+import { migrateLegacyCVData } from '@/src/utils/cvDefaults';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
@@ -67,10 +68,10 @@ function validateOptimisedCV(
 
   original.experience.forEach((orig, i) => {
     const opt = optimised.experience[i];
-    if (opt && (opt.company !== orig.company || opt.title !== orig.title)) {
+    if (opt && (opt.company !== orig.company || opt.role !== orig.role)) {
       warnings.push(`AI changed company/title for ${orig.company} — reverted`);
       optimised.experience[i].company = orig.company;
-      optimised.experience[i].title = orig.title;
+      optimised.experience[i].role = orig.role;
     }
   });
 
@@ -91,11 +92,11 @@ function validateOptimisedCV(
     const opt = optimised.experience[i];
     if (
       opt &&
-      (opt.start_date !== orig.start_date || opt.end_date !== orig.end_date)
+      (opt.startDate !== orig.startDate || opt.endDate !== orig.endDate)
     ) {
-      optimised.experience[i].start_date = orig.start_date;
-      optimised.experience[i].end_date = orig.end_date;
-      optimised.experience[i].is_current = orig.is_current;
+      optimised.experience[i].startDate = orig.startDate;
+      optimised.experience[i].endDate = orig.endDate;
+      optimised.experience[i].current = orig.current;
     }
   });
 
@@ -126,27 +127,10 @@ type CvRow = {
 };
 
 function rowToCvData(cvRow: CvRow): CVData {
-  return {
-    full_name: cvRow.full_name ?? null,
-    professional_title: cvRow.professional_title ?? null,
-    email: cvRow.email ?? null,
-    phone: cvRow.phone ?? null,
-    location: cvRow.location ?? null,
-    linkedin_url: cvRow.linkedin_url ?? null,
-    github_url: cvRow.github_url ?? null,
-    links: (cvRow.links ?? []) as CVData['links'],
-    address: cvRow.address ?? null,
-    photo_url: cvRow.photo_url ?? null,
-    summary: cvRow.summary ?? null,
-    experience: (cvRow.experience ?? []) as CVData['experience'],
-    education: (cvRow.education ?? []) as CVData['education'],
-    skills: (cvRow.skills ?? []) as CVData['skills'],
-    projects: (cvRow.projects ?? []) as CVData['projects'],
-    certifications: (cvRow.certifications ?? []) as CVData['certifications'],
-    languages: (cvRow.languages ?? []) as CVData['languages'],
-    awards: (cvRow.awards ?? []) as CVData['awards'],
-    referrals: (cvRow.referrals ?? []) as CVData['referrals'],
-  } satisfies CVData;
+  return migrateLegacyCVData({
+    ...cvRow,
+    section_visibility: {},
+  });
 }
 
 async function generateOptimisedCvJson(params: {

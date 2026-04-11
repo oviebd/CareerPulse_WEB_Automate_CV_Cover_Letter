@@ -1,8 +1,12 @@
 import type { CVData } from '@/types';
+import { migrateLegacyCVData } from '@/src/utils/cvDefaults';
 
 /** Static content for template gallery thumbnails (no user data). */
 export function getSampleCVData(accentColor = '#2563EB'): CVData {
-  return {
+  const flat = {
+    preferred_template_id: 'classic',
+    accent_color: accentColor,
+    font_family: 'Inter',
     full_name: 'Alex Morgan',
     professional_title: 'Senior Product Designer',
     email: 'alex.morgan@email.com',
@@ -88,7 +92,7 @@ export function getSampleCVData(accentColor = '#2563EB'): CVData {
     ],
     awards: [],
     referrals: [],
-    accent_color: accentColor,
     watermark: false,
   };
+  return migrateLegacyCVData(flat);
 }

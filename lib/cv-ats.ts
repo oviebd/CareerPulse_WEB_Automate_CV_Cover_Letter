@@ -53,20 +53,25 @@ function clamp(v: number): number {
   return Math.max(0, Math.min(100, Math.round(v)));
 }
 
+function skillItemLabel(it: { name: string } | string): string {
+  return typeof it === 'string' ? it : it.name;
+}
+
 export function buildATSReport(cv: CVData, highlightedKeywords: string[] = []): ATSReport {
   const sections: Record<string, ATSSectionFeedback> = {};
+  const p = cv.personal;
 
   const headerSuggestions: string[] = [];
   let headerScore = 0;
-  if ((cv.full_name ?? '').trim()) headerScore += 4;
+  if ((p?.fullName ?? '').trim()) headerScore += 4;
   else headerSuggestions.push('Add your full name.');
-  if ((cv.professional_title ?? '').trim()) headerScore += 4;
+  if ((p?.title ?? '').trim()) headerScore += 4;
   else headerSuggestions.push('Add a role-focused professional title.');
-  if ((cv.email ?? '').trim()) headerScore += 4;
+  if ((p?.email ?? '').trim()) headerScore += 4;
   else headerSuggestions.push('Add an email so recruiters can contact you quickly.');
-  if ((cv.phone ?? '').trim()) headerScore += 4;
+  if ((p?.phone ?? '').trim()) headerScore += 4;
   else headerSuggestions.push('Add a phone number in your header.');
-  if ((cv.location ?? '').trim()) headerScore += 4;
+  if ((p?.location ?? '').trim()) headerScore += 4;
   else headerSuggestions.push('Add your city/location for ATS and recruiter filtering.');
   sections.header = { score: clamp((headerScore / 20) * 100), suggestions: headerSuggestions };
 
@@ -110,7 +115,7 @@ export function buildATSReport(cv: CVData, highlightedKeywords: string[] = []): 
   sections.experience = { score: clamp(experienceScore), suggestions: experienceSuggestions };
 
   const skillGroups = cv.skills ?? [];
-  const skillItems = skillGroups.flatMap((g) => g.items ?? []);
+  const skillItems = skillGroups.flatMap((g) => (g.items ?? []).map(skillItemLabel));
   const skillsSuggestions: string[] = [];
   let skillsScore = 0;
   if (skillItems.length >= 8) skillsScore += 45;
@@ -129,9 +134,11 @@ export function buildATSReport(cv: CVData, highlightedKeywords: string[] = []): 
   let educationScore = 0;
   if ((cv.education ?? []).length > 0) educationScore += 60;
   else educationSuggestions.push('Add at least one education entry.');
-  if ((cv.education ?? []).some((e) => (e.field_of_study ?? '').trim())) educationScore += 20;
+  if ((cv.education ?? []).some((e) => (e.field ?? '').trim())) educationScore += 20;
   else educationSuggestions.push('Add field of study to improve keyword relevance.');
-  if ((cv.education ?? []).some((e) => (e.start_date ?? '').trim() || (e.end_date ?? '').trim())) {
+  if (
+    (cv.education ?? []).some((e) => (e.startDate ?? '').trim() || (e.endDate ?? '').trim())
+  ) {
     educationScore += 20;
   } else {
     educationSuggestions.push('Add education dates for timeline completeness.');
@@ -143,11 +150,11 @@ export function buildATSReport(cv: CVData, highlightedKeywords: string[] = []): 
   const projects = cv.projects ?? [];
   if (projects.length > 0) projectsScore += 40;
   else projectSuggestions.push('Add a project section if you have relevant portfolio work.');
-  if (projects.some((p) => (p.tech_stack ?? []).length > 0)) projectsScore += 30;
+  if (projects.some((p) => (p.technologies ?? []).length > 0)) projectsScore += 30;
   else projectSuggestions.push('List tech stack in projects so ATS can match tools/technologies.');
   if (projects.some((p) => /\d/.test(p.description ?? ''))) projectsScore += 15;
   else projectSuggestions.push('Add measurable outcomes in project descriptions where possible.');
-  if (projects.some((p) => (p.url ?? '').trim())) projectsScore += 15;
+  if (projects.some((p) => (p.links ?? []).some((l) => l.url?.trim()))) projectsScore += 15;
   else projectSuggestions.push('Add project links for credibility when available.');
   sections.projects = { score: clamp(projectsScore), suggestions: projectSuggestions };
 

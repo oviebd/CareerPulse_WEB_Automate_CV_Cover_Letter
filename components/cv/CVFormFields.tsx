@@ -10,23 +10,39 @@ import { Select } from '@/components/ui/select';
 import type {
   AwardEntry,
   CertificationEntry,
+  CustomSection,
   CVSectionVisibility,
+  CVTemplate,
   EducationEntry,
   EntryLink,
   ExperienceEntry,
   LanguageEntry,
   ProfileLink,
   ProjectEntry,
+  Publication,
   ReferralEntry,
+  Research,
   SkillGroup,
+  SubscriptionTier,
+  Volunteer,
 } from '@/types';
 import { CVPhotoField } from '@/components/cv/CVPhotoField';
 import { CVSectionVisibilityPanel } from '@/components/cv/CVSectionVisibilityPanel';
 import { CVRewriteWithAIModal } from '@/components/cv/CVRewriteWithAIModal';
 import { CvAtsPolishButton } from '@/components/cv/CvAtsPolishButton';
 import { TemplateThumbnail } from '@/components/cv/TemplateThumbnail';
-import { cn, generateId } from '@/lib/utils';
+import { cn, generateId, moveIndexInArray } from '@/lib/utils';
 import { CV_FORM_CARD as FORM_CARD } from '@/lib/cv-editor-styles';
+import { canUseTemplate } from '@/lib/subscription';
+import { ALL_TEMPLATE_IDS, TEMPLATE_CONFIGS } from '@/src/config/templateConfig';
+import {
+  CustomSectionsForm,
+  InterestsSection,
+  PublicationsSection,
+  ResearchSection,
+  VolunteerSection,
+} from '@/components/cv/ExtendedCvSections';
+import { ListReorderArrows } from '@/components/cv/ListReorderArrows';
 
 export type CVFormTab =
   | 'design'
@@ -36,10 +52,15 @@ export type CVFormTab =
   | 'education'
   | 'skills'
   | 'projects'
+  | 'publications'
+  | 'research'
   | 'languages'
   | 'certifications'
   | 'references'
-  | 'awards';
+  | 'awards'
+  | 'volunteer'
+  | 'interests'
+  | 'custom';
 
 const DEGREE_OPTIONS = [
   { value: "Bachelor's", label: "Bachelor's" },
@@ -118,6 +139,18 @@ type Props = {
   onReferralsChange: (next: ReferralEntry[]) => void;
   awards: AwardEntry[];
   onAwardsChange: (next: AwardEntry[]) => void;
+  publications: Publication[];
+  onPublicationsChange: (next: Publication[]) => void;
+  research: Research[];
+  onResearchChange: (next: Research[]) => void;
+  volunteer: Volunteer[];
+  onVolunteerChange: (next: Volunteer[]) => void;
+  interestsText: string;
+  onInterestsTextChange: (v: string) => void;
+  custom: CustomSection[];
+  onCustomChange: (next: CustomSection[]) => void;
+  /** Used to lock premium templates in the design picker. Defaults to free. */
+  userTier?: SubscriptionTier;
   hiddenTabs?: CVFormTab[];
   /** When true, horizontal tab pills are hidden (e.g. when using a side nav). */
   hideTabBar?: boolean;
@@ -127,7 +160,7 @@ type Props = {
   /** Job-specific context injected into "Rewrite with AI" requests. */
   aiJobContext?: AiJobContext;
   atsBySection?: Record<string, { score: number; suggestions: string[] }>;
-  templates?: any[]; // Using any for brevity or import CVTemplate if preferred
+  templates?: CVTemplate[];
   selectedTemplateId?: string;
   onTemplateChange?: (id: string) => void;
   accent?: string;
@@ -169,10 +202,15 @@ const TAB_DEFS: { id: CVFormTab; label: string }[] = [
   { id: 'education', label: 'Education' },
   { id: 'skills', label: 'Skills' },
   { id: 'projects', label: 'Projects' },
+  { id: 'publications', label: 'Publications' },
+  { id: 'research', label: 'Research' },
   { id: 'languages', label: 'Languages' },
   { id: 'certifications', label: 'Certifications' },
   { id: 'references', label: 'References' },
   { id: 'awards', label: 'Awards' },
+  { id: 'volunteer', label: 'Volunteering' },
+  { id: 'interests', label: 'Interests' },
+  { id: 'custom', label: 'Custom sections' },
 ];
 
 export function CVFormFields(props: Props) {
@@ -219,6 +257,17 @@ export function CVFormFields(props: Props) {
     onReferralsChange,
     awards,
     onAwardsChange,
+    publications,
+    onPublicationsChange,
+    research,
+    onResearchChange,
+    volunteer,
+    onVolunteerChange,
+    interestsText,
+    onInterestsTextChange,
+    custom,
+    onCustomChange,
+    userTier = 'free',
     hiddenTabs,
     hideTabBar,
     hideVisibilityPanel,
@@ -329,48 +378,69 @@ export function CVFormFields(props: Props) {
               </div>
             </div>
 
-            {/* Template Selection */}
+            {/* Template Selection — full catalog (8); DB row supplies tier locks & labels when present */}
             <div className={FORM_CARD}>
               <p className="mb-4 text-sm font-semibold text-[var(--color-text-primary)] uppercase tracking-wider text-xs">
                 Select Template
               </p>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {templates.map((template) => (
-                  <button
-                    key={template.id}
-                    type="button"
-                    onClick={() => onTemplateChange?.(template.id)}
-                    className={cn(
-                      'group relative aspect-[3/4] overflow-hidden rounded-xl border-2 transition-all duration-300',
-                      selectedTemplateId === template.id
-                        ? 'border-[var(--color-primary-400)] shadow-lg shadow-[var(--color-primary-400)]/20'
-                        : 'border-[var(--color-border)] hover:border-[var(--color-border-hover)]'
-                    )}
-                  >
-                    <TemplateThumbnail
-                      templateId={template.id}
-                      accent={accent}
-                      name={template.name}
-                      className="absolute inset-0 h-full w-full grayscale-[0.1] opacity-90 transition-all duration-500 group-hover:scale-110 group-hover:grayscale-0 group-hover:opacity-100"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent flex flex-col justify-end p-3 transition-opacity duration-300 group-hover:from-black/90">
-                      <p className={cn(
-                        "text-[10px] font-bold uppercase tracking-widest transition-colors",
-                        selectedTemplateId === template.id ? "text-[var(--color-primary-400)]" : "text-white"
-                      )}>
-                        {template.name}
-                      </p>
-                      <p className="text-[8px] text-white/80">{template.category}</p>
-                    </div>
-                    {selectedTemplateId === template.id && (
-                      <div className="absolute top-2 right-2 rounded-full bg-[var(--color-primary-400)] p-1">
-                        <svg className="h-2 w-2 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                        </svg>
+                {ALL_TEMPLATE_IDS.map((tid) => {
+                  const cfg = TEMPLATE_CONFIGS[tid];
+                  const row = templates.find((t) => t.id === tid);
+                  const name = row?.name ?? cfg.label;
+                  const category = row?.category ?? cfg.description.slice(0, 48);
+                  const tiers = row?.available_tiers ?? ['free', 'pro', 'premium', 'career'];
+                  const allowed = canUseTemplate(tiers, userTier);
+                  return (
+                    <button
+                      key={tid}
+                      type="button"
+                      disabled={!allowed}
+                      onClick={() => {
+                        if (allowed) onTemplateChange?.(tid);
+                      }}
+                      className={cn(
+                        'group relative aspect-[3/4] overflow-hidden rounded-xl border-2 transition-all duration-300',
+                        !allowed && 'cursor-not-allowed opacity-60',
+                        selectedTemplateId === tid
+                          ? 'border-[var(--color-primary-400)] shadow-lg shadow-[var(--color-primary-400)]/20'
+                          : 'border-[var(--color-border)] hover:border-[var(--color-border-hover)]'
+                      )}
+                    >
+                      <TemplateThumbnail
+                        templateId={tid}
+                        accent={accent}
+                        name={name}
+                        className="absolute inset-0 h-full w-full grayscale-[0.1] opacity-90 transition-all duration-500 group-hover:scale-110 group-hover:grayscale-0 group-hover:opacity-100"
+                      />
+                      <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/85 via-black/10 to-transparent p-3 transition-opacity duration-300 group-hover:from-black/90">
+                        <p
+                          className={cn(
+                            'text-[10px] font-bold uppercase tracking-widest transition-colors',
+                            selectedTemplateId === tid
+                              ? 'text-[var(--color-primary-400)]'
+                              : 'text-white'
+                          )}
+                        >
+                          {name}
+                        </p>
+                        <p className="line-clamp-2 text-[8px] text-white/80">{category}</p>
                       </div>
-                    )}
-                  </button>
-                ))}
+                      {!allowed ? (
+                        <span className="absolute left-2 top-2 rounded bg-black/60 px-1.5 py-0.5 text-[8px] font-semibold uppercase text-white">
+                          Upgrade
+                        </span>
+                      ) : null}
+                      {selectedTemplateId === tid ? (
+                        <div className="absolute right-2 top-2 rounded-full bg-[var(--color-primary-400)] p-1">
+                          <svg className="h-2 w-2 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                      ) : null}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -581,6 +651,14 @@ export function CVFormFields(props: Props) {
           <div className="space-y-4">
             {experience.map((ex, i) => (
               <div key={ex.id} className={FORM_CARD}>
+                <div className="mb-3 flex items-center justify-between gap-2 border-b border-[var(--color-border)] pb-2">
+                  <span className="text-xs font-medium text-[var(--color-muted)]">Position {i + 1}</span>
+                  <ListReorderArrows
+                    index={i}
+                    length={experience.length}
+                    onMove={(from, to) => onExperienceChange(moveIndexInArray(experience, from, to))}
+                  />
+                </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <Input
                     label="Job title"
@@ -794,6 +872,14 @@ export function CVFormFields(props: Props) {
           <div className="space-y-4">
             {education.map((ed, i) => (
               <div key={ed.id} className={FORM_CARD}>
+                <div className="mb-3 flex items-center justify-between gap-2 border-b border-[var(--color-border)] pb-2">
+                  <span className="text-xs font-medium text-[var(--color-muted)]">Education {i + 1}</span>
+                  <ListReorderArrows
+                    index={i}
+                    length={education.length}
+                    onMove={(from, to) => onEducationChange(moveIndexInArray(education, from, to))}
+                  />
+                </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <Input
                     className="sm:col-span-2"
@@ -922,6 +1008,14 @@ export function CVFormFields(props: Props) {
             </p>
             {skills.map((g, i) => (
               <div key={g.id} className={FORM_CARD}>
+                <div className="mb-3 flex items-center justify-between gap-2 border-b border-[var(--color-border)] pb-2">
+                  <span className="text-xs font-medium text-[var(--color-muted)]">Skill group {i + 1}</span>
+                  <ListReorderArrows
+                    index={i}
+                    length={skills.length}
+                    onMove={(from, to) => onSkillsChange(moveIndexInArray(skills, from, to))}
+                  />
+                </div>
                 <Select
                   label="Category label"
                   value={g.category}
@@ -1018,6 +1112,14 @@ export function CVFormFields(props: Props) {
           <div className="space-y-4">
             {projects.map((p, i) => (
               <div key={p.id} className={FORM_CARD}>
+                <div className="mb-3 flex items-center justify-between gap-2 border-b border-[var(--color-border)] pb-2">
+                  <span className="text-xs font-medium text-[var(--color-muted)]">Project {i + 1}</span>
+                  <ListReorderArrows
+                    index={i}
+                    length={projects.length}
+                    onMove={(from, to) => onProjectsChange(moveIndexInArray(projects, from, to))}
+                  />
+                </div>
                 <Input
                   label="Project name"
                   value={p.name}
@@ -1491,6 +1593,26 @@ export function CVFormFields(props: Props) {
               </Button>
             ) : null}
           </div>
+        ) : null}
+
+        {tab === 'publications' ? (
+          <PublicationsSection publications={publications} onChange={onPublicationsChange} />
+        ) : null}
+
+        {tab === 'research' ? (
+          <ResearchSection research={research} onChange={onResearchChange} />
+        ) : null}
+
+        {tab === 'volunteer' ? (
+          <VolunteerSection volunteer={volunteer} onChange={onVolunteerChange} />
+        ) : null}
+
+        {tab === 'interests' ? (
+          <InterestsSection interestsText={interestsText} onChange={onInterestsTextChange} />
+        ) : null}
+
+        {tab === 'custom' ? (
+          <CustomSectionsForm custom={custom} onChange={onCustomChange} />
         ) : null}
 
         {tab === 'awards' ? (

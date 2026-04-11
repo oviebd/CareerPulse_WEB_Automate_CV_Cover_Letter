@@ -1,0 +1,11 @@
+/* Entry-level — education emphasis */
+.edu-block {
+  background: #f8fafc;
+  border: 1pt solid #e2e8f0;
+  border-radius: 8pt;
+  padding: 10pt;
+}
+.cv-section-title {
+  color: #0369a1;
+  border-bottom-color: #7dd3fc;
+}

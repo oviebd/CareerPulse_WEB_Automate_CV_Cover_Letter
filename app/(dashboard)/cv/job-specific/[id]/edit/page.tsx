@@ -29,6 +29,10 @@ import {
   optimisedCvJsonToCvData,
   cvDataToOptimisedCvJson,
 } from '@/lib/optimise-result';
+import { profileToUniversalCV, universalToProfilePayload } from '@/lib/cv-universal-bridge';
+import { ALL_TEMPLATE_IDS, TEMPLATE_CONFIGS } from '@/src/config/templateConfig';
+import { normalizeTemplateId } from '@/src/utils/cvDefaults';
+import type { TemplateId } from '@/src/types/cv.types';
 import { useOptimiseDraftStore } from '@/stores/useOptimiseDraftStore';
 import type { GenerationType, JobStatus } from '@/types';
 import { JOB_STATUS_CONFIG, jobStatusShortLabel } from '@/types';
@@ -56,27 +60,28 @@ import {
 } from '@/stores/useOptimiseEditDraftStore';
 
 function previewPayloadFromCVData(d: CVData): Record<string, unknown> {
+  return JSON.parse(JSON.stringify(d)) as Record<string, unknown>;
+}
+
+function withDesign(
+  cv: CVData,
+  templateId: string,
+  accent: string,
+  font: string
+): CVData {
+  const tid = normalizeTemplateId(templateId) as TemplateId;
+  const cfg = TEMPLATE_CONFIGS[tid];
   return {
-    full_name: d.full_name,
-    professional_title: d.professional_title,
-    email: d.email,
-    phone: d.phone,
-    location: d.location,
-    linkedin_url: d.linkedin_url,
-    github_url: d.github_url,
-    links: d.links ?? [],
-    address: d.address ?? null,
-    photo_url: d.photo_url ?? null,
-    summary: d.summary,
-    section_visibility: d.section_visibility ?? {},
-    experience: d.experience ?? [],
-    education: d.education ?? [],
-    skills: d.skills ?? [],
-    projects: d.projects ?? [],
-    certifications: d.certifications ?? [],
-    languages: d.languages ?? [],
-    referrals: (d.referrals ?? []).slice(0, 2),
-    awards: d.awards ?? [],
+    ...cv,
+    meta: {
+      ...cv.meta,
+      templateId: tid,
+      colorScheme: accent,
+      fontFamily: font,
+      sectionOrder: [...cfg.sectionOrder],
+      layout: cfg.layout === 'two-column' ? 'two-column' : 'single-column',
+      showPhoto: cfg.showPhoto,
+    },
   };
 }
 
@@ -86,27 +91,9 @@ function patchFromCvData(
   accent: string,
   fontFamily: string
 ) {
-  return {
-    full_name: data.full_name,
-    professional_title: data.professional_title,
-    email: data.email,
-    phone: data.phone,
-    location: data.location,
-    linkedin_url: data.linkedin_url,
-    github_url: data.github_url,
-    links: data.links ?? [],
-    summary: data.summary,
-    experience: data.experience,
-    education: data.education,
-    skills: data.skills,
-    projects: data.projects,
-    certifications: data.certifications,
-    languages: data.languages,
-    awards: data.awards,
-    preferred_template_id: selectedTemplateId,
-    accent_color: accent,
-    font_family: fontFamily,
-  };
+  return universalToProfilePayload(
+    withDesign(data, selectedTemplateId, accent, fontFamily)
+  );
 }
 
 function patchFromCvDataWithJobMeta(
@@ -127,28 +114,7 @@ function patchFromCvDataWithJobMeta(
 /** Payload for PATCH /api/cv (core profile), matching core editor save. */
 
 function cvProfileToCvData(profile: CVProfile): CVData {
-  return {
-    full_name: profile.full_name,
-    professional_title: profile.professional_title,
-    email: profile.email,
-    phone: profile.phone,
-    location: profile.location,
-    linkedin_url: profile.linkedin_url,
-    github_url: profile.github_url,
-    links: profile.links ?? [],
-    address: profile.address ?? null,
-    photo_url: profile.photo_url ?? null,
-    summary: profile.summary,
-    section_visibility: profile.section_visibility ?? {},
-    experience: profile.experience as CVData['experience'],
-    education: profile.education as CVData['education'],
-    skills: profile.skills as CVData['skills'],
-    projects: profile.projects as CVData['projects'],
-    certifications: profile.certifications as CVData['certifications'],
-    languages: profile.languages as CVData['languages'],
-    awards: profile.awards as CVData['awards'],
-    referrals: profile.referrals ?? [],
-  };
+  return profileToUniversalCV(profile);
 }
 
 const TRACK_STATUS_OPTIONS = TRACKABLE_JOB_STATUSES;
@@ -156,32 +122,14 @@ const TRACK_STATUS_OPTIONS = TRACKABLE_JOB_STATUSES;
 function coreCvPatchFromDraft(
   data: CVData,
   preferredTemplateId: string,
-  fontFamily: string
+  fontFamily: string,
+  accent: string
 ) {
   return {
-    full_name: data.full_name,
-    professional_title: data.professional_title,
-    email: data.email,
-    phone: data.phone,
-    location: data.location,
-    linkedin_url: data.linkedin_url,
-    github_url: data.github_url,
-    links: data.links ?? [],
-    address: data.address,
-    photo_url: data.photo_url || null,
-    summary: data.summary,
+    ...universalToProfilePayload(
+      withDesign(data, preferredTemplateId, accent, fontFamily)
+    ),
     original_cv_file_url: null,
-    section_visibility: data.section_visibility ?? {},
-    experience: data.experience,
-    education: data.education,
-    skills: data.skills,
-    projects: data.projects,
-    languages: data.languages,
-    certifications: data.certifications,
-    referrals: (data.referrals ?? []).slice(0, 2),
-    awards: data.awards,
-    preferred_template_id: preferredTemplateId,
-    font_family: fontFamily,
   };
 }
 
@@ -207,7 +155,8 @@ export default function JobCVEditPage() {
 
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('classic');
   const [accent, setAccent] = useState<string>('#6C63FF');
-  const [previewPdfUrl, setPreviewPdfUrl] = useState<string>('');
+  const [previewSrc, setPreviewSrc] = useState<string>('');
+  const [previewIsPdf, setPreviewIsPdf] = useState(true);
   const [previewBusy, setPreviewBusy] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [editorTab, setEditorTab] = useState<CVFormTab>('header');
@@ -259,17 +208,19 @@ export default function JobCVEditPage() {
     staleTime: 10 * 60 * 1000,
   });
 
+  const catalogTid = normalizeTemplateId(selectedTemplateId) as TemplateId;
   const templateMeta = useMemo(
-    () => templates.find((t) => t.id === selectedTemplateId) ?? null,
-    [templates, selectedTemplateId]
+    () => templates.find((t) => t.id === catalogTid) ?? null,
+    [templates, catalogTid]
   );
   const allowed = useMemo(() => {
-    if (!templateMeta) return false;
+    if (!ALL_TEMPLATE_IDS.includes(catalogTid)) return false;
+    if (!templateMeta) return true;
     return canUseTemplate(
       templateMeta.available_tiers as SubscriptionTier[],
       tier
     );
-  }, [templateMeta, tier]);
+  }, [templateMeta, tier, catalogTid]);
 
   const jobTitle = jobCV?.job_title ?? draftMeta?.jobTitle ?? '';
   const companyName = jobCV?.company_name ?? draftMeta?.companyName ?? null;
@@ -342,28 +293,14 @@ export default function JobCVEditPage() {
 
   useEffect(() => {
     if (isDraftMode || !jobCV || draft) return;
-    setDraft({
-      full_name: jobCV.full_name ?? null,
-      professional_title: jobCV.professional_title ?? null,
-      email: jobCV.email ?? null,
-      phone: jobCV.phone ?? null,
-      location: jobCV.location ?? null,
-      linkedin_url: jobCV.linkedin_url ?? null,
-      github_url: jobCV.github_url ?? null,
-      links: jobCV.links ?? [],
-      address: null,
-      photo_url: null,
-      summary: jobCV.summary ?? null,
-      section_visibility: {},
-      experience: jobCV.experience ?? [],
-      education: jobCV.education ?? [],
-      skills: jobCV.skills ?? [],
-      projects: jobCV.projects ?? [],
-      certifications: jobCV.certifications ?? [],
-      languages: jobCV.languages ?? [],
-      awards: jobCV.awards ?? [],
-      referrals: [],
-    });
+    setDraft(
+      withDesign(
+        profileToUniversalCV(jobCV as CVProfile),
+        jobCV.preferred_template_id ?? 'classic',
+        jobCV.accent_color ?? '#6C63FF',
+        jobCV.font_family ?? 'Inter'
+      )
+    );
     setSelectedTemplateId(jobCV.preferred_template_id ?? 'classic');
     setAccent(jobCV.accent_color ?? '#6C63FF');
     setFontFamily(jobCV.font_family ?? 'Inter');
@@ -443,6 +380,31 @@ export default function JobCVEditPage() {
     if (!draft || !selectedTemplateId) return;
     setPreviewBusy(true);
     try {
+      const snapshot = previewPayloadFromCVData(draft);
+      const pngRes = await fetch('/api/cv/preview-png', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cv_snapshot: snapshot,
+          template_id: selectedTemplateId,
+          accent_color: accent,
+          font_family: fontFamily,
+        }),
+      });
+      if (pngRes.ok) {
+        const data = (await pngRes.json()) as { png?: string };
+        if (data.png) {
+          setPreviewIsPdf(false);
+          setPreviewSrc((prev) => {
+            if (prev.startsWith('blob:')) {
+              URL.revokeObjectURL(prev.split('#')[0]);
+            }
+            return `data:image/png;base64,${data.png}`;
+          });
+          return;
+        }
+      }
+
       const res = await fetch('/api/export', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -453,7 +415,7 @@ export default function JobCVEditPage() {
                 template_id: selectedTemplateId,
                 accent_color: accent,
                 font_family: fontFamily,
-                cv_snapshot: previewPayloadFromCVData(draft),
+                cv_snapshot: snapshot,
               }
             : {
                 type: 'cv',
@@ -461,22 +423,21 @@ export default function JobCVEditPage() {
                 template_id: selectedTemplateId,
                 accent_color: accent,
                 font_family: fontFamily,
-                cv_snapshot: previewPayloadFromCVData(draft),
+                cv_snapshot: snapshot,
               }
         ),
       });
       if (!res.ok) {
-        setPreviewPdfUrl('');
+        setPreviewSrc('');
         return;
       }
       const blob = await res.blob();
       const rawUrl = URL.createObjectURL(blob);
-      // Hide PDF chrome for a cleaner in-app preview (match core editor).
       const decoratedUrl = `${rawUrl}#toolbar=0&navpanes=0&scrollbar=0`;
-      setPreviewPdfUrl((prev) => {
-        if (prev) {
-          const originalUrl = prev.split('#')[0];
-          URL.revokeObjectURL(originalUrl);
+      setPreviewIsPdf(true);
+      setPreviewSrc((prev) => {
+        if (prev.startsWith('blob:')) {
+          URL.revokeObjectURL(prev.split('#')[0]);
         }
         return decoratedUrl;
       });
@@ -495,8 +456,8 @@ export default function JobCVEditPage() {
 
   useEffect(() => {
     return () => {
-      setPreviewPdfUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev.split('#')[0]);
+      setPreviewSrc((prev) => {
+        if (prev.startsWith('blob:')) URL.revokeObjectURL(prev.split('#')[0]);
         return '';
       });
     };
@@ -557,7 +518,8 @@ export default function JobCVEditPage() {
 
   useEffect(() => {
     if (templatesLoading || !templates.length) return;
-    if (templates.some((t) => t.id === selectedTemplateId)) return;
+    const tid = normalizeTemplateId(selectedTemplateId) as TemplateId;
+    if (ALL_TEMPLATE_IDS.includes(tid)) return;
     setSelectedTemplateId(templates[0].id);
   }, [templatesLoading, templates, selectedTemplateId]);
 
@@ -837,7 +799,7 @@ export default function JobCVEditPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           core_cv_id: targetCoreCvId,
-          ...coreCvPatchFromDraft(draft, selectedTemplateId, fontFamily),
+          ...coreCvPatchFromDraft(draft, selectedTemplateId, fontFamily, accent),
         }),
       });
       if (!res.ok) {
@@ -850,7 +812,7 @@ export default function JobCVEditPage() {
     } finally {
       setSavingCore(false);
     }
-  }, [draft, targetCoreCvId, selectedTemplateId, toast, queryClient, fontFamily]);
+  }, [draft, targetCoreCvId, selectedTemplateId, toast, queryClient, fontFamily, accent]);
 
   const deleteJobCv = useCallback(async () => {
     if (!id || isDraftMode) return;
@@ -1243,6 +1205,7 @@ export default function JobCVEditPage() {
                     onFontFamilyChange={(next) => {
                       setFontFamily(next);
                     }}
+                    userTier={tier}
                   />
                 </div>
               </div>
@@ -1259,7 +1222,8 @@ export default function JobCVEditPage() {
               <ATSCircularScore score={ats.score} suggestions={ats.suggestions} />
               {keywords.length > 0 ? <JobKeywordsBanner keywords={keywords} cv={draft} /> : null}
               <PreviewPanel
-                previewPdfUrl={previewPdfUrl}
+                previewSrc={previewSrc}
+                previewIsPdf={previewIsPdf}
                 previewBusy={previewBusy}
                 zoom={zoom}
                 onZoomChange={setZoom}

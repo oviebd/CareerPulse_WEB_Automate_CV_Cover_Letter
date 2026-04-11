@@ -1,0 +1,18 @@
+/* Minimal — executive sparse */
+.cv-header h1 {
+  font-size: 28pt;
+  font-weight: 300;
+  letter-spacing: 0.02em;
+}
+.cv-section-title {
+  border: none;
+  text-transform: none;
+  font-size: 10pt;
+  letter-spacing: 0.2em;
+  color: #64748b;
+}
+.cv-line {
+  border-bottom: 0.5pt solid #e2e8f0;
+  padding-bottom: 6pt;
+  margin-bottom: 6pt;
+}

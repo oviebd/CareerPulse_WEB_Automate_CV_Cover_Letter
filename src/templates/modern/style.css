@@ -1,0 +1,47 @@
+/* Modern — two-column, accent header */
+.cv-two-col {
+  display: grid;
+  grid-template-columns: 32% 1fr;
+  gap: 16pt;
+  align-items: start;
+}
+.cv-sidebar {
+  background: #f8fafc;
+  padding: 12pt;
+  border-radius: 8pt;
+  font-size: 9pt;
+}
+.cv-main .cv-header h1 {
+  color: var(--cv-accent, #6c63ff);
+}
+.cv-section-title {
+  color: var(--cv-accent, #6c63ff);
+  border-bottom-color: var(--cv-accent, #6c63ff);
+}
+.skill-bar {
+  display: inline-block;
+  width: 80px;
+  height: 4px;
+  background: #e2e8f0;
+  border-radius: 2px;
+  margin-left: 6pt;
+  vertical-align: middle;
+}
+.skill-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--cv-accent, #6c63ff);
+  border-radius: 2px;
+}
+.cv-photo {
+  width: 72pt;
+  height: 72pt;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2pt solid #e2e8f0;
+}
+.cv-header {
+  display: flex;
+  gap: 12pt;
+  align-items: flex-start;
+}

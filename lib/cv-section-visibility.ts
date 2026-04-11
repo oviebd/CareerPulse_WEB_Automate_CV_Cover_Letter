@@ -1,4 +1,5 @@
-import type { CVData, CVSectionVisibility, CVSectionVisibilityKey } from '@/types';
+import type { CVData } from '@/src/types/cv.types';
+import type { CVSectionVisibility, CVSectionVisibilityKey } from '@/types';
 
 const ALL_KEYS: CVSectionVisibilityKey[] = [
   'photo',
@@ -12,6 +13,11 @@ const ALL_KEYS: CVSectionVisibilityKey[] = [
   'certifications',
   'awards',
   'referrals',
+  'publications',
+  'research',
+  'volunteer',
+  'interests',
+  'custom',
 ];
 
 export function isCvSectionVisible(
@@ -32,18 +38,18 @@ export function applyCvSectionVisibility(
   if (visibility == null || Object.keys(visibility).length === 0) {
     return data;
   }
-  let out: CVData = { ...data };
+  let out: CVData = { ...data, personal: { ...data.personal } };
   for (const key of ALL_KEYS) {
     if (!isCvSectionVisible(key, visibility)) {
       switch (key) {
         case 'photo':
-          out = { ...out, photo_url: null };
+          out = { ...out, personal: { ...out.personal, photo: undefined } };
           break;
         case 'address':
-          out = { ...out, address: null };
+          out = { ...out, postalAddress: undefined };
           break;
         case 'summary':
-          out = { ...out, summary: null };
+          out = { ...out, summary: '' };
           break;
         case 'experience':
           out = { ...out, experience: [] };
@@ -67,7 +73,22 @@ export function applyCvSectionVisibility(
           out = { ...out, awards: [] };
           break;
         case 'referrals':
-          out = { ...out, referrals: [] };
+          out = { ...out, references: [] };
+          break;
+        case 'publications':
+          out = { ...out, publications: [] };
+          break;
+        case 'research':
+          out = { ...out, research: [] };
+          break;
+        case 'volunteer':
+          out = { ...out, volunteer: [] };
+          break;
+        case 'interests':
+          out = { ...out, interests: [] };
+          break;
+        case 'custom':
+          out = { ...out, custom: [] };
           break;
         default:
           break;

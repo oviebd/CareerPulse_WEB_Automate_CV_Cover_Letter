@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useParams, notFound, useSearchParams } from 'next/navigation';
+import { useParams, notFound, useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,7 @@ import { useToast } from '@/components/ui/toast';
 import type {
   AwardEntry,
   CertificationEntry,
+  CustomSection,
   CVProfile,
   CVTemplate,
   EducationEntry,
@@ -26,11 +27,31 @@ import type {
   LanguageEntry,
   JobSpecificCV,
   ProjectEntry,
+  Publication,
   ReferralEntry,
+  Research,
   SkillGroup,
   SubscriptionTier,
+  Volunteer,
 } from '@/types';
 import { canUseTemplate } from '@/lib/subscription';
+import type { CVExtraPayload } from '@/lib/cv-universal-bridge';
+
+function readCvExtra(d: CVProfile) {
+  const x = (d.cv_extra ?? {}) as Partial<CVExtraPayload>;
+  return {
+    publications: (x.publications ?? []) as Publication[],
+    research: (x.research ?? []) as Research[],
+    volunteer: (x.volunteer ?? []) as Volunteer[],
+    interestsText: (x.interests ?? []).join('\n'),
+    custom: (x.custom ?? []) as CustomSection[],
+  };
+}
+
+function patchCvExtra(d: CVProfile, patch: Partial<CVExtraPayload>): CVProfile {
+  const prev = (d.cv_extra ?? {}) as CVExtraPayload;
+  return { ...d, cv_extra: { ...prev, ...patch } };
+}
 
 function previewPayloadFromProfile(d: CVProfile): Record<string, unknown> {
   return {
@@ -54,6 +75,7 @@ function previewPayloadFromProfile(d: CVProfile): Record<string, unknown> {
     languages: d.languages ?? [],
     referrals: (d.referrals ?? []).slice(0, 2),
     awards: d.awards ?? [],
+    cv_extra: d.cv_extra ?? {},
   };
 }
 
@@ -95,6 +117,7 @@ function draftFromJobSpecificCV(j: JobSpecificCV): CVProfile {
 const SWATCHES = ['#2563EB', '#0d9488', '#7c3aed', '#dc2626', '#0f172a'];
 
 export default function CVTemplatePreviewPage() {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const params = useParams();
   const templateId = typeof params.templateId === 'string' ? params.templateId : '';
@@ -251,6 +274,7 @@ export default function CVTemplatePreviewPage() {
           awards: draft.awards,
           preferred_template_id: templateId,
           accent_color: accent,
+          cv_extra: draft.cv_extra ?? {},
         }),
       });
       if (res.ok) {
@@ -297,6 +321,7 @@ export default function CVTemplatePreviewPage() {
         certifications: draft.certifications,
         referrals: (draft.referrals ?? []).slice(0, 2),
         awards: draft.awards,
+        cv_extra: draft.cv_extra ?? {},
       }),
     });
     if (res.ok) {
@@ -355,6 +380,7 @@ export default function CVTemplatePreviewPage() {
                   // Ensure we never persist uploaded PDFs; we only keep extracted info.
                   original_cv_file_url: null,
               section_visibility: draft.section_visibility,
+              cv_extra: draft.cv_extra ?? {},
             }
           : {
               full_name: draft.full_name,
@@ -379,6 +405,7 @@ export default function CVTemplatePreviewPage() {
               certifications: draft.certifications,
               referrals: (draft.referrals ?? []).slice(0, 2),
               awards: draft.awards,
+              cv_extra: draft.cv_extra ?? {},
             }),
       }),
     });
@@ -508,6 +535,8 @@ export default function CVTemplatePreviewPage() {
   if (!draft) {
     return <p className="text-sm text-[var(--color-muted)]">Loading profile…</p>;
   }
+
+  const ex = readCvExtra(draft);
 
   return (
     <div className="mx-auto max-w-[1400px] space-y-6">
@@ -681,6 +710,36 @@ export default function CVTemplatePreviewPage() {
             }
             awards={(draft.awards?.length ? draft.awards : []) as AwardEntry[]}
             onAwardsChange={(awards) => setDraft({ ...draft, awards })}
+            publications={ex.publications}
+            onPublicationsChange={(publications) =>
+              setDraft(patchCvExtra(draft, { publications }))
+            }
+            research={ex.research}
+            onResearchChange={(research) => setDraft(patchCvExtra(draft, { research }))}
+            volunteer={ex.volunteer}
+            onVolunteerChange={(volunteer) => setDraft(patchCvExtra(draft, { volunteer }))}
+            interestsText={ex.interestsText}
+            onInterestsTextChange={(text) =>
+              setDraft(
+                patchCvExtra(draft, {
+                  interests: text
+                    .split('\n')
+                    .map((s) => s.trim())
+                    .filter(Boolean),
+                })
+              )
+            }
+            custom={ex.custom}
+            onCustomChange={(custom) => setDraft(patchCvExtra(draft, { custom }))}
+            userTier={tier}
+            templates={templates}
+            selectedTemplateId={templateId}
+            onTemplateChange={(nextId) => {
+              const q = jobCvId ? `?job_cv_id=${encodeURIComponent(jobCvId)}` : '';
+              router.push(`/cv/templates/${encodeURIComponent(nextId)}/preview${q}`);
+            }}
+            accent={accent}
+            onAccentChange={setAccent}
           />
         </Card>
 

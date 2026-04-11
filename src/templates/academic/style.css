@@ -1,0 +1,16 @@
+/* Academic — dense, numbered publications */
+.cv-page {
+  font-size: 9.5pt;
+  line-height: 1.35;
+}
+.pub-list {
+  margin: 0;
+  padding-left: 14pt;
+}
+.pub-row {
+  margin-bottom: 6pt;
+  text-align: justify;
+}
+.cv-section-title {
+  letter-spacing: 0.12em;
+}

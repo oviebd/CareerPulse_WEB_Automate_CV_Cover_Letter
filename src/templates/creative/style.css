@@ -1,0 +1,35 @@
+/* Creative — accent + photo hero */
+.cv-two-col {
+  display: grid;
+  grid-template-columns: 34% 1fr;
+  gap: 18pt;
+}
+.cv-sidebar {
+  background: linear-gradient(180deg, #faf5ff 0%, #fff 40%);
+  padding: 14pt;
+  border-radius: 12pt;
+}
+.cv-header h1 {
+  color: var(--cv-accent, #7c3aed);
+}
+.cv-photo {
+  width: 88pt;
+  height: 88pt;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 4pt 12pt rgba(124, 58, 237, 0.25);
+}
+.skill-bar {
+  display: inline-block;
+  width: 64px;
+  height: 5px;
+  background: #ede9fe;
+  border-radius: 3px;
+  margin-left: 4pt;
+}
+.skill-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--cv-accent, #7c3aed);
+  border-radius: 3px;
+}

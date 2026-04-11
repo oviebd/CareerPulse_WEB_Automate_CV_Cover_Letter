@@ -4,6 +4,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { CVData, CVProfile } from '@/types';
 import { cvProfileToCvData } from '@/lib/cv-profile-cvdata';
+import { universalToProfilePayload } from '@/lib/cv-universal-bridge';
+import { createEmptyCVData } from '@/src/utils/cvDefaults';
+import { normalizeTemplateId } from '@/src/utils/cvDefaults';
+import { TEMPLATE_CONFIGS } from '@/src/config/templateConfig';
+import type { TemplateId } from '@/src/types/cv.types';
 
 export interface CVEditorState {
   cvData: CVData;
@@ -13,28 +18,26 @@ export interface CVEditorState {
   font_family: string;
 }
 
-function emptyCvData(): CVData {
+function applyDesignToCv(
+  cv: CVData,
+  templateId: string,
+  accent: string,
+  font: string
+): CVData {
+  const tid = normalizeTemplateId(templateId) as TemplateId;
+  const cfg = TEMPLATE_CONFIGS[tid];
   return {
-    full_name: '',
-    professional_title: '',
-    email: '',
-    phone: '',
-    location: '',
-    linkedin_url: '',
-    github_url: '',
-    links: [],
-    address: '',
-    photo_url: null,
-    summary: '',
-    section_visibility: {},
-    experience: [],
-    education: [],
-    skills: [],
-    projects: [],
-    certifications: [],
-    languages: [],
-    awards: [],
-    referrals: [],
+    ...cv,
+    meta: {
+      ...cv.meta,
+      templateId: tid,
+      colorScheme: accent,
+      fontFamily: font,
+      layout:
+        cfg.layout === 'two-column' ? 'two-column' : 'single-column',
+      showPhoto: cfg.showPhoto,
+      sectionOrder: [...cfg.sectionOrder],
+    },
   };
 }
 
@@ -43,7 +46,7 @@ function serializeEditorState(s: CVEditorState): string {
 }
 
 const DEFAULT_EDITOR_STATE: CVEditorState = {
-  cvData: emptyCvData(),
+  cvData: createEmptyCVData('classic'),
   name: 'Untitled CV',
   preferred_template_id: 'classic',
   accent_color: '#6C63FF',
@@ -94,18 +97,18 @@ export function useCVEditor({ cvIdFromRoute }: UseCVEditorOptions): UseCVEditorR
       if (typeof window !== 'undefined' && sessionStorage.getItem('cv_draft')) {
         try {
           const raw = sessionStorage.getItem('cv_draft');
-          const parsed = raw ? (JSON.parse(raw) as CVData) : emptyCvData();
+          const parsed = raw ? (JSON.parse(raw) as CVData) : createEmptyCVData('classic');
           setEditorState({
             cvData: parsed,
             name: 'Untitled CV',
-            preferred_template_id: 'classic',
-            accent_color: '#6C63FF',
-            font_family: 'Inter',
+            preferred_template_id: parsed.meta?.templateId ?? 'classic',
+            accent_color: parsed.meta?.colorScheme ?? '#6C63FF',
+            font_family: parsed.meta?.fontFamily ?? 'Inter',
           });
           setSavedSnapshot(null);
         } catch {
           setEditorState({
-            cvData: emptyCvData(),
+            cvData: createEmptyCVData('classic'),
             name: 'Untitled CV',
             preferred_template_id: 'classic',
             accent_color: '#6C63FF',
@@ -129,10 +132,18 @@ export function useCVEditor({ cvIdFromRoute }: UseCVEditorOptions): UseCVEditorR
       }
       const profile = (await res.json()) as CVProfile;
       setLoadedProfile(profile);
+      const tid = profile.preferred_template_id ?? 'classic';
+      let cvData = cvProfileToCvData(profile);
+      cvData = applyDesignToCv(
+        cvData,
+        tid,
+        profile.accent_color ?? '#6C63FF',
+        profile.font_family ?? 'Inter'
+      );
       const st: CVEditorState = {
-        cvData: cvProfileToCvData(profile),
+        cvData,
         name: profile.name ?? 'Untitled CV',
-        preferred_template_id: profile.preferred_template_id ?? 'classic',
+        preferred_template_id: tid,
         accent_color: profile.accent_color ?? '#6C63FF',
         font_family: profile.font_family ?? 'Inter',
       };
@@ -168,32 +179,18 @@ export function useCVEditor({ cvIdFromRoute }: UseCVEditorOptions): UseCVEditorR
   }, []);
 
   const buildPatchBody = useCallback((st: CVEditorState): Record<string, unknown> => {
-    const d = st.cvData;
+    const cv = applyDesignToCv(
+      st.cvData,
+      st.preferred_template_id,
+      st.accent_color,
+      st.font_family
+    );
     return {
       name: st.name.trim() || 'Untitled CV',
-      full_name: d.full_name,
-      professional_title: d.professional_title,
-      email: d.email,
-      phone: d.phone,
-      location: d.location,
-      linkedin_url: d.linkedin_url,
-      github_url: d.github_url,
-      links: d.links ?? [],
-      address: d.address,
-      photo_url: d.photo_url || null,
-      summary: d.summary,
-      section_visibility: d.section_visibility ?? {},
-      experience: d.experience,
-      education: d.education,
-      skills: d.skills,
-      projects: d.projects,
-      languages: d.languages,
-      certifications: d.certifications,
-      referrals: (d.referrals ?? []).slice(0, 2),
-      awards: d.awards,
+      ...universalToProfilePayload(cv),
       font_family: st.font_family,
       accent_color: st.accent_color,
-      preferred_template_id: st.preferred_template_id,
+      preferred_template_id: normalizeTemplateId(st.preferred_template_id),
       original_cv_file_url: null,
     };
   }, []);
@@ -204,7 +201,9 @@ export function useCVEditor({ cvIdFromRoute }: UseCVEditorOptions): UseCVEditorR
     try {
       if (isNew) {
         const name =
-          editorState.name.trim() || editorState.cvData.full_name?.trim() || 'Untitled CV';
+          editorState.name.trim() ||
+          editorState.cvData.personal.fullName?.trim() ||
+          'Untitled CV';
         const createRes = await fetch('/api/cvs', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -229,8 +228,15 @@ export function useCVEditor({ cvIdFromRoute }: UseCVEditorOptions): UseCVEditorR
         const updated = (await patchRes.json()) as CVProfile;
         setCvId(newId);
         setLoadedProfile(updated);
+        let cvData = cvProfileToCvData(updated);
+        cvData = applyDesignToCv(
+          cvData,
+          updated.preferred_template_id ?? 'classic',
+          updated.accent_color ?? '#6C63FF',
+          updated.font_family ?? 'Inter'
+        );
         const st: CVEditorState = {
-          cvData: cvProfileToCvData(updated),
+          cvData,
           name: updated.name ?? 'Untitled CV',
           preferred_template_id: updated.preferred_template_id ?? 'classic',
           accent_color: updated.accent_color ?? '#6C63FF',
@@ -259,8 +265,15 @@ export function useCVEditor({ cvIdFromRoute }: UseCVEditorOptions): UseCVEditorR
         }
         const updated = (await patchRes.json()) as CVProfile;
         setLoadedProfile(updated);
+        let cvData = cvProfileToCvData(updated);
+        cvData = applyDesignToCv(
+          cvData,
+          updated.preferred_template_id ?? 'classic',
+          updated.accent_color ?? '#6C63FF',
+          updated.font_family ?? 'Inter'
+        );
         const st: CVEditorState = {
-          cvData: cvProfileToCvData(updated),
+          cvData,
           name: updated.name ?? 'Untitled CV',
           preferred_template_id: updated.preferred_template_id ?? 'classic',
           accent_color: updated.accent_color ?? '#6C63FF',

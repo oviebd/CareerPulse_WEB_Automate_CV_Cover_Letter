@@ -1,22 +1,15 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
-import type {
-  AwardEntry,
-  CertificationEntry,
-  CVData,
-  CVSectionVisibility,
-  EducationEntry,
-  ExperienceEntry,
-  LanguageEntry,
-  ProfileLink,
-  ProjectEntry,
-  ReferralEntry,
-  SkillGroup,
-} from '@/types';
+import { useMemo, useState, useCallback } from 'react';
+import type { CVData, SubscriptionTier } from '@/types';
 import { CVFormFields, type CVFormTab, type AiJobContext } from '@/components/cv/CVFormFields';
 import { Progress } from '@/components/ui/progress';
 import { buildATSReport } from '@/lib/cv-ats';
+import {
+  cvDataToFormSlices,
+  formSlicesToCvData,
+  type FormSlices,
+} from '@/lib/cv-form-slices';
 
 export interface CVEditorPanelProps {
   value: CVData;
@@ -24,16 +17,11 @@ export interface CVEditorPanelProps {
   mode?: 'full' | 'compact';
   readOnly?: boolean;
   highlightedKeywords?: string[];
-  /** Job-specific context injected into "Rewrite with AI" requests. */
   aiJobContext?: AiJobContext;
-  /** Controlled section tab (sync with side nav). */
   activeTab?: CVFormTab;
   onActiveTabChange?: (tab: CVFormTab) => void;
-  /** Hide the large ATS checker card (e.g. when the parent shows ATS in the header). */
   hideAtsBanner?: boolean;
-  /** Hide horizontal tab row when using a side nav. */
   hideFormTabBar?: boolean;
-  /** Hide the inline keyword chips strip (parent renders a custom keywords UI). */
   hideKeywordsBanner?: boolean;
   hideVisibilityPanel?: boolean;
   templates?: any[];
@@ -43,6 +31,7 @@ export interface CVEditorPanelProps {
   onAccentChange?: (color: string) => void;
   fontFamily?: string;
   onFontFamilyChange?: (font: string) => void;
+  userTier?: SubscriptionTier;
 }
 
 export function CVEditorPanel({
@@ -65,6 +54,7 @@ export function CVEditorPanel({
   onAccentChange,
   fontFamily,
   onFontFamilyChange,
+  userTier,
 }: CVEditorPanelProps) {
   const [internalTab, setInternalTab] = useState<CVFormTab>('header');
   const isTabControlled = activeTabProp !== undefined && onActiveTabChange !== undefined;
@@ -73,139 +63,26 @@ export function CVEditorPanel({
     if (isTabControlled) onActiveTabChange(next);
     else setInternalTab(next);
   };
-  const latestValue = useRef(value);
-  latestValue.current = value;
 
-  const [full_name, setFullName] = useState(value.full_name ?? '');
-  const [professional_title, setTitle] = useState(value.professional_title ?? '');
-  const [email, setEmail] = useState(value.email ?? '');
-  const [phone, setPhone] = useState(value.phone ?? '');
-  const [location, setLocation] = useState(value.location ?? '');
-  const [linkedin_url, setLi] = useState(value.linkedin_url ?? '');
-  const [github_url, setGithub] = useState(value.github_url ?? '');
-  const [links, setLinks] = useState<ProfileLink[]>(value.links ?? []);
-  const [address, setAddress] = useState(value.address ?? '');
-  const [photo_url, setPhotoUrl] = useState(value.photo_url ?? '');
-  const [summary, setSummary] = useState(value.summary ?? '');
-  const [section_visibility, setSectionVisibility] = useState<CVSectionVisibility>(
-    value.section_visibility ?? {}
-  );
-  const [experience, setExperience] = useState<ExperienceEntry[]>(
-    (value.experience ?? []) as ExperienceEntry[]
-  );
-  const [education, setEducation] = useState<EducationEntry[]>(
-    (value.education ?? []) as EducationEntry[]
-  );
-  const [skills, setSkills] = useState<SkillGroup[]>(
-    (value.skills ?? []) as SkillGroup[]
-  );
-  const [projects, setProjects] = useState<ProjectEntry[]>(
-    (value.projects ?? []) as ProjectEntry[]
-  );
-  const [languages, setLanguages] = useState<LanguageEntry[]>(
-    (value.languages ?? []) as LanguageEntry[]
-  );
-  const [certifications, setCertifications] = useState<CertificationEntry[]>(
-    (value.certifications ?? []) as CertificationEntry[]
-  );
-  const [referrals, setReferrals] = useState<ReferralEntry[]>(
-    (value.referrals ?? []) as ReferralEntry[]
-  );
-  const [awards, setAwards] = useState<AwardEntry[]>(
-    (value.awards ?? []) as AwardEntry[]
+  const slices = useMemo(() => cvDataToFormSlices(value), [value]);
+
+  const design = useMemo(
+    () => ({
+      preferred_template_id: selectedTemplateId ?? value.meta.templateId,
+      accent_color: accent ?? value.meta.colorScheme,
+      font_family: fontFamily ?? value.meta.fontFamily,
+    }),
+    [selectedTemplateId, accent, fontFamily, value.meta]
   );
 
-  const isExternalUpdate = useRef(false);
-
-  useEffect(() => {
-    isExternalUpdate.current = true;
-    setFullName(value.full_name ?? '');
-    setTitle(value.professional_title ?? '');
-    setEmail(value.email ?? '');
-    setPhone(value.phone ?? '');
-    setLocation(value.location ?? '');
-    setLi(value.linkedin_url ?? '');
-    setGithub(value.github_url ?? '');
-    setLinks(value.links ?? []);
-    setAddress(value.address ?? '');
-    setPhotoUrl(value.photo_url ?? '');
-    setSummary(value.summary ?? '');
-    setSectionVisibility(value.section_visibility ?? {});
-    setExperience((value.experience ?? []) as ExperienceEntry[]);
-    setEducation((value.education ?? []) as EducationEntry[]);
-    setSkills((value.skills ?? []) as SkillGroup[]);
-    setProjects((value.projects ?? []) as ProjectEntry[]);
-    setLanguages((value.languages ?? []) as LanguageEntry[]);
-    setCertifications((value.certifications ?? []) as CertificationEntry[]);
-    setReferrals((value.referrals ?? []) as ReferralEntry[]);
-    setAwards((value.awards ?? []) as AwardEntry[]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value]);
-
-  const emitChange = useCallback(
-    (overrides: Partial<CVData>) => {
-      const next: CVData = {
-        full_name,
-        professional_title,
-        email,
-        phone,
-        location,
-        linkedin_url,
-        github_url,
-        links,
-        section_visibility,
-        address,
-        photo_url,
-        summary,
-        experience,
-        education,
-        skills,
-        projects,
-        certifications,
-        languages,
-        awards,
-        referrals,
-        ...overrides,
-      };
-      onChange(next);
+  const applyPatch = useCallback(
+    (patch: Partial<FormSlices>) => {
+      const base = cvDataToFormSlices(value);
+      onChange(formSlicesToCvData(value, { ...base, ...patch }, design));
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [
-      full_name,
-      professional_title,
-      email,
-      phone,
-      location,
-      linkedin_url,
-      github_url,
-      links,
-      section_visibility,
-      address,
-      photo_url,
-      summary,
-      experience,
-      education,
-      skills,
-      projects,
-      certifications,
-      languages,
-      awards,
-      referrals,
-      onChange,
-    ]
+    [value, onChange, design]
   );
 
-  const makeHandler = <T,>(
-    setter: React.Dispatch<React.SetStateAction<T>>,
-    key: keyof CVData
-  ) => {
-    return (v: T) => {
-      setter(v);
-      emitChange({ [key]: v } as Partial<CVData>);
-    };
-  };
-
-  const COMPACT_TABS: CVFormTab[] = ['header', 'summary', 'experience', 'education', 'skills'];
   const ats = buildATSReport(value, highlightedKeywords ?? []);
 
   return (
@@ -255,49 +132,57 @@ export function CVEditorPanel({
         tab={tab}
         onTabChange={(id) => setTab(id as CVFormTab)}
         hideTabBar={hideFormTabBar}
-        full_name={full_name}
-        onFullName={(v) => { setFullName(v); emitChange({ full_name: v }); }}
-        professional_title={professional_title}
-        onProfessionalTitle={(v) => { setTitle(v); emitChange({ professional_title: v }); }}
-        email={email}
-        onEmail={(v) => { setEmail(v); emitChange({ email: v }); }}
-        phone={phone}
-        onPhone={(v) => { setPhone(v); emitChange({ phone: v }); }}
-        location={location}
-        onLocation={(v) => { setLocation(v); emitChange({ location: v }); }}
-        linkedin_url={linkedin_url}
-        onLinkedinUrl={(v) => { setLi(v); emitChange({ linkedin_url: v }); }}
-        github_url={github_url}
-        onGithubUrl={(v) => { setGithub(v); emitChange({ github_url: v }); }}
-        links={links}
-        onLinksChange={(v) => { setLinks(v); emitChange({ links: v }); }}
-        address={address}
-        onAddress={(v) => { setAddress(v); emitChange({ address: v }); }}
-        photo_url={photo_url}
-        onPhotoUrl={(v) => { setPhotoUrl(v ?? ''); emitChange({ photo_url: v }); }}
-        summary={summary}
-        onSummary={(v) => { setSummary(v); emitChange({ summary: v }); }}
-        sectionVisibility={section_visibility}
-        onSectionVisibilityChange={(v) => {
-          setSectionVisibility(v);
-          emitChange({ section_visibility: v });
-        }}
-        experience={experience}
-        onExperienceChange={(v) => { setExperience(v); emitChange({ experience: v }); }}
-        education={education}
-        onEducationChange={(v) => { setEducation(v); emitChange({ education: v }); }}
-        skills={skills}
-        onSkillsChange={(v) => { setSkills(v); emitChange({ skills: v }); }}
-        projects={projects}
-        onProjectsChange={(v) => { setProjects(v); emitChange({ projects: v }); }}
-        languages={languages}
-        onLanguagesChange={(v) => { setLanguages(v); emitChange({ languages: v }); }}
-        certifications={certifications}
-        onCertificationsChange={(v) => { setCertifications(v); emitChange({ certifications: v }); }}
-        referrals={referrals}
-        onReferralsChange={(v) => { setReferrals(v.slice(0, 2)); emitChange({ referrals: v.slice(0, 2) as ReferralEntry[] }); }}
-        awards={awards}
-        onAwardsChange={(v) => { setAwards(v); emitChange({ awards: v }); }}
+        full_name={slices.full_name}
+        onFullName={(v) => applyPatch({ full_name: v })}
+        professional_title={slices.professional_title}
+        onProfessionalTitle={(v) => applyPatch({ professional_title: v })}
+        email={slices.email}
+        onEmail={(v) => applyPatch({ email: v })}
+        phone={slices.phone}
+        onPhone={(v) => applyPatch({ phone: v })}
+        location={slices.location}
+        onLocation={(v) => applyPatch({ location: v })}
+        linkedin_url={slices.linkedin_url}
+        onLinkedinUrl={(v) => applyPatch({ linkedin_url: v })}
+        github_url={slices.github_url}
+        onGithubUrl={(v) => applyPatch({ github_url: v })}
+        links={slices.links}
+        onLinksChange={(v) => applyPatch({ links: v })}
+        address={slices.address}
+        onAddress={(v) => applyPatch({ address: v })}
+        photo_url={slices.photo_url}
+        onPhotoUrl={(v) => applyPatch({ photo_url: v ?? '' })}
+        summary={slices.summary}
+        onSummary={(v) => applyPatch({ summary: v })}
+        sectionVisibility={slices.section_visibility}
+        onSectionVisibilityChange={(v) => applyPatch({ section_visibility: v })}
+        experience={slices.experience}
+        onExperienceChange={(v) => applyPatch({ experience: v })}
+        education={slices.education}
+        onEducationChange={(v) => applyPatch({ education: v })}
+        skills={slices.skills}
+        onSkillsChange={(v) => applyPatch({ skills: v })}
+        projects={slices.projects}
+        onProjectsChange={(v) => applyPatch({ projects: v })}
+        languages={slices.languages}
+        onLanguagesChange={(v) => applyPatch({ languages: v })}
+        certifications={slices.certifications}
+        onCertificationsChange={(v) => applyPatch({ certifications: v })}
+        referrals={slices.referrals}
+        onReferralsChange={(v) => applyPatch({ referrals: v.slice(0, 2) })}
+        awards={slices.awards}
+        onAwardsChange={(v) => applyPatch({ awards: v })}
+        publications={slices.publications}
+        onPublicationsChange={(v) => applyPatch({ publications: v })}
+        research={slices.research}
+        onResearchChange={(v) => applyPatch({ research: v })}
+        volunteer={slices.volunteer}
+        onVolunteerChange={(v) => applyPatch({ volunteer: v })}
+        interestsText={slices.interestsText}
+        onInterestsTextChange={(v) => applyPatch({ interestsText: v })}
+        custom={slices.custom}
+        onCustomChange={(v) => applyPatch({ custom: v })}
+        userTier={userTier}
         hiddenTabs={mode === 'compact' ? undefined : undefined}
         hideVisibilityPanel={hideVisibilityPanel}
         highlightedKeywords={highlightedKeywords}

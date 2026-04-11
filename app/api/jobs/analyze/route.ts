@@ -4,7 +4,8 @@ import { createClient } from '@/lib/supabase/server';
 import { rateLimitHit } from '@/lib/rate-limit';
 import { resolveEffectiveTier } from '@/lib/dev-subscription';
 import { canAccessFeature } from '@/lib/subscription';
-import type { CVData, JobAnalysisResult } from '@/types';
+import type { JobAnalysisResult } from '@/types';
+import { migrateLegacyCVData } from '@/src/utils/cvDefaults';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
@@ -135,27 +136,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'CV not found' }, { status: 404 });
     }
 
-    const cvData = {
-      full_name: cvRow.full_name ?? null,
-      professional_title: cvRow.professional_title ?? null,
-      email: cvRow.email ?? null,
-      phone: cvRow.phone ?? null,
-      location: cvRow.location ?? null,
-      linkedin_url: cvRow.linkedin_url ?? null,
-      github_url: cvRow.github_url ?? null,
-      links: (cvRow.links ?? []) as CVData['links'],
-      address: cvRow.address ?? null,
-      photo_url: cvRow.photo_url ?? null,
-      summary: cvRow.summary ?? null,
-      experience: (cvRow.experience ?? []) as CVData['experience'],
-      education: (cvRow.education ?? []) as CVData['education'],
-      skills: (cvRow.skills ?? []) as CVData['skills'],
-      projects: (cvRow.projects ?? []) as CVData['projects'],
-      certifications: (cvRow.certifications ?? []) as CVData['certifications'],
-      languages: (cvRow.languages ?? []) as CVData['languages'],
-      awards: (cvRow.awards ?? []) as CVData['awards'],
-      referrals: (cvRow.referrals ?? []) as CVData['referrals'],
-    } satisfies CVData;
+    const cvData = migrateLegacyCVData(cvRow as Record<string, unknown>);
 
     const systemPrompt = `You are a professional CV analyst. Analyze the provided job description against the candidate's CV.
 Return ONLY a valid JSON object with this exact structure, no explanation, no markdown:

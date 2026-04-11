@@ -1,0 +1,47 @@
+/* Classic — ATS-neutral, minimal accent */
+.cv-page {
+  font-family: var(--cv-font, 'Inter', sans-serif);
+}
+.cv-section-title {
+  color: #1a1a2e;
+  border-bottom-color: #cbd5e1;
+}
+.cv-header h1 {
+  font-size: 22pt;
+  font-weight: 700;
+  margin: 0;
+}
+.cv-subtitle {
+  color: #64748b;
+  font-size: 12pt;
+  margin-top: 4pt;
+}
+.cv-contact {
+  font-size: 9pt;
+  color: #475569;
+  margin-top: 10pt;
+  padding-bottom: 10pt;
+  border-bottom: 1pt solid #e2e8f0;
+}
+.cv-strong {
+  font-weight: 700;
+}
+.cv-dates {
+  font-size: 9pt;
+  color: #64748b;
+  white-space: nowrap;
+}
+.cv-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 8pt;
+}
+.cv-bullets {
+  margin: 6pt 0 0 14pt;
+  padding: 0;
+  font-size: 9pt;
+}
+.cv-muted {
+  color: #94a3b8;
+  font-size: 9pt;
+}

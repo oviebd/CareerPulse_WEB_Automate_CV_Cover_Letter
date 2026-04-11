@@ -1,0 +1,16 @@
+/* Healthcare — license emphasis */
+.lic-badge {
+  display: inline-block;
+  background: #ecfdf5;
+  border: 1pt solid #6ee7b7;
+  color: #065f46;
+  font-size: 8pt;
+  font-weight: 600;
+  padding: 3pt 8pt;
+  border-radius: 999pt;
+  margin-right: 6pt;
+}
+.cv-section-title {
+  color: #0f766e;
+  border-bottom-color: #5eead4;
+}

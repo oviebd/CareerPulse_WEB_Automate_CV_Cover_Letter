@@ -58,5 +58,9 @@ export function dbRowToCvProfile(row: Record<string, unknown>): CVProfile {
     is_archived: Boolean(row.is_archived),
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),
+    cv_extra:
+      row.cv_extra && typeof row.cv_extra === 'object'
+        ? (row.cv_extra as Record<string, unknown>)
+        : undefined,
   };
 }

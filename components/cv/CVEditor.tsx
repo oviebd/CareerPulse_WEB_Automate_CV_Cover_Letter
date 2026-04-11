@@ -21,30 +21,13 @@ import { buildATSReport } from '@/lib/cv-ats';
 import { CV_FORM_CARD, CV_SHELL_HEADER } from '@/lib/cv-editor-styles';
 import { cloneCvData } from '@/lib/cv-clone';
 import { Undo2, Redo2 } from 'lucide-react';
+import { createEmptyCVData } from '@/src/utils/cvDefaults';
+import { ALL_TEMPLATE_IDS, TEMPLATE_CONFIGS } from '@/src/config/templateConfig';
+import { normalizeTemplateId } from '@/src/utils/cvDefaults';
+import type { TemplateId } from '@/src/types/cv.types';
 
 function previewPayloadFromCVData(d: CVData): Record<string, unknown> {
-  return {
-    full_name: d.full_name,
-    professional_title: d.professional_title,
-    email: d.email,
-    phone: d.phone,
-    location: d.location,
-    linkedin_url: d.linkedin_url,
-    github_url: d.github_url,
-    links: d.links ?? [],
-    address: d.address ?? null,
-    photo_url: d.photo_url ?? null,
-    summary: d.summary,
-    section_visibility: d.section_visibility ?? {},
-    experience: d.experience ?? [],
-    education: d.education ?? [],
-    skills: d.skills ?? [],
-    projects: d.projects ?? [],
-    certifications: d.certifications ?? [],
-    languages: d.languages ?? [],
-    referrals: (d.referrals ?? []).slice(0, 2),
-    awards: d.awards ?? [],
-  };
+  return JSON.parse(JSON.stringify(d)) as Record<string, unknown>;
 }
 
 export function CVEditor() {
@@ -91,28 +74,7 @@ export function CVEditor() {
 
   useEffect(() => {
     if (isNew && typeof window !== 'undefined') {
-      const emptyCv = {
-        full_name: '',
-        professional_title: '',
-        email: '',
-        phone: '',
-        location: '',
-        linkedin_url: '',
-        github_url: '',
-        links: [],
-        address: '',
-        photo_url: null,
-        summary: '',
-        section_visibility: {},
-        experience: [],
-        education: [],
-        skills: [],
-        projects: [],
-        certifications: [],
-        languages: [],
-        awards: [],
-        referrals: [],
-      };
+      const emptyCv = createEmptyCVData('classic');
       sessionStorage.setItem('cv_draft', JSON.stringify(emptyCv));
       sessionStorage.setItem('cv_draft_force_overwrite', '0');
       window.dispatchEvent(new Event('cv_draft_updated'));
@@ -132,26 +94,58 @@ export function CVEditor() {
 
   const setSelectedTemplateId = useCallback(
     (id: string) => {
-      setEditorState((prev) => ({ ...prev, preferred_template_id: id }));
+      setEditorState((prev) => {
+        const tid = normalizeTemplateId(id) as TemplateId;
+        const cfg = TEMPLATE_CONFIGS[tid];
+        return {
+          ...prev,
+          preferred_template_id: tid,
+          cvData: {
+            ...prev.cvData,
+            meta: {
+              ...prev.cvData.meta,
+              templateId: tid,
+              sectionOrder: [...cfg.sectionOrder],
+              layout: cfg.layout === 'two-column' ? 'two-column' : 'single-column',
+              showPhoto: cfg.showPhoto,
+            },
+          },
+        };
+      });
     },
     [setEditorState]
   );
 
   const setAccent = useCallback(
     (v: string) => {
-      setEditorState((prev) => ({ ...prev, accent_color: v }));
+      setEditorState((prev) => ({
+        ...prev,
+        accent_color: v,
+        cvData: {
+          ...prev.cvData,
+          meta: { ...prev.cvData.meta, colorScheme: v },
+        },
+      }));
     },
     [setEditorState]
   );
 
   const setFontFamily = useCallback(
     (v: string) => {
-      setEditorState((prev) => ({ ...prev, font_family: v }));
+      setEditorState((prev) => ({
+        ...prev,
+        font_family: v,
+        cvData: {
+          ...prev.cvData,
+          meta: { ...prev.cvData.meta, fontFamily: v },
+        },
+      }));
     },
     [setEditorState]
   );
 
-  const [previewPdfUrl, setPreviewPdfUrl] = useState<string>('');
+  const [previewSrc, setPreviewSrc] = useState<string>('');
+  const [previewIsPdf, setPreviewIsPdf] = useState(true);
   const [previewBusy, setPreviewBusy] = useState(false);
   const [settingDefault, setSettingDefault] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -190,10 +184,15 @@ export function CVEditor() {
     staleTime: 10 * 60 * 1000,
   });
 
-  const templateMeta = templates.find((t) => t.id === selectedTemplateId) ?? null;
-  const allowed = templateMeta
-    ? canUseTemplate(templateMeta.available_tiers as SubscriptionTier[], tier)
-    : false;
+  const catalogTid = normalizeTemplateId(selectedTemplateId) as TemplateId;
+  const templateMeta = templates.find((t) => t.id === catalogTid) ?? null;
+  /** DB row may be missing for some unified ids; export still uses `src/templates/{id}` via `exportCV`. */
+  const allowed =
+    !ALL_TEMPLATE_IDS.includes(catalogTid)
+      ? false
+      : templateMeta
+        ? canUseTemplate(templateMeta.available_tiers as SubscriptionTier[], tier)
+        : true;
 
   const handleChange = useCallback(
     (data: CVData) => {
@@ -259,9 +258,11 @@ export function CVEditor() {
     return () => window.removeEventListener('keydown', onKey);
   }, [undo, redo]);
 
+  /** Keep selection when the unified id exists on disk (`src/templates/{id}`); DB may only list a subset of rows. */
   useEffect(() => {
     if (templatesLoading || !templates.length) return;
-    if (templates.some((t) => t.id === selectedTemplateId)) return;
+    const tid = normalizeTemplateId(selectedTemplateId) as TemplateId;
+    if (ALL_TEMPLATE_IDS.includes(tid)) return;
     setSelectedTemplateId(templates[0].id);
   }, [templatesLoading, templates, selectedTemplateId, setSelectedTemplateId]);
 
@@ -269,6 +270,31 @@ export function CVEditor() {
     if (!selectedTemplateId || !cvData) return;
     setPreviewBusy(true);
     try {
+      const snapshot = previewPayloadFromCVData(cvData);
+      const pngRes = await fetch('/api/cv/preview-png', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cv_snapshot: snapshot,
+          template_id: selectedTemplateId,
+          accent_color: accent,
+          font_family: fontFamily,
+        }),
+      });
+      if (pngRes.ok) {
+        const data = (await pngRes.json()) as { png?: string };
+        if (data.png) {
+          setPreviewIsPdf(false);
+          setPreviewSrc((prev) => {
+            if (prev.startsWith('blob:')) {
+              URL.revokeObjectURL(prev.split('#')[0]);
+            }
+            return `data:image/png;base64,${data.png}`;
+          });
+          return;
+        }
+      }
+
       const res = await fetch('/api/export', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -278,20 +304,20 @@ export function CVEditor() {
           template_id: selectedTemplateId,
           accent_color: accent,
           font_family: fontFamily,
-          cv_snapshot: previewPayloadFromCVData(cvData),
+          cv_snapshot: snapshot,
         }),
       });
       if (!res.ok) {
-        setPreviewPdfUrl('');
+        setPreviewSrc('');
         return;
       }
       const blob = await res.blob();
       const rawUrl = URL.createObjectURL(blob);
       const decoratedUrl = `${rawUrl}#toolbar=0&navpanes=0&scrollbar=0`;
-      setPreviewPdfUrl((prev) => {
-        if (prev) {
-          const originalUrl = prev.split('#')[0];
-          URL.revokeObjectURL(originalUrl);
+      setPreviewIsPdf(true);
+      setPreviewSrc((prev) => {
+        if (prev.startsWith('blob:')) {
+          URL.revokeObjectURL(prev.split('#')[0]);
         }
         return decoratedUrl;
       });
@@ -304,7 +330,7 @@ export function CVEditor() {
     if (!selectedTemplateId || !cvData || templatesLoading) return;
     const t = window.setTimeout(() => {
       void refreshPreview();
-    }, 700);
+    }, 500);
     return () => window.clearTimeout(t);
   }, [selectedTemplateId, cvData, templatesLoading, refreshPreview]);
 
@@ -317,10 +343,9 @@ export function CVEditor() {
 
   useEffect(() => {
     return () => {
-      setPreviewPdfUrl((prev) => {
-        if (prev) {
-          const originalUrl = prev.split('#')[0];
-          URL.revokeObjectURL(originalUrl);
+      setPreviewSrc((prev) => {
+        if (prev.startsWith('blob:')) {
+          URL.revokeObjectURL(prev.split('#')[0]);
         }
         return '';
       });
@@ -500,6 +525,7 @@ export function CVEditor() {
                     onAccentChange={setAccent}
                     fontFamily={fontFamily}
                     onFontFamilyChange={setFontFamily}
+                    userTier={tier}
                   />
                 </div>
               </div>
@@ -510,7 +536,8 @@ export function CVEditor() {
         <div className="space-y-3 xl:sticky xl:top-24">
           <ATSCircularScore score={ats.score} suggestions={ats.suggestions} />
           <PreviewPanel
-            previewPdfUrl={previewPdfUrl}
+            previewSrc={previewSrc}
+            previewIsPdf={previewIsPdf}
             previewBusy={previewBusy}
             zoom={zoom}
             onZoomChange={setZoom}

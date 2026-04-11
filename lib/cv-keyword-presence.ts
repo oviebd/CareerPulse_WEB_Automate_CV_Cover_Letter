@@ -1,20 +1,25 @@
 import type { CVData } from '@/types';
 
+function skillName(it: { name: string } | string): string {
+  return typeof it === 'string' ? it : it.name;
+}
+
 /** Concatenate CV fields into one searchable string (case handled by caller). */
 export function flattenCvSearchText(cv: CVData): string {
+  const p = cv.personal;
   const parts: string[] = [];
   parts.push(
-    cv.full_name ?? '',
-    cv.professional_title ?? '',
+    p?.fullName ?? '',
+    p?.title ?? '',
     cv.summary ?? '',
-    cv.address ?? ''
+    cv.postalAddress ?? ''
   );
   for (const ex of cv.experience ?? []) {
     parts.push(
-      ex.title,
+      ex.role,
       ex.company,
       ex.location ?? '',
-      ex.description ?? '',
+      ex.highlights ?? '',
       ...(ex.bullets ?? [])
     );
   }
@@ -22,28 +27,28 @@ export function flattenCvSearchText(cv: CVData): string {
     parts.push(
       ed.institution,
       ed.degree ?? '',
-      ed.field_of_study ?? '',
-      ed.description ?? '',
+      ed.field ?? '',
+      ed.thesis ?? '',
       ed.gpa ?? ''
     );
   }
   for (const g of cv.skills ?? []) {
-    parts.push(...(g.items ?? []));
+    parts.push(...(g.items ?? []).map(skillName));
   }
-  for (const p of cv.projects ?? []) {
-    parts.push(p.name, p.description ?? '', ...(p.tech_stack ?? []));
+  for (const proj of cv.projects ?? []) {
+    parts.push(proj.name, proj.description ?? '', ...(proj.technologies ?? []));
   }
   for (const c of cv.certifications ?? []) {
     parts.push(c.name, c.issuer ?? '');
   }
   for (const l of cv.languages ?? []) {
-    parts.push(l.language);
+    parts.push(l.name);
   }
   for (const a of cv.awards ?? []) {
     parts.push(a.title, a.description ?? '', a.issuer ?? '');
   }
-  for (const r of cv.referrals ?? []) {
-    parts.push(r.name, r.title ?? '', r.company ?? '', r.relationship ?? '');
+  for (const r of cv.references ?? []) {
+    parts.push(r.name, r.role ?? '', r.company ?? '', r.relationship ?? '');
   }
   return parts.join(' ');
 }
