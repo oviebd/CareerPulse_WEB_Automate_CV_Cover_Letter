@@ -7,12 +7,12 @@ import type {
   ProfileLink,
   ProjectEntry,
   ReferralEntry,
-  SkillGroup,
 } from '@/types';
 import type { CVProfile } from '@/types';
 import type { CVData } from '@/src/types/cv.types';
 import { migrateLegacyCVData } from '@/src/utils/cvDefaults';
 import { generateId } from '@/lib/utils';
+import { normalizeSkillsForSave } from '@/src/utils/migrateSkills';
 
 /** Build universal CVData from a stored profile row + JSONB fields. */
 export function profileToUniversalCV(row: CVProfile): CVData {
@@ -45,25 +45,6 @@ export function profileToUniversalCV(row: CVProfile): CVData {
     cv_extra: (row as { cv_extra?: Record<string, unknown> }).cv_extra,
   };
   return migrateLegacyCVData(flat);
-}
-
-function skillItemToString(it: { name: string; level?: string }): string {
-  if (!it.level) return it.name;
-  return `${it.name} (${it.level})`;
-}
-
-function mapSkillCategory(cat: string): SkillGroup['category'] {
-  const x = cat.trim().toLowerCase();
-  if (x === 'soft' || x === 'tools' || x === 'languages') return x;
-  return 'technical';
-}
-
-function universalSkillsToGroups(skills: CVData['skills']): SkillGroup[] {
-  return (skills ?? []).map((s) => ({
-    id: s.id || generateId(),
-    category: mapSkillCategory(s.category || 'technical'),
-    items: (s.items ?? []).map((it) => skillItemToString(it)),
-  }));
 }
 
 function universalExperienceToEntries(
@@ -202,7 +183,7 @@ export function universalToProfilePayload(cv: CVData): Record<string, unknown> {
     summary: cv.summary || null,
     experience: universalExperienceToEntries(cv.experience),
     education: universalEducationToEntries(cv.education),
-    skills: universalSkillsToGroups(cv.skills),
+    skills: normalizeSkillsForSave(cv.skills ?? []),
     projects: universalProjectsToEntries(cv.projects),
     certifications: universalCertsToEntries(cv.certifications),
     languages: universalLangsToEntries(cv.languages),

@@ -1,4 +1,6 @@
-import type { CVProfile, SkillGroup } from '@/types';
+import type { CVProfile } from '@/types';
+import type { SkillCategory } from '@/src/types/cv.types';
+import { migrateSkillsToRated } from '@/src/utils/migrateSkills';
 
 /**
  * Normalizes a `cvs` table row (Supabase JSONB) into the editor-facing CVProfile shape.
@@ -6,9 +8,9 @@ import type { CVProfile, SkillGroup } from '@/types';
 export function dbRowToCvProfile(row: Record<string, unknown>): CVProfile {
   const links = Array.isArray(row.links) ? row.links : [];
   const skillsRaw = row.skills;
-  const skills = Array.isArray(skillsRaw)
-    ? (skillsRaw as SkillGroup[])
-    : [];
+  const skills: SkillCategory[] = migrateSkillsToRated(
+    Array.isArray(skillsRaw) ? skillsRaw : []
+  );
 
   return {
     id: String(row.id),

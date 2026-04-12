@@ -142,6 +142,34 @@ a {
   min-width: 0;
 }
 
+.skill-category-block {
+  page-break-inside: avoid;
+}
+
+.skill-level {
+  font-size: 10px;
+  color: #888;
+  margin-left: 4px;
+}
+
+.skill-level-5 {
+  color: #222;
+  font-weight: 600;
+}
+
+.skill-level-4 {
+  color: #444;
+}
+
+.skill-level-3 {
+  color: #666;
+}
+
+.skill-level-2,
+.skill-level-1 {
+  color: #999;
+}
+
 @media print {
   .cv-two-col {
     align-items: stretch;
@@ -153,5 +181,8 @@ a {
   }
   .cv-main {
     break-inside: auto;
+  }
+  .skill-category-block {
+    page-break-inside: avoid;
   }
 }

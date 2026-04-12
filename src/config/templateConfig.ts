@@ -14,6 +14,8 @@ export interface TemplateConfig {
   sectionOrder: string[];
   educationFirst: boolean;
   showSkillBars: boolean;
+  /** When true, the CV editor shows skill level (1–5) controls; the PDF uses bars/dots or clear level visuals. */
+  showsSkillRatingInCv: boolean;
   showPhoto: boolean;
   hideIfEmpty: string[];
   requiredSections: string[];
@@ -68,6 +70,7 @@ export const TEMPLATE_CONFIGS: Record<TemplateId, TemplateConfig> = {
     ],
     educationFirst: false,
     showSkillBars: false,
+    showsSkillRatingInCv: false,
     showPhoto: false,
     hideIfEmpty: ['publications', 'research', 'projects'],
     requiredSections: ['personal', 'summary', 'experience', 'education', 'skills'],
@@ -98,6 +101,7 @@ export const TEMPLATE_CONFIGS: Record<TemplateId, TemplateConfig> = {
     ],
     educationFirst: false,
     showSkillBars: true,
+    showsSkillRatingInCv: true,
     showPhoto: true,
     hideIfEmpty: ['publications', 'research'],
     requiredSections: ['personal', 'summary', 'experience', 'skills'],
@@ -127,6 +131,7 @@ export const TEMPLATE_CONFIGS: Record<TemplateId, TemplateConfig> = {
     ],
     educationFirst: false,
     showSkillBars: false,
+    showsSkillRatingInCv: false,
     showPhoto: false,
     hideIfEmpty: ['projects', 'volunteer'],
     requiredSections: ['personal', 'education', 'publications', 'research'],
@@ -157,6 +162,7 @@ export const TEMPLATE_CONFIGS: Record<TemplateId, TemplateConfig> = {
     ],
     educationFirst: false,
     showSkillBars: true,
+    showsSkillRatingInCv: false,
     showPhoto: false,
     hideIfEmpty: ['publications', 'research', 'volunteer'],
     requiredSections: ['personal', 'skills', 'experience', 'projects'],
@@ -186,6 +192,7 @@ export const TEMPLATE_CONFIGS: Record<TemplateId, TemplateConfig> = {
     ],
     educationFirst: false,
     showSkillBars: false,
+    showsSkillRatingInCv: false,
     showPhoto: false,
     hideIfEmpty: [
       'projects',
@@ -222,6 +229,7 @@ export const TEMPLATE_CONFIGS: Record<TemplateId, TemplateConfig> = {
     ],
     educationFirst: false,
     showSkillBars: true,
+    showsSkillRatingInCv: true,
     showPhoto: true,
     hideIfEmpty: ['publications', 'research'],
     requiredSections: ['personal', 'projects', 'skills'],
@@ -251,6 +259,7 @@ export const TEMPLATE_CONFIGS: Record<TemplateId, TemplateConfig> = {
     ],
     educationFirst: true,
     showSkillBars: true,
+    showsSkillRatingInCv: false,
     showPhoto: false,
     hideIfEmpty: ['publications', 'research'],
     requiredSections: ['personal', 'education', 'skills'],
@@ -280,6 +289,7 @@ export const TEMPLATE_CONFIGS: Record<TemplateId, TemplateConfig> = {
     ],
     educationFirst: false,
     showSkillBars: false,
+    showsSkillRatingInCv: false,
     showPhoto: false,
     hideIfEmpty: ['projects', 'publications'],
     requiredSections: ['personal', 'certifications', 'experience', 'education'],
@@ -311,6 +321,7 @@ export const TEMPLATE_CONFIGS: Record<TemplateId, TemplateConfig> = {
     ],
     educationFirst: false,
     showSkillBars: true,
+    showsSkillRatingInCv: true,
     showPhoto: true,
     hideIfEmpty: ['publications', 'research'],
     requiredSections: ['personal', 'summary', 'experience', 'skills'],
@@ -342,6 +353,7 @@ export const TEMPLATE_CONFIGS: Record<TemplateId, TemplateConfig> = {
     ],
     educationFirst: false,
     showSkillBars: false,
+    showsSkillRatingInCv: false,
     showPhoto: true,
     hideIfEmpty: ['publications', 'research', 'volunteer'],
     requiredSections: ['personal', 'summary', 'experience', 'skills'],
@@ -373,6 +385,7 @@ export const TEMPLATE_CONFIGS: Record<TemplateId, TemplateConfig> = {
     ],
     educationFirst: false,
     showSkillBars: true,
+    showsSkillRatingInCv: true,
     showPhoto: true,
     hideIfEmpty: ['publications', 'research'],
     requiredSections: ['personal', 'summary', 'experience', 'skills'],
@@ -404,6 +417,7 @@ export const TEMPLATE_CONFIGS: Record<TemplateId, TemplateConfig> = {
     ],
     educationFirst: false,
     showSkillBars: false,
+    showsSkillRatingInCv: true,
     showPhoto: true,
     hideIfEmpty: ['publications', 'research'],
     requiredSections: ['personal', 'summary', 'experience', 'skills'],
@@ -435,6 +449,7 @@ export const TEMPLATE_CONFIGS: Record<TemplateId, TemplateConfig> = {
     ],
     educationFirst: false,
     showSkillBars: false,
+    showsSkillRatingInCv: true,
     showPhoto: true,
     hideIfEmpty: ['publications', 'research'],
     requiredSections: ['personal', 'summary', 'experience', 'skills'],

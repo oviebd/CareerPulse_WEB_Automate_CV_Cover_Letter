@@ -30,7 +30,7 @@ import type {
   Publication,
   ReferralEntry,
   Research,
-  SkillGroup,
+  SkillCategory,
   SubscriptionTier,
   Volunteer,
 } from '@/types';
@@ -687,7 +687,7 @@ export default function CVTemplatePreviewPage() {
             onExperienceChange={(experience) => setDraft({ ...draft, experience })}
             education={(draft.education?.length ? draft.education : []) as EducationEntry[]}
             onEducationChange={(education) => setDraft({ ...draft, education })}
-            skills={(draft.skills?.length ? draft.skills : []) as SkillGroup[]}
+            skills={(draft.skills?.length ? draft.skills : []) as SkillCategory[]}
             onSkillsChange={(skills) => setDraft({ ...draft, skills })}
             projects={(draft.projects?.length ? draft.projects : []) as ProjectEntry[]}
             onProjectsChange={(projects) => setDraft({ ...draft, projects })}

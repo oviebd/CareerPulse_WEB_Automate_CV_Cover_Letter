@@ -78,16 +78,35 @@ export interface Education {
   honors?: string[];
 }
 
+export type SkillRating = 1 | 2 | 3 | 4 | 5;
+
+export const SKILL_RATING_LABEL: Record<SkillRating, string> = {
+  1: 'Beginner',
+  2: 'Basic',
+  3: 'Intermediate',
+  4: 'Advanced',
+  5: 'Professional',
+};
+
+export const SKILL_RATING_PCT: Record<SkillRating, number> = {
+  1: 20,
+  2: 40,
+  3: 60,
+  4: 80,
+  5: 100,
+};
+
 export interface SkillItem {
+  id: string;
   name: string;
-  level?: 'beginner' | 'intermediate' | 'advanced' | 'expert';
-  showBar?: boolean;
+  rating: SkillRating;
 }
 
-export interface SkillSection {
+export interface SkillCategory {
   id: string;
   category: string;
   items: SkillItem[];
+  displayOrder: number;
 }
 
 export interface Project {
@@ -189,7 +208,7 @@ export interface CVData {
   summary: string;
   experience: WorkExperience[];
   education: Education[];
-  skills: SkillSection[];
+  skills: SkillCategory[];
   projects: Project[];
   publications: Publication[];
   research: Research[];

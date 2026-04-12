@@ -96,12 +96,44 @@
     return false;
   }
 
-  function skillBar(level) {
-    var pct = { beginner: 20, intermediate: 50, advanced: 75, expert: 100 };
-    var p = pct[level] || 60;
+  var RATING_PCT = { 1: 20, 2: 40, 3: 60, 4: 80, 5: 100 };
+  var RATING_LABEL = {
+    1: 'Beginner',
+    2: 'Basic',
+    3: 'Intermediate',
+    4: 'Advanced',
+    5: 'Professional',
+  };
+
+  function clampRating(r) {
+    var n = parseInt(r, 10);
+    if (!isFinite(n)) return 3;
+    if (n < 1) return 1;
+    if (n > 5) return 5;
+    return n;
+  }
+
+  /** Legacy level strings + numeric rating on skill items */
+  function skillRatingFromItem(it) {
+    if (!it || typeof it !== 'object') return 3;
+    if (typeof it.rating === 'number') return clampRating(it.rating);
+    var lv = it.level;
+    if (lv == null || lv === '') return 3;
+    var s = String(lv).toLowerCase();
+    if (s === 'beginner') return 1;
+    if (s === 'basic') return 2;
+    if (s === 'intermediate') return 3;
+    if (s === 'advanced') return 4;
+    if (s === 'expert' || s === 'professional') return 5;
+    return 3;
+  }
+
+  function skillBarFromItem(it) {
+    var r = skillRatingFromItem(it);
+    var pct = RATING_PCT[r] != null ? RATING_PCT[r] : 60;
     return (
       '<span class="skill-bar"><span class="skill-bar-fill" style="width:' +
-      p +
+      pct +
       '%"></span></span>'
     );
   }
@@ -154,18 +186,9 @@
     return m[k] || esc(p);
   }
 
-  function skillFillPct(level) {
-    var pct = { beginner: 20, intermediate: 50, advanced: 75, expert: 100 };
-    if (level && pct[level] != null) return pct[level];
-    return 60;
-  }
-
-  function skillDotsCount(level) {
-    if (level === 'beginner') return 1;
-    if (level === 'intermediate') return 2;
-    if (level === 'advanced') return 4;
-    if (level === 'expert') return 5;
-    return 3;
+  function skillFillPctFromItem(it) {
+    var r = skillRatingFromItem(it);
+    return RATING_PCT[r] != null ? RATING_PCT[r] : 60;
   }
 
   function contactBasicsBlock(p, lineClass) {
@@ -435,10 +458,19 @@
           if (cat.indexOf('language') !== -1) return;
           g.items.forEach(function (it) {
             var name = typeof it === 'string' ? it : it.name;
-            var lv = typeof it === 'object' && it ? it.level : null;
-            var pct = skillFillPct(lv);
-            h += '<div class="golden-skill">';
-            h += '<div class="golden-skill-name">' + esc(name) + '</div>';
+            var pct = skillFillPctFromItem(
+              typeof it === 'object' && it ? it : { name: String(name) }
+            );
+            var rr = skillRatingFromItem(
+              typeof it === 'object' && it ? it : { name: String(name) }
+            );
+            h += '<div class="golden-skill skill-item">';
+            h +=
+              '<div class="golden-skill-name">' +
+              esc(name) +
+              '<span class="skill-label"> ' +
+              esc(RATING_LABEL[rr] || '') +
+              '</span></div>';
             h +=
               '<div class="golden-sbar"><span class="golden-sbar-fill" style="width:' +
               pct +
@@ -603,13 +635,28 @@
         if (key === 'personal') return;
         if (key === 'skills' && !shouldSkip('skills', d, cfg)) {
           h +=
-            '<section class="cv-section ocean-sec"><h2 class="ocean-h2">Skills</h2><div class="ocean-skill-grid">';
+            '<section class="cv-section ocean-sec"><h2 class="ocean-h2">Skills</h2><div class="ocean-skill-bars">';
           (d.skills || []).forEach(function (g) {
             if (!g.items || !g.items.length) return;
+            h +=
+              '<div class="skill-category-block ocean-skill-cat"><div class="ocean-skill-cat-name">' +
+              esc(g.category || '') +
+              '</div>';
             g.items.forEach(function (it) {
               var name = typeof it === 'string' ? it : it.name;
-              h += '<span class="ocean-chip">' + esc(name) + '</span>';
+              var obj = typeof it === 'object' && it ? it : { name: String(name) };
+              var pct = skillFillPctFromItem(obj);
+              var rr = skillRatingFromItem(obj);
+              h += '<div class="ocean-skill-row skill-item">';
+              h += '<div class="ocean-skill-hd"><span>' + esc(name) + '</span>';
+              h += '<span class="skill-label">' + esc(RATING_LABEL[rr] || '') + '</span></div>';
+              h +=
+                '<div class="ocean-sbar"><span class="ocean-sbar-fill" style="width:' +
+                pct +
+                '%"></span></div>';
+              h += '</div>';
             });
+            h += '</div>';
           });
           h += '</div></section>';
           return;
@@ -768,8 +815,14 @@
           if (!g.items || !g.items.length) return;
           g.items.forEach(function (it) {
             var name = typeof it === 'string' ? it : it.name;
-            var n = skillDotsCount(typeof it === 'object' && it ? it.level : null);
-            h += '<div class="violet-skill-row"><span>' + esc(name) + '</span><span class="violet-dots">';
+            var obj = typeof it === 'object' && it ? it : { name: String(name) };
+            var n = skillRatingFromItem(obj);
+            h +=
+              '<div class="violet-skill-row skill-item"><span>' +
+              esc(name) +
+              '</span><span class="violet-dots" aria-label="' +
+              n +
+              ' of 5">';
             var j;
             for (j = 0; j < 5; j++) {
               h += '<span class="' + (j < n ? 'violet-dot on' : 'violet-dot') + '">●</span>';
@@ -833,15 +886,25 @@
       if (filterCat === 'skills' && (cat === 'languages' || cat === 'tools')) return;
       if (!g.items || !g.items.length) return;
       if (compact) {
-        html += '<div class="skill-group skill-group--compact">';
+        html += '<div class="skill-group skill-group--compact skill-category-block">';
         html += '<div class="skill-cat">' + esc(g.category) + '</div>';
         html += '<div class="skill-inline">';
         var parts = [];
         g.items.forEach(function (it) {
           var name = typeof it === 'string' ? it : it.name;
           var piece = esc(name);
-          if (cfg.showSkillBars && it && typeof it === 'object' && it.level) {
-            piece += ' <span class="skill-inline-level">(' + esc(it.level) + ')</span>';
+          if (cfg.showSkillBars && it && typeof it === 'object') {
+            var rc = skillRatingFromItem(it);
+            piece +=
+              ' <span class="skill-inline-level">(' + esc(RATING_LABEL[rc] || '') + ')</span>';
+          } else if (it && typeof it === 'object') {
+            var r0 = skillRatingFromItem(it);
+            piece +=
+              ' <span class="skill-level skill-level-' +
+              r0 +
+              '">' +
+              esc(RATING_LABEL[r0] || '') +
+              '</span>';
           }
           parts.push(piece);
         });
@@ -849,14 +912,23 @@
         html += '</div></div>';
         return;
       }
-      html += '<div class="skill-group">';
+      html += '<div class="skill-group skill-category-block">';
       html += '<div class="skill-cat">' + esc(g.category) + '</div>';
       g.items.forEach(function (it) {
         var name = typeof it === 'string' ? it : it.name;
-        html += '<div class="skill-row">';
+        var rr = skillRatingFromItem(it && typeof it === 'object' ? it : { name: name });
+        html += '<div class="skill-row skill-item">';
         html += '<span class="skill-name">' + esc(name) + '</span>';
         if (cfg.showSkillBars) {
-          html += skillBar(it && typeof it === 'object' ? it.level : null);
+          html += '<span class="skill-label">' + esc(RATING_LABEL[rr] || '') + '</span>';
+          html += skillBarFromItem(it && typeof it === 'object' ? it : { name: String(name) });
+        } else {
+          html +=
+            '<span class="skill-level skill-level-' +
+            rr +
+            '">' +
+            esc(RATING_LABEL[rr] || '') +
+            '</span>';
         }
         html += '</div>';
       });

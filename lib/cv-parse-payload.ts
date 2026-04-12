@@ -7,7 +7,7 @@ import type {
   LanguageEntry,
   ProfileLink,
   ProjectEntry,
-  SkillGroup,
+  SkillCategory,
 } from '@/types';
 import { generateId } from '@/lib/utils';
 
@@ -86,7 +86,7 @@ export function normalizeExtractedCV(
     })
   );
   const education = ((raw.education as EducationEntry[]) ?? []).map(id);
-  const skills = ((raw.skills as SkillGroup[]) ?? []).map(id);
+  const skills = ((raw.skills as SkillCategory[]) ?? []).map(id);
 
   const projects = ((raw.projects as ProjectEntry[]) ?? []).map((p) =>
     id({

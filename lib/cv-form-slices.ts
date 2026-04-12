@@ -12,7 +12,7 @@ import type {
   Publication,
   ReferralEntry,
   Research,
-  SkillGroup,
+  SkillCategory,
   CVData,
   WorkExperience,
   Project,
@@ -41,7 +41,7 @@ export type FormSlices = {
   section_visibility: CVSectionVisibility;
   experience: ExperienceEntry[];
   education: EducationEntry[];
-  skills: SkillGroup[];
+  skills: SkillCategory[];
   projects: ProjectEntry[];
   languages: LanguageEntry[];
   certifications: CertificationEntry[];
@@ -109,44 +109,6 @@ function entryToEdu(e: EducationEntry): Education {
     endDate: e.end_date ?? '',
     current: false,
     gpa: e.gpa ?? undefined,
-  };
-}
-
-function mapSkillCat(c: string): SkillGroup['category'] {
-  const x = c.toLowerCase();
-  if (x === 'soft' || x === 'tools' || x === 'languages') return x;
-  return 'technical';
-}
-
-function skillSecToGroup(s: import('@/types').SkillSection): SkillGroup {
-  return {
-    id: s.id,
-    category: mapSkillCat(s.category),
-    items: (s.items ?? []).map((it) =>
-      it.level ? `${it.name} (${it.level})` : it.name
-    ),
-  };
-}
-
-function skillGroupToSec(g: SkillGroup): import('@/types').SkillSection {
-  return {
-    id: g.id || generateId(),
-    category: g.category,
-    items: (g.items ?? []).map((raw) => {
-      const m = String(raw).match(/^(.+?)\s*\(([^)]+)\)\s*$/);
-      if (m) {
-        const lvl = m[2].toLowerCase();
-        const level =
-          lvl === 'beginner' ||
-          lvl === 'intermediate' ||
-          lvl === 'advanced' ||
-          lvl === 'expert'
-            ? lvl
-            : undefined;
-        return { name: m[1].trim(), level, showBar: Boolean(level) };
-      }
-      return { name: String(raw) };
-    }),
   };
 }
 
@@ -282,7 +244,10 @@ export function cvDataToFormSlices(cv: CVData): FormSlices {
     section_visibility: (cv.sectionVisibility ?? {}) as CVSectionVisibility,
     experience: (cv.experience ?? []).map(workToExp),
     education: (cv.education ?? []).map(eduToEntry),
-    skills: (cv.skills ?? []).map(skillSecToGroup),
+    skills: (cv.skills ?? []).map((s, i) => ({
+      ...s,
+      displayOrder: typeof s.displayOrder === 'number' ? s.displayOrder : i,
+    })),
     projects: (cv.projects ?? []).map(projToEntry),
     languages: (cv.languages ?? []).map(langToEntry),
     certifications: (cv.certifications ?? []).map(certToEntry),
@@ -355,7 +320,10 @@ export function formSlicesToCvData(
     summary: slices.summary,
     experience: slices.experience.map(expToWork),
     education: slices.education.map(entryToEdu),
-    skills: slices.skills.map(skillGroupToSec),
+    skills: slices.skills.map((s, i) => ({
+      ...s,
+      displayOrder: typeof s.displayOrder === 'number' ? s.displayOrder : i,
+    })),
     projects: slices.projects.map(entryToProj),
     publications: slices.publications,
     research: slices.research,

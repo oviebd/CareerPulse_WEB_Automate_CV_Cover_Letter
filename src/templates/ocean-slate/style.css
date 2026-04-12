@@ -163,6 +163,59 @@
   font-weight: 600;
 }
 
+.tpl-ocean-slate .ocean-skill-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 10pt;
+}
+
+.tpl-ocean-slate .ocean-skill-cat {
+  page-break-inside: avoid;
+}
+
+.tpl-ocean-slate .ocean-skill-cat-name {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  margin-bottom: 4pt;
+}
+
+.tpl-ocean-slate .ocean-skill-row {
+  margin-bottom: 6pt;
+}
+
+.tpl-ocean-slate .ocean-skill-hd {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8pt;
+  font-size: 10pt;
+  font-weight: 600;
+}
+
+.tpl-ocean-slate .ocean-skill-hd .skill-label {
+  font-size: 9px;
+  font-weight: 500;
+  color: #64748b;
+}
+
+.tpl-ocean-slate .ocean-sbar {
+  height: 5px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  margin-top: 3pt;
+  overflow: hidden;
+}
+
+.tpl-ocean-slate .ocean-sbar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), #38bdf8);
+}
+
 .tpl-ocean-slate .ocean-edu-inst {
   color: var(--accent);
   font-weight: 600;

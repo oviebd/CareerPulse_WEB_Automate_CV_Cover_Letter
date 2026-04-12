@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LayoutDashboard, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,7 +22,7 @@ import type {
   Publication,
   ReferralEntry,
   Research,
-  SkillGroup,
+  SkillCategory,
   SubscriptionTier,
   Volunteer,
 } from '@/types';
@@ -43,6 +43,8 @@ import {
   VolunteerSection,
 } from '@/components/cv/ExtendedCvSections';
 import { ListReorderArrows } from '@/components/cv/ListReorderArrows';
+import { SkillsEditor } from '@/components/cv/SkillsEditor';
+import { templateShowsSkillRatingEditor } from '@/src/utils/templateSkillUi';
 
 export type CVFormTab =
   | 'design'
@@ -69,13 +71,6 @@ const DEGREE_OPTIONS = [
   { value: 'Diploma', label: 'Diploma' },
   { value: 'Certificate', label: 'Certificate' },
   { value: 'Other', label: 'Other' },
-];
-
-const SKILL_CATEGORY_OPTIONS = [
-  { value: 'technical', label: 'Technical' },
-  { value: 'tools', label: 'Tools' },
-  { value: 'soft', label: 'Soft skills' },
-  { value: 'languages', label: 'Languages (skill group)' },
 ];
 
 const PROFICIENCY_OPTIONS = [
@@ -127,8 +122,8 @@ type Props = {
   onExperienceChange: (next: ExperienceEntry[]) => void;
   education: EducationEntry[];
   onEducationChange: (next: EducationEntry[]) => void;
-  skills: SkillGroup[];
-  onSkillsChange: (next: SkillGroup[]) => void;
+  skills: SkillCategory[];
+  onSkillsChange: (next: SkillCategory[]) => void;
   projects: ProjectEntry[];
   onProjectsChange: (next: ProjectEntry[]) => void;
   languages: LanguageEntry[];
@@ -330,6 +325,43 @@ export function CVFormFields(props: Props) {
     extraContext?: string;
     onApply: (value: string) => void;
   } | null>(null);
+
+  const [skillsLocal, setSkillsLocal] = useState<SkillCategory[] | null>(null);
+  const skillsShown = skillsLocal ?? skills;
+  const skillsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setSkillsLocal(null);
+  }, [skills]);
+
+  useEffect(() => {
+    return () => {
+      if (skillsDebounceRef.current) clearTimeout(skillsDebounceRef.current);
+    };
+  }, []);
+
+  const handleSkillsChangeDebounced = useCallback(
+    (next: SkillCategory[]) => {
+      if (skillsDebounceRef.current) clearTimeout(skillsDebounceRef.current);
+      skillsDebounceRef.current = setTimeout(() => {
+        onSkillsChange(next);
+      }, 800);
+    },
+    [onSkillsChange]
+  );
+
+  const handleSkillsEditorChange = useCallback(
+    (next: SkillCategory[]) => {
+      setSkillsLocal(next);
+      handleSkillsChangeDebounced(next);
+    },
+    [handleSkillsChangeDebounced]
+  );
+
+  const showSkillRatingUi = useMemo(
+    () => templateShowsSkillRatingEditor(selectedTemplateId),
+    [selectedTemplateId]
+  );
 
   return (
     <div className="space-y-5">
@@ -1011,107 +1043,42 @@ export function CVFormFields(props: Props) {
         {tab === 'skills' ? (
           <div className="space-y-4">
             <p className="text-sm text-[var(--color-muted)]">
-              Group skills by category (e.g. technical, tools). These appear as labeled chips in many templates.
+              Group skills by category and add them to your CV.
+              {showSkillRatingUi
+                ? ' This layout shows skill levels (1–5) in the preview — use the rating controls when adding a skill.'
+                : ' This layout only lists skill names in the preview, so rating controls are hidden. Switch to a template with skill bars or dots (e.g. Violet Edge, Modern) to set levels.'}
             </p>
-            {skills.map((g, i) => (
-              <div key={g.id} className={FORM_CARD}>
-                <div className="mb-3 flex items-center justify-between gap-2 border-b border-[var(--color-border)] pb-2">
-                  <span className="text-xs font-medium text-[var(--color-muted)]">Skill group {i + 1}</span>
-                  <ListReorderArrows
-                    index={i}
-                    length={skills.length}
-                    onMove={(from, to) => onSkillsChange(moveIndexInArray(skills, from, to))}
-                  />
+            <SkillsEditor
+              skills={skillsShown}
+              onChange={handleSkillsEditorChange}
+              showRatingControls={showSkillRatingUi}
+            />
+            {kw.length > 0 &&
+              skillsShown.some((g) => g.items.length > 0) && (
+                <div className="flex flex-wrap gap-1.5 rounded-lg border border-[var(--color-accent-gold)]/25 bg-[var(--color-accent-gold)]/10 p-3">
+                  <span className="mr-1 text-xs font-medium text-[var(--color-accent-gold)]">
+                    Keyword match:
+                  </span>
+                  {skillsShown.flatMap((g) => g.items).map((it) => {
+                    const skill = it.name;
+                    const isHighlighted = kw.some((k) =>
+                      skill.toLowerCase().includes(k.toLowerCase())
+                    );
+                    return (
+                      <span
+                        key={it.id}
+                        className={
+                          isHighlighted
+                            ? 'rounded-badge border border-[var(--color-accent-gold)]/40 bg-[var(--color-accent-gold)]/20 px-2 py-0.5 text-xs font-medium text-[var(--color-accent-gold)]'
+                            : 'rounded-badge border border-[var(--color-border)] bg-white/[0.06] px-2 py-0.5 text-xs text-[var(--color-muted)]'
+                        }
+                      >
+                        {skill}
+                      </span>
+                    );
+                  })}
                 </div>
-                <Select
-                  label="Category label"
-                  value={g.category}
-                  options={SKILL_CATEGORY_OPTIONS}
-                  onChange={(e) => {
-                    const n = [...skills];
-                    n[i] = { ...g, category: e.target.value as SkillGroup['category'] };
-                    onSkillsChange(n);
-                  }}
-                />
-                <Textarea
-                  className="mt-3 min-h-[120px]"
-                  label="Skills (one per line)"
-                  value={g.items.join('\n')}
-                  onChange={(e) => {
-                    const n = [...skills];
-                    n[i] = {
-                      ...g,
-                      items: e.target.value.split('\n').map((s) => s.trim()).filter(Boolean),
-                    };
-                    onSkillsChange(n);
-                  }}
-                />
-                <div className="mt-2 flex flex-wrap justify-end gap-2">
-                  <CvAtsPolishButton
-                    disabled={!g.items.join('\n').trim()}
-                    onClick={() =>
-                      setRewriteTarget({
-                        section: 'Skills',
-                        inputLabel: `${g.category} skills (one per line)`,
-                        sourceText: g.items.join('\n'),
-                        extraContext: mergeExtraContext(),
-                        onApply: (value) => {
-                          const n = [...skills];
-                          n[i] = {
-                            ...g,
-                            items: value
-                              .split('\n')
-                              .map((s) => s.trim())
-                              .filter(Boolean),
-                          };
-                          onSkillsChange(n);
-                        },
-                      })
-                    }
-                  />
-                </div>
-                {kw.length > 0 && g.items.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {g.items.map((skill, si) => {
-                      const isHighlighted = kw.some(
-                        (k) => skill.toLowerCase().includes(k.toLowerCase())
-                      );
-                      return (
-                        <span
-                          key={si}
-                          className={
-                            isHighlighted
-                              ? 'rounded-badge border border-[var(--color-accent-gold)]/40 bg-[var(--color-accent-gold)]/20 px-2 py-0.5 text-xs font-medium text-[var(--color-accent-gold)]'
-                              : 'rounded-badge border border-[var(--color-border)] bg-white/[0.06] px-2 py-0.5 text-xs text-[var(--color-muted)]'
-                          }
-                        >
-                          {skill}
-                        </span>
-                      );
-                    })}
-                  </div>
-                )}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="mt-2"
-                  onClick={() => onSkillsChange(skills.filter((_, j) => j !== i))}
-                >
-                  Remove group
-                </Button>
-              </div>
-            ))}
-            <Button
-              variant="secondary"
-              onClick={() =>
-                onSkillsChange([
-                  ...skills,
-                  { id: generateId(), category: 'technical', items: [] },
-                ])
-              }
-            >
-              Add skill group
-            </Button>
+              )}
           </div>
         ) : null}
 

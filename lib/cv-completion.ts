@@ -5,8 +5,8 @@ import type {
   ExperienceEntry,
   LanguageEntry,
   ProjectEntry,
-  SkillGroup,
 } from '@/types';
+import type { SkillCategory } from '@/src/types/cv.types';
 
 function nonEmpty(s: string | null | undefined): boolean {
   return Boolean(s && String(s).trim().length > 0);
@@ -21,7 +21,7 @@ export function computeCompletionPercentage(input: {
   summary?: string | null;
   experience?: ExperienceEntry[];
   education?: EducationEntry[];
-  skills?: SkillGroup[];
+  skills?: SkillCategory[];
   projects?: ProjectEntry[];
   certifications?: CertificationEntry[];
   languages?: LanguageEntry[];

@@ -148,6 +148,9 @@ function buildCoverLetterUserContent(
     .join('\n\n');
   const skillsText = (params.cvProfile.skills || [])
     .flatMap((s) => s.items ?? [])
+    .map((it) =>
+      typeof it === 'string' ? it : `${it.name}${typeof it.rating === 'number' ? ` (${it.rating})` : ''}`
+    )
     .join(', ');
   const projectsText = (params.cvProfile.projects || [])
     .map((p) => `${p.name}: ${p.description ?? ''}`)

@@ -252,12 +252,6 @@ export interface EducationEntry {
   description: string | null;
 }
 
-export interface SkillGroup {
-  id: string;
-  category: 'technical' | 'soft' | 'languages' | 'tools';
-  items: string[];
-}
-
 export interface ProjectEntry {
   id: string;
   name: string;
@@ -338,8 +332,9 @@ export type {
   PersonalInfo,
   WorkExperience,
   Education,
-  SkillSection,
+  SkillCategory,
   SkillItem,
+  SkillRating,
   Project,
   Publication,
   Research,
@@ -351,7 +346,9 @@ export type {
   CustomSection,
 } from '../src/types/cv.types';
 
-// CV Profile (editor + PDF — JSONB arrays use app shapes: SkillGroup, etc.)
+export { SKILL_RATING_LABEL, SKILL_RATING_PCT } from '../src/types/cv.types';
+
+// CV Profile (editor + PDF — JSONB arrays use app shapes: SkillCategory[], etc.)
 export interface CVProfile {
   id: string;
   user_id: string;
@@ -375,7 +372,7 @@ export interface CVProfile {
   summary: string | null;
   experience: ExperienceEntry[];
   education: EducationEntry[];
-  skills: SkillGroup[];
+  skills: import('../src/types/cv.types').SkillCategory[];
   projects: ProjectEntry[];
   certifications: CertificationEntry[];
   languages: LanguageEntry[];

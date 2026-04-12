@@ -1,3 +1,4 @@
+import { createEmptySkillCategory, migrateSkillsToRated } from '@/src/utils/migrateSkills';
 import { TEMPLATE_CONFIGS } from '../config/templateConfig';
 import type {
   CVData,
@@ -121,7 +122,7 @@ export function createEmptyCVData(templateId: TemplateId = 'classic'): CVData {
     summary: '',
     experience: [],
     education: [],
-    skills: [],
+    skills: [createEmptySkillCategory()],
     projects: [],
     publications: [],
     research: [],
@@ -307,30 +308,7 @@ export function migrateLegacyCVData(legacyData: unknown): CVData {
     };
   });
 
-  const sk = Array.isArray(L.skills) ? L.skills : [];
-  out.skills = sk.map((row, i) => {
-    if (!isRecord(row)) {
-      return { id: `sk-${i}`, category: 'Skills', items: [] };
-    }
-    const r = row;
-    const itemsRaw = Array.isArray(r.items) ? r.items : [];
-    const items = itemsRaw.map((it, j) => {
-      if (typeof it === 'string') return { name: it };
-      if (isRecord(it)) {
-        return {
-          name: str(it.name),
-          level: it.level as import('../types/cv.types').SkillItem['level'],
-          showBar: Boolean(it.showBar),
-        };
-      }
-      return { name: String(it) };
-    });
-    return {
-      id: str(r.id) || `sk-${i}`,
-      category: str(r.category) || 'Skills',
-      items,
-    };
-  });
+  out.skills = migrateSkillsToRated(L.skills);
 
   const pr = Array.isArray(L.projects) ? L.projects : [];
   out.projects = pr.map((row, i) => {

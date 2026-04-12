@@ -14,6 +14,8 @@ import {
   CV_TEXTAREA,
 } from '@/lib/cv-editor-styles';
 import type { CVData, WorkExperience } from '@/types';
+import { SkillsEditor } from '@/components/cv/SkillsEditor';
+import { templateShowsSkillRatingEditor } from '@/src/utils/templateSkillUi';
 import { ExperienceCard } from '@/components/cv/premium/ExperienceCard';
 import type { CVFormTab } from '@/components/cv/CVFormFields';
 
@@ -168,32 +170,13 @@ export function Editor({ value, onChange, activeSection }: EditorProps) {
     }
 
     if (activeSection === 'skills') {
-      const plainSkills = (value.skills ?? [])
-        .flatMap((s) => s.items.map((it) => (typeof it === 'string' ? it : it.name)))
-        .join(', ');
       return (
         <section className="space-y-3">
           <h2 className={CV_SECTION_H2}>Skills</h2>
-          <textarea
-            className={cn(CV_TEXTAREA, 'min-h-[140px]')}
-            value={plainSkills}
-            placeholder="React, TypeScript, Tailwind, Product Design..."
-            onChange={(e) =>
-              update({
-                ...value,
-                skills: [
-                  {
-                    id: value.skills?.[0]?.id ?? generateId(),
-                    category: 'technical',
-                    items: e.target.value
-                      .split(',')
-                      .map((s) => s.trim())
-                      .filter(Boolean)
-                      .map((name) => ({ name })),
-                  },
-                ],
-              })
-            }
+          <SkillsEditor
+            skills={value.skills ?? []}
+            onChange={(skills) => update({ ...value, skills })}
+            showRatingControls={templateShowsSkillRatingEditor(value.meta?.templateId)}
           />
         </section>
       );
