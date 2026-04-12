@@ -388,7 +388,8 @@ export function CVFormFields(props: Props) {
                   const cfg = TEMPLATE_CONFIGS[tid];
                   const row = templates.find((t) => t.id === tid);
                   const name = row?.name ?? cfg.label;
-                  const category = row?.category ?? cfg.description.slice(0, 48);
+                  const targetLabel = cfg.targetUsers;
+                  const swatchColor = cfg.templateAccent ?? accent;
                   const tiers = row?.available_tiers ?? ['free', 'pro', 'premium', 'career'];
                   const allowed = canUseTemplate(tiers, userTier);
                   return (
@@ -409,9 +410,15 @@ export function CVFormFields(props: Props) {
                     >
                       <TemplateThumbnail
                         templateId={tid}
-                        accent={accent}
+                        accent={swatchColor}
                         name={name}
                         className="absolute inset-0 h-full w-full grayscale-[0.1] opacity-90 transition-all duration-500 group-hover:scale-110 group-hover:grayscale-0 group-hover:opacity-100"
+                      />
+                      <span
+                        className="absolute left-2 top-2 z-20 h-2.5 w-2.5 rounded-full border border-white/40 shadow-sm"
+                        style={{ backgroundColor: swatchColor }}
+                        title="Accent"
+                        aria-hidden
                       />
                       <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/85 via-black/10 to-transparent p-3 transition-opacity duration-300 group-hover:from-black/90">
                         <p
@@ -424,7 +431,7 @@ export function CVFormFields(props: Props) {
                         >
                           {name}
                         </p>
-                        <p className="line-clamp-2 text-[8px] text-white/80">{category}</p>
+                        <p className="line-clamp-2 text-[8px] text-white/80">{targetLabel}</p>
                       </div>
                       {!allowed ? (
                         <span className="absolute left-2 top-2 rounded bg-black/60 px-1.5 py-0.5 text-[8px] font-semibold uppercase text-white">

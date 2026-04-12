@@ -8,7 +8,12 @@ export type TemplateId =
   | 'minimal'
   | 'creative'
   | 'entry-level'
-  | 'healthcare';
+  | 'healthcare'
+  | 'amber-strike'
+  | 'midnight-pro'
+  | 'golden-hour'
+  | 'ocean-slate'
+  | 'violet-edge';
 
 export type LayoutType = 'single-column' | 'two-column' | 'sidebar';
 

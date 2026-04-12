@@ -47,6 +47,33 @@ a {
   text-decoration: underline;
 }
 
+.cv-tech-row {
+  margin-top: 4pt;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3pt;
+}
+
+.cv-tech-chip {
+  display: inline-block;
+  font-size: 7.5pt;
+  line-height: 1.2;
+  padding: 2pt 5pt;
+  border-radius: 3pt;
+  background: #f1f5f9;
+  color: #334155;
+  border: 0.5pt solid #e2e8f0;
+}
+
+.cv-photo--initial {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: #fff;
+  background: var(--cv-accent, #6366f1);
+}
+
 .watermark {
   position: fixed;
   bottom: 8mm;
@@ -97,4 +124,34 @@ a {
   font-size: 8.5pt;
   font-weight: 500;
   color: #64748b;
+}
+
+/* Shared two-column shell (unified CV templates; layout specifics per tpl-*.css) */
+.cv-two-col {
+  display: grid;
+  align-items: start;
+  width: 100%;
+}
+
+.cv-sidebar {
+  min-height: 100vh;
+  align-self: stretch;
+}
+
+.cv-main {
+  min-width: 0;
+}
+
+@media print {
+  .cv-two-col {
+    align-items: stretch;
+  }
+  .cv-sidebar {
+    min-height: 0;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .cv-main {
+    break-inside: auto;
+  }
 }

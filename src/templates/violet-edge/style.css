@@ -1,0 +1,243 @@
+.tpl-violet-edge {
+  --accent-dark: #3d1a8e;
+  --accent-mid: #7c3aed;
+  --accent-light: #a78bfa;
+  --sidebar-text: #c4b5fd;
+  --body-text: #374151;
+  --heading-text: #3d1a8e;
+}
+
+.tpl-violet-edge.cv-page {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  color: var(--body-text);
+  background: #fff;
+}
+
+.tpl-violet-edge .violet-wrap {
+  min-height: 100vh;
+}
+
+.tpl-violet-edge .violet-banner {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 16pt;
+  background: var(--accent-dark);
+  color: #fff;
+  padding: 20pt 20pt 28pt;
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 18px), calc(100% - 80px) 100%, 0 100%);
+}
+
+.tpl-violet-edge .violet-banner-name {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  font-size: 30px;
+  line-height: 1.1;
+}
+
+.tpl-violet-edge .violet-banner-title {
+  margin-top: 6pt;
+  font-size: 14px;
+  color: var(--accent-light);
+}
+
+.tpl-violet-edge .violet-banner-photo {
+  justify-self: end;
+}
+
+.tpl-violet-edge .violet-banner-img {
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid #fff;
+  display: block;
+}
+
+.tpl-violet-edge .violet-banner-initial {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-light);
+  color: var(--accent-dark);
+  font-weight: 700;
+  font-size: 28px;
+}
+
+.tpl-violet-edge .violet-body {
+  display: grid;
+  grid-template-columns: 63% 37%;
+  align-items: start;
+  gap: 0;
+}
+
+.tpl-violet-edge .violet-main {
+  padding: 16pt 18pt 20pt;
+  min-width: 0;
+}
+
+.tpl-violet-edge .violet-h2 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--heading-text);
+  margin: 0 0 8pt;
+  padding-left: 10px;
+  border-left: 2px solid var(--accent-mid);
+}
+
+.tpl-violet-edge .violet-sec {
+  margin-bottom: 12pt;
+}
+
+.tpl-violet-edge .violet-tl {
+  position: relative;
+  padding-left: 14px;
+}
+
+.tpl-violet-edge .violet-tl::before {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  background: var(--accent-mid);
+  border-radius: 2px;
+}
+
+.tpl-violet-edge .violet-tl-item {
+  position: relative;
+  margin-bottom: 10pt;
+}
+
+.tpl-violet-edge .violet-tl-dot {
+  position: absolute;
+  left: -11px;
+  top: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid var(--accent-mid);
+}
+
+.tpl-violet-edge .violet-exp-role {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.tpl-violet-edge .violet-exp-meta {
+  font-size: 11px;
+  color: #6b7280;
+  margin-top: 2pt;
+}
+
+.tpl-violet-edge .violet-proj-card {
+  background: #f5f3ff;
+  border-left: 6px solid var(--accent-mid);
+  padding: 8pt 10pt;
+  margin-bottom: 8pt;
+}
+
+.tpl-violet-edge .violet-proj-name {
+  font-weight: 700;
+}
+
+.tpl-violet-edge .violet-proj-tech {
+  margin-top: 6pt;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4pt;
+}
+
+.tpl-violet-edge .violet-tech-chip {
+  font-size: 8px;
+  padding: 2pt 6pt;
+  border-radius: 999px;
+  background: #ede9fe;
+  color: var(--accent-mid);
+  font-weight: 600;
+}
+
+.tpl-violet-edge .violet-cert-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6pt;
+}
+
+.tpl-violet-edge .violet-cert-badge {
+  font-size: 9px;
+  padding: 4pt 10pt;
+  border-radius: 999px;
+  background: #ede9fe;
+  color: var(--accent-dark);
+  font-weight: 600;
+}
+
+.tpl-violet-edge .violet-side {
+  background: var(--accent-dark);
+  color: var(--sidebar-text);
+  padding: 16pt 14pt 20pt;
+  min-height: calc(100vh - 120px);
+  align-self: stretch;
+}
+
+.tpl-violet-edge .violet-side-sec {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent-light);
+  margin: 10pt 0 6pt;
+}
+
+.tpl-violet-edge .violet-side-body {
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.tpl-violet-edge .violet-line {
+  margin-bottom: 4pt;
+}
+
+.tpl-violet-edge .violet-line a {
+  color: var(--sidebar-text);
+}
+
+.tpl-violet-edge .violet-skill-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5pt;
+  font-size: 11px;
+}
+
+.tpl-violet-edge .violet-dots {
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+
+.tpl-violet-edge .violet-dot {
+  color: #5b3aa0;
+  font-size: 9px;
+}
+
+.tpl-violet-edge .violet-dot.on {
+  color: var(--accent-light);
+}
+
+.tpl-violet-edge .violet-main .cv-section-title {
+  border: none;
+}
+
+.tpl-violet-edge .cv-section {
+  page-break-inside: avoid;
+}
+
+@media print {
+  .tpl-violet-edge .violet-side {
+    min-height: 0;
+  }
+}

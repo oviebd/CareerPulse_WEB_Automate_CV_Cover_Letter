@@ -92,18 +92,722 @@
     if (sectionHiddenByUser(key, d)) return true;
     if (hideKey(key, cfg, d)) return true;
     // Header may still show contact links if name is empty — only hide via visibility/hideKey.
-    if (key !== 'personal' && isEmpty(key, d)) return true;
+    if (key !== 'personal' && key !== 'summary' && isEmpty(key, d)) return true;
     return false;
   }
 
   function skillBar(level) {
-    var pct = { beginner: 25, intermediate: 50, advanced: 75, expert: 100 };
+    var pct = { beginner: 20, intermediate: 50, advanced: 75, expert: 100 };
     var p = pct[level] || 60;
     return (
       '<span class="skill-bar"><span class="skill-bar-fill" style="width:' +
       p +
       '%"></span></span>'
     );
+  }
+
+  var PREMIUM_IDS = {
+    'amber-strike': true,
+    'midnight-pro': true,
+    'golden-hour': true,
+    'ocean-slate': true,
+    'violet-edge': true,
+  };
+
+  function isPremiumTpl(id) {
+    return !!PREMIUM_IDS[id];
+  }
+
+  function splitFullName(name) {
+    var n = String(name || '').trim();
+    if (!n) return { first: '', last: '' };
+    var p = n.split(/\s+/);
+    if (p.length === 1) return { first: p[0], last: '' };
+    return { first: p.slice(0, -1).join(' '), last: p[p.length - 1] };
+  }
+
+  function nameInitial(name) {
+    var n = String(name || '').trim();
+    return n ? n.charAt(0).toUpperCase() : '?';
+  }
+
+  function linkDisplayUrl(href) {
+    var u = String(href || '').trim();
+    if (!u) return '';
+    try {
+      var url = new URL(u.indexOf('//') === -1 ? 'https://' + u : u);
+      var h = url.hostname.replace(/^www\./, '');
+      return h.length > 32 ? h.slice(0, 29) + '…' : h;
+    } catch (e) {
+      return u.length > 36 ? u.slice(0, 33) + '…' : u;
+    }
+  }
+
+  function langProfLabel(p) {
+    var m = {
+      basic: 'Basic',
+      conversational: 'Conversational',
+      professional: 'Proficient',
+      native: 'Native',
+    };
+    var k = String(p || '').toLowerCase();
+    return m[k] || esc(p);
+  }
+
+  function skillFillPct(level) {
+    var pct = { beginner: 20, intermediate: 50, advanced: 75, expert: 100 };
+    if (level && pct[level] != null) return pct[level];
+    return 60;
+  }
+
+  function skillDotsCount(level) {
+    if (level === 'beginner') return 1;
+    if (level === 'intermediate') return 2;
+    if (level === 'advanced') return 4;
+    if (level === 'expert') return 5;
+    return 3;
+  }
+
+  function contactBasicsBlock(p, lineClass) {
+    var h = '';
+    if (p.email)
+      h +=
+        '<div class="' +
+        lineClass +
+        '"><span class="plink-icon" aria-hidden="true">✉</span> ' +
+        esc(p.email) +
+        '</div>';
+    if (p.phone)
+      h +=
+        '<div class="' +
+        lineClass +
+        '"><span class="plink-icon" aria-hidden="true">✆</span> ' +
+        esc(p.phone) +
+        '</div>';
+    if (p.location)
+      h +=
+        '<div class="' +
+        lineClass +
+        '"><span class="plink-icon" aria-hidden="true">⌂</span> ' +
+        esc(p.location) +
+        '</div>';
+    return h;
+  }
+
+  function extraPersonalLinksBlock(lk, lineClass) {
+    lk = lk || {};
+    var pairs = [
+      ['linkedin', 'in', 'LinkedIn'],
+      ['github', 'GH', 'GitHub'],
+      ['portfolio', '◆', 'Portfolio'],
+      ['website', '🔗', 'Web'],
+      ['behance', 'Bē', 'Behance'],
+      ['dribbble', 'Dr', 'Dribbble'],
+      ['orcid', 'ID', 'ORCID'],
+      ['googleScholar', 'Sch', 'Scholar'],
+      ['researchGate', 'RG', 'ResearchGate'],
+    ];
+    var h = '';
+    pairs.forEach(function (pr) {
+      var key = pr[0];
+      var v = lk[key];
+      if (!v || !String(v).trim()) return;
+      h +=
+        '<div class="' +
+        lineClass +
+        '"><span class="plink-label">' +
+        esc(pr[2]) +
+        '</span> <a href="' +
+        esc(v) +
+        '">' +
+        esc(linkDisplayUrl(v)) +
+        '</a></div>';
+    });
+    return h;
+  }
+
+  function technologiesRow(tech) {
+    if (!tech || !tech.length) return '';
+    var h = '<div class="cv-tech-row">';
+    tech.forEach(function (t) {
+      h += '<span class="cv-tech-chip">' + esc(t) + '</span>';
+    });
+    h += '</div>';
+    return h;
+  }
+
+  function premiumMainByOrder(tpl, key, d, cfg) {
+    return renderMainSection(key, d, cfg, tpl);
+  }
+
+  function buildPremiumHtml(tpl, d, cfg, order) {
+    var p = d.personal || {};
+    var lk = p.links || {};
+    var nm = splitFullName(p.fullName);
+    var photoAllowed = !d.sectionVisibility || d.sectionVisibility.photo !== false;
+    var showPh = cfg.showPhoto && d.meta && d.meta.showPhoto && photoAllowed;
+
+    function amber() {
+      var h = '';
+      h += '<div class="cv-two-col cv-premium amber-grid">';
+      h += '<aside class="cv-sidebar amber-side">';
+      h += '<div class="amber-photo-stage">';
+      h += '<span class="amber-shape amber-shape-rect"></span>';
+      h += '<span class="amber-shape amber-shape-tri"></span>';
+      if (showPh && p.photo) {
+        h += '<img class="amber-photo" src="' + esc(p.photo) + '" alt="" />';
+      } else if (showPh) {
+        h +=
+          '<span class="amber-photo amber-photo--initial">' +
+          esc(nameInitial(p.fullName)) +
+          '</span>';
+      }
+      h += '</div>';
+      h += '<div class="amber-side-hd"><span class="amber-pill"></span>Contact</div>';
+      h += '<div class="amber-side-body">' + contactBasicsBlock(p, 'amber-line') + extraPersonalLinksBlock(lk, 'amber-line') + '</div>';
+      if (!shouldSkip('education', d, cfg)) {
+        h += '<div class="amber-side-hd"><span class="amber-pill"></span>Education</div><div class="amber-side-body">';
+        (d.education || []).forEach(function (e) {
+          h += '<div class="amber-edu">';
+          h += '<div class="amber-edu-inst">' + esc(e.institution) + '</div>';
+          h +=
+            '<div>' +
+            esc(e.degree) +
+            (e.field ? ' — ' + esc(e.field) : '') +
+            '</div>';
+          h +=
+            '<div class="amber-muted">' +
+            range(e.startDate, e.endDate, e.current) +
+            '</div></div>';
+        });
+        h += '</div>';
+      }
+      if (!shouldSkip('references', d, cfg)) {
+        h += '<div class="amber-side-hd"><span class="amber-pill"></span>References</div><div class="amber-side-body">';
+        (d.references || []).forEach(function (r) {
+          h += '<div class="amber-ref">';
+          h += esc(r.name) + '<br/>' + esc(r.role) + ', ' + esc(r.company);
+          if (r.email) h += '<br/>' + esc(r.email);
+          h += '</div>';
+        });
+        h += '</div>';
+      }
+      h += '</aside><main class="cv-main amber-main">';
+      h += '<header class="amber-main-head">';
+      h +=
+        '<h1 class="amber-name"><span class="amber-name-first">' +
+        esc(nm.first) +
+        '</span> <span class="amber-name-last">' +
+        esc(nm.last) +
+        '</span></h1>';
+      if (p.title) h += '<div class="amber-jobtitle">' + esc(p.title) + '</div>';
+      h += '</header>';
+      order.forEach(function (key) {
+        if (key === 'personal' || key === 'education' || key === 'references') return;
+        if (key === 'experience' && !shouldSkip('experience', d, cfg)) {
+          h +=
+            '<section class="cv-section amber-main-sec"><div class="amber-sec-title">Experience</div>';
+          (d.experience || []).forEach(function (e) {
+            h += '<div class="cv-card amber-exp">';
+            h += '<div class="amber-exp-line">';
+            h += '<span class="amber-exp-co">' + esc(e.company) + '</span>';
+            h +=
+              '<span class="amber-exp-date">' +
+              range(e.startDate, e.endDate, e.current) +
+              '</span></div>';
+            h += '<div class="amber-exp-role">' + esc(e.role) + '</div>';
+            if (e.location) h += '<div class="amber-exp-loc">' + esc(e.location) + '</div>';
+            if (e.bullets && e.bullets.length) {
+              h += '<ul class="cv-bullets amber-bullets">';
+              e.bullets.forEach(function (b) {
+                h += '<li>' + esc(b) + '</li>';
+              });
+              h += '</ul>';
+            }
+            h += technologiesRow(e.technologies);
+            h += '</div>';
+          });
+          h += '</section>';
+          return;
+        }
+        h += premiumMainByOrder(tpl, key, d, cfg);
+      });
+      h += '</main></div>';
+      return h;
+    }
+
+    function midnight() {
+      var h = '';
+      h += '<div class="cv-two-col cv-premium midnight-grid">';
+      h += '<aside class="cv-sidebar midnight-side">';
+      h += '<div class="midnight-photo-wrap">';
+      if (showPh && p.photo) {
+        h += '<img class="midnight-photo" src="' + esc(p.photo) + '" alt="" />';
+      } else if (showPh) {
+        h +=
+          '<span class="midnight-photo midnight-photo--initial">' +
+          esc(nameInitial(p.fullName)) +
+          '</span>';
+      }
+      h += '</div>';
+      h += '<div class="midnight-side-name">' + esc(p.fullName) + '</div>';
+      if (p.title) h += '<div class="midnight-side-title">' + esc(p.title) + '</div>';
+      h += '<div class="midnight-divider"></div>';
+      h += '<div class="midnight-side-sec">Contact</div>';
+      h += '<div class="midnight-side-body">' + contactBasicsBlock(p, 'midnight-line') + extraPersonalLinksBlock(lk, 'midnight-line') + '</div>';
+      if (!shouldSkip('skills', d, cfg)) {
+        h += '<div class="midnight-divider"></div><div class="midnight-side-sec">Skills</div><div class="midnight-side-body">';
+        var cfgList = {
+          id: cfg.id,
+          showSkillBars: false,
+          hideIfEmpty: cfg.hideIfEmpty || [],
+        };
+        h += renderSkillsBlock(d, cfgList, 'skills');
+        h += renderSkillsBlock(d, cfgList, 'tools');
+        h += '</div>';
+      }
+      if (!shouldSkip('languages', d, cfg)) {
+        h += '<div class="midnight-divider"></div><div class="midnight-side-sec">Languages</div>';
+        h += '<div class="midnight-lang-grid">';
+        (d.languages || []).forEach(function (l) {
+          h +=
+            '<div class="midnight-lang-cell"><span>' +
+            esc(l.name) +
+            '</span><span>' +
+            langProfLabel(l.proficiency) +
+            '</span></div>';
+        });
+        h += '</div>';
+      }
+      if (!shouldSkip('interests', d, cfg)) {
+        h += '<div class="midnight-divider"></div><div class="midnight-side-sec">Hobbies</div>';
+        h += renderInterests(d);
+      }
+      h += '</aside><main class="cv-main midnight-main">';
+      order.forEach(function (key) {
+        if (
+          key === 'personal' ||
+          key === 'skills' ||
+          key === 'languages' ||
+          key === 'interests'
+        )
+          return;
+        h += premiumMainByOrder(tpl, key, d, cfg);
+      });
+      h += '</main></div>';
+      return h;
+    }
+
+    function goldenSideHdr(icon, title) {
+      return (
+        '<div class="golden-side-hd"><span class="golden-side-ico">' +
+        esc(icon) +
+        '</span><span>' +
+        esc(title) +
+        '</span></div>'
+      );
+    }
+
+    function golden() {
+      var h = '';
+      h += '<div class="cv-two-col cv-premium golden-grid">';
+      h += '<aside class="cv-sidebar golden-side">';
+      h += '<div class="golden-photo-head">';
+      if (showPh && p.photo) {
+        h += '<img class="golden-photo" src="' + esc(p.photo) + '" alt="" />';
+      } else if (showPh) {
+        h +=
+          '<span class="golden-photo golden-photo--initial">' +
+          esc(nameInitial(p.fullName)) +
+          '</span>';
+      }
+      h += '</div>';
+      h += '<div class="golden-side-name">' + esc(p.fullName) + '</div>';
+      if (p.title) h += '<div class="golden-side-title">' + esc(p.title) + '</div>';
+      h += '<div class="golden-side-block">' + goldenSideHdr('◎', 'Contact') + '<div class="golden-side-txt">';
+      h += contactBasicsBlock(p, 'golden-line') + extraPersonalLinksBlock(lk, 'golden-line');
+      h += '</div></div>';
+      if (!shouldSkip('skills', d, cfg)) {
+        h += '<div class="golden-side-block">' + goldenSideHdr('◎', 'Skills') + '<div class="golden-skills">';
+        (d.skills || []).forEach(function (g) {
+          if (!g.items || !g.items.length) return;
+          var cat = (g.category || '').toLowerCase();
+          if (cat.indexOf('language') !== -1) return;
+          g.items.forEach(function (it) {
+            var name = typeof it === 'string' ? it : it.name;
+            var lv = typeof it === 'object' && it ? it.level : null;
+            var pct = skillFillPct(lv);
+            h += '<div class="golden-skill">';
+            h += '<div class="golden-skill-name">' + esc(name) + '</div>';
+            h +=
+              '<div class="golden-sbar"><span class="golden-sbar-fill" style="width:' +
+              pct +
+              '%"></span></div>';
+            h += '</div>';
+          });
+        });
+        h += '</div></div>';
+      }
+      if (!shouldSkip('languages', d, cfg)) {
+        h += '<div class="golden-side-block">' + goldenSideHdr('◎', 'Languages') + '<div class="golden-side-txt">';
+        (d.languages || []).forEach(function (l) {
+          h +=
+            '<div>' +
+            esc(l.name) +
+            ' · ' +
+            langProfLabel(l.proficiency) +
+            '</div>';
+        });
+        h += '</div></div>';
+      }
+      h += '</aside><main class="cv-main golden-main">';
+      order.forEach(function (key) {
+        if (key === 'personal' || key === 'skills' || key === 'languages') return;
+        if (key === 'summary' && !shouldSkip('summary', d, cfg)) {
+          h +=
+            '<section class="cv-section golden-sec"><div class="golden-main-hd"><span class="golden-ico">◆</span><span>Profile</span></div><div class="golden-summary">' +
+            esc(d.summary || '') +
+            '</div></section>';
+          return;
+        }
+        if (key === 'experience' && !shouldSkip('experience', d, cfg)) {
+          h +=
+            '<section class="cv-section golden-sec"><div class="golden-main-hd"><span class="golden-ico">◆</span><span>Experience</span></div><div class="golden-tl">';
+          (d.experience || []).forEach(function (e) {
+            h += '<div class="golden-tl-item">';
+            h += '<span class="golden-tl-dot"></span><div class="golden-tl-body">';
+            h += '<div class="golden-exp-title">' + esc(e.role) + '</div>';
+            h +=
+              '<div class="golden-exp-meta">' +
+              esc(e.company) +
+              (e.location ? ' | ' + esc(e.location) : '') +
+              '</div>';
+            h += '<div class="golden-exp-date">' + range(e.startDate, e.endDate, e.current) + '</div>';
+            if (e.bullets && e.bullets.length) {
+              h += '<ul class="cv-bullets golden-bullets">';
+              e.bullets.forEach(function (b) {
+                h += '<li>' + esc(b) + '</li>';
+              });
+              h += '</ul>';
+            }
+            h += technologiesRow(e.technologies);
+            h += '</div></div>';
+          });
+          h += '</div></section>';
+          return;
+        }
+        if (key === 'education' && !shouldSkip('education', d, cfg)) {
+          h +=
+            '<section class="cv-section golden-sec"><div class="golden-main-hd"><span class="golden-ico">◆</span><span>Education</span></div>';
+          (d.education || []).forEach(function (e) {
+            h += '<div class="golden-edu cv-card">';
+            h += '<div class="golden-exp-title">' + esc(e.institution) + '</div>';
+            h +=
+              '<div>' +
+              esc(e.degree) +
+              (e.field ? ' — ' + esc(e.field) : '') +
+              '</div>';
+            h += '<div class="golden-exp-date">' + range(e.startDate, e.endDate, e.current) + '</div>';
+            h += '</div>';
+          });
+          h += '</section>';
+          return;
+        }
+        if (key === 'projects' && !shouldSkip('projects', d, cfg)) {
+          h +=
+            '<section class="cv-section golden-sec"><div class="golden-main-hd"><span class="golden-ico">◆</span><span>Portfolio</span></div>';
+          (d.projects || []).forEach(function (pr) {
+            h += '<div class="golden-proj cv-card">';
+            h += '<div class="golden-proj-name">' + esc(pr.name) + '</div>';
+            if (pr.description) h += '<div class="golden-proj-desc"><em>' + esc(pr.description) + '</em></div>';
+            if (pr.bullets && pr.bullets.length) {
+              h += '<ul class="cv-bullets golden-bullets">';
+              pr.bullets.forEach(function (b) {
+                h += '<li>' + esc(b) + '</li>';
+              });
+              h += '</ul>';
+            }
+            h += '</div>';
+          });
+          h += '</section>';
+          return;
+        }
+        if (key === 'interests' && !shouldSkip('interests', d, cfg)) {
+          h +=
+            '<section class="cv-section golden-sec"><div class="golden-main-hd"><span class="golden-ico">◆</span><span>Interests</span></div>';
+          h += '<div class="golden-pills">';
+          (d.interests || []).forEach(function (x) {
+            h += '<span class="golden-pill">' + esc(x) + '</span>';
+          });
+          h += '</div></section>';
+          return;
+        }
+        h += premiumMainByOrder(tpl, key, d, cfg);
+      });
+      h += '</main></div>';
+      return h;
+    }
+
+    function ocean() {
+      var h = '';
+      h += '<div class="cv-two-col cv-premium ocean-grid">';
+      h += '<aside class="cv-sidebar ocean-side">';
+      h += '<div class="ocean-photo-wrap">';
+      if (showPh && p.photo) {
+        h += '<img class="ocean-photo" src="' + esc(p.photo) + '" alt="" />';
+      } else if (showPh) {
+        h +=
+          '<span class="ocean-photo ocean-photo--initial">' +
+          esc(nameInitial(p.fullName)) +
+          '</span>';
+      }
+      h += '</div>';
+      h += '<div class="ocean-side-name">' + esc(p.fullName) + '</div>';
+      if (p.title) h += '<div class="ocean-side-title">' + esc(p.title) + '</div>';
+      h += '<div class="ocean-side-sec">Contact</div><div class="ocean-contact">';
+      if (p.email)
+        h +=
+          '<div class="ocean-crow"><span class="ocean-cico">✉</span><span>' +
+          esc(p.email) +
+          '</span></div>';
+      if (p.phone)
+        h +=
+          '<div class="ocean-crow"><span class="ocean-cico">✆</span><span>' +
+          esc(p.phone) +
+          '</span></div>';
+      if (p.location)
+        h +=
+          '<div class="ocean-crow"><span class="ocean-cico">⌂</span><span>' +
+          esc(p.location) +
+          '</span></div>';
+      var linkPairs = [
+        ['linkedin', '🔗', lk.linkedin],
+        ['github', '🔗', lk.github],
+        ['portfolio', '🔗', lk.portfolio],
+        ['website', '🔗', lk.website],
+      ];
+      linkPairs.forEach(function (lp) {
+        var u = lp[2];
+        if (!u || !String(u).trim()) return;
+        h +=
+          '<div class="ocean-crow"><span class="ocean-cico">' +
+          lp[1] +
+          '</span><a href="' +
+          esc(u) +
+          '">' +
+          esc(linkDisplayUrl(u)) +
+          '</a></div>';
+      });
+      h += '</div></aside><main class="cv-main ocean-main"><div class="ocean-topbar"></div>';
+      order.forEach(function (key) {
+        if (key === 'personal') return;
+        if (key === 'skills' && !shouldSkip('skills', d, cfg)) {
+          h +=
+            '<section class="cv-section ocean-sec"><h2 class="ocean-h2">Skills</h2><div class="ocean-skill-grid">';
+          (d.skills || []).forEach(function (g) {
+            if (!g.items || !g.items.length) return;
+            g.items.forEach(function (it) {
+              var name = typeof it === 'string' ? it : it.name;
+              h += '<span class="ocean-chip">' + esc(name) + '</span>';
+            });
+          });
+          h += '</div></section>';
+          return;
+        }
+        if (key === 'experience' && !shouldSkip('experience', d, cfg)) {
+          h += '<section class="cv-section ocean-sec"><h2 class="ocean-h2">Experience</h2>';
+          (d.experience || []).forEach(function (e, idx) {
+            if (idx) h += '<div class="ocean-exp-rule"></div>';
+            h += '<div class="ocean-exp cv-card">';
+            h +=
+              '<div class="ocean-exp-line"><span class="ocean-role">' +
+              esc(e.role) +
+              '</span><span class="ocean-exp-date">' +
+              range(e.startDate, e.endDate, e.current) +
+              '</span></div>';
+            h += '<div class="ocean-comp">' + esc(e.company) + '</div>';
+            if (e.bullets && e.bullets.length) {
+              h += '<ul class="cv-bullets">';
+              e.bullets.forEach(function (b) {
+                h += '<li>' + esc(b) + '</li>';
+              });
+              h += '</ul>';
+            }
+            h += technologiesRow(e.technologies);
+            h += '</div>';
+          });
+          h += '</section>';
+          return;
+        }
+        if (key === 'education' && !shouldSkip('education', d, cfg)) {
+          h += '<section class="cv-section ocean-sec"><h2 class="ocean-h2">Education</h2>';
+          (d.education || []).forEach(function (e) {
+            h += '<div class="ocean-edu cv-card">';
+            h += '<div class="ocean-edu-inst">' + esc(e.institution) + '</div>';
+            h +=
+              '<div class="ocean-edu-deg">' +
+              esc(e.degree) +
+              (e.field ? ' — ' + esc(e.field) : '') +
+              '</div>';
+            h += '<div class="ocean-muted">' + range(e.startDate, e.endDate, e.current) + '</div>';
+            h += '</div>';
+          });
+          h += '</section>';
+          return;
+        }
+        if (key === 'certifications' && !shouldSkip('certifications', d, cfg)) {
+          h += '<section class="cv-section ocean-sec"><h2 class="ocean-h2">Certifications</h2>';
+          (d.certifications || []).forEach(function (c) {
+            h += '<div class="ocean-cert cv-card"><span class="ocean-cert-dot"></span>';
+            h += esc(c.name) + ' — ' + esc(c.issuer) + ' · ' + esc(c.date);
+            h += '</div>';
+          });
+          h += '</section>';
+          return;
+        }
+        h += premiumMainByOrder(tpl, key, d, cfg);
+      });
+      h += '</main></div>';
+      return h;
+    }
+
+    function violet() {
+      var h = '';
+      h += '<div class="cv-premium violet-wrap">';
+      h += '<header class="violet-banner">';
+      h += '<div class="violet-banner-text">';
+      h +=
+        '<div class="violet-banner-name">' +
+        esc(p.fullName) +
+        '</div>';
+      if (p.title) h += '<div class="violet-banner-title">' + esc(p.title) + '</div>';
+      h += '</div>';
+      h += '<div class="violet-banner-photo">';
+      if (showPh && p.photo) {
+        h += '<img src="' + esc(p.photo) + '" alt="" class="violet-banner-img" />';
+      } else if (showPh) {
+        h +=
+          '<span class="violet-banner-img violet-banner-initial">' +
+          esc(nameInitial(p.fullName)) +
+          '</span>';
+      }
+      h += '</div></header>';
+      h += '<div class="violet-body">';
+      h += '<main class="violet-main">';
+      order.forEach(function (key) {
+        if (
+          key === 'personal' ||
+          key === 'skills' ||
+          key === 'languages' ||
+          key === 'interests'
+        )
+          return;
+        if (key === 'experience' && !shouldSkip('experience', d, cfg)) {
+          h +=
+            '<section class="cv-section violet-sec"><h2 class="violet-h2">Experience</h2><div class="violet-tl">';
+          (d.experience || []).forEach(function (e) {
+            h += '<div class="violet-tl-item"><div class="violet-tl-dot"></div><div class="violet-tl-content">';
+            h += '<div class="violet-exp-role">' + esc(e.role) + '</div>';
+            h +=
+              '<div class="violet-exp-meta">' +
+              esc(e.company) +
+              ' · ' +
+              range(e.startDate, e.endDate, e.current) +
+              '</div>';
+            if (e.bullets && e.bullets.length) {
+              h += '<ul class="cv-bullets">';
+              e.bullets.forEach(function (b) {
+                h += '<li>' + esc(b) + '</li>';
+              });
+              h += '</ul>';
+            }
+            h += technologiesRow(e.technologies);
+            h += '</div></div>';
+          });
+          h += '</div></section>';
+          return;
+        }
+        if (key === 'projects' && !shouldSkip('projects', d, cfg)) {
+          h += '<section class="cv-section violet-sec"><h2 class="violet-h2">Projects</h2>';
+          (d.projects || []).forEach(function (pr) {
+            h += '<div class="violet-proj-card cv-card">';
+            h += '<div class="violet-proj-name">' + esc(pr.name) + '</div>';
+            if (pr.description) h += '<p>' + esc(pr.description) + '</p>';
+            if (pr.technologies && pr.technologies.length) {
+              h += '<div class="violet-proj-tech">';
+              pr.technologies.forEach(function (t) {
+                h += '<span class="violet-tech-chip">' + esc(t) + '</span>';
+              });
+              h += '</div>';
+            }
+            h += '</div>';
+          });
+          h += '</section>';
+          return;
+        }
+        if (key === 'certifications' && !shouldSkip('certifications', d, cfg)) {
+          h += '<section class="cv-section violet-sec"><h2 class="violet-h2">Certifications</h2><div class="violet-cert-row">';
+          (d.certifications || []).forEach(function (c) {
+            h +=
+              '<span class="violet-cert-badge">' +
+              esc(c.name) +
+              '</span>';
+          });
+          h += '</div></section>';
+          return;
+        }
+        h += premiumMainByOrder(tpl, key, d, cfg);
+      });
+      h += '</main><aside class="violet-side">';
+      h += '<div class="violet-side-sec">Contact</div><div class="violet-side-body">';
+      h += contactBasicsBlock(p, 'violet-line') + extraPersonalLinksBlock(lk, 'violet-line');
+      h += '</div>';
+      if (!shouldSkip('skills', d, cfg)) {
+        h += '<div class="violet-side-sec">Skills</div><div class="violet-side-body">';
+        (d.skills || []).forEach(function (g) {
+          if (!g.items || !g.items.length) return;
+          g.items.forEach(function (it) {
+            var name = typeof it === 'string' ? it : it.name;
+            var n = skillDotsCount(typeof it === 'object' && it ? it.level : null);
+            h += '<div class="violet-skill-row"><span>' + esc(name) + '</span><span class="violet-dots">';
+            var j;
+            for (j = 0; j < 5; j++) {
+              h += '<span class="' + (j < n ? 'violet-dot on' : 'violet-dot') + '">●</span>';
+            }
+            h += '</span></div>';
+          });
+        });
+        h += '</div>';
+      }
+      if (!shouldSkip('languages', d, cfg)) {
+        h += '<div class="violet-side-sec">Languages</div><div class="violet-side-body">';
+        (d.languages || []).forEach(function (l) {
+          h +=
+            '<div>' +
+            esc(l.name) +
+            ' · ' +
+            langProfLabel(l.proficiency) +
+            '</div>';
+        });
+        h += '</div>';
+      }
+      if (!shouldSkip('interests', d, cfg)) {
+        h += '<div class="violet-side-sec">Interests</div><div class="violet-side-body">';
+        (d.interests || []).forEach(function (x) {
+          h += '<div>· ' + esc(x) + '</div>';
+        });
+        h += '</div>';
+      }
+      h += '</aside></div></div>';
+      return h;
+    }
+
+    if (tpl === 'amber-strike') return amber();
+    if (tpl === 'midnight-pro') return midnight();
+    if (tpl === 'golden-hour') return golden();
+    if (tpl === 'ocean-slate') return ocean();
+    if (tpl === 'violet-edge') return violet();
+    return '';
   }
 
   /** Single-column layouts: one comma-separated line per category (saves vertical space). */
@@ -151,8 +855,8 @@
         var name = typeof it === 'string' ? it : it.name;
         html += '<div class="skill-row">';
         html += '<span class="skill-name">' + esc(name) + '</span>';
-        if (cfg.showSkillBars && it.level) {
-          html += skillBar(it.level);
+        if (cfg.showSkillBars) {
+          html += skillBar(it && typeof it === 'object' ? it.level : null);
         }
         html += '</div>';
       });
@@ -230,13 +934,21 @@
   function headerBlock(d, cfg) {
     var p = d.personal || {};
     var photoAllowed = !d.sectionVisibility || d.sectionVisibility.photo !== false;
-    var showPhoto = cfg.showPhoto && d.meta && d.meta.showPhoto && p.photo && photoAllowed;
+    var wantHeadshot =
+      cfg.showPhoto && d.meta && d.meta.showPhoto && photoAllowed;
+    var showPhoto = wantHeadshot && p.photo;
+    var showInitial = wantHeadshot && !p.photo;
     var html = '<header class="cv-header">';
     if (showPhoto) {
       html +=
         '<img class="cv-photo" src="' +
         esc(p.photo) +
         '" alt="" />';
+    } else if (showInitial) {
+      html +=
+        '<span class="cv-photo cv-photo--initial" aria-hidden="true">' +
+        esc(nameInitial(p.fullName)) +
+        '</span>';
     }
     html += '<div class="cv-header-text">';
     html += '<h1>' + esc(p.fullName) + '</h1>';
@@ -273,7 +985,7 @@
     if (shouldSkip('summary', d, cfg)) return '';
     return (
       '<section class="cv-section"><div class="cv-section-title">Summary</div><div class="cv-summary">' +
-      esc(d.summary) +
+      esc(d.summary || '') +
       '</div></section>'
     );
   }
@@ -301,6 +1013,7 @@
         });
         html += '</ul>';
       }
+      html += technologiesRow(e.technologies);
       html += '</div>';
     });
     html += '</section>';
@@ -358,15 +1071,8 @@
     (d.projects || []).forEach(function (p) {
       html += '<div class="cv-card proj-block">';
       html += '<div class="cv-strong">' + esc(p.name) + '</div>';
-      if (p.technologies && p.technologies.length) {
-        html +=
-          '<div class="cv-tech">' +
-          p.technologies.map(function (t) {
-            return esc(t);
-          }).join(' · ') +
-          '</div>';
-      }
       if (p.description) html += '<p>' + esc(p.description) + '</p>';
+      html += technologiesRow(p.technologies);
       if (p.links && p.links.length) {
         p.links.forEach(function (l) {
           html +=
@@ -603,7 +1309,7 @@
     if (!root || !d) return;
 
     document.body.className = 'cv-page tpl-' + tpl;
-    if (d.meta && d.meta.colorScheme) {
+    if (d.meta && d.meta.colorScheme && !isPremiumTpl(tpl)) {
       document.documentElement.style.setProperty('--cv-accent', d.meta.colorScheme);
     }
 
@@ -620,7 +1326,9 @@
         '<div class="cv-postal">' + esc(d.postalAddress) + '</div>';
     }
 
-    if (cfg.layout === 'two-column') {
+    if (isPremiumTpl(tpl)) {
+      html += buildPremiumHtml(tpl, d, cfg, order);
+    } else if (cfg.layout === 'two-column') {
       html += '<div class="cv-two-col">';
       html += '<aside class="cv-sidebar">';
       (cfg.sidebarSections || []).forEach(function (sk) {

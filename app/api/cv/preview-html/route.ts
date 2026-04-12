@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getSampleCVData } from '@/lib/cv-sample-data';
 import { looseProfileToCVData, renderTemplate } from '@/lib/pdf';
+import { renderUnifiedHtml } from '@/src/services/pdfRenderer';
+import { TEMPLATE_CONFIGS } from '@/src/config/templateConfig';
+import { normalizeTemplateId } from '@/src/utils/cvDefaults';
+import type { TemplateId } from '@/src/types/cv.types';
 
 export const runtime = 'nodejs';
 
@@ -32,7 +36,13 @@ export async function GET(request: Request) {
     }
 
     const cvData = getSampleCVData(accent);
-    const html = renderTemplate(templateId, cvData);
+    const tid = normalizeTemplateId(templateId) as TemplateId;
+    const cfg = TEMPLATE_CONFIGS[tid];
+    cvData.meta.templateId = tid;
+    cvData.meta.showPhoto = cfg.showPhoto;
+    cvData.meta.layout = cfg.layout === 'two-column' ? 'two-column' : 'single-column';
+    cvData.meta.sectionOrder = [...cfg.sectionOrder];
+    const html = renderUnifiedHtml(cvData);
     return new NextResponse(html, {
       status: 200,
       headers: {

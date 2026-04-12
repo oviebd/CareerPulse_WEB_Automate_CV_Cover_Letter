@@ -16,6 +16,11 @@ const ALL_TEMPLATE_IDS = new Set<string>([
   'creative',
   'entry-level',
   'healthcare',
+  'amber-strike',
+  'midnight-pro',
+  'golden-hour',
+  'ocean-slate',
+  'violet-edge',
 ]);
 
 /** Map retired template ids (DB / bookmarks) to the unified catalog. */

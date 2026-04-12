@@ -1,0 +1,267 @@
+.tpl-golden-hour {
+  --accent: #f0b429;
+  --sidebar-bg: #1e1e2e;
+  --sidebar-text: #c0c0d0;
+  --body-bg: #fafafa;
+  --body-text: #444;
+  --heading-text: #1e1e2e;
+}
+
+.tpl-golden-hour.cv-page {
+  font-family: Lato, system-ui, sans-serif;
+  color: var(--body-text);
+  background: var(--body-bg);
+}
+
+.tpl-golden-hour .golden-grid {
+  grid-template-columns: 35% 1fr;
+  gap: 0;
+  min-height: 100vh;
+}
+
+.tpl-golden-hour .golden-side {
+  background: var(--sidebar-bg);
+  color: var(--sidebar-text);
+  font-family: Poppins, system-ui, sans-serif;
+  padding: 0 0 16pt;
+}
+
+.tpl-golden-hour .golden-photo-head {
+  display: flex;
+  justify-content: center;
+  padding: 16pt 0 12pt;
+  background: linear-gradient(180deg, #252536 0%, var(--sidebar-bg) 100%);
+}
+
+.tpl-golden-hour .golden-photo {
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid var(--accent);
+}
+
+.tpl-golden-hour .golden-photo--initial {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  color: var(--heading-text);
+  font-weight: 700;
+  font-size: 36px;
+}
+
+.tpl-golden-hour .golden-side-name {
+  text-align: center;
+  color: #fff;
+  font-weight: 700;
+  font-size: 22px;
+  padding: 0 12pt;
+}
+
+.tpl-golden-hour .golden-side-title {
+  text-align: center;
+  color: var(--accent);
+  font-size: 13px;
+  margin-top: 4pt;
+  padding: 0 12pt 12pt;
+}
+
+.tpl-golden-hour .golden-side-block {
+  padding: 10pt 14pt 0;
+}
+
+.tpl-golden-hour .golden-side-hd {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8pt;
+}
+
+.tpl-golden-hour .golden-side-ico {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--heading-text);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.tpl-golden-hour .golden-side-hd span:last-child {
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tpl-golden-hour .golden-side-txt,
+.tpl-golden-hour .golden-line {
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.tpl-golden-hour .golden-side-txt a {
+  color: var(--sidebar-text);
+}
+
+.tpl-golden-hour .golden-skills {
+  padding-bottom: 4pt;
+}
+
+.tpl-golden-hour .golden-skill-name {
+  color: #ccc;
+  font-size: 11px;
+  margin-bottom: 3pt;
+}
+
+.tpl-golden-hour .golden-sbar {
+  height: 3px;
+  width: 100px;
+  background: #333355;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.tpl-golden-hour .golden-sbar-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+}
+
+.tpl-golden-hour .golden-skill {
+  margin-bottom: 8pt;
+}
+
+.tpl-golden-hour .golden-main {
+  padding: 16pt 18pt;
+}
+
+.tpl-golden-hour .golden-main-hd {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 6pt;
+  margin-bottom: 10pt;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.tpl-golden-hour .golden-ico {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
+.tpl-golden-hour .golden-main-hd span:last-child {
+  font-family: Poppins, sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--heading-text);
+}
+
+.tpl-golden-hour .golden-summary {
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.tpl-golden-hour .golden-tl {
+  position: relative;
+  padding-left: 16px;
+}
+
+.tpl-golden-hour .golden-tl::before {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 6px;
+  bottom: 6px;
+  width: 1px;
+  background: #e0e0e0;
+}
+
+.tpl-golden-hour .golden-tl-item {
+  position: relative;
+  margin-bottom: 12pt;
+}
+
+.tpl-golden-hour .golden-tl-dot {
+  position: absolute;
+  left: -16px;
+  top: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.tpl-golden-hour .golden-exp-title {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--heading-text);
+}
+
+.tpl-golden-hour .golden-exp-meta {
+  font-size: 12px;
+  color: #888;
+}
+
+.tpl-golden-hour .golden-exp-date {
+  font-size: 11px;
+  color: #999;
+  margin-top: 2pt;
+}
+
+.tpl-golden-hour .golden-bullets {
+  margin-top: 4pt;
+}
+
+.tpl-golden-hour .golden-proj-name {
+  font-weight: 700;
+}
+
+.tpl-golden-hour .golden-proj-desc {
+  font-size: 12px;
+  color: #555;
+  margin-top: 2pt;
+}
+
+.tpl-golden-hour .golden-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6pt;
+}
+
+.tpl-golden-hour .golden-pill {
+  background: #2a2a3e;
+  color: var(--accent);
+  font-size: 10px;
+  padding: 4pt 8pt;
+  border-radius: 999px;
+}
+
+.tpl-golden-hour .golden-main .cv-section-title {
+  border: none;
+}
+
+.tpl-golden-hour .cv-section {
+  page-break-inside: avoid;
+}
+
+@media print {
+  .tpl-golden-hour .golden-side {
+    min-height: 0;
+  }
+}
