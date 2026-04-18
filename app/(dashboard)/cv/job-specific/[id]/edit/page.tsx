@@ -885,7 +885,7 @@ export default function JobCVEditPage() {
   const trackRingClass =
     trackStatus && trackStatus !== 'none'
       ? JOB_STATUS_CONFIG[trackStatus].borderClass
-      : 'border-slate-400 text-slate-700';
+      : 'border-slate-400 text-slate-700 dark:border-slate-500 dark:text-slate-300';
 
   const isUnsavedDraft =
     isDraftMode && !sessionSavedCvId && !(draftMeta?.savedCvId ?? null);
@@ -900,7 +900,7 @@ export default function JobCVEditPage() {
   const editingCvBody = !(genType === 'both' && documentTab === 'coverLetter');
 
   return (
-    <div className="mx-auto max-w-[1800px] space-y-4 pb-24 md:pb-8">
+    <div className="cv-editor-text-tune mx-auto max-w-[1800px] space-y-4 pb-24 md:pb-8">
       <CVEditorTopBar
         backHref={isDraftMode ? '/cv/optimise' : '/cv/job-specific'}
         title="Job-tailored CV"

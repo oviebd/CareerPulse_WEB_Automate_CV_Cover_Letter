@@ -111,7 +111,7 @@ export function ProfileMenu() {
               <Link
                 href="/settings/billing"
                 role="menuitem"
-                className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm text-[var(--color-text-primary)] transition hover:bg-white/[0.06]"
+                className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm text-[var(--color-text-primary)] transition hover:bg-[var(--color-hover-surface)]"
                 onClick={() => setOpen(false)}
               >
                 <CreditCard className="h-4 w-4 shrink-0 text-[var(--color-muted)]" />
@@ -123,7 +123,7 @@ export function ProfileMenu() {
               <Link
                 href="/settings"
                 role="menuitem"
-                className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm text-[var(--color-text-primary)] transition hover:bg-white/[0.06]"
+                className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm text-[var(--color-text-primary)] transition hover:bg-[var(--color-hover-surface)]"
                 onClick={() => setOpen(false)}
               >
                 <Settings className="h-4 w-4 shrink-0 text-[var(--color-muted)]" />
@@ -133,7 +133,7 @@ export function ProfileMenu() {
                 type="button"
                 role="menuitem"
                 disabled={signingOut}
-                className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm text-[var(--color-text-primary)] transition hover:bg-white/[0.06] disabled:opacity-60"
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm text-[var(--color-text-primary)] transition hover:bg-[var(--color-hover-surface)] disabled:opacity-60"
                 onClick={() => void signOut()}
               >
                 <LogOut className="h-4 w-4 shrink-0 text-[var(--color-muted)]" />

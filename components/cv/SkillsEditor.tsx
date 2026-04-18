@@ -138,7 +138,7 @@ export function SkillsEditor({
 
   if (skills.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-[var(--color-border)] bg-white/[0.03] p-6 text-center">
+      <div className="rounded-lg border border-dashed border-[var(--color-border)] bg-[var(--color-surface-faint)] p-6 text-center">
         <p className="text-sm italic text-[var(--color-muted)]">
           No skill categories yet.
         </p>

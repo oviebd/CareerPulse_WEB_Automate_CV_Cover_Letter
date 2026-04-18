@@ -211,7 +211,7 @@ export function CVRewriteWithAIModal({
                     'rounded-full border px-3 py-1.5 text-sm transition',
                     active
                       ? 'border-[var(--color-primary-400)]/50 bg-[var(--color-primary-100)]/50 text-[var(--color-primary-400)]'
-                      : 'border-[var(--color-border)] bg-[var(--color-input-bg)] text-[var(--color-text-primary)] hover:bg-white/[0.06]'
+                      : 'border-[var(--color-border)] bg-[var(--color-input-bg)] text-[var(--color-text-primary)] hover:bg-[var(--color-hover-surface)]'
                   )}
                   aria-pressed={active}
                 >

@@ -60,7 +60,7 @@ export function JobKeywordsBanner({ keywords, cv, embedded = false }: JobKeyword
                   className={
                     present
                       ? 'inline-flex items-center rounded-badge border border-[var(--color-accent-mint)]/40 bg-[var(--color-accent-mint)]/15 px-3 py-1.5 text-xs font-medium text-[var(--color-accent-mint)]'
-                      : 'inline-flex items-center rounded-badge border border-[var(--color-border)] bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-[var(--color-muted)]'
+                      : 'inline-flex items-center rounded-badge border border-[var(--color-border)] bg-[var(--color-control-bg)] px-3 py-1.5 text-xs font-medium text-[var(--color-muted)]'
                   }
                   title={present ? 'Found in your CV' : 'Not found in your CV yet'}
                 >

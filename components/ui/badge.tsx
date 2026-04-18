@@ -2,7 +2,7 @@ import { cn } from '@/lib/utils';
 
 const variants = {
   default:
-    'bg-white/[0.06] text-[var(--color-text-secondary)] border border-[var(--color-border)]',
+    'bg-[var(--color-control-bg)] text-[var(--color-text-secondary)] border border-[var(--color-border)]',
   success:
     'bg-[var(--color-accent-mint)]/15 text-[var(--color-accent-mint)] border border-[var(--color-accent-mint)]/25',
   warning:

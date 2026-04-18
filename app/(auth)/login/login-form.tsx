@@ -126,7 +126,7 @@ export function LoginForm({
         type="button"
         onClick={() => void onGoogle()}
         disabled={loading || magicLoading}
-        className="flex w-full items-center justify-center gap-3 rounded-btn border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-sm font-medium text-[var(--color-text-primary)] shadow-sm transition hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-60"
+        className="flex w-full items-center justify-center gap-3 rounded-btn border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-sm font-medium text-[var(--color-text-primary)] shadow-sm transition hover:bg-[var(--color-hover-surface)] disabled:cursor-not-allowed disabled:opacity-60"
       >
         <GoogleIcon />
         {loading ? 'Redirecting…' : 'Continue with Google'}
@@ -208,7 +208,7 @@ export function LoginForm({
           <button
             type="submit"
             disabled={magicLoading || loading}
-            className="rounded-btn border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2.5 text-sm font-medium text-[var(--color-text-primary)] hover:bg-white/[0.06] disabled:opacity-60"
+            className="rounded-btn border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2.5 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-hover-surface)] disabled:opacity-60"
           >
             {magicLoading ? 'Sending…' : 'Email link'}
           </button>

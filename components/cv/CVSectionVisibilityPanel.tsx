@@ -47,7 +47,7 @@ export function CVSectionVisibilityPanel({ visibility, onChange }: Props) {
             className={`rounded-badge border px-3 py-1.5 text-xs font-medium transition duration-200 ${
               isCvSectionVisible(key, visibility)
                 ? 'border-[var(--color-primary-400)]/50 bg-[var(--color-primary-100)] text-[var(--color-primary-400)] shadow-[0_0_0_1px_rgba(108,99,255,0.2)]'
-                : 'border-[var(--color-border)] bg-white/[0.04] text-[var(--color-muted)] hover:bg-white/[0.08] hover:text-[var(--color-text-primary)]'
+                : 'border-[var(--color-border)] bg-[var(--color-control-bg)] text-[var(--color-muted)] hover:bg-[var(--color-control-bg-hover)] hover:text-[var(--color-text-primary)]'
             }`}
             onClick={() => onChange(toggleCvSectionVisibility(visibility, key))}
           >

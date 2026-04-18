@@ -102,7 +102,7 @@ export function CVEditorTopBar({
         <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           <Link
             href={backHref}
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--color-border)] bg-white/[0.04] text-[var(--color-text-primary)] transition hover:bg-white/[0.08]"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-control-bg)] text-[var(--color-text-primary)] transition duration-200 hover:bg-[var(--color-control-bg-hover)]"
             aria-label="Back"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -115,7 +115,9 @@ export function CVEditorTopBar({
               {badge}
             </div>
             {subtitle ? (
-              <p className="truncate text-xs text-[var(--color-muted)] sm:text-sm">{subtitle}</p>
+              <p className="truncate text-xs font-medium text-[var(--color-text-secondary)] sm:text-sm">
+                {subtitle}
+              </p>
             ) : null}
           </div>
         </div>
@@ -161,15 +163,16 @@ export function CVEditorTopBar({
             </Button>
           ) : null}
 
-          <div className="flex items-center rounded-lg border border-[var(--color-border)] bg-white/[0.03] p-0.5">
+          <div className="flex items-center rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-faint)] p-0.5">
             <button
               type="button"
               title="Default layout"
               aria-pressed={focusMode === 'default'}
               onClick={() => onFocusModeChange('default')}
               className={cn(
-                'flex h-8 w-8 items-center justify-center rounded-md text-[var(--color-muted)] transition',
-                focusMode === 'default' && 'bg-white/[0.08] text-[var(--color-text-primary)] shadow-sm'
+                'flex h-8 w-8 items-center justify-center rounded-md text-[var(--color-text-secondary)] transition',
+                focusMode === 'default' &&
+                  'bg-[var(--color-hover-surface-strong)] text-[var(--color-text-primary)] shadow-sm'
               )}
             >
               <LayoutGrid className="h-4 w-4" />
@@ -180,8 +183,9 @@ export function CVEditorTopBar({
               aria-pressed={focusMode === 'editor'}
               onClick={() => onFocusModeChange('editor')}
               className={cn(
-                'flex h-8 w-8 items-center justify-center rounded-md text-[var(--color-muted)] transition',
-                focusMode === 'editor' && 'bg-white/[0.08] text-[var(--color-text-primary)] shadow-sm'
+                'flex h-8 w-8 items-center justify-center rounded-md text-[var(--color-text-secondary)] transition',
+                focusMode === 'editor' &&
+                  'bg-[var(--color-hover-surface-strong)] text-[var(--color-text-primary)] shadow-sm'
               )}
             >
               <Maximize2 className="h-4 w-4" />
@@ -192,8 +196,9 @@ export function CVEditorTopBar({
               aria-pressed={focusMode === 'preview'}
               onClick={() => onFocusModeChange('preview')}
               className={cn(
-                'flex h-8 w-8 items-center justify-center rounded-md text-[var(--color-muted)] transition',
-                focusMode === 'preview' && 'bg-white/[0.08] text-[var(--color-text-primary)] shadow-sm'
+                'flex h-8 w-8 items-center justify-center rounded-md text-[var(--color-text-secondary)] transition',
+                focusMode === 'preview' &&
+                  'bg-[var(--color-hover-surface-strong)] text-[var(--color-text-primary)] shadow-sm'
               )}
             >
               <Eye className="h-4 w-4" />
@@ -255,7 +260,9 @@ export function CVEditorTopBar({
             </Button>
           ) : null}
 
-          {statusLine ? <span className="text-[11px] text-[var(--color-muted)]">{statusLine}</span> : null}
+          {statusLine ? (
+            <span className="text-[11px] font-medium text-[var(--color-text-secondary)]">{statusLine}</span>
+          ) : null}
         </div>
       </div>
       {bottomRow ? (

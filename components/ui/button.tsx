@@ -3,11 +3,11 @@ import { cn } from '@/lib/utils';
 
 const variants = {
   primary:
-    'bg-gradient-to-br from-[var(--color-primary-500)] to-[var(--color-primary-600)] text-white shadow-md hover:-translate-y-px hover:shadow-lg hover:brightness-105 active:scale-[0.98]',
+    'btn-primary-themed bg-gradient-to-br from-[var(--color-primary-500)] to-[var(--color-primary-600)] text-white hover:-translate-y-0.5 hover:brightness-[1.03] active:scale-[0.98]',
   secondary:
-    'border border-[var(--color-border)] bg-[var(--color-glass-bg)] text-[var(--color-text-primary)] backdrop-blur-sm hover:bg-white/[0.06] hover:border-[var(--color-border-hover)] active:scale-[0.98]',
+    'border border-[var(--color-border)] bg-[var(--color-glass-bg)] text-[var(--color-text-primary)] backdrop-blur-sm hover:-translate-y-px hover:border-[var(--color-border-hover)] hover:bg-[var(--color-hover-surface)] active:scale-[0.98]',
   ghost:
-    'text-[var(--color-text-primary)] hover:bg-white/[0.06] active:scale-[0.98]',
+    'text-[var(--color-text-primary)] hover:bg-[var(--color-hover-surface)] active:scale-[0.98]',
   danger: 'bg-[var(--color-danger)] text-white hover:brightness-110 active:scale-[0.98]',
 };
 

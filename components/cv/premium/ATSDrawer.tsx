@@ -77,7 +77,7 @@ export function ATSDrawer({ open, onOpenChange, report }: ATSDrawerProps) {
               <button
                 type="button"
                 onClick={() => onOpenChange(false)}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--color-border)] bg-white/[0.04] text-[var(--color-muted)] transition hover:bg-white/[0.08] hover:text-[var(--color-text-primary)]"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-control-bg)] text-[var(--color-muted)] transition duration-200 hover:bg-[var(--color-control-bg-hover)] hover:text-[var(--color-text-primary)]"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -96,7 +96,7 @@ export function ATSDrawer({ open, onOpenChange, report }: ATSDrawerProps) {
                     CV strength
                   </span>
                 </div>
-                <Progress value={score} className="mt-3 h-2 bg-white/[0.06]" />
+                <Progress value={score} className="mt-3 h-2" />
               </div>
 
               {summary ? (
@@ -113,7 +113,7 @@ export function ATSDrawer({ open, onOpenChange, report }: ATSDrawerProps) {
                     {suggestions.map((s, i) => (
                       <li
                         key={`${i}-${s.slice(0, 24)}`}
-                        className="rounded-lg border border-[var(--color-border)]/60 bg-white/[0.03] px-3 py-2 leading-relaxed text-[var(--color-text-primary)]"
+                        className="rounded-lg border border-[var(--color-border)]/60 bg-[var(--color-surface-faint)] px-3 py-2 leading-relaxed text-[var(--color-text-primary)]"
                       >
                         {s}
                       </li>
@@ -127,7 +127,7 @@ export function ATSDrawer({ open, onOpenChange, report }: ATSDrawerProps) {
               <button
                 type="button"
                 onClick={() => setSectionsOpen((v) => !v)}
-                className="mt-6 flex w-full items-center justify-between rounded-xl border border-[var(--color-border)] bg-white/[0.03] px-3 py-2.5 text-left text-sm font-medium text-[var(--color-text-primary)] transition hover:bg-white/[0.06]"
+                className="mt-6 flex w-full items-center justify-between rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-faint)] px-3 py-2.5 text-left text-sm font-medium text-[var(--color-text-primary)] transition duration-200 hover:bg-[var(--color-hover-surface)]"
               >
                 Section scores
                 {sectionsOpen ? (
@@ -142,7 +142,7 @@ export function ATSDrawer({ open, onOpenChange, report }: ATSDrawerProps) {
                   {Object.entries(sections).map(([name, fb]) => (
                     <li
                       key={name}
-                      className="rounded-xl border border-[var(--color-border)]/70 bg-white/[0.02] p-3"
+                      className="rounded-xl border border-[var(--color-border)]/70 bg-[var(--color-surface-faint)] p-3"
                     >
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-xs font-semibold capitalize text-[var(--color-text-primary)]">

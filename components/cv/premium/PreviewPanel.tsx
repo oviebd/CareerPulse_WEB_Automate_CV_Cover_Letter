@@ -91,7 +91,7 @@ export function PreviewPanel(props: PreviewPanelProps) {
         <button
           type="button"
           onClick={onToggleCollapse}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-border)] bg-white/[0.04] px-2 py-1 text-xs font-medium text-[var(--color-muted)] transition hover:bg-white/[0.08]"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-control-bg)] px-2 py-1 text-xs font-medium text-[var(--color-muted)] transition duration-200 hover:bg-[var(--color-control-bg-hover)]"
         >
           <ChevronDown className="h-3.5 w-3.5" aria-hidden />
           Expand
@@ -103,7 +103,7 @@ export function PreviewPanel(props: PreviewPanelProps) {
   return (
     <aside
       className={cn(
-        'glass-panel sticky z-10 h-[calc(100vh-4.5rem)] w-full rounded-2xl border border-[var(--color-border)]/80 p-4 shadow-[0_8px_30px_rgba(0,0,0,0.06)]',
+        'glass-panel sticky z-10 h-[calc(100vh-4.5rem)] w-full rounded-2xl border border-[var(--color-border)] border-l-[3px] border-l-[var(--color-primary-400)] p-4 shadow-[var(--shadow-card)]',
         stickyTopClass
       )}
     >
@@ -116,7 +116,7 @@ export function PreviewPanel(props: PreviewPanelProps) {
                 type="button"
                 title="Collapse preview"
                 onClick={onToggleCollapse}
-                className="rounded-lg border border-[var(--color-border)] bg-white/[0.04] p-1.5 text-[var(--color-muted)] transition hover:bg-white/[0.08]"
+                className="rounded-lg border border-[var(--color-border)] bg-[var(--color-control-bg)] p-1.5 text-[var(--color-muted)] transition duration-200 hover:bg-[var(--color-control-bg-hover)]"
               >
                 <ChevronUp className="h-4 w-4" aria-hidden />
               </button>
@@ -124,7 +124,7 @@ export function PreviewPanel(props: PreviewPanelProps) {
           <div className="flex items-center gap-2 font-mono text-xs text-[var(--color-muted)]">
             <button
               type="button"
-              className="rounded-btn border border-[var(--color-border)] bg-white/[0.06] px-2 py-1 transition hover:bg-white/[0.1]"
+              className="rounded-btn border border-[var(--color-border)] bg-[var(--color-control-bg)] px-2 py-1 transition duration-200 hover:bg-[var(--color-control-bg-hover)]"
               onClick={() => onZoomChange(Math.max(70, zoom - 10))}
             >
               -
@@ -132,7 +132,7 @@ export function PreviewPanel(props: PreviewPanelProps) {
             <span className="min-w-[3ch] text-center">{zoom}%</span>
             <button
               type="button"
-              className="rounded-btn border border-[var(--color-border)] bg-white/[0.06] px-2 py-1 transition hover:bg-white/[0.1]"
+              className="rounded-btn border border-[var(--color-border)] bg-[var(--color-control-bg)] px-2 py-1 transition duration-200 hover:bg-[var(--color-control-bg-hover)]"
               onClick={() => onZoomChange(Math.min(140, zoom + 10))}
             >
               +
@@ -145,9 +145,9 @@ export function PreviewPanel(props: PreviewPanelProps) {
           ref={scrollRef}
           className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden pr-1"
         >
-          <div className="relative w-full rounded-xl border border-[var(--color-border)] bg-slate-50/50 shadow-inner">
+          <div className="relative w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-preview-well)] shadow-inner">
             {previewBusy ? (
-              <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/80 text-sm text-[var(--color-muted)] backdrop-blur-sm">
+              <div className="absolute inset-0 z-10 flex items-center justify-center bg-[var(--color-preview-overlay)] text-sm text-[var(--color-muted)] backdrop-blur-sm">
                 <div className="flex flex-col items-center gap-2">
                   <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--color-primary-400)] border-t-transparent" />
                   <span>Updating preview…</span>
@@ -214,7 +214,7 @@ export function PreviewPanel(props: PreviewPanelProps) {
           <button
             type="button"
             disabled={currentPage <= 1}
-            className="flex items-center gap-1 rounded-btn border border-[var(--color-border)] bg-white/[0.06] px-3 py-1.5 transition hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-30"
+            className="flex items-center gap-1 rounded-btn border border-[var(--color-border)] bg-[var(--color-control-bg)] px-3 py-1.5 transition duration-200 hover:bg-[var(--color-control-bg-hover)] disabled:cursor-not-allowed disabled:opacity-30"
             onClick={() => onPageChange(Math.max(1, currentPage - 1))}
           >
             Previous
@@ -229,7 +229,7 @@ export function PreviewPanel(props: PreviewPanelProps) {
           <button
             type="button"
             disabled={!previewIsPdf && currentPage >= pngPageCount}
-            className="flex items-center gap-1 rounded-btn border border-[var(--color-border)] bg-white/[0.06] px-3 py-1.5 transition hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-30"
+            className="flex items-center gap-1 rounded-btn border border-[var(--color-border)] bg-[var(--color-control-bg)] px-3 py-1.5 transition duration-200 hover:bg-[var(--color-control-bg-hover)] disabled:cursor-not-allowed disabled:opacity-30"
             onClick={() =>
               previewIsPdf
                 ? onPageChange(currentPage + 1)

@@ -1,4 +1,4 @@
-/** Shared class strings for CV editor surfaces (dark theme). */
+/** Shared class strings for CV editor surfaces (theme tokens). */
 
 /*
   Layout note (2026 refactor): The previous core editor used a 2-column split (editor vs. wide preview + always-visible ATS).
@@ -12,15 +12,15 @@ export const CV_FORM_CARD =
 
 /** Primary editing canvas — extra breathing room vs. the legacy card. */
 export const CV_EDITOR_CANVAS =
-  'rounded-2xl border border-[var(--color-border)]/75 bg-[var(--color-surface)]/95 p-4 shadow-[0_8px_30px_rgba(0,0,0,0.05)] backdrop-blur-sm sm:p-6';
+  'rounded-2xl border border-[var(--color-border)]/80 bg-[var(--color-surface)] p-4 shadow-[var(--shadow-card)] backdrop-blur-sm sm:p-6';
 
 export const CV_SECTION_H2 = 'font-display text-lg font-semibold text-[var(--color-text-primary)]';
 
 export const CV_INPUT =
-  'rounded-btn border border-[var(--color-border)] bg-[var(--color-input-bg)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-muted)] focus:border-[var(--color-primary-500)] focus:shadow-[0_0_0_3px_rgba(108,99,255,0.2)]';
+  'rounded-btn border border-[var(--color-border)] bg-[var(--color-input-bg)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none transition duration-200 placeholder:text-[var(--color-muted)] focus:border-[var(--color-primary-500)] focus:shadow-[0_0_0_3px_var(--color-focus-ring)]';
 
 export const CV_TEXTAREA =
-  'w-full rounded-btn border border-[var(--color-border)] bg-[var(--color-input-bg)] px-4 py-3 text-sm text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-muted)] focus:border-[var(--color-primary-500)] focus:shadow-[0_0_0_3px_rgba(108,99,255,0.2)]';
+  'w-full rounded-btn border border-[var(--color-border)] bg-[var(--color-input-bg)] px-4 py-3 text-sm text-[var(--color-text-primary)] outline-none transition duration-200 placeholder:text-[var(--color-muted)] focus:border-[var(--color-primary-500)] focus:shadow-[0_0_0_3px_var(--color-focus-ring)]';
 
 export const CV_NESTED_CARD =
   'rounded-card border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm';

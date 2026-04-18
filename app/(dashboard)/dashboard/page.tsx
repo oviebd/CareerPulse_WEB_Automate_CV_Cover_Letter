@@ -173,7 +173,7 @@ export default function DashboardPage() {
                 <motion.li
                   key={l.id}
                   variants={reduce ? undefined : fadeUp}
-                  className="flex items-center justify-between rounded-lg border border-[var(--color-border)] p-3 text-sm transition hover:bg-white/[0.04]"
+                  className="flex items-center justify-between rounded-lg border border-[var(--color-border)] p-3 text-sm transition hover:bg-[var(--color-hover-surface)]"
                 >
                   <div>
                     <div className="font-medium">{l.name || 'Cover letter'}</div>
@@ -264,7 +264,7 @@ export default function DashboardPage() {
           </Card>
         ) : null}
         {apps.length === 0 && limits.trackerAccess ? (
-          <Card padding="sm" className="border-[var(--color-border)] bg-white/[0.02]">
+          <Card padding="sm" className="border-[var(--color-border)] bg-[var(--color-surface-faint)]">
             <p className="text-sm font-medium text-[var(--color-text-primary)]">Track your applications</p>
             <Link href="/tracker" className="mt-2 text-xs text-[var(--color-primary)]">
               Open board

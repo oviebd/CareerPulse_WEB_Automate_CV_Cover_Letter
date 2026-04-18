@@ -14,6 +14,7 @@ export type CoreCVVersion = {
   completion_percentage: number;
   is_complete: boolean;
   created_at: string;
+  updated_at: string;
   preferred_template_id: string | null;
 };
 
@@ -33,6 +34,7 @@ export function useCoreCVVersions() {
         completion_percentage: v.completion_percentage,
         is_complete: v.is_complete,
         created_at: v.created_at,
+        updated_at: v.updated_at,
         preferred_template_id: v.preferred_template_id ?? null,
       }));
     },

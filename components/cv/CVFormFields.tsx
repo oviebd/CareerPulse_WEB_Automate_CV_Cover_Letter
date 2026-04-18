@@ -1073,7 +1073,7 @@ export function CVFormFields(props: Props) {
                         className={
                           isHighlighted
                             ? 'rounded-badge border border-[var(--color-accent-gold)]/40 bg-[var(--color-accent-gold)]/20 px-2 py-0.5 text-xs font-medium text-[var(--color-accent-gold)]'
-                            : 'rounded-badge border border-[var(--color-border)] bg-white/[0.06] px-2 py-0.5 text-xs text-[var(--color-muted)]'
+                            : 'rounded-badge border border-[var(--color-border)] bg-[var(--color-control-bg)] px-2 py-0.5 text-xs text-[var(--color-muted)]'
                         }
                       >
                         {skill}

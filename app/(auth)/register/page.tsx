@@ -11,7 +11,7 @@ export default async function RegisterPage({
 
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
-      <div className="hidden flex-col justify-between border-r border-[var(--color-border)] bg-gradient-to-br from-[#13131a] via-[#0d0d12] to-[#0a0a0f] p-10 lg:flex">
+      <div className="hidden flex-col justify-between border-r border-[var(--color-border)] bg-gradient-to-br from-[var(--auth-hero-from)] via-[var(--auth-hero-via)] to-[var(--auth-hero-to)] p-10 lg:flex">
         <div>
           <p className="font-display text-lg font-semibold text-[var(--color-text-primary)]">
             CareerPulse

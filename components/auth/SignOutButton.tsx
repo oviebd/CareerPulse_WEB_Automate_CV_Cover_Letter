@@ -38,7 +38,7 @@ export function SignOutButton({ className }: { className?: string }) {
       onClick={() => void signOut()}
       disabled={loading}
       className={cn(
-        'rounded-btn border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-white/[0.06] disabled:opacity-60',
+        'rounded-btn border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-hover-surface)] disabled:opacity-60',
         className
       )}
     >

@@ -127,7 +127,7 @@ export function RegisterForm({ returnTo }: { returnTo?: string }) {
         type="button"
         onClick={() => void onGoogle()}
         disabled={loading}
-        className="flex w-full items-center justify-center gap-3 rounded-btn border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-sm font-medium text-[var(--color-text-primary)] shadow-sm transition hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-60"
+        className="flex w-full items-center justify-center gap-3 rounded-btn border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-sm font-medium text-[var(--color-text-primary)] shadow-sm transition hover:bg-[var(--color-hover-surface)] disabled:cursor-not-allowed disabled:opacity-60"
       >
         <GoogleIcon />
         {loading ? 'Redirecting…' : 'Continue with Google'}

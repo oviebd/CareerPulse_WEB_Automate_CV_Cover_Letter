@@ -21,6 +21,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { ProfileMenu } from '@/components/shared/ProfileMenu';
+import { ThemeToggle } from '@/components/shared/ThemeToggle';
 import { cn } from '@/lib/utils';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useTrackedJobsCount } from '@/hooks/useTracker';
@@ -108,7 +109,7 @@ function NavLinkContent({
     return (
       <div className="space-y-1">
         <div className={cn(
-          "flex items-center gap-2 px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-muted)]",
+          "flex items-center gap-2 px-3 pb-1 pt-2 text-[11px] font-bold uppercase tracking-wider text-[var(--color-text-secondary)]",
           collapsed && "justify-center px-0"
         )}>
           <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
@@ -130,10 +131,14 @@ function NavLinkContent({
                   href={child.href}
                   onClick={onNavigate}
                   className={cn(
-                    'flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-all duration-200',
+                    'relative flex items-center gap-2 rounded-lg py-2 pl-3 pr-3 text-sm font-semibold transition-all duration-200 ease-out',
+                    !collapsed &&
+                      'before:pointer-events-none before:absolute before:left-0 before:top-1/2 before:h-[70%] before:w-[3px] before:-translate-y-1/2 before:rounded-full before:bg-[var(--color-primary-500)] before:transition-opacity before:duration-200',
+                    !collapsed && !childActive && 'before:opacity-0',
+                    !collapsed && childActive && 'before:opacity-100',
                     childActive
-                      ? 'bg-[var(--color-primary-100)] text-[var(--color-primary-400)]'
-                      : 'text-[var(--color-muted)] hover:bg-white/[0.04] hover:text-[var(--color-text-primary)]'
+                      ? 'bg-[var(--color-primary-100)] text-[var(--color-primary-500)]'
+                      : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-hover-surface)] hover:text-[var(--color-text-primary)]'
                   )}
                 >
                   <ChildIcon className="h-4 w-4 shrink-0 opacity-90" />
@@ -159,11 +164,15 @@ function NavLinkContent({
       onClick={onNavigate}
       title={collapsed ? item.label : undefined}
       className={cn(
-        'flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 active:scale-[0.99]',
-        collapsed ? 'justify-center px-0' : 'px-3',
+        'relative flex items-center gap-2 rounded-lg py-2.5 text-sm font-semibold transition-all duration-200 ease-out active:scale-[0.98]',
+        collapsed ? 'justify-center px-0' : 'pl-3 pr-3',
+        !collapsed &&
+          'before:pointer-events-none before:absolute before:left-0 before:top-1/2 before:h-[65%] before:w-[3px] before:-translate-y-1/2 before:rounded-full before:bg-[var(--color-primary-500)] before:transition-opacity before:duration-200',
+        !collapsed && !active && 'before:opacity-0',
+        !collapsed && active && 'before:opacity-100',
         active
-          ? 'bg-[var(--color-primary-100)] text-[var(--color-primary-400)] shadow-[0_0_0_1px_rgba(108,99,255,0.2)]'
-          : 'text-[var(--color-muted)] hover:bg-white/[0.04] hover:text-[var(--color-text-primary)]'
+          ? 'bg-[var(--color-primary-100)] text-[var(--color-primary-500)] shadow-[var(--shadow-nav-active-glow)]'
+          : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-hover-surface)] hover:text-[var(--color-text-primary)]'
       )}
     >
       <Icon className="h-4 w-4 shrink-0" />
@@ -215,8 +224,8 @@ export function AppHeader() {
       {/* Desktop: fixed sidebar */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-[var(--color-border)] bg-[var(--color-surface)]/90 backdrop-blur-xl transition-all duration-300 lg:flex",
-          sidebarCollapsed ? "w-20" : "w-64"
+          'fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm backdrop-blur-xl transition-all duration-300 ease-out lg:flex',
+          sidebarCollapsed ? 'w-20' : 'w-64'
         )}
       >
         <div className={cn(
@@ -227,8 +236,8 @@ export function AppHeader() {
           <button
             type="button"
             className={cn(
-              "group rounded-btn flex items-center justify-center p-2 text-[var(--color-muted)] transition-all hover:bg-white/[0.06] hover:text-[var(--color-text-primary)] active:scale-90",
-              sidebarCollapsed ? "mt-2" : ""
+              'group rounded-btn flex items-center justify-center p-2 text-[var(--color-muted)] transition-all duration-200 hover:bg-[var(--color-hover-surface)] hover:text-[var(--color-text-primary)] active:scale-95',
+              sidebarCollapsed ? 'mt-2' : ''
             )}
             onClick={toggleSidebar}
             title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
@@ -252,11 +261,14 @@ export function AppHeader() {
             />
           ))}
         </nav>
-        <div className="shrink-0 border-t border-[var(--color-border)] p-3">
-          <div className={cn(
-            "flex items-center justify-center",
-            !sidebarCollapsed && "justify-end"
-          )}>
+        <div className="shrink-0 space-y-3 border-t border-[var(--color-border)] p-3">
+          <ThemeToggle collapsed={sidebarCollapsed} />
+          <div
+            className={cn(
+              'flex items-center justify-center',
+              !sidebarCollapsed && 'justify-end'
+            )}
+          >
             <ProfileMenu />
           </div>
         </div>
@@ -269,7 +281,7 @@ export function AppHeader() {
           <ProfileMenu />
           <button
             type="button"
-            className="rounded-btn p-2 text-[var(--color-text-primary)] transition hover:bg-white/[0.06] active:scale-95"
+            className="rounded-btn p-2 text-[var(--color-text-primary)] transition duration-200 hover:bg-[var(--color-hover-surface)] active:scale-95"
             onClick={toggleMobileMenu}
             aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
             aria-expanded={mobileMenuOpen}
@@ -305,7 +317,7 @@ export function AppHeader() {
                 </span>
                 <button
                   type="button"
-                  className="rounded-btn p-2 text-[var(--color-muted)] hover:bg-white/[0.06] hover:text-[var(--color-text-primary)]"
+                  className="rounded-btn p-2 text-[var(--color-muted)] transition duration-200 hover:bg-[var(--color-hover-surface)] hover:text-[var(--color-text-primary)]"
                   onClick={() => setMobileMenuOpen(false)}
                   aria-label="Close menu"
                 >
@@ -324,6 +336,9 @@ export function AppHeader() {
                   />
                 ))}
               </nav>
+              <div className="border-t border-[var(--color-border)] px-3 pb-2">
+                <ThemeToggle />
+              </div>
               <p className="border-t border-[var(--color-border)] px-4 py-3 text-xs text-[var(--color-muted)]">
                 Account and billing live in the profile menu (top right).
               </p>

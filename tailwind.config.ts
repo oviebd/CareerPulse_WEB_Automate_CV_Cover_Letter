@@ -45,8 +45,8 @@ const config: Config = {
         xl: "var(--shadow-xl)",
       },
       fontFamily: {
-        sans: ["var(--font-dm-sans)", "ui-sans-serif", "system-ui", "sans-serif"],
-        display: ["var(--font-clash)", "var(--font-dm-sans)", "ui-sans-serif", "sans-serif"],
+        sans: ["var(--font-inter)", "ui-sans-serif", "system-ui", "sans-serif"],
+        display: ["var(--font-clash)", "var(--font-inter)", "ui-sans-serif", "sans-serif"],
         mono: ["var(--font-jetbrains-mono)", "ui-monospace", "monospace"],
       },
     },

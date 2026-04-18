@@ -454,7 +454,7 @@ export function CVEditor() {
   }
 
   return (
-    <div className="mx-auto max-w-[1800px] pb-8">
+    <div className="cv-editor-text-tune mx-auto max-w-[1800px] pb-8">
       <CVEditorTopBar
         backHref="/cv"
         title="Core CV"
@@ -521,7 +521,12 @@ export function CVEditor() {
         ) : null}
 
         {focusMode !== 'preview' ? (
-          <div className="min-w-0 space-y-3">
+          <div
+            className={cn(
+              'min-w-0 space-y-3',
+              focusMode === 'default' && 'xl:border-r xl:border-[var(--color-border)] xl:pr-3'
+            )}
+          >
             <div className={CV_EDITOR_CANVAS}>
               <CVEditorPanel
                 value={cvData}

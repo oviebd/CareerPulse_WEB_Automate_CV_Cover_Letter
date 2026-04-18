@@ -84,7 +84,7 @@ export function KeywordPopover({
             <button
               type="button"
               onClick={() => onOpenChange(false)}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--color-border)] bg-white/[0.04] text-[var(--color-muted)] transition hover:bg-white/[0.08]"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-control-bg)] text-[var(--color-muted)] transition duration-200 hover:bg-[var(--color-control-bg-hover)]"
             >
               <X className="h-4 w-4" />
             </button>

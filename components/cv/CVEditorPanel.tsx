@@ -100,7 +100,7 @@ export function CVEditorPanel({
               {ats.score}/100
             </span>
           </div>
-          <Progress value={ats.score} className="mt-3 h-2.5 bg-white/[0.08]" />
+          <Progress value={ats.score} className="mt-3 h-2.5" />
           {ats.suggestions.length > 0 ? (
             <ul className="mt-3 list-inside list-disc space-y-1 text-sm text-[var(--color-muted)]">
               {ats.suggestions.slice(0, 4).map((item) => (

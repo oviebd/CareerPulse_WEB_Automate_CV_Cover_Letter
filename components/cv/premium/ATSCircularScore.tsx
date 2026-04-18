@@ -113,7 +113,7 @@ export function ATSCircularScore({
             transition={{ duration: 0.3, ease: "easeInOut" }}
             className="overflow-hidden"
           >
-            <div className="mt-5 space-y-3 rounded-2xl border border-white/[0.05] bg-white/[0.03] p-4">
+            <div className="mt-5 space-y-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-faint)] p-4">
               <div className="flex items-center gap-2 border-b border-white/5 pb-2">
                 <Sparkles className="h-3.5 w-3.5 text-[var(--color-accent-mint)]" />
                 <span className="text-[10px] font-bold uppercase tracking-widest text-white/70">

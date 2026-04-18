@@ -133,14 +133,14 @@ function CollapsibleNavGroup({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left transition hover:bg-white/[0.04]"
+        className="flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left transition duration-200 hover:bg-[var(--color-hover-surface)]"
       >
         <span>
-          <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-muted)]">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-text-secondary)]">
             {title}
           </span>
           {hint ? (
-            <span className="mt-0.5 block text-[10px] font-normal normal-case tracking-normal text-[var(--color-muted)]/90">
+            <span className="mt-0.5 block text-[10px] font-medium normal-case tracking-normal text-[var(--color-muted)]">
               {hint}
             </span>
           ) : null}
@@ -189,18 +189,20 @@ export function Sidebar({
       <div
         key={item.id}
         className={cn(
-          'flex w-full items-center gap-1 rounded-xl px-1 py-0.5 transition duration-200',
-          active ? 'bg-[var(--color-primary-100)]/70 shadow-sm ring-1 ring-[var(--color-primary-200)]/40' : 'hover:bg-white/[0.03]'
+          'flex w-full items-center gap-1 rounded-xl px-1 py-0.5 transition duration-200 ease-out',
+          active
+            ? 'cv-sidebar-row-active bg-[var(--color-primary-100)]/80 shadow-sm ring-1 ring-[var(--color-primary-200)]/45'
+            : 'hover:bg-[var(--color-hover-surface)]'
         )}
       >
         <button
           type="button"
           onClick={() => onSelect(item.id)}
           className={cn(
-            'flex min-w-0 flex-1 items-center gap-2 rounded-lg border-l-2 px-2 py-1.5 text-left text-sm transition duration-200',
+            'flex min-w-0 flex-1 items-center gap-2 rounded-lg border-l-2 px-2 py-1.5 text-left text-sm font-semibold transition duration-200',
             active
-              ? 'border-[var(--color-primary-400)] font-medium text-[var(--color-primary-400)]'
-              : 'border-transparent text-[var(--color-muted)] hover:text-[var(--color-text-primary)]'
+              ? 'border-[var(--color-primary-400)] text-[var(--color-primary-400)]'
+              : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
           )}
         >
           <Icon className="h-4 w-4 shrink-0" />
@@ -233,10 +235,10 @@ export function Sidebar({
           type="button"
           onClick={() => onSelect('design')}
           className={cn(
-            'flex w-full items-center gap-2 rounded-xl border-l-2 px-3 py-2 text-left text-sm transition duration-200',
+            'flex w-full items-center gap-2 rounded-xl border-l-2 px-3 py-2 text-left text-sm font-semibold transition duration-200',
             activeSection === 'design'
-              ? 'border-[var(--color-primary-400)] bg-[var(--color-primary-100)]/80 font-medium text-[var(--color-primary-400)] shadow-sm'
-              : 'border-transparent text-[var(--color-muted)] hover:bg-white/[0.04] hover:text-[var(--color-text-primary)]'
+              ? 'border-[var(--color-primary-500)] bg-[var(--color-primary-100)]/90 text-[var(--color-primary-500)] shadow-sm'
+              : 'border-transparent text-[var(--color-text-secondary)] hover:bg-[var(--color-hover-surface)] hover:text-[var(--color-text-primary)]'
           )}
         >
           <Palette className="h-4 w-4 shrink-0" />

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { MeshBackground } from '@/components/layout/MeshBackground';
+import { MarketingThemeToggle } from '@/components/shared/MarketingThemeToggle';
 
 export const revalidate = 3600;
 
@@ -16,20 +17,21 @@ export default function MarketingLayout({
           <Link href="/" className="font-display text-sm font-semibold tracking-tight">
             CareerPulse
           </Link>
-          <nav className="flex gap-6 text-sm font-medium">
+          <nav className="flex flex-wrap items-center justify-end gap-4 text-sm font-medium sm:gap-6">
+            <MarketingThemeToggle />
             <Link
               href="/pricing"
-              className="text-[var(--color-muted)] transition hover:text-[var(--color-primary)]"
+              className="text-[var(--color-muted)] transition duration-200 hover:text-[var(--color-primary)]"
             >
               Pricing
             </Link>
             <Link
               href="/blog"
-              className="text-[var(--color-muted)] transition hover:text-[var(--color-primary)]"
+              className="text-[var(--color-muted)] transition duration-200 hover:text-[var(--color-primary)]"
             >
               Blog
             </Link>
-            <Link href="/login" className="text-[var(--color-primary)]">
+            <Link href="/login" className="font-semibold text-[var(--color-primary)]">
               Sign in
             </Link>
           </nav>

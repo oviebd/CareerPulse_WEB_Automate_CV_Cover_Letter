@@ -13,7 +13,7 @@ export function Progress({
   return (
     <div
       className={cn(
-        'h-2 w-full overflow-hidden rounded-full bg-white/[0.08]',
+        'h-2 w-full overflow-hidden rounded-full bg-[var(--color-progress-track)]',
         className
       )}
     >

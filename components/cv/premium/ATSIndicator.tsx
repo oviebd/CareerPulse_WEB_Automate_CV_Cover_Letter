@@ -40,11 +40,11 @@ export function ATSIndicator({
             {score}/100
           </p>
         </div>
-        <span className="rounded-badge border border-[var(--color-border)] bg-white/[0.06] px-3 py-1 text-xs font-medium text-[var(--color-text-primary)]">
+        <span className="rounded-badge border border-[var(--color-border)] bg-[var(--color-control-bg)] px-3 py-1 text-xs font-medium text-[var(--color-text-primary)]">
           {getLabel(score)}
         </span>
       </div>
-      <Progress value={score} className="mt-3 h-2.5 bg-white/[0.08]" />
+      <Progress value={score} className="mt-3 h-2.5" />
       {topSuggestions.length > 0 ? (
         <div className="mt-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]/50 px-3 py-2.5">
           <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-muted)]">

@@ -29,7 +29,7 @@ import { cn } from '@/lib/utils';
 import type { GenerationType, JobStatus } from '@/types';
 
 const btnSecondarySm =
-  'inline-flex min-w-[88px] items-center justify-center gap-2 rounded-btn border border-[var(--color-border)] bg-[var(--color-glass-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--color-text-primary)] backdrop-blur-sm transition hover:bg-white/[0.06] hover:border-[var(--color-border-hover)] active:scale-[0.98]';
+  'inline-flex min-w-[88px] items-center justify-center gap-2 rounded-btn border border-[var(--color-border)] bg-[var(--color-glass-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--color-text-primary)] backdrop-blur-sm transition hover:bg-[var(--color-hover-surface)] hover:border-[var(--color-border-hover)] active:scale-[0.98]';
 
 const CV_DOC_WIDTH = 794;
 const CV_DOC_HEIGHT = 1123;
