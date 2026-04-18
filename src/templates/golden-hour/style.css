@@ -139,6 +139,15 @@
   margin-bottom: 8pt;
 }
 
+.tpl-golden-hour .golden-remote {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
 .tpl-golden-hour .golden-main {
   padding: 16pt 18pt;
 }

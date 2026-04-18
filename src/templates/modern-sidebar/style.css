@@ -1,0 +1,165 @@
+.tpl-modern-sidebar {
+  --accent: #4f8ef7;
+  --sidebar-bg: #1b2137;
+  --sidebar-text: #a8b4cf;
+  --sidebar-head: #4f8ef7;
+  --bar-track: #2e3a56;
+  --body-text: #333;
+  --heading-text: #1b2137;
+  --border: #f0f0f0;
+}
+
+.tpl-modern-sidebar.cv-page {
+  font-family: Inter, system-ui, sans-serif;
+  color: var(--body-text);
+  background: #fff;
+}
+
+.tpl-modern-sidebar .ms-grid {
+  display: grid;
+  grid-template-columns: 35% 1fr;
+  gap: 0;
+  min-height: 100vh;
+  align-items: start;
+}
+
+.tpl-modern-sidebar .ms-side {
+  background: var(--sidebar-bg);
+  color: var(--sidebar-text);
+  padding: 18pt 14pt 24pt;
+  min-height: 100vh;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.tpl-modern-sidebar .ms-photo-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 14pt;
+}
+
+.tpl-modern-sidebar .ms-photo {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid var(--accent);
+  display: block;
+}
+
+.tpl-modern-sidebar .ms-photo--initial {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  font-size: 28px;
+  border: none;
+}
+
+.tpl-modern-sidebar .ms-side-hd {
+  color: var(--sidebar-head);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin: 12pt 0 6pt;
+}
+
+.tpl-modern-sidebar .ms-side-body a {
+  color: var(--sidebar-text);
+}
+
+.tpl-modern-sidebar .ms-skills .skill-cat {
+  color: var(--sidebar-head);
+  font-size: 10px;
+  margin-top: 8pt;
+}
+
+.tpl-modern-sidebar .ms-skills .skill-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.tpl-modern-sidebar .ms-skills .skill-name {
+  color: var(--sidebar-text);
+}
+
+.tpl-modern-sidebar .ms-skills .skill-bar {
+  display: block;
+  height: 4px;
+  background: var(--bar-track);
+  border-radius: 2px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.tpl-modern-sidebar .ms-skills .skill-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+}
+
+.tpl-modern-sidebar .ms-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.tpl-modern-sidebar .ms-pill {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #2e3a56;
+  color: var(--sidebar-text);
+  font-size: 10px;
+}
+
+.tpl-modern-sidebar .ms-main {
+  padding: 20pt 20pt 24pt;
+  min-width: 0;
+}
+
+.tpl-modern-sidebar .ms-main-head {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 12pt;
+  margin-bottom: 12pt;
+}
+
+.tpl-modern-sidebar .ms-name {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--heading-text);
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tpl-modern-sidebar .ms-title {
+  margin-top: 6px;
+  font-size: 14px;
+  color: #666;
+}
+
+.tpl-modern-sidebar .ms-address {
+  font-size: 11px;
+  color: #555;
+  margin-bottom: 12pt;
+}
+
+.tpl-modern-sidebar .ms-main .cv-section-title {
+  color: var(--heading-text);
+  border-bottom-color: var(--border);
+}
+
+@media print {
+  .tpl-modern-sidebar .ms-side {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

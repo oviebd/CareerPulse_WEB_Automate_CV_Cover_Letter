@@ -133,6 +133,61 @@
   margin-top: 2pt;
 }
 
+.tpl-violet-edge .violet-exp-date {
+  font-size: 11px;
+  color: #6b7280;
+  margin-top: 2pt;
+}
+
+.tpl-violet-edge .violet-remote {
+  font-weight: 600;
+  color: var(--accent-mid);
+}
+
+.tpl-violet-edge .violet-proj-role {
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.tpl-violet-edge .violet-proj-date {
+  font-size: 10px;
+  color: #9ca3af;
+}
+
+.tpl-violet-edge .violet-cert-line {
+  margin-bottom: 8pt;
+}
+
+.tpl-violet-edge .violet-cert-name {
+  font-weight: 700;
+  color: var(--heading-text);
+}
+
+.tpl-violet-edge .violet-cert-meta {
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.tpl-violet-edge .violet-cert-id,
+.tpl-violet-edge .violet-cert-exp {
+  font-size: 10px;
+  color: #9ca3af;
+}
+
+.tpl-violet-edge .violet-interest-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4pt;
+}
+
+.tpl-violet-edge .violet-interest-pill {
+  font-size: 10px;
+  padding: 3pt 8pt;
+  border-radius: 999px;
+  background: #5b3aa0;
+  color: var(--accent-light);
+}
+
 .tpl-violet-edge .violet-proj-card {
   background: #f5f3ff;
   border-left: 6px solid var(--accent-mid);

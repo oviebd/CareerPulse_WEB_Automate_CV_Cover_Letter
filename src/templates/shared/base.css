@@ -74,6 +74,75 @@ a {
   background: var(--cv-accent, #6366f1);
 }
 
+.photo-circle,
+.initials-circle {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
+.initials-circle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 500;
+  font-size: 18px;
+  color: #fff;
+}
+
+.skill-bar-track {
+  background: #e2e8f0;
+  height: 4px;
+  border-radius: 2px;
+  width: 100%;
+}
+
+.skill-bar-fill {
+  background: var(--cv-accent, #6366f1);
+  height: 100%;
+  border-radius: 2px;
+}
+
+.cv-remote-badge {
+  display: inline-block;
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #f1f5f9;
+  color: #475569;
+  margin-top: 4px;
+}
+
+.pub-status {
+  font-size: 8px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #64748b;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: #f1f5f9;
+}
+
+.cv-honor-chips {
+  margin-top: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.cv-honor-chip {
+  font-size: 8px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #f1f5f9;
+  color: #334155;
+}
+
 .watermark {
   position: fixed;
   bottom: 8mm;

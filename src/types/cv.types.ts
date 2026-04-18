@@ -11,6 +11,9 @@ export type TemplateId =
   | 'healthcare'
   | 'amber-strike'
   | 'midnight-pro'
+  | 'midnight-navy'
+  | 'modern-sidebar'
+  | 'bold-charcoal'
   | 'golden-hour'
   | 'ocean-slate'
   | 'violet-edge';

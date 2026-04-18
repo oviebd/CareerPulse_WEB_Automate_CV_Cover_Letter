@@ -84,7 +84,9 @@
   function sectionHiddenByUser(key, d) {
     var vis = d.sectionVisibility;
     if (!vis) return false;
-    return vis[key] === false;
+    if (vis[key] === false) return true;
+    if (key === 'references' && vis.referrals === false) return true;
+    return false;
   }
 
   /** Hide: user turned section off, template hide-if-empty, or no content (no bare headers). */
@@ -92,8 +94,28 @@
     if (sectionHiddenByUser(key, d)) return true;
     if (hideKey(key, cfg, d)) return true;
     // Header may still show contact links if name is empty — only hide via visibility/hideKey.
-    if (key !== 'personal' && key !== 'summary' && isEmpty(key, d)) return true;
+    if (
+      key !== 'personal' &&
+      key !== 'summary' &&
+      key !== 'references' &&
+      isEmpty(key, d)
+    )
+      return true;
     return false;
+  }
+
+  /**
+   * Section visibility for template rendering (catalog key + editor `referrals` for references).
+   */
+  function isSectionVisible(sectionKey, d, cfg) {
+    if (!d) return false;
+    if (sectionHiddenByUser(sectionKey, d)) return false;
+    if (hideKey(sectionKey, cfg || {}, d)) return false;
+    if (sectionKey === 'personal' || sectionKey === 'summary') return true;
+    if (sectionKey === 'references') {
+      return true;
+    }
+    return !isEmpty(sectionKey, d);
   }
 
   var RATING_PCT = { 1: 20, 2: 40, 3: 60, 4: 80, 5: 100 };
@@ -141,6 +163,9 @@
   var PREMIUM_IDS = {
     'amber-strike': true,
     'midnight-pro': true,
+    'midnight-navy': true,
+    'modern-sidebar': true,
+    'bold-charcoal': true,
     'golden-hour': true,
     'ocean-slate': true,
     'violet-edge': true,
@@ -156,6 +181,14 @@
     var p = n.split(/\s+/);
     if (p.length === 1) return { first: p[0], last: '' };
     return { first: p.slice(0, -1).join(' '), last: p[p.length - 1] };
+  }
+
+  function initialsFromName(name) {
+    var sp = splitFullName(name);
+    var a = sp.first ? sp.first.charAt(0).toUpperCase() : '';
+    var b = sp.last ? sp.last.charAt(0).toUpperCase() : '';
+    var s = a + b;
+    return s || nameInitial(name);
   }
 
   function nameInitial(name) {
@@ -270,6 +303,82 @@
     var photoAllowed = !d.sectionVisibility || d.sectionVisibility.photo !== false;
     var showPh = cfg.showPhoto && d.meta && d.meta.showPhoto && photoAllowed;
 
+    function modernSidebar() {
+      var h = '';
+      h += '<div class="cv-two-col cv-premium ms-grid">';
+      h += '<aside class="cv-sidebar ms-side">';
+      h += '<div class="ms-photo-wrap">';
+      if (showPh && p.photo) {
+        h += '<img class="ms-photo" src="' + esc(p.photo) + '" alt="" />';
+      } else if (showPh) {
+        h +=
+          '<span class="ms-photo ms-photo--initial">' +
+          esc(initialsFromName(p.fullName)) +
+          '</span>';
+      }
+      h += '</div>';
+      h += '<div class="ms-side-hd">Contact</div>';
+      h +=
+        '<div class="ms-side-body">' +
+        contactBasicsBlock(p, 'ms-line') +
+        extraPersonalLinksBlock(lk, 'ms-line') +
+        '</div>';
+      if (!shouldSkip('skills', d, cfg)) {
+        h += '<div class="ms-side-hd">Skills</div><div class="ms-skills">';
+        var msSkCfg = {
+          id: cfg.id,
+          showSkillBars: true,
+          hideIfEmpty: cfg.hideIfEmpty || [],
+        };
+        h += renderSkillsBlock(d, msSkCfg, 'skills');
+        h += renderSkillsBlock(d, msSkCfg, 'tools');
+        h += '</div>';
+      }
+      if (!shouldSkip('languages', d, cfg)) {
+        h += '<div class="ms-side-hd">Languages</div><div class="ms-side-body">';
+        (d.languages || []).forEach(function (l) {
+          h +=
+            '<div>' +
+            esc(l.name) +
+            ' · ' +
+            langProfLabel(l.proficiency) +
+            '</div>';
+        });
+        h += '</div>';
+      }
+      if (!shouldSkip('interests', d, cfg)) {
+        h += '<div class="ms-side-hd">Interests</div><div class="ms-pills">';
+        (d.interests || []).forEach(function (x) {
+          if (!String(x || '').trim()) return;
+          h += '<span class="ms-pill">' + esc(x) + '</span>';
+        });
+        h += '</div>';
+      }
+      h += '</aside><main class="cv-main ms-main">';
+      h +=
+        '<header class="ms-main-head"><h1 class="ms-name">' +
+        esc(p.fullName) +
+        '</h1>';
+      if (p.title) h += '<div class="ms-title">' + esc(p.title) + '</div>';
+      h += '</header>';
+      var addrLine = '';
+      if (d.postalAddress && String(d.postalAddress).trim()) {
+        addrLine = String(d.postalAddress).trim();
+      } else if (p.location && String(p.location).trim()) {
+        addrLine = String(p.location).trim();
+      }
+      if (addrLine && !shouldSkip('address', d, cfg)) {
+        h += '<div class="ms-address">' + esc(addrLine) + '</div>';
+      }
+      order.forEach(function (key) {
+        if (key === 'personal') return;
+        if (key === 'skills' || key === 'languages' || key === 'interests') return;
+        h += premiumMainByOrder(tpl, key, d, cfg);
+      });
+      h += '</main></div>';
+      return h;
+    }
+
     function amber() {
       var h = '';
       h += '<div class="cv-two-col cv-premium amber-grid">';
@@ -282,7 +391,7 @@
       } else if (showPh) {
         h +=
           '<span class="amber-photo amber-photo--initial">' +
-          esc(nameInitial(p.fullName)) +
+          esc(initialsFromName(p.fullName)) +
           '</span>';
       }
       h += '</div>';
@@ -369,7 +478,7 @@
       } else if (showPh) {
         h +=
           '<span class="midnight-photo midnight-photo--initial">' +
-          esc(nameInitial(p.fullName)) +
+          esc(initialsFromName(p.fullName)) +
           '</span>';
       }
       h += '</div>';
@@ -441,7 +550,7 @@
       } else if (showPh) {
         h +=
           '<span class="golden-photo golden-photo--initial">' +
-          esc(nameInitial(p.fullName)) +
+          esc(initialsFromName(p.fullName)) +
           '</span>';
       }
       h += '</div>';
@@ -492,9 +601,18 @@
         });
         h += '</div></div>';
       }
+      if (!shouldSkip('interests', d, cfg)) {
+        h += '<div class="golden-side-block">' + goldenSideHdr('◎', 'Interests') + '<div class="golden-pills">';
+        (d.interests || []).forEach(function (x) {
+          if (!String(x || '').trim()) return;
+          h += '<span class="golden-pill">' + esc(x) + '</span>';
+        });
+        h += '</div></div>';
+      }
       h += '</aside><main class="cv-main golden-main">';
       order.forEach(function (key) {
-        if (key === 'personal' || key === 'skills' || key === 'languages') return;
+        if (key === 'personal' || key === 'skills' || key === 'languages' || key === 'interests')
+          return;
         if (key === 'summary' && !shouldSkip('summary', d, cfg)) {
           h +=
             '<section class="cv-section golden-sec"><div class="golden-main-hd"><span class="golden-ico">◆</span><span>Profile</span></div><div class="golden-summary">' +
@@ -518,9 +636,13 @@
             if (e.bullets && e.bullets.length) {
               h += '<ul class="cv-bullets golden-bullets">';
               e.bullets.forEach(function (b) {
+                if (!String(b || '').trim()) return;
                 h += '<li>' + esc(b) + '</li>';
               });
               h += '</ul>';
+            }
+            if (e.remote) {
+              h += '<span class="golden-remote">Remote</span>';
             }
             h += technologiesRow(e.technologies);
             h += '</div></div>';
@@ -564,16 +686,6 @@
           h += '</section>';
           return;
         }
-        if (key === 'interests' && !shouldSkip('interests', d, cfg)) {
-          h +=
-            '<section class="cv-section golden-sec"><div class="golden-main-hd"><span class="golden-ico">◆</span><span>Interests</span></div>';
-          h += '<div class="golden-pills">';
-          (d.interests || []).forEach(function (x) {
-            h += '<span class="golden-pill">' + esc(x) + '</span>';
-          });
-          h += '</div></section>';
-          return;
-        }
         h += premiumMainByOrder(tpl, key, d, cfg);
       });
       h += '</main></div>';
@@ -590,7 +702,7 @@
       } else if (showPh) {
         h +=
           '<span class="ocean-photo ocean-photo--initial">' +
-          esc(nameInitial(p.fullName)) +
+          esc(initialsFromName(p.fullName)) +
           '</span>';
       }
       h += '</div>';
@@ -735,7 +847,7 @@
       } else if (showPh) {
         h +=
           '<span class="violet-banner-img violet-banner-initial">' +
-          esc(nameInitial(p.fullName)) +
+          esc(initialsFromName(p.fullName)) +
           '</span>';
       }
       h += '</div></header>';
@@ -758,12 +870,17 @@
             h +=
               '<div class="violet-exp-meta">' +
               esc(e.company) +
-              ' · ' +
+              (e.location ? ' · ' + esc(e.location) : '') +
+              '</div>';
+            h +=
+              '<div class="violet-exp-date">' +
               range(e.startDate, e.endDate, e.current) +
+              (e.remote ? ' · <span class="violet-remote">Remote</span>' : '') +
               '</div>';
             if (e.bullets && e.bullets.length) {
               h += '<ul class="cv-bullets">';
               e.bullets.forEach(function (b) {
+                if (!String(b || '').trim()) return;
                 h += '<li>' + esc(b) + '</li>';
               });
               h += '</ul>';
@@ -779,7 +896,22 @@
           (d.projects || []).forEach(function (pr) {
             h += '<div class="violet-proj-card cv-card">';
             h += '<div class="violet-proj-name">' + esc(pr.name) + '</div>';
+            if (pr.role) h += '<div class="violet-proj-role">' + esc(pr.role) + '</div>';
+            if (pr.startDate || pr.endDate) {
+              h +=
+                '<div class="violet-proj-date">' +
+                range(pr.startDate || '', pr.endDate || '', false) +
+                '</div>';
+            }
             if (pr.description) h += '<p>' + esc(pr.description) + '</p>';
+            if (pr.bullets && pr.bullets.length) {
+              h += '<ul class="cv-bullets">';
+              pr.bullets.forEach(function (b) {
+                if (!String(b || '').trim()) return;
+                h += '<li>' + esc(b) + '</li>';
+              });
+              h += '</ul>';
+            }
             if (pr.technologies && pr.technologies.length) {
               h += '<div class="violet-proj-tech">';
               pr.technologies.forEach(function (t) {
@@ -787,20 +919,44 @@
               });
               h += '</div>';
             }
+            if (pr.links && pr.links.length) {
+              pr.links.forEach(function (l) {
+                if (!l.url || !String(l.url).trim()) return;
+                h +=
+                  '<div><a href="' +
+                  esc(l.url) +
+                  '">' +
+                  esc(l.label || 'Link') +
+                  '</a></div>';
+              });
+            }
             h += '</div>';
           });
           h += '</section>';
           return;
         }
         if (key === 'certifications' && !shouldSkip('certifications', d, cfg)) {
-          h += '<section class="cv-section violet-sec"><h2 class="violet-h2">Certifications</h2><div class="violet-cert-row">';
+          h += '<section class="cv-section violet-sec"><h2 class="violet-h2">Certifications</h2>';
           (d.certifications || []).forEach(function (c) {
+            h += '<div class="violet-cert-line cv-card">';
+            h += '<div class="violet-cert-name">' + esc(c.name) + '</div>';
             h +=
-              '<span class="violet-cert-badge">' +
-              esc(c.name) +
-              '</span>';
+              '<div class="violet-cert-meta">' +
+              esc(c.issuer) +
+              ' · ' +
+              esc(c.date) +
+              '</div>';
+            if (c.credentialId)
+              h += '<div class="violet-cert-id">' + esc(c.credentialId) + '</div>';
+            if (c.expiry) h += '<div class="violet-cert-exp">Expires: ' + esc(c.expiry) + '</div>';
+            if (c.url)
+              h +=
+                '<div><a href="' +
+                esc(c.url) +
+                '">Credential</a></div>';
+            h += '</div>';
           });
-          h += '</div></section>';
+          h += '</section>';
           return;
         }
         h += premiumMainByOrder(tpl, key, d, cfg);
@@ -845,9 +1001,10 @@
         h += '</div>';
       }
       if (!shouldSkip('interests', d, cfg)) {
-        h += '<div class="violet-side-sec">Interests</div><div class="violet-side-body">';
+        h += '<div class="violet-side-sec">Interests</div><div class="violet-side-body violet-interest-chips">';
         (d.interests || []).forEach(function (x) {
-          h += '<div>· ' + esc(x) + '</div>';
+          if (!String(x || '').trim()) return;
+          h += '<span class="violet-interest-pill">' + esc(x) + '</span>';
         });
         h += '</div>';
       }
@@ -855,6 +1012,9 @@
       return h;
     }
 
+    if (tpl === 'modern-sidebar') return modernSidebar();
+    if (tpl === 'bold-charcoal') return amber();
+    if (tpl === 'midnight-navy') return midnight();
     if (tpl === 'amber-strike') return amber();
     if (tpl === 'midnight-pro') return midnight();
     if (tpl === 'golden-hour') return golden();
@@ -944,7 +1104,7 @@
         '<div class="lang-row">' +
         esc(l.name) +
         ' · ' +
-        esc(l.proficiency) +
+        langProfLabel(l.proficiency) +
         '</div>';
     });
     html += '</div>';
@@ -1081,9 +1241,13 @@
       if (e.bullets && e.bullets.length) {
         html += '<ul class="cv-bullets">';
         e.bullets.forEach(function (b) {
+          if (!String(b || '').trim()) return;
           html += '<li>' + esc(b) + '</li>';
         });
         html += '</ul>';
+      }
+      if (e.remote) {
+        html += '<span class="cv-remote-badge">Remote</span>';
       }
       html += technologiesRow(e.technologies);
       html += '</div>';
@@ -1108,6 +1272,28 @@
         (e.field ? ' — ' + esc(e.field) : '') +
         '</div>';
       if (e.gpa) html += '<div class="cv-muted">GPA: ' + esc(e.gpa) + '</div>';
+      if (e.thesis) html += '<div class="cv-thesis"><em>' + esc(e.thesis) + '</em></div>';
+      if (e.honors && e.honors.length) {
+        html += '<div class="cv-honor-chips">';
+        e.honors.forEach(function (hn) {
+          if (!String(hn || '').trim()) return;
+          html += '<span class="cv-honor-chip">' + esc(hn) + '</span>';
+        });
+        html += '</div>';
+      }
+      if (e.coursework && e.coursework.length) {
+        html +=
+          '<div class="cv-muted">Coursework: ' +
+          e.coursework
+            .filter(function (c) {
+              return String(c || '').trim();
+            })
+            .map(function (c) {
+              return esc(c);
+            })
+            .join(', ') +
+          '</div>';
+      }
       html += '</div>';
     });
     html += '</section>';
@@ -1143,15 +1329,31 @@
     (d.projects || []).forEach(function (p) {
       html += '<div class="cv-card proj-block">';
       html += '<div class="cv-strong">' + esc(p.name) + '</div>';
+      if (p.role) html += '<div class="cv-muted">' + esc(p.role) + '</div>';
+      if (p.startDate || p.endDate) {
+        html +=
+          '<div class="cv-muted">' +
+          range(p.startDate || '', p.endDate || '', false) +
+          '</div>';
+      }
       if (p.description) html += '<p>' + esc(p.description) + '</p>';
+      if (p.bullets && p.bullets.length) {
+        html += '<ul class="cv-bullets">';
+        p.bullets.forEach(function (b) {
+          if (!String(b || '').trim()) return;
+          html += '<li>' + esc(b) + '</li>';
+        });
+        html += '</ul>';
+      }
       html += technologiesRow(p.technologies);
       if (p.links && p.links.length) {
         p.links.forEach(function (l) {
+          if (!l.url || !String(l.url).trim()) return;
           html +=
             '<div><a href="' +
             esc(l.url) +
             '">' +
-            esc(l.label) +
+            esc(l.label || 'Link') +
             '</a></div>';
         });
       }
@@ -1161,17 +1363,52 @@
     return html;
   }
 
+  function formatAuthorsHtml(authors, fullName) {
+    if (!authors || !authors.length) return '';
+    var fn = String(fullName || '').trim().toLowerCase();
+    return authors
+      .map(function (a) {
+        var s = String(a).trim();
+        if (fn && s.toLowerCase().indexOf(fn) !== -1) {
+          return '<strong>' + esc(s) + '</strong>';
+        }
+        return esc(s);
+      })
+      .join(', ');
+  }
+
+  function pubStatusLabel(st) {
+    var m = {
+      published: 'Published',
+      'in-press': 'In Press',
+      'under-review': 'Under Review',
+    };
+    return m[st] || st || '';
+  }
+
   function sectionPublications(d, cfg, tpl) {
     if (shouldSkip('publications', d, cfg)) return '';
+    var ppl = d.personal || {};
     var html =
       '<section class="cv-section"><div class="cv-section-title">Publications</div><ol class="pub-list">';
-    (d.publications || []).forEach(function (p, i) {
+    (d.publications || []).forEach(function (pub, i) {
       html += '<li class="pub-row">';
-      if (tpl === 'academic') {
-        html += esc(p.authors && p.authors.length ? p.authors.join(', ') : '') + ' ';
+      if (pub.authors && pub.authors.length) {
+        html += formatAuthorsHtml(pub.authors, ppl.fullName) + '. ';
       }
-      html += esc(p.title) + '. <em>' + esc(p.journal) + '</em> (' + esc(p.year) + ').';
-      if (p.doi) html += ' DOI: ' + esc(p.doi);
+      html += '<em>' + esc(pub.title) + '</em>. ' + esc(pub.journal);
+      if (pub.year) html += ' (' + esc(pub.year) + ')';
+      if (pub.status && pub.status !== 'published') {
+        html +=
+          ' <span class="pub-status">' + esc(pubStatusLabel(pub.status)) + '</span>';
+      }
+      if (pub.doi)
+        html +=
+          ' · <a href="' +
+          esc('https://doi.org/' + pub.doi) +
+          '">DOI</a>';
+      else if (pub.url)
+        html += ' · <a href="' + esc(pub.url) + '">Link</a>';
       html += '</li>';
     });
     html += '</ol></section>';
@@ -1183,9 +1420,14 @@
     var html = '<section class="cv-section"><div class="cv-section-title">Research</div>';
     (d.research || []).forEach(function (r) {
       html += '<div class="cv-card">';
-      html += '<div class="cv-strong">' + esc(r.title) + '</div>';
+      html += '<div class="cv-line"><span class="cv-strong">' + esc(r.title) + '</span>';
+      html +=
+        '<span class="cv-dates">' +
+        range(r.startDate, r.endDate, false) +
+        '</span></div>';
       html += '<div>' + esc(r.institution) + ' · ' + esc(r.role) + '</div>';
-      html += '<p>' + esc(r.description) + '</p>';
+      if (r.description) html += '<p>' + esc(r.description) + '</p>';
+      if (r.funding) html += '<div class="cv-muted">Funding: ' + esc(r.funding) + '</div>';
       html += '</div>';
     });
     html += '</section>';
@@ -1205,6 +1447,14 @@
       }
       html += '<span class="cv-strong">' + esc(c.name) + '</span> — ' + esc(c.issuer);
       html += ' · ' + esc(c.date);
+      if (c.credentialId)
+        html += '<div class="cv-muted">ID: ' + esc(c.credentialId) + '</div>';
+      if (c.expiry) html += '<div class="cv-muted">Expires: ' + esc(c.expiry) + '</div>';
+      if (c.url)
+        html +=
+          '<div><a href="' +
+          esc(c.url) +
+          '">Verify</a></div>';
       html += '</div>';
     });
     html += '</section>';
@@ -1215,7 +1465,11 @@
     if (shouldSkip('awards', d, cfg)) return '';
     var html = '<section class="cv-section"><div class="cv-section-title">Awards</div>';
     (d.awards || []).forEach(function (a) {
-      html += '<div class="cv-card">' + esc(a.title) + ' — ' + esc(a.issuer) + ' (' + esc(a.date) + ')</div>';
+      html += '<div class="cv-card">';
+      html += '<div class="cv-strong">' + esc(a.title) + '</div>';
+      html += '<div>' + esc(a.issuer) + ' · ' + esc(a.date) + '</div>';
+      if (a.description) html += '<p>' + esc(a.description) + '</p>';
+      html += '</div>';
     });
     html += '</section>';
     return html;
@@ -1223,12 +1477,16 @@
 
   function sectionVolunteer(d, cfg) {
     if (shouldSkip('volunteer', d, cfg)) return '';
-    var html = '<section class="cv-section"><div class="cv-section-title">Volunteer</div>';
+    var html = '<section class="cv-section"><div class="cv-section-title">Volunteering</div>';
     (d.volunteer || []).forEach(function (v) {
       html += '<div class="cv-card">';
-      html += '<div class="cv-strong">' + esc(v.organization) + '</div>';
-      html += '<div>' + esc(v.role) + '</div>';
-      html += '<p>' + esc(v.description) + '</p>';
+      html += '<div class="cv-line"><span class="cv-strong">' + esc(v.role) + '</span>';
+      html +=
+        '<span class="cv-dates">' +
+        range(v.startDate, v.endDate, false) +
+        '</span></div>';
+      html += '<div>' + esc(v.organization) + '</div>';
+      if (v.description) html += '<p>' + esc(v.description) + '</p>';
       html += '</div>';
     });
     html += '</section>';
@@ -1246,11 +1504,21 @@
 
   function sectionReferences(d, cfg) {
     if (shouldSkip('references', d, cfg)) return '';
+    var refs = d.references || [];
+    if (!refs.length) {
+      return (
+        '<section class="cv-section"><div class="cv-section-title">References</div><p class="cv-muted">References available upon request</p></section>'
+      );
+    }
     var html = '<section class="cv-section"><div class="cv-section-title">References</div>';
-    d.references.forEach(function (r) {
+    refs.forEach(function (r) {
       html += '<div class="cv-card">';
-      html += esc(r.name) + ', ' + esc(r.role) + ' — ' + esc(r.company);
-      if (r.email) html += '<br/>' + esc(r.email);
+      html += '<div class="cv-strong">' + esc(r.name) + '</div>';
+      html += '<div>' + esc(r.role) + ' · ' + esc(r.company) + '</div>';
+      if (r.email) html += '<div>' + esc(r.email) + '</div>';
+      if (r.phone) html += '<div>' + esc(r.phone) + '</div>';
+      if (r.relationship)
+        html += '<div class="cv-muted">' + esc(r.relationship) + '</div>';
       html += '</div>';
     });
     html += '</section>';
@@ -1271,6 +1539,7 @@
         if (it.bullets && it.bullets.length) {
           html += '<ul class="cv-bullets">';
           it.bullets.forEach(function (b) {
+            if (!String(b || '').trim()) return;
             html += '<li>' + esc(b) + '</li>';
           });
           html += '</ul>';
@@ -1425,6 +1694,71 @@
 
     root.innerHTML = html;
   }
+
+  function renderSkillRating(rating, style, accentHex) {
+    var r = clampRating(rating);
+    var pct = RATING_PCT[r] != null ? RATING_PCT[r] : 60;
+    var label = RATING_LABEL[r] || '';
+    if (style === 'bar') {
+      return (
+        '<div class="skill-bar-track"><div class="skill-bar-fill" style="width:' +
+        pct +
+        '%"></div></div>'
+      );
+    }
+    if (style === 'dots') {
+      var h = '<span class="skill-dots">';
+      var j;
+      for (j = 0; j < 5; j++) {
+        h +=
+          '<span class="skill-dot' +
+          (j < r ? ' filled' : ' empty') +
+          '">●</span>';
+      }
+      h += '</span>';
+      return h;
+    }
+    if (style === 'chips') {
+      return '<span class="skill-chip">' + esc(label) + '</span>';
+    }
+    return esc(label);
+  }
+
+  window.CVSectionHelpers = {
+    escapeHtml: esc,
+    isSectionVisible: isSectionVisible,
+    formatDateRange: range,
+    renderBullets: function (bullets) {
+      if (!bullets || !bullets.length) return '';
+      var h = '<ul class="cv-bullets">';
+      bullets.forEach(function (b) {
+        if (!String(b || '').trim()) return;
+        h += '<li>' + esc(b) + '</li>';
+      });
+      h += '</ul>';
+      return h;
+    },
+    renderSkillRating: renderSkillRating,
+    renderTechChips: technologiesRow,
+    renderLinks: extraPersonalLinksBlock,
+    renderPhotoOrInitials: function (photo, fullName, accentColor) {
+      if (photo && String(photo).trim()) {
+        return (
+          '<img src="' +
+          esc(photo) +
+          '" alt="" class="photo-circle" />'
+        );
+      }
+      var bg = accentColor || '#6366f1';
+      return (
+        '<div class="initials-circle" style="background:' +
+        esc(bg) +
+        '">' +
+        esc(initialsFromName(fullName)) +
+        '</div>'
+      );
+    },
+  };
 
   render();
 })();

@@ -1,0 +1,271 @@
+.tpl-bold-charcoal {
+  --accent: #f5c518;
+  --sidebar-bg: #2c2c2c;
+  --sidebar-text: #ccc;
+  --sidebar-title: #f5c518;
+  --body-text: #444;
+  --heading-text: #2c2c2c;
+}
+
+.tpl-bold-charcoal.cv-page {
+  font-family: Roboto, system-ui, sans-serif;
+  color: var(--body-text);
+  background: #fff;
+}
+
+.tpl-bold-charcoal .amber-grid {
+  grid-template-columns: 34% 1fr;
+  gap: 0;
+  min-height: 100vh;
+}
+
+.tpl-bold-charcoal .amber-side {
+  background: var(--sidebar-bg);
+  color: var(--sidebar-text);
+  padding: 18pt 14pt 14pt;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.tpl-bold-charcoal .amber-photo-stage {
+  position: relative;
+  width: 110px;
+  height: 110px;
+  margin-bottom: 16pt;
+}
+
+.tpl-bold-charcoal .amber-shape {
+  position: absolute;
+  z-index: 0;
+}
+
+.tpl-bold-charcoal .amber-shape-rect {
+  width: 48px;
+  height: 36px;
+  background: var(--accent);
+  top: -4px;
+  right: -6px;
+  border-radius: 2px;
+  transform: rotate(12deg);
+}
+
+.tpl-bold-charcoal .amber-shape-tri {
+  width: 0;
+  height: 0;
+  border-left: 28px solid transparent;
+  border-right: 28px solid transparent;
+  border-top: 40px solid #1a1a1a;
+  left: -8px;
+  bottom: -4px;
+  transform: rotate(-8deg);
+}
+
+.tpl-bold-charcoal .amber-photo {
+  position: relative;
+  z-index: 1;
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid #fff;
+  display: block;
+}
+
+.tpl-bold-charcoal .amber-photo--initial {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  color: #2c2c2c;
+  font-weight: 700;
+  font-size: 28px;
+  border: none;
+}
+
+.tpl-bold-charcoal .amber-side-hd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--sidebar-title);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin: 14pt 0 6pt;
+}
+
+.tpl-bold-charcoal .amber-pill {
+  width: 4px;
+  height: 20px;
+  border-radius: 2px;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+
+.tpl-bold-charcoal .amber-side-body {
+  margin-bottom: 4pt;
+}
+
+.tpl-bold-charcoal .amber-line {
+  margin-bottom: 4pt;
+  word-break: break-word;
+}
+
+.tpl-bold-charcoal .amber-line a {
+  color: var(--sidebar-text);
+}
+
+.tpl-bold-charcoal .amber-edu-inst,
+.tpl-bold-charcoal .amber-ref {
+  margin-bottom: 8pt;
+}
+
+.tpl-bold-charcoal .amber-muted {
+  color: #999;
+  font-size: 11px;
+}
+
+.tpl-bold-charcoal .amber-main {
+  padding: 18pt 16pt 14pt;
+}
+
+.tpl-bold-charcoal .amber-main-head {
+  margin-bottom: 14pt;
+  padding-bottom: 12pt;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.tpl-bold-charcoal .amber-name {
+  font-family: 'Roboto Condensed', Roboto, sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.1;
+  margin: 0;
+}
+
+.tpl-bold-charcoal .amber-name-first {
+  color: var(--heading-text);
+}
+
+.tpl-bold-charcoal .amber-name-last {
+  color: var(--accent);
+}
+
+.tpl-bold-charcoal .amber-jobtitle {
+  margin-top: 6pt;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #888;
+}
+
+.tpl-bold-charcoal .amber-main .cv-section-title {
+  font-family: 'Roboto Condensed', Roboto, sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--heading-text);
+  text-transform: none;
+  letter-spacing: 0;
+  border-bottom: none;
+  padding-bottom: 4pt;
+  margin-bottom: 8pt;
+  position: relative;
+}
+
+.tpl-bold-charcoal .amber-main .cv-section-title::after {
+  content: '';
+  display: block;
+  width: 40px;
+  height: 3px;
+  background: var(--accent);
+  margin-top: 4pt;
+}
+
+.tpl-bold-charcoal .amber-sec-title {
+  font-family: 'Roboto Condensed', Roboto, sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--heading-text);
+  margin-bottom: 8pt;
+  padding-bottom: 4pt;
+}
+
+.tpl-bold-charcoal .amber-sec-title::after {
+  content: '';
+  display: block;
+  width: 40px;
+  height: 3px;
+  background: var(--accent);
+  margin-top: 4pt;
+}
+
+.tpl-bold-charcoal .amber-exp-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8pt;
+}
+
+.tpl-bold-charcoal .amber-exp-co {
+  font-weight: 700;
+  color: var(--heading-text);
+}
+
+.tpl-bold-charcoal .amber-exp-date {
+  font-size: 11px;
+  color: #888;
+  white-space: nowrap;
+}
+
+.tpl-bold-charcoal .amber-exp-role {
+  font-style: italic;
+  color: #777;
+  margin-top: 2pt;
+}
+
+.tpl-bold-charcoal .amber-exp-loc {
+  font-size: 10px;
+  color: #999;
+}
+
+.tpl-bold-charcoal .amber-bullets li::marker {
+  color: var(--accent);
+}
+
+.tpl-bold-charcoal .amber-main .skill-bar {
+  width: 120px;
+  height: 4px;
+  background: #e8e8e8;
+  margin-left: auto;
+}
+
+.tpl-bold-charcoal .amber-main .skill-bar-fill {
+  background: var(--accent);
+}
+
+.tpl-bold-charcoal .amber-main .skill-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8pt;
+}
+
+@media print {
+  /* Avoid forcing a full viewport row height in print (wastes vertical space on page 1). */
+  .tpl-bold-charcoal .amber-grid {
+    min-height: 0;
+  }
+
+  .tpl-bold-charcoal .amber-side {
+    min-height: 0;
+  }
+
+  /*
+   * Allow main-column sections to split across pages so the following section can
+   * start in leftover space. Cards (.cv-card) still use base.css break-inside: avoid.
+   */
+  .tpl-bold-charcoal .amber-main .cv-section {
+    page-break-inside: auto;
+    break-inside: auto;
+  }
+}
