@@ -10,7 +10,9 @@ import { Button } from '@/components/ui/button';
 import { CVEditorPanel } from '@/components/cv/CVEditorPanel';
 import { Sidebar } from '@/components/cv/premium/Sidebar';
 import { PreviewPanel } from '@/components/cv/premium/PreviewPanel';
-import { ATSCircularScore } from '@/components/cv/premium/ATSCircularScore';
+import { CVEditorTopBar } from '@/components/cv/premium/CVEditorTopBar';
+import type { CVEditorFocusMode } from '@/components/cv/premium/CVEditorTopBar';
+import { ATSDrawer } from '@/components/cv/premium/ATSDrawer';
 import type { CVFormTab } from '@/components/cv/CVFormFields';
 import type { CVSectionVisibility } from '@/types';
 import { FeatureGate } from '@/components/shared/FeatureGate';
@@ -19,10 +21,10 @@ import type { CVData } from '@/types';
 import type { CVTemplate, SubscriptionTier } from '@/types';
 import { canUseTemplate } from '@/lib/subscription';
 import { buildATSReport } from '@/lib/cv-ats';
-import { CV_FORM_CARD, CV_SHELL_HEADER } from '@/lib/cv-editor-styles';
+import { CV_EDITOR_CANVAS } from '@/lib/cv-editor-styles';
 import { cloneCvData } from '@/lib/cv-clone';
-import { Undo2, Redo2 } from 'lucide-react';
 import { createEmptyCVData } from '@/src/utils/cvDefaults';
+import { cn } from '@/lib/utils';
 import { ALL_TEMPLATE_IDS, TEMPLATE_CONFIGS } from '@/src/config/templateConfig';
 import { normalizeTemplateId } from '@/src/utils/cvDefaults';
 import type { TemplateId } from '@/src/types/cv.types';
@@ -153,6 +155,9 @@ export function CVEditor() {
   const [editorTab, setEditorTab] = useState<CVFormTab>('photo');
   const [zoom, setZoom] = useState(100);
   const [page, setPage] = useState(1);
+  const [focusMode, setFocusMode] = useState<CVEditorFocusMode>('default');
+  const [atsDrawerOpen, setAtsDrawerOpen] = useState(false);
+  const [previewCollapsed, setPreviewCollapsed] = useState(false);
   const [autosaveState, setAutosaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [undoPast, setUndoPast] = useState<CVData[]>([]);
   const [undoFuture, setUndoFuture] = useState<CVData[]>([]);
@@ -425,6 +430,14 @@ export function CVEditor() {
     ? buildATSReport(cvData)
     : { score: 0, summary: '', suggestions: [], sections: {} };
 
+  const subtitleName = cvData?.personal?.fullName?.trim();
+  const statusBits: string[] = [];
+  if (isDirty) statusBits.push('Unsaved changes');
+  if (!isDirty && (autosaveState === 'saved' || autosaveState === 'saving')) {
+    if (autosaveState === 'saving') statusBits.push('Saving…');
+    else statusBits.push('Saved ✓');
+  }
+
   if (loadError) {
     return (
       <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-900">
@@ -441,72 +454,60 @@ export function CVEditor() {
   }
 
   return (
-    <div className="mx-auto max-w-[1650px] space-y-4">
-      <div className={CV_SHELL_HEADER}>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h1 className="font-display text-2xl font-semibold text-[var(--color-text-primary)]">Edit CV</h1>
-            <p className="mt-1 text-sm text-[var(--color-muted)]">
-              Editor-first CV writing with live ATS feedback and preview.
-            </p>
-            {isDirty ? (
-              <p className="mt-1 text-xs text-amber-700/90">Unsaved changes</p>
-            ) : null}
-          </div>
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={!undoPast.length}
-              onClick={undo}
-              icon={<Undo2 className="h-4 w-4" />}
-              title="Undo (⌘Z)"
-            >
-              Undo
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={!undoFuture.length}
-              onClick={redo}
-              icon={<Redo2 className="h-4 w-4" />}
-              title="Redo (⌘⇧Z)"
-            >
-              Redo
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              loading={isSaving}
-              disabled={isSaving}
-              onClick={() => void onSaveClick()}
-            >
-              {saveButtonLabel}
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              loading={exporting}
-              disabled={!allowed}
-              onClick={() => void exportPdf()}
-            >
-              Export PDF
-            </Button>
-            <span className="text-xs text-[var(--color-muted)]">
-              {!isDirty && (autosaveState === 'saved' || autosaveState === 'saving')
-                ? 'Saved ✓'
-                : autosaveState === 'saving'
-                  ? 'Saving…'
-                  : ''}
+    <div className="mx-auto max-w-[1800px] pb-8">
+      <CVEditorTopBar
+        backHref="/cv"
+        title="Core CV"
+        subtitle={subtitleName || 'Add your name in Header'}
+        badge={
+          isDirty ? (
+            <span className="rounded-full border border-amber-400/60 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900">
+              Draft
             </span>
-            {saveError ? <span className="text-xs text-red-600">{saveError}</span> : null}
-          </div>
-        </div>
-      </div>
+          ) : null
+        }
+        atsScore={ats.score}
+        onOpenAts={() => setAtsDrawerOpen(true)}
+        undoRedo={{
+          canUndo: undoPast.length > 0,
+          canRedo: undoFuture.length > 0,
+          onUndo: undo,
+          onRedo: redo,
+        }}
+        secondaryAction={{
+          label: 'Export PDF',
+          loading: exporting,
+          disabled: !allowed,
+          onClick: () => void exportPdf(),
+        }}
+        primaryAction={{
+          label: saveButtonLabel,
+          loading: isSaving,
+          disabled: isSaving,
+          onClick: () => void onSaveClick(),
+        }}
+        statusLine={
+          <>
+            {statusBits.join(' · ')}
+            {saveError ? <span className="text-red-600"> · {saveError}</span> : null}
+          </>
+        }
+        focusMode={focusMode}
+        onFocusModeChange={setFocusMode}
+      />
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_630px]">
-        <div className="min-w-0">
-          <div className="grid gap-4 xl:grid-cols-[260px_1fr]">
+      <ATSDrawer open={atsDrawerOpen} onOpenChange={setAtsDrawerOpen} report={ats} />
+
+      <div
+        className={cn(
+          'mt-4 grid gap-4 px-1 sm:px-0',
+          focusMode === 'default' &&
+            'xl:grid-cols-[minmax(220px,0.24fr)_minmax(0,1fr)_minmax(390px,0.45fr)]',
+          (focusMode === 'editor' || focusMode === 'preview') && 'xl:grid-cols-1'
+        )}
+      >
+        {focusMode !== 'preview' ? (
+          focusMode === 'default' ? (
             <Sidebar
               activeSection={editorTab}
               onSelect={setEditorTab}
@@ -516,47 +517,51 @@ export function CVEditor() {
                 handleChange({ ...cvData, sectionVisibility: next })
               }
             />
-            <div className="space-y-3">
-              <div className="space-y-3">
-                <div className={CV_FORM_CARD}>
-                  <CVEditorPanel
-                    value={cvData}
-                    onChange={handleChange}
-                    activeTab={editorTab}
-                    onActiveTabChange={setEditorTab}
-                    hideAtsBanner
-                    hideFormTabBar
-                    hideVisibilityPanel
-                    templates={templates}
-                    selectedTemplateId={selectedTemplateId}
-                    onTemplateChange={setSelectedTemplateId}
-                    accent={accent}
-                    onAccentChange={setAccent}
-                    fontFamily={fontFamily}
-                    onFontFamilyChange={setFontFamily}
-                    userTier={tier}
-                  />
-                </div>
-              </div>
+          ) : null
+        ) : null}
+
+        {focusMode !== 'preview' ? (
+          <div className="min-w-0 space-y-3">
+            <div className={CV_EDITOR_CANVAS}>
+              <CVEditorPanel
+                value={cvData}
+                onChange={handleChange}
+                activeTab={editorTab}
+                onActiveTabChange={setEditorTab}
+                hideAtsBanner
+                hideFormTabBar
+                hideVisibilityPanel
+                templates={templates}
+                selectedTemplateId={selectedTemplateId}
+                onTemplateChange={setSelectedTemplateId}
+                accent={accent}
+                onAccentChange={setAccent}
+                fontFamily={fontFamily}
+                onFontFamilyChange={setFontFamily}
+                userTier={tier}
+              />
             </div>
           </div>
-        </div>
+        ) : null}
 
-        <div className="space-y-3 xl:sticky xl:top-24">
-          <ATSCircularScore score={ats.score} suggestions={ats.suggestions} />
-          <PreviewPanel
-            previewSrc={previewSrc}
-            previewIsPdf={previewIsPdf}
-            previewBusy={previewBusy}
-            zoom={zoom}
-            onZoomChange={setZoom}
-            currentPage={page}
-            onPageChange={setPage}
-          />
-          <FeatureGate requiredTier={['pro', 'premium', 'career']} userTier={tier}>
-            <p className="text-xs text-[var(--color-muted)]">Pro settings unlocked</p>
-          </FeatureGate>
-        </div>
+        {focusMode !== 'editor' ? (
+          <div className="min-w-0 space-y-3">
+            <PreviewPanel
+              previewSrc={previewSrc}
+              previewIsPdf={previewIsPdf}
+              previewBusy={previewBusy}
+              zoom={zoom}
+              onZoomChange={setZoom}
+              currentPage={page}
+              onPageChange={setPage}
+              collapsed={previewCollapsed}
+              onToggleCollapse={() => setPreviewCollapsed((c) => !c)}
+            />
+            <FeatureGate requiredTier={['pro', 'premium', 'career']} userTier={tier}>
+              <p className="text-xs text-[var(--color-muted)]">Pro settings unlocked</p>
+            </FeatureGate>
+          </div>
+        ) : null}
       </div>
     </div>
   );

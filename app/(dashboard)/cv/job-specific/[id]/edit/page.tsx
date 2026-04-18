@@ -1,7 +1,12 @@
 'use client';
 
+/**
+ * Layout history: legacy job editor stacked a tall header, separate core-CV sync panel, expandable keyword/JD tray,
+ * and an always-visible ATS stack beside a fixed-width preview — shrinking the form. Refactor keeps every control
+ * but moves ATS into a drawer, keywords into a contextual popover, and uses a 3-column shell + focus modes.
+ */
+
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createClient } from '@/lib/supabase/client';
@@ -10,8 +15,10 @@ import { Select } from '@/components/ui/select';
 import { CVEditorPanel } from '@/components/cv/CVEditorPanel';
 import { Sidebar } from '@/components/cv/premium/Sidebar';
 import { PreviewPanel } from '@/components/cv/premium/PreviewPanel';
-import { ATSCircularScore } from '@/components/cv/premium/ATSCircularScore';
-import { JobKeywordsBanner } from '@/components/cv/premium/JobKeywordsBanner';
+import { CVEditorTopBar } from '@/components/cv/premium/CVEditorTopBar';
+import type { CVEditorFocusMode } from '@/components/cv/premium/CVEditorTopBar';
+import { ATSDrawer } from '@/components/cv/premium/ATSDrawer';
+import { KeywordPopover } from '@/components/cv/premium/KeywordPopover';
 import type { CVFormTab } from '@/components/cv/CVFormFields';
 import type { CVSectionVisibility } from '@/types';
 import { useJobSpecificCV, useArchiveJobSpecificCV } from '@/hooks/useJobSpecificCVs';
@@ -24,7 +31,7 @@ import { canUseTemplate } from '@/lib/subscription';
 import { buildATSReport } from '@/lib/cv-ats';
 import { cloneCvData } from '@/lib/cv-clone';
 import { useToast } from '@/components/ui/toast';
-import { CV_FORM_CARD } from '@/lib/cv-editor-styles';
+import { CV_EDITOR_CANVAS } from '@/lib/cv-editor-styles';
 import {
   parseOptimisedCvText,
   optimisedCvJsonToCvData,
@@ -48,10 +55,7 @@ import {
   MapPin,
   Building2,
   AlertTriangle,
-  Undo2,
-  Redo2,
   ChevronDown,
-  ChevronUp,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -145,7 +149,10 @@ export default function JobCVEditPage() {
   );
   const archive = useArchiveJobSpecificCV();
   const { data: coreVersions = [], isLoading: coreVersionsLoading } = useCoreCVVersions();
-  const [showJD, setShowJD] = useState(false);
+  const [keywordsPopoverOpen, setKeywordsPopoverOpen] = useState(false);
+  const [atsDrawerOpen, setAtsDrawerOpen] = useState(false);
+  const [focusMode, setFocusMode] = useState<CVEditorFocusMode>('default');
+  const [previewCollapsed, setPreviewCollapsed] = useState(false);
 
   const { tier } = useSubscription();
   const { toast } = useToast();
@@ -890,35 +897,92 @@ export default function JobCVEditPage() {
         ? 'Saved ✓'
         : '';
 
+  const editingCvBody = !(genType === 'both' && documentTab === 'coverLetter');
+
   return (
-    <div className="mx-auto max-w-[1650px] space-y-4 pb-24 md:pb-4">
-      <div className="glass-panel z-20 rounded-card border border-[var(--color-border)] p-4 backdrop-blur-xl">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-3">
-              <Link
-                href={isDraftMode ? '/cv/optimise' : '/cv/job-specific'}
-                className="inline-flex text-sm font-medium text-[var(--color-primary)] hover:underline"
-              >
-                ← Back
-              </Link>
-              {isUnsavedDraft ? (
-                <span className="rounded-full border border-amber-400/80 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900">
-                  Unsaved draft
-                </span>
-              ) : null}
+    <div className="mx-auto max-w-[1800px] space-y-4 pb-24 md:pb-8">
+      <CVEditorTopBar
+        backHref={isDraftMode ? '/cv/optimise' : '/cv/job-specific'}
+        title="Job-tailored CV"
+        subtitle={`${displayCompany} · ${displayJobTitle}`}
+        badge={
+          isUnsavedDraft ? (
+            <span className="rounded-full border border-amber-400/80 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900">
+              Unsaved draft
+            </span>
+          ) : null
+        }
+        centerSlot={
+          <div className="flex w-full max-w-lg flex-col items-stretch gap-2 sm:flex-row sm:items-end sm:justify-center">
+            <div className="min-w-0 flex-1">
+              <Select
+                value={targetCoreCvId ?? ''}
+                disabled={coreVersionsLoading || coreVersions.length === 0}
+                options={
+                  coreVersions.length
+                    ? coreVersions.map((v) => ({
+                        value: v.id,
+                        label: `${v.full_name ?? 'Core CV'} · ${formatDate(v.created_at)}`,
+                      }))
+                    : [{ value: '', label: coreVersionsLoading ? 'Loading…' : 'No core CV yet' }]
+                }
+                onChange={(e) => setTargetCoreCvId(e.target.value || null)}
+                className="py-2 text-xs"
+              />
             </div>
-            <h1 className="mt-2 font-display text-2xl font-semibold text-[var(--color-text-primary)]">
-              Job-Tailored CV
-            </h1>
-            <p className="mt-1 text-sm font-medium text-[var(--color-text-primary)]">
-              {displayCompany} · {displayJobTitle}
-            </p>
-            <p className="mt-1 text-sm text-[var(--color-muted)]">
-              Live ATS feedback, preview, and undo — nothing is stored until you save.
-            </p>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="h-9 shrink-0"
+              loading={savingCore}
+              disabled={!draft || !targetCoreCvId || !coreVersions.length}
+              onClick={() => void updateCoreCvFromJob()}
+              title="Apply this editor content to the selected core CV. Does not modify this job CV."
+            >
+              Update core CV
+            </Button>
           </div>
-          <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+        }
+        atsScore={editingCvBody ? ats.score : null}
+        onOpenAts={() => setAtsDrawerOpen(true)}
+        keywords={
+          editingCvBody
+            ? {
+                show: true,
+                count: keywords.length,
+                open: keywordsPopoverOpen,
+                onToggle: () => setKeywordsPopoverOpen((v) => !v),
+              }
+            : undefined
+        }
+        undoRedo={{
+          canUndo: undoPast.length > 0,
+          canRedo: undoFuture.length > 0,
+          onUndo: undo,
+          onRedo: redo,
+        }}
+        secondaryAction={{
+          label: 'Export PDF',
+          loading: exporting,
+          disabled: !allowed,
+          onClick: () => void exportPdf(),
+        }}
+        primaryAction={{
+          label:
+            pageSaveState === 'saving'
+              ? 'Saving…'
+              : pageSaveState === 'saved'
+                ? 'Saved ✓'
+                : 'Save',
+          loading: pageSaveState === 'saving',
+          disabled: pageSaveState === 'saving',
+          onClick: () => void saveJobCv(),
+        }}
+        statusLine={saveLabel}
+        focusMode={editingCvBody ? focusMode : 'default'}
+        onFocusModeChange={setFocusMode}
+        trailingControls={
+          <>
             <button
               type="button"
               onClick={() => {
@@ -928,78 +992,37 @@ export default function JobCVEditPage() {
                 setTrackPopupOpen(true);
               }}
               className={cn(
-                'rounded-full border-2 px-4 py-1.5 text-xs font-semibold transition',
+                'inline-flex h-9 shrink-0 items-center rounded-full border-2 px-3 text-xs font-semibold transition',
                 trackRingClass
               )}
             >
               {trackButtonLabel}
             </button>
-            <div className="hidden items-center gap-2 md:flex">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="hidden h-9 md:inline-flex"
+              disabled={diffLoading}
+              onClick={() => void openDiffViewer()}
+              icon={<GitCompareArrows className="h-4 w-4" />}
+            >
+              Diff
+            </Button>
+            {!isDraftMode ? (
               <Button
                 variant="secondary"
                 size="sm"
-                disabled={!undoPast.length}
-                onClick={undo}
-                icon={<Undo2 className="h-4 w-4" />}
+                className="hidden h-9 border-[var(--color-accent-coral)]/40 text-[var(--color-accent-coral)] lg:inline-flex"
+                loading={archive.isPending}
+                onClick={() => void deleteJobCv()}
               >
-                Undo
+                Delete
               </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={!undoFuture.length}
-                onClick={redo}
-                icon={<Redo2 className="h-4 w-4" />}
-              >
-                Redo
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={diffLoading}
-                onClick={() => void openDiffViewer()}
-                icon={<GitCompareArrows className="h-4 w-4" />}
-              >
-                See Differences
-              </Button>
-              <Button
-                variant="primary"
-                size="sm"
-                loading={pageSaveState === 'saving'}
-                disabled={pageSaveState === 'saving'}
-                onClick={() => void saveJobCv()}
-              >
-                {pageSaveState === 'saving' ? 'Saving…' : pageSaveState === 'saved' ? 'Saved ✓' : 'Save'}
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                loading={exporting}
-                disabled={!allowed}
-                onClick={() => void exportPdf()}
-              >
-                Export PDF
-              </Button>
-              {!isDraftMode ? (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  loading={archive.isPending}
-                  className="border-[var(--color-accent-coral)]/40 text-[var(--color-accent-coral)]"
-                  onClick={() => void deleteJobCv()}
-                >
-                  Delete
-                </Button>
-              ) : null}
-              {saveLabel ? (
-                <span className="text-xs text-[var(--color-muted)]">{saveLabel}</span>
-              ) : null}
-            </div>
-          </div>
-        </div>
-
-        {genType === 'both' ? (
-          <div className="mt-4 flex flex-col gap-3 border-t border-[var(--color-border)] pt-4 sm:flex-row sm:items-center sm:justify-between">
+            ) : null}
+          </>
+        }
+        bottomRow={
+          genType === 'both' ? (
             <Tabs
               className="max-w-md"
               tabs={[
@@ -1009,28 +1032,22 @@ export default function JobCVEditPage() {
               value={documentTab}
               onChange={(tid) => setDocumentTab(tid as 'cv' | 'coverLetter')}
             />
-            <div className="flex flex-wrap items-center gap-2 md:hidden">
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={diffLoading}
-                onClick={() => void openDiffViewer()}
-                icon={<GitCompareArrows className="h-4 w-4" />}
-              >
-                See Differences
-              </Button>
-              <Button
-                variant="primary"
-                size="sm"
-                loading={pageSaveState === 'saving'}
-                onClick={() => void saveJobCv()}
-              >
-                Save
-              </Button>
-            </div>
-          </div>
-        ) : null}
-      </div>
+          ) : undefined
+        }
+      />
+
+      {editingCvBody ? (
+        <>
+          <ATSDrawer open={atsDrawerOpen} onOpenChange={setAtsDrawerOpen} report={ats} />
+          <KeywordPopover
+            open={keywordsPopoverOpen}
+            onOpenChange={setKeywordsPopoverOpen}
+            keywords={keywords}
+            cv={draft}
+            jobDescriptionText={jobCV?.job_description ?? null}
+          />
+        </>
+      ) : null}
 
       {draftMeta?.analysis ? (
         <div className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]">
@@ -1099,77 +1116,16 @@ export default function JobCVEditPage() {
         </div>
       ) : null}
 
-      <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]/80 p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          <div className="min-w-0 flex-1">
-            <Select
-              label="Core CV version"
-              value={targetCoreCvId ?? ''}
-              disabled={coreVersionsLoading || coreVersions.length === 0}
-              options={
-                coreVersions.length
-                  ? coreVersions.map((v) => ({
-                      value: v.id,
-                      label: `${v.full_name ?? 'Core CV'} · ${formatDate(v.created_at)}`,
-                    }))
-                  : [{ value: '', label: coreVersionsLoading ? 'Loading…' : 'No core CV yet' }]
-              }
-              onChange={(e) => setTargetCoreCvId(e.target.value || null)}
-            />
-          </div>
-          <Button
-            variant="secondary"
-            size="sm"
-            className="shrink-0"
-            loading={savingCore}
-            disabled={!draft || !targetCoreCvId || !coreVersions.length}
-            onClick={() => void updateCoreCvFromJob()}
-            title="Apply this editor content to the selected core CV. Does not modify this job CV."
-          >
-            Update core CV
-          </Button>
-        </div>
-        <p className="mt-2 text-[10px] leading-snug text-[var(--color-muted)]">
-          Copies your current fields into the selected core profile. This job CV is unchanged until you use Save above.
-        </p>
-      </div>
-
-      <div className="overflow-hidden rounded-card border border-[var(--color-border)] bg-[var(--color-surface)]/90 shadow-sm backdrop-blur-sm">
-        <button
-          type="button"
-          className="flex w-full items-center justify-between gap-3 p-4 text-left sm:p-5"
-          onClick={() => setShowJD((v) => !v)}
-          aria-expanded={showJD}
-        >
-          <div className="min-w-0 flex-1">
-            <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">Job keywords</span>
-            <p className="mt-1 text-sm text-[var(--color-muted)]">
-              {showJD ? 'Keywords stored for this role' : 'Expand to view stored keywords'}
-            </p>
-          </div>
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--color-border)] bg-white/[0.04] text-[var(--color-muted)]">
-            {showJD ? <ChevronUp className="h-4 w-4" aria-hidden /> : <ChevronDown className="h-4 w-4" aria-hidden />}
-          </span>
-        </button>
-        {showJD ? (
-          <div className="border-t border-[var(--color-border)] px-4 pb-4 pt-2 sm:px-5 sm:pb-5">
-            <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-xl border border-[var(--color-border)] bg-[var(--color-input-bg)] p-4 font-mono text-xs leading-relaxed text-[var(--color-text-primary)] shadow-inner">
-              {jobCV?.job_description ||
-                (keywords.length ? keywords.join(', ') : 'No keywords stored for this job.')}
-            </pre>
-          </div>
-        ) : null}
-      </div>
-
-      <div className="relative grid gap-6 xl:grid-cols-[minmax(0,1fr)_630px]">
+      <div className="relative mt-1 px-1 sm:px-0">
         {pageSaveState === 'saving' ? (
           <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-xl bg-white/75">
             <Loader2 className="h-10 w-10 animate-spin text-[var(--color-primary)]" />
           </div>
         ) : null}
-        <div className="min-w-0">
-          {genType === 'both' && documentTab === 'coverLetter' ? (
-            <div className="rounded-2xl border border-[var(--color-border)] bg-white p-6 shadow-md">
+
+        {genType === 'both' && documentTab === 'coverLetter' ? (
+          <div className="mt-2 grid max-w-4xl gap-4">
+            <div className={CV_EDITOR_CANVAS}>
               <p className="mb-2 text-sm font-semibold">Cover letter</p>
               <Textarea
                 value={coverLetterText}
@@ -1177,19 +1133,36 @@ export default function JobCVEditPage() {
                 className="min-h-[420px] text-sm leading-relaxed"
               />
             </div>
-          ) : (
-            <div className="grid gap-4 xl:grid-cols-[260px_1fr]">
-              <Sidebar
-                activeSection={editorTab}
-                onSelect={setEditorTab}
-                cvData={draft}
-                sectionVisibility={draft.sectionVisibility}
-                onSectionVisibilityChange={(next: CVSectionVisibility) =>
-                  handleChange({ ...draft, sectionVisibility: next })
-                }
-              />
-              <div className="space-y-3">
-                <div className={CV_FORM_CARD}>
+            <p className="text-sm text-[var(--color-muted)]">
+              Export cover letter to PDF from the cover letter page after you save.
+            </p>
+          </div>
+        ) : (
+          <div
+            className={cn(
+              'mt-2 grid gap-4',
+              focusMode === 'default' &&
+                'xl:grid-cols-[minmax(220px,0.24fr)_minmax(0,1fr)_minmax(390px,0.45fr)]',
+              (focusMode === 'editor' || focusMode === 'preview') && 'xl:grid-cols-1'
+            )}
+          >
+            {focusMode !== 'preview' ? (
+              focusMode === 'default' ? (
+                <Sidebar
+                  activeSection={editorTab}
+                  onSelect={setEditorTab}
+                  cvData={draft}
+                  sectionVisibility={draft.sectionVisibility}
+                  onSectionVisibilityChange={(next: CVSectionVisibility) =>
+                    handleChange({ ...draft, sectionVisibility: next })
+                  }
+                />
+              ) : null
+            ) : null}
+
+            {focusMode !== 'preview' ? (
+              <div className="min-w-0 space-y-3">
+                <div className={CV_EDITOR_CANVAS}>
                   <CVEditorPanel
                     value={draft}
                     onChange={handleChange}
@@ -1200,7 +1173,7 @@ export default function JobCVEditPage() {
                     hideAtsBanner
                     hideFormTabBar
                     hideVisibilityPanel
-                    hideKeywordsBanner={keywords.length > 0}
+                    hideKeywordsBanner
                     templates={templates}
                     selectedTemplateId={selectedTemplateId}
                     onTemplateChange={(nextId: string) => {
@@ -1218,35 +1191,30 @@ export default function JobCVEditPage() {
                   />
                 </div>
               </div>
-            </div>
-          )}
-        </div>
-        <div className="space-y-3 xl:sticky xl:top-24">
-          {genType === 'both' && documentTab === 'coverLetter' ? (
-            <p className="text-sm text-[var(--color-muted)]">
-              Export cover letter to PDF from the cover letter page after you save.
-            </p>
-          ) : (
-            <>
-              <ATSCircularScore score={ats.score} suggestions={ats.suggestions} />
-              {keywords.length > 0 ? <JobKeywordsBanner keywords={keywords} cv={draft} /> : null}
-              <PreviewPanel
-                previewSrc={previewSrc}
-                previewIsPdf={previewIsPdf}
-                previewBusy={previewBusy}
-                zoom={zoom}
-                onZoomChange={setZoom}
-                currentPage={page}
-                onPageChange={setPage}
-              />
-              {!templatesLoading && !allowed && templateMeta ? (
-                <p className="rounded-xl border border-[var(--color-accent-gold)]/35 bg-[var(--color-accent-gold)]/10 px-3 py-2 text-sm text-[var(--color-accent-gold)]">
-                  You can preview this layout with your data here. Upgrade to export with this template.
-                </p>
-              ) : null}
-            </>
-          )}
-        </div>
+            ) : null}
+
+            {focusMode !== 'editor' ? (
+              <div className="min-w-0 space-y-3">
+                <PreviewPanel
+                  previewSrc={previewSrc}
+                  previewIsPdf={previewIsPdf}
+                  previewBusy={previewBusy}
+                  zoom={zoom}
+                  onZoomChange={setZoom}
+                  currentPage={page}
+                  onPageChange={setPage}
+                  collapsed={previewCollapsed}
+                  onToggleCollapse={() => setPreviewCollapsed((c) => !c)}
+                />
+                {!templatesLoading && !allowed && templateMeta ? (
+                  <p className="rounded-xl border border-[var(--color-accent-gold)]/35 bg-[var(--color-accent-gold)]/10 px-3 py-2 text-sm text-[var(--color-accent-gold)]">
+                    You can preview this layout with your data here. Upgrade to export with this template.
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        )}
       </div>
 
       <div className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-2 border-t border-[var(--color-border)] bg-[var(--color-surface)]/95 p-3 backdrop-blur-md md:hidden">

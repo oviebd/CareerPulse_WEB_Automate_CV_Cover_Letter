@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /** A4 height / width — estimate how many “pages” a tall PNG spans. */
@@ -16,6 +17,11 @@ interface PreviewPanelProps {
   onZoomChange: (zoom: number) => void;
   currentPage: number;
   onPageChange: (page: number) => void;
+  /** Collapse to a slim strip to free space for the editor. */
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
+  /** Sticky offset under app header; matches CV editor shell top bar. */
+  stickyTopClass?: string;
 }
 
 export function PreviewPanel(props: PreviewPanelProps) {
@@ -27,6 +33,9 @@ export function PreviewPanel(props: PreviewPanelProps) {
     onZoomChange,
     currentPage,
     onPageChange,
+    collapsed = false,
+    onToggleCollapse,
+    stickyTopClass = 'xl:top-[72px]',
   } = props;
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -70,15 +79,48 @@ export function PreviewPanel(props: PreviewPanelProps) {
   /** Logical CV width at 96dpi-ish; `maxWidth: 100%` caps to the sidebar. */
   const displayWidthPx = 794 * scale;
 
+  if (collapsed) {
+    return (
+      <aside
+        className={cn(
+          'glass-panel sticky z-10 flex h-12 w-full shrink-0 items-center justify-between gap-2 rounded-2xl border border-[var(--color-border)] px-3 shadow-sm backdrop-blur-xl',
+          stickyTopClass
+        )}
+      >
+        <p className="text-sm font-semibold text-[var(--color-text-primary)]">Live preview</p>
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-border)] bg-white/[0.04] px-2 py-1 text-xs font-medium text-[var(--color-muted)] transition hover:bg-white/[0.08]"
+        >
+          <ChevronDown className="h-3.5 w-3.5" aria-hidden />
+          Expand
+        </button>
+      </aside>
+    );
+  }
+
   return (
     <aside
       className={cn(
-        'glass-panel sticky top-24 h-[calc(100vh-7rem)] w-full rounded-card border border-[var(--color-border)] p-4 shadow-sm xl:w-[630px]'
+        'glass-panel sticky z-10 h-[calc(100vh-4.5rem)] w-full rounded-2xl border border-[var(--color-border)]/80 p-4 shadow-[0_8px_30px_rgba(0,0,0,0.06)]',
+        stickyTopClass
       )}
     >
       <div className="flex h-full flex-col">
-        <div className="mb-4 flex items-center justify-between border-b border-[var(--color-border)] pb-2 pt-1">
-          <p className="text-sm font-semibold text-[var(--color-text-primary)]">Live Preview</p>
+        <div className="mb-4 flex items-center justify-between border-b border-[var(--color-border)]/80 pb-2 pt-1">
+          <p className="text-sm font-semibold text-[var(--color-text-primary)]">Live preview</p>
+          <div className="flex items-center gap-2">
+            {onToggleCollapse ? (
+              <button
+                type="button"
+                title="Collapse preview"
+                onClick={onToggleCollapse}
+                className="rounded-lg border border-[var(--color-border)] bg-white/[0.04] p-1.5 text-[var(--color-muted)] transition hover:bg-white/[0.08]"
+              >
+                <ChevronUp className="h-4 w-4" aria-hidden />
+              </button>
+            ) : null}
           <div className="flex items-center gap-2 font-mono text-xs text-[var(--color-muted)]">
             <button
               type="button"
@@ -95,6 +137,7 @@ export function PreviewPanel(props: PreviewPanelProps) {
             >
               +
             </button>
+          </div>
           </div>
         </div>
 

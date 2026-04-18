@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo, useState, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import type { ComponentType } from 'react';
 import type { CVFormTab } from '@/components/cv/CVFormFields';
@@ -11,6 +12,8 @@ import {
   BookOpen,
   BriefcaseBusiness,
   Camera,
+  ChevronDown,
+  ChevronRight,
   FileBadge2,
   FlaskConical,
   GraduationCap,
@@ -21,7 +24,6 @@ import {
   Lightbulb,
   MapPin,
   Palette,
-  Sparkles,
   Tag,
   UserRound,
   Users,
@@ -32,7 +34,6 @@ const ITEMS: Array<{
   id: CVFormTab;
   label: string;
   icon: ComponentType<{ className?: string }>;
-  /** Maps editor row to PDF/preview visibility; omitted where the model has no key (e.g. Header contact block). */
   visibilityKey?: CVSectionVisibilityKey;
 }> = [
   { id: 'photo', label: 'Photo', icon: Camera, visibilityKey: 'photo' },
@@ -58,6 +59,20 @@ const ITEMS: Array<{
   { id: 'interests', label: 'Interests', icon: Tag, visibilityKey: 'interests' },
   { id: 'custom', label: 'Custom sections', icon: Layers, visibilityKey: 'custom' },
 ];
+
+const CONTENT_IDS = new Set<CVFormTab>([
+  'photo',
+  'header',
+  'address',
+  'summary',
+  'experience',
+  'education',
+  'skills',
+]);
+
+const OPTIONAL_IDS = new Set<CVFormTab>(
+  ITEMS.map((i) => i.id).filter((id) => !CONTENT_IDS.has(id))
+);
 
 function VisibilitySwitch({
   on,
@@ -100,10 +115,50 @@ function VisibilitySwitch({
   );
 }
 
+function CollapsibleNavGroup({
+  title,
+  hint,
+  defaultOpen,
+  children,
+}: {
+  title: string;
+  hint?: string;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen !== false);
+
+  return (
+    <div className="space-y-1">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left transition hover:bg-white/[0.04]"
+      >
+        <span>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-muted)]">
+            {title}
+          </span>
+          {hint ? (
+            <span className="mt-0.5 block text-[10px] font-normal normal-case tracking-normal text-[var(--color-muted)]/90">
+              {hint}
+            </span>
+          ) : null}
+        </span>
+        {open ? (
+          <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[var(--color-muted)]" />
+        ) : (
+          <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[var(--color-muted)]" />
+        )}
+      </button>
+      {open ? <div className="space-y-0.5">{children}</div> : null}
+    </div>
+  );
+}
+
 interface SidebarProps {
   activeSection: CVFormTab;
   onSelect: (section: CVFormTab) => void;
-  /** Used to reflect whether each section has data — empty sections show the toggle off until filled. */
   cvData?: CVData | null;
   sectionVisibility?: CVSectionVisibility;
   onSectionVisibilityChange?: (next: CVSectionVisibility) => void;
@@ -118,98 +173,98 @@ export function Sidebar({
 }: SidebarProps) {
   const showToggles = Boolean(onSectionVisibilityChange);
 
-  return (
-    <aside className="glass-panel w-full rounded-card border border-[var(--color-border)] p-3 shadow-sm xl:sticky xl:top-24 xl:max-h-[calc(100vh-7rem)] xl:w-64 xl:overflow-y-auto">
-      <div className="mb-4 space-y-4 border-b border-[var(--color-border)] px-2 py-3">
-        <div className="flex items-center gap-2">
-          <span className="rounded-lg bg-[var(--color-primary-100)] p-1.5 text-[var(--color-primary-400)]">
-            <Sparkles className="h-4 w-4" />
-          </span>
-          <p className="text-sm font-semibold text-[var(--color-text-primary)]">CV Builder Pro</p>
-        </div>
-      </div>
+  const contentItems = useMemo(() => ITEMS.filter((i) => CONTENT_IDS.has(i.id)), []);
+  const optionalItems = useMemo(() => ITEMS.filter((i) => OPTIONAL_IDS.has(i.id)), []);
 
-      <div className="mb-6 space-y-1 px-1">
-        <p className="mb-2 px-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-muted)]">
-          Design & Layout
-        </p>
+  const renderRow = (item: (typeof ITEMS)[number]) => {
+    const Icon = item.icon;
+    const active = item.id === activeSection;
+    const vKey = item.visibilityKey;
+    const exportVisible = vKey ? isCvSectionVisible(vKey, sectionVisibility) : true;
+    const filled = vKey && cvData ? cvSectionHasFilledContent(vKey, cvData) : false;
+    const switchOn = Boolean(vKey && filled && exportVisible);
+    const toggleDisabled = Boolean(vKey && (!cvData || !filled));
+
+    return (
+      <div
+        key={item.id}
+        className={cn(
+          'flex w-full items-center gap-1 rounded-xl px-1 py-0.5 transition duration-200',
+          active ? 'bg-[var(--color-primary-100)]/70 shadow-sm ring-1 ring-[var(--color-primary-200)]/40' : 'hover:bg-white/[0.03]'
+        )}
+      >
+        <button
+          type="button"
+          onClick={() => onSelect(item.id)}
+          className={cn(
+            'flex min-w-0 flex-1 items-center gap-2 rounded-lg border-l-2 px-2 py-1.5 text-left text-sm transition duration-200',
+            active
+              ? 'border-[var(--color-primary-400)] font-medium text-[var(--color-primary-400)]'
+              : 'border-transparent text-[var(--color-muted)] hover:text-[var(--color-text-primary)]'
+          )}
+        >
+          <Icon className="h-4 w-4 shrink-0" />
+          <span className={cn(!switchOn && vKey && 'opacity-55')}>{item.label}</span>
+        </button>
+        {showToggles && vKey ? (
+          <VisibilitySwitch
+            on={switchOn}
+            disabled={toggleDisabled}
+            ariaLabel={
+              toggleDisabled
+                ? `${item.label}: add content here before it can appear on your CV.`
+                : switchOn
+                  ? `${item.label}: shown on CV. Click to hide from PDF and preview.`
+                  : `${item.label}: hidden from PDF and preview. Click to show.`
+            }
+            onToggle={() =>
+              onSectionVisibilityChange!(toggleCvSectionVisibility(sectionVisibility, vKey))
+            }
+          />
+        ) : null}
+      </div>
+    );
+  };
+
+  return (
+    <aside className="glass-panel w-full rounded-2xl border border-[var(--color-border)]/80 p-3 shadow-[0_8px_30px_rgba(0,0,0,0.06)] xl:sticky xl:top-[72px] xl:max-h-[calc(100vh-5.5rem)] xl:w-full xl:overflow-y-auto xl:overscroll-contain">
+      <CollapsibleNavGroup title="Design & layout" hint="Template, colours, typography" defaultOpen>
         <button
           type="button"
           onClick={() => onSelect('design')}
           className={cn(
-            'flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm transition duration-200',
+            'flex w-full items-center gap-2 rounded-xl border-l-2 px-3 py-2 text-left text-sm transition duration-200',
             activeSection === 'design'
-              ? 'bg-[var(--color-primary-100)] font-medium text-[var(--color-primary-400)]'
-              : 'text-[var(--color-muted)] hover:bg-white/[0.04] hover:text-[var(--color-text-primary)]'
+              ? 'border-[var(--color-primary-400)] bg-[var(--color-primary-100)]/80 font-medium text-[var(--color-primary-400)] shadow-sm'
+              : 'border-transparent text-[var(--color-muted)] hover:bg-white/[0.04] hover:text-[var(--color-text-primary)]'
           )}
         >
           <Palette className="h-4 w-4 shrink-0" />
-          <span>Design Settings</span>
+          <span>Design settings</span>
         </button>
-      </div>
+      </CollapsibleNavGroup>
 
-      <p className="mb-1 px-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-muted)]">
-        CV Sections
-      </p>
+      <div className="my-3 border-t border-[var(--color-border)]/70" />
+
+      <CollapsibleNavGroup
+        title="Content"
+        hint="Core sections recruiters scan first"
+        defaultOpen
+      >
+        {contentItems.map(renderRow)}
+      </CollapsibleNavGroup>
+
+      <div className="my-3 border-t border-[var(--color-border)]/70" />
+
+      <CollapsibleNavGroup title="Optional sections" hint="Toggle visibility per section" defaultOpen>
+        {optionalItems.map(renderRow)}
+      </CollapsibleNavGroup>
+
       {showToggles ? (
-        <p className="mb-2 px-3 text-[10px] leading-snug text-[var(--color-muted)]">
-          Toggle off to hide from PDF and preview. Your data stays here.
+        <p className="mt-4 px-2 text-[10px] leading-snug text-[var(--color-muted)]">
+          Toggle off to hide from PDF and preview. Your data stays in the editor.
         </p>
       ) : null}
-
-      <nav className="space-y-1">
-        {ITEMS.map((item) => {
-          const Icon = item.icon;
-          const active = item.id === activeSection;
-          const vKey = item.visibilityKey;
-          const exportVisible = vKey ? isCvSectionVisible(vKey, sectionVisibility) : true;
-          const filled = vKey && cvData ? cvSectionHasFilledContent(vKey, cvData) : false;
-          const switchOn = Boolean(vKey && filled && exportVisible);
-          const toggleDisabled = Boolean(vKey && (!cvData || !filled));
-
-          return (
-            <div
-              key={item.id}
-              className={cn(
-                'flex w-full items-center gap-1 rounded-xl px-1 py-0.5 transition duration-200',
-                active ? 'bg-[var(--color-primary-100)]/90' : 'hover:bg-white/[0.04]'
-              )}
-            >
-              <button
-                type="button"
-                onClick={() => onSelect(item.id)}
-                className={cn(
-                  'flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm transition duration-200',
-                  active
-                    ? 'font-medium text-[var(--color-primary-400)]'
-                    : 'text-[var(--color-muted)] hover:text-[var(--color-text-primary)]'
-                )}
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                <span className={cn(!switchOn && vKey && 'opacity-55')}>{item.label}</span>
-              </button>
-              {showToggles && vKey ? (
-                <VisibilitySwitch
-                  on={switchOn}
-                  disabled={toggleDisabled}
-                  ariaLabel={
-                    toggleDisabled
-                      ? `${item.label}: add content here before it can appear on your CV.`
-                      : switchOn
-                        ? `${item.label}: shown on CV. Click to hide from PDF and preview.`
-                        : `${item.label}: hidden from PDF and preview. Click to show.`
-                  }
-                  onToggle={() =>
-                    onSectionVisibilityChange!(
-                      toggleCvSectionVisibility(sectionVisibility, vKey)
-                    )
-                  }
-                />
-              ) : null}
-            </div>
-          );
-        })}
-      </nav>
     </aside>
   );
 }
