@@ -13,6 +13,7 @@ import { PreviewPanel } from '@/components/cv/premium/PreviewPanel';
 import { ATSCircularScore } from '@/components/cv/premium/ATSCircularScore';
 import { JobKeywordsBanner } from '@/components/cv/premium/JobKeywordsBanner';
 import type { CVFormTab } from '@/components/cv/CVFormFields';
+import type { CVSectionVisibility } from '@/types';
 import { useJobSpecificCV, useArchiveJobSpecificCV } from '@/hooks/useJobSpecificCVs';
 import { useCoreCVVersions } from '@/hooks/useCV';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -159,7 +160,7 @@ export default function JobCVEditPage() {
   const [previewIsPdf, setPreviewIsPdf] = useState(true);
   const [previewBusy, setPreviewBusy] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [editorTab, setEditorTab] = useState<CVFormTab>('header');
+  const [editorTab, setEditorTab] = useState<CVFormTab>('photo');
   const [zoom, setZoom] = useState(100);
   const [page, setPage] = useState(1);
   const [fontFamily, setFontFamily] = useState('Inter');
@@ -1178,7 +1179,15 @@ export default function JobCVEditPage() {
             </div>
           ) : (
             <div className="grid gap-4 xl:grid-cols-[260px_1fr]">
-              <Sidebar activeSection={editorTab} onSelect={setEditorTab} />
+              <Sidebar
+                activeSection={editorTab}
+                onSelect={setEditorTab}
+                cvData={draft}
+                sectionVisibility={draft.sectionVisibility}
+                onSectionVisibilityChange={(next: CVSectionVisibility) =>
+                  handleChange({ ...draft, sectionVisibility: next })
+                }
+              />
               <div className="space-y-3">
                 <div className={CV_FORM_CARD}>
                   <CVEditorPanel

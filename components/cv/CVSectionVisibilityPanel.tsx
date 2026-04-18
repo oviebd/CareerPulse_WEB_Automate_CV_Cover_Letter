@@ -1,6 +1,10 @@
 'use client';
 
 import type { CVSectionVisibility, CVSectionVisibilityKey } from '@/types';
+import {
+  isCvSectionVisible,
+  toggleCvSectionVisibility,
+} from '@/lib/cv-section-visibility';
 
 const ROWS: { key: CVSectionVisibilityKey; label: string }[] = [
   { key: 'photo', label: 'Photo' },
@@ -27,20 +31,6 @@ type Props = {
 };
 
 export function CVSectionVisibilityPanel({ visibility, onChange }: Props) {
-  function toggle(key: CVSectionVisibilityKey, checked: boolean) {
-    const next = { ...visibility };
-    if (checked) {
-      delete next[key];
-    } else {
-      next[key] = false;
-    }
-    onChange(next);
-  }
-
-  function isOn(key: CVSectionVisibilityKey): boolean {
-    return visibility?.[key] !== false;
-  }
-
   return (
     <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)]/80 p-4 backdrop-blur-sm">
       <p className="text-sm font-semibold text-[var(--color-text-primary)]">
@@ -55,11 +45,11 @@ export function CVSectionVisibilityPanel({ visibility, onChange }: Props) {
             key={key}
             type="button"
             className={`rounded-badge border px-3 py-1.5 text-xs font-medium transition duration-200 ${
-              isOn(key)
+              isCvSectionVisible(key, visibility)
                 ? 'border-[var(--color-primary-400)]/50 bg-[var(--color-primary-100)] text-[var(--color-primary-400)] shadow-[0_0_0_1px_rgba(108,99,255,0.2)]'
                 : 'border-[var(--color-border)] bg-white/[0.04] text-[var(--color-muted)] hover:bg-white/[0.08] hover:text-[var(--color-text-primary)]'
             }`}
-            onClick={() => toggle(key, !isOn(key))}
+            onClick={() => onChange(toggleCvSectionVisibility(visibility, key))}
           >
             {label}
           </button>

@@ -48,7 +48,9 @@ import { templateShowsSkillRatingEditor } from '@/src/utils/templateSkillUi';
 
 export type CVFormTab =
   | 'design'
+  | 'photo'
   | 'header'
+  | 'address'
   | 'summary'
   | 'experience'
   | 'education'
@@ -191,7 +193,9 @@ function HighlightedText({ text, keywords }: { text: string; keywords: string[] 
 
 const TAB_DEFS: { id: CVFormTab; label: string }[] = [
   { id: 'design', label: 'Layout & Design' },
-  { id: 'header', label: 'Header & contact' },
+  { id: 'photo', label: 'Photo' },
+  { id: 'header', label: 'Header' },
+  { id: 'address', label: 'Address' },
   { id: 'summary', label: 'Summary' },
   { id: 'experience', label: 'Experience' },
   { id: 'education', label: 'Education' },
@@ -309,7 +313,9 @@ export function CVFormFields(props: Props) {
     return pieces.join('\n');
   };
   const atsSectionKeyByTab: Partial<Record<CVFormTab, string>> = {
+    photo: 'header',
     header: 'header',
+    address: 'header',
     summary: 'summary',
     experience: 'experience',
     education: 'education',
@@ -530,52 +536,44 @@ export function CVFormFields(props: Props) {
               </div>
             </div>
 
-            {/* Layout Settings */}
-            <div className={FORM_CARD}>
-              <div className="mb-4">
-                 <h3 className="text-sm font-semibold text-[var(--color-text-primary)] uppercase tracking-wider text-xs">Section Visibility</h3>
-                 <p className="text-xs text-[var(--color-muted)] mt-1">Configure which sections appear on your final CV.</p>
-              </div>
-              <CVSectionVisibilityPanel
-                visibility={sectionVisibility}
-                onChange={onSectionVisibilityChange}
-              />
-            </div>
-
             <div className={FORM_CARD}>
                <p className="mb-2 text-sm font-medium text-[var(--color-text-primary)]">Pro Tip</p>
                <p className="text-sm text-[var(--color-muted)]">
-                 Hiding a section here only removes it from the exported PDF and the live preview. Your data remains safe and can be re-enabled at any time.
+                 Use the switches next to each section in the sidebar to hide blocks from your PDF and preview. Your data stays in the editor and you can turn sections back on anytime.
                </p>
             </div>
           </div>
         ) : null}
 
-        {tab === 'header' ? (
+        {tab === 'photo' ? (
           <div className={cn('space-y-4', FORM_CARD)}>
             <CVPhotoField photoUrl={photo_url} onPhotoUrl={onPhotoUrl} />
+          </div>
+        ) : null}
+
+        {tab === 'header' ? (
+          <div className={cn('space-y-4', FORM_CARD)}>
             <div className="grid gap-4 sm:grid-cols-2">
-            <Input label="Full name" value={full_name} onChange={(e) => onFullName(e.target.value)} />
-            <Input
-              label="Professional title"
-              value={professional_title}
-              onChange={(e) => onProfessionalTitle(e.target.value)}
-            />
-            <Input label="Email" type="email" value={email} onChange={(e) => onEmail(e.target.value)} />
-            <Input label="Phone" value={phone} onChange={(e) => onPhone(e.target.value)} />
-            <Input label="Location" value={location} onChange={(e) => onLocation(e.target.value)} />
-            <Input
-              label="LinkedIn URL"
-              value={linkedin_url}
-              onChange={(e) => onLinkedinUrl(e.target.value)}
-            />
-            <Input
-              label="GitHub URL"
-              value={github_url}
-              onChange={(e) => onGithubUrl(e.target.value)}
-            />
+              <Input label="Full name" value={full_name} onChange={(e) => onFullName(e.target.value)} />
+              <Input
+                label="Professional title"
+                value={professional_title}
+                onChange={(e) => onProfessionalTitle(e.target.value)}
+              />
+              <Input label="Email" type="email" value={email} onChange={(e) => onEmail(e.target.value)} />
+              <Input label="Phone" value={phone} onChange={(e) => onPhone(e.target.value)} />
+              <Input label="Location" value={location} onChange={(e) => onLocation(e.target.value)} />
+              <Input
+                label="LinkedIn URL"
+                value={linkedin_url}
+                onChange={(e) => onLinkedinUrl(e.target.value)}
+              />
+              <Input
+                label="GitHub URL"
+                value={github_url}
+                onChange={(e) => onGithubUrl(e.target.value)}
+              />
             </div>
-            {/* ── Additional links ──────────────────────────────── */}
             <div className="col-span-2">
               <p className="mb-2 text-sm font-medium text-[var(--color-text-primary)]">Additional links</p>
               <p className="mb-3 text-xs text-[var(--color-muted)]">Portfolio, website, Behance, Dribbble, blog, Twitter/X, etc. — any links beyond LinkedIn &amp; GitHub.</p>
@@ -629,6 +627,11 @@ export function CVFormFields(props: Props) {
                 + Add link
               </Button>
             </div>
+          </div>
+        ) : null}
+
+        {tab === 'address' ? (
+          <div className={cn('space-y-4', FORM_CARD)}>
             <Textarea
               label="Full address (optional)"
               value={address}
@@ -640,7 +643,7 @@ export function CVFormFields(props: Props) {
                 disabled={!address?.trim()}
                 onClick={() =>
                   setRewriteTarget({
-                    section: 'Header',
+                    section: 'Address',
                     inputLabel: 'Full address',
                     sourceText: address ?? '',
                     extraContext: mergeExtraContext(),

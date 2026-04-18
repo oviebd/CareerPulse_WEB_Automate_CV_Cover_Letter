@@ -56,7 +56,7 @@ export function CVEditorPanel({
   onFontFamilyChange,
   userTier,
 }: CVEditorPanelProps) {
-  const [internalTab, setInternalTab] = useState<CVFormTab>('header');
+  const [internalTab, setInternalTab] = useState<CVFormTab>('photo');
   const isTabControlled = activeTabProp !== undefined && onActiveTabChange !== undefined;
   const tab = isTabControlled ? activeTabProp : internalTab;
   const setTab = (next: CVFormTab) => {

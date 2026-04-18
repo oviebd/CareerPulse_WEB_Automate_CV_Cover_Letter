@@ -30,6 +30,20 @@ export function isCvSectionVisible(
   return true;
 }
 
+/** Flip show/hide for PDF/preview for one section (omit key or true = visible). */
+export function toggleCvSectionVisibility(
+  visibility: CVSectionVisibility | undefined,
+  key: CVSectionVisibilityKey
+): CVSectionVisibility {
+  const next: CVSectionVisibility = { ...(visibility ?? {}) };
+  if (isCvSectionVisible(key, visibility)) {
+    next[key] = false;
+  } else {
+    delete next[key];
+  }
+  return next;
+}
+
 /** Strip hidden sections from CV data for PDF/HTML templates. */
 export function applyCvSectionVisibility(
   data: CVData,

@@ -11,6 +11,9 @@ import { cn, formatDate } from '@/lib/utils';
 import { FeatureGate } from '@/components/shared/FeatureGate';
 import { Modal } from '@/components/ui/modal';
 import { CVFormFields, type CVFormTab } from '@/components/cv/CVFormFields';
+import { Sidebar } from '@/components/cv/premium/Sidebar';
+import type { CVSectionVisibility } from '@/types';
+import { profileToUniversalCV } from '@/lib/cv-universal-bridge';
 import { Select } from '@/components/ui/select';
 import { useCVProfile, useCoreCVVersions } from '@/hooks/useCV';
 import { useJobSpecificCV } from '@/hooks/useJobSpecificCVs';
@@ -136,7 +139,7 @@ export default function CVTemplatePreviewPage() {
     refetch: refetchJobCv,
   } = useJobSpecificCV(jobCvId ?? '');
   const { tier } = useSubscription();
-  const [tab, setTab] = useState<CVFormTab>('header');
+  const [tab, setTab] = useState<CVFormTab>('photo');
   const [draft, setDraft] = useState<CVProfile | null>(null);
   const [accent, setAccent] = useState('#2563EB');
   const [previewHtml, setPreviewHtml] = useState<string>('');
@@ -651,10 +654,22 @@ export default function CVTemplatePreviewPage() {
       </FeatureGate>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,480px)]">
-        <Card className="p-4 sm:p-6">
+        <div className="grid min-w-0 gap-4 xl:grid-cols-[260px_1fr]">
+          <Sidebar
+            activeSection={tab}
+            onSelect={setTab}
+            cvData={profileToUniversalCV(draft)}
+            sectionVisibility={draft.section_visibility ?? {}}
+            onSectionVisibilityChange={(next: CVSectionVisibility) =>
+              setDraft({ ...draft, section_visibility: next })
+            }
+          />
+          <Card className="min-w-0 p-4 sm:p-6">
           <CVFormFields
             tab={tab}
             onTabChange={(id) => setTab(id as CVFormTab)}
+            hideTabBar
+            hideVisibilityPanel
             full_name={draft.full_name ?? ''}
             onFullName={(v) => setDraft({ ...draft, full_name: v })}
             professional_title={draft.professional_title ?? ''}
@@ -741,7 +756,8 @@ export default function CVTemplatePreviewPage() {
             accent={accent}
             onAccentChange={setAccent}
           />
-        </Card>
+          </Card>
+        </div>
 
         <div className="lg:sticky lg:top-4 lg:self-start">
           <p className="mb-2 text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">

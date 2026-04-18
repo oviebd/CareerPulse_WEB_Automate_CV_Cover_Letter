@@ -12,6 +12,7 @@ import { Sidebar } from '@/components/cv/premium/Sidebar';
 import { PreviewPanel } from '@/components/cv/premium/PreviewPanel';
 import { ATSCircularScore } from '@/components/cv/premium/ATSCircularScore';
 import type { CVFormTab } from '@/components/cv/CVFormFields';
+import type { CVSectionVisibility } from '@/types';
 import { FeatureGate } from '@/components/shared/FeatureGate';
 import { useToast } from '@/components/ui/toast';
 import type { CVData } from '@/types';
@@ -149,7 +150,7 @@ export function CVEditor() {
   const [previewBusy, setPreviewBusy] = useState(false);
   const [settingDefault, setSettingDefault] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [editorTab, setEditorTab] = useState<CVFormTab>('header');
+  const [editorTab, setEditorTab] = useState<CVFormTab>('photo');
   const [zoom, setZoom] = useState(100);
   const [page, setPage] = useState(1);
   const [autosaveState, setAutosaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -506,7 +507,15 @@ export function CVEditor() {
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_630px]">
         <div className="min-w-0">
           <div className="grid gap-4 xl:grid-cols-[260px_1fr]">
-            <Sidebar activeSection={editorTab} onSelect={setEditorTab} />
+            <Sidebar
+              activeSection={editorTab}
+              onSelect={setEditorTab}
+              cvData={cvData}
+              sectionVisibility={cvData.sectionVisibility}
+              onSectionVisibilityChange={(next: CVSectionVisibility) =>
+                handleChange({ ...cvData, sectionVisibility: next })
+              }
+            />
             <div className="space-y-3">
               <div className="space-y-3">
                 <div className={CV_FORM_CARD}>
