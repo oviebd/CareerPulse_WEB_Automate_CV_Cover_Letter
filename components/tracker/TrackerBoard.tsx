@@ -18,7 +18,7 @@ import {
   X,
 } from 'lucide-react';
 import type { Job, JobStatus } from '@/types/database';
-import { JOB_STATUS_CONFIG, jobStatusShortLabel } from '@/types';
+import { JOB_STATUS_CONFIG } from '@/types';
 import { TRACKABLE_JOB_STATUSES } from '@/lib/job-status';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
@@ -66,6 +66,8 @@ export function TrackerBoard() {
   const { toast } = useToast();
   const [filter, setFilter] = useState<FilterKey>('all');
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
+  const moreFiltersRef = useRef<HTMLDivElement>(null);
+  useClickOutside(moreFiltersRef, () => setMoreFiltersOpen(false), moreFiltersOpen);
 
   const filtered = useMemo(() => {
     if (filter === 'all') return apps;
@@ -76,12 +78,17 @@ export function TrackerBoard() {
   const overflowChips = FILTER_CHIPS.slice(6);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-[var(--color-muted)]">
-          {apps.length} job{apps.length === 1 ? '' : 's'} being tracked
-        </p>
-        <div className="flex flex-wrap gap-2">
+    <div className="space-y-4">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1 sm:gap-x-3">
+          <h1 className="font-display text-2xl font-semibold tracking-tight text-[var(--color-text-primary)]">
+            Job Tracker
+          </h1>
+          <span className="text-sm text-[var(--color-muted)]">
+            {apps.length} job{apps.length === 1 ? '' : 's'} being tracked
+          </span>
+        </div>
+        <div className="flex shrink-0 flex-wrap gap-2">
           <Button
             size="sm"
             variant="primary"
@@ -102,10 +109,15 @@ export function TrackerBoard() {
             </Button>
           </Link>
         </div>
-      </div>
+      </header>
 
       <div className="relative">
-        <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {/*
+          Do not use overflow-x-auto here: paired with overflow-x, overflow-y cannot stay
+          visible, so any dropdown below the row (More menu) gets clipped.
+          Chips use flex-wrap; horizontal scrolling is not required for the layout.
+        */}
+        <div className="-mx-0.5 flex flex-wrap items-center gap-2 px-0.5 pb-1">
           {primaryChips.map((c) => (
             <FilterChip
               key={String(c.key)}
@@ -116,32 +128,47 @@ export function TrackerBoard() {
             />
           ))}
           {overflowChips.length > 0 ? (
-            <div className="relative shrink-0">
+            <div ref={moreFiltersRef} className="relative shrink-0">
               <button
                 type="button"
+                aria-expanded={moreFiltersOpen}
+                aria-haspopup="listbox"
                 onClick={() => setMoreFiltersOpen((v) => !v)}
                 className={cn(
-                  'inline-flex items-center gap-1 rounded-full border border-[var(--color-border)] px-3 py-1.5 text-sm font-medium transition duration-200',
+                  'inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-sm font-medium transition duration-200',
                   overflowChips.some((c) => filter === c.key)
-                    ? 'bg-[var(--color-primary-500)] text-white'
-                    : 'bg-[var(--color-control-bg)] text-[var(--color-muted)] hover:bg-[var(--color-hover-surface)] hover:text-[var(--color-text-primary)]'
+                    ? 'border-transparent bg-[var(--color-primary-500)] text-white shadow-sm ring-1 ring-[var(--color-primary-500)]/30'
+                    : 'border-[var(--color-border)]/50 bg-[var(--color-control-bg)] text-[var(--color-muted)] shadow-sm hover:border-[var(--color-border)] hover:bg-[var(--color-hover-surface)] hover:text-[var(--color-text-primary)]'
                 )}
               >
                 More
                 <MoreHorizontal className="h-4 w-4" />
               </button>
               {moreFiltersOpen ? (
-                <div className="absolute left-0 top-full z-20 mt-1 min-w-[180px] rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] py-1 shadow-lg">
+                <div
+                  className="absolute left-0 top-full z-[80] mt-2 min-w-[200px] rounded-xl border border-[var(--color-border)]/60 bg-[var(--color-surface)] py-1 shadow-lg shadow-black/5"
+                  role="listbox"
+                >
                   {overflowChips.map((c) => (
                     <button
                       key={String(c.key)}
                       type="button"
-                      className="block w-full px-3 py-2 text-left text-sm text-[var(--color-text-primary)] transition-colors hover:bg-[var(--color-hover-surface)]"
+                      className={cn(
+                        'flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition-colors hover:bg-[var(--color-hover-surface)]',
+                        filter === c.key
+                          ? 'bg-[var(--color-primary-500)]/10 font-medium text-[var(--color-primary-500)]'
+                          : 'text-[var(--color-text-primary)]'
+                      )}
                       onClick={() => {
                         setFilter(c.key);
                         setMoreFiltersOpen(false);
                       }}
                     >
+                      {filter === c.key ? (
+                        <Check className="h-4 w-4 shrink-0" />
+                      ) : (
+                        <span className="w-4 shrink-0" />
+                      )}
                       {c.label}
                     </button>
                   ))}
@@ -152,31 +179,30 @@ export function TrackerBoard() {
         </div>
       </div>
 
-      {isLoading ? (
-        <div className="mx-auto flex max-w-3xl flex-col gap-3">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-36 w-full rounded-xl" />
-          ))}
-        </div>
-      ) : filtered.length === 0 ? (
-        <EmptyState hasAnyJobs={apps.length > 0} />
-      ) : (
-        <motion.div
-          layout
-          className="mx-auto flex max-w-3xl flex-col gap-3"
-        >
-          <AnimatePresence mode="popLayout">
-            {filtered.map((app, index) => (
-              <JobTrackerCard
-                key={app.id}
-                job={app}
-                index={index}
-                toast={toast}
-              />
+      <div className="rounded-2xl border border-[var(--color-border)]/50 bg-[var(--color-surface-faint)]/70 p-4 shadow-sm sm:p-6">
+        {isLoading ? (
+          <div className="flex flex-col gap-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-36 w-full rounded-xl" />
             ))}
-          </AnimatePresence>
-        </motion.div>
-      )}
+          </div>
+        ) : filtered.length === 0 ? (
+          <EmptyState hasAnyJobs={apps.length > 0} />
+        ) : (
+          <motion.div layout className="flex flex-col gap-4">
+            <AnimatePresence mode="popLayout">
+              {filtered.map((app, index) => (
+                <JobTrackerCard
+                  key={app.id}
+                  job={app}
+                  index={index}
+                  toast={toast}
+                />
+              ))}
+            </AnimatePresence>
+          </motion.div>
+        )}
+      </div>
     </div>
   );
 }
@@ -201,16 +227,16 @@ function FilterChip({
       type="button"
       onClick={onSelect}
       className={cn(
-        'shrink-0 rounded-full border border-transparent px-3 py-1.5 text-sm font-medium transition duration-200',
+        'shrink-0 rounded-full border px-3 py-2 text-sm font-medium transition duration-200',
         active
           ? cfg
             ? cn(
                 cfg.bgColor,
                 cfg.textColor,
-                'ring-2 ring-current ring-offset-2 ring-offset-[var(--color-background)]'
+                'border-transparent shadow-sm ring-1 ring-black/5 dark:ring-white/10'
               )
-            : 'border-[var(--color-primary-400)]/30 bg-[var(--color-primary-500)] text-white shadow-sm'
-          : 'bg-[var(--color-control-bg)] text-[var(--color-muted)] hover:border-[var(--color-border)] hover:bg-[var(--color-hover-surface)] hover:text-[var(--color-text-primary)]'
+            : 'border-transparent bg-[var(--color-primary-500)] text-white shadow-sm ring-1 ring-[var(--color-primary-500)]/25'
+          : 'border-[var(--color-border)]/40 bg-[var(--color-control-bg)] text-[var(--color-muted)] shadow-sm hover:border-[var(--color-border)] hover:bg-[var(--color-hover-surface)] hover:text-[var(--color-text-primary)]'
       )}
     >
       {label}
@@ -220,7 +246,7 @@ function FilterChip({
 
 function EmptyState({ hasAnyJobs }: { hasAnyJobs: boolean }) {
   return (
-    <div className="mx-auto max-w-md rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] px-8 py-14 text-center shadow-[var(--shadow-card)]">
+    <div className="mx-auto max-w-md rounded-xl border border-dashed border-[var(--color-border)]/60 bg-[var(--color-surface)]/80 px-6 py-12 text-center shadow-sm sm:px-8 sm:py-14">
       <div className="text-4xl">📋</div>
       <p className="mt-4 font-semibold text-[var(--color-text-primary)]">
         {hasAnyJobs ? 'No jobs match this filter' : 'No jobs being tracked yet'}
@@ -338,45 +364,79 @@ function JobTrackerCard({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, height: 0, marginBottom: 0 }}
       transition={{ duration: 0.25, delay: index * 0.05 }}
-      className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-sm)] transition-shadow duration-200 hover:shadow-[var(--shadow-md)]"
+      className="overflow-visible rounded-xl border border-[var(--color-border)]/45 bg-[var(--color-surface)] shadow-[var(--shadow-sm)] ring-1 ring-[var(--color-surface-faint)] transition-shadow duration-200 hover:shadow-[var(--shadow-md)]"
     >
-      <div className="p-4 sm:p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="flex min-w-0 flex-1 gap-3">
-            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--color-primary-100)] text-lg">
-              <Building2 className="h-5 w-5 text-[var(--color-primary-500)]" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-base font-semibold text-[var(--color-text-primary)]">
+      <div className="p-4 sm:p-6">
+        <div className="flex gap-4">
+          <div
+            className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--color-primary-100)] shadow-sm ring-1 ring-[var(--color-primary-500)]/10"
+            aria-hidden
+          >
+            <Building2 className="h-5 w-5 text-[var(--color-primary-500)]" />
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+              <div className="min-w-0 space-y-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                  {job.company_name || 'Company'}
+                </p>
+                <h3 className="text-lg font-semibold leading-snug tracking-tight text-[var(--color-text-primary)]">
                   {job.job_title || 'Untitled role'}
                 </h3>
-                <div ref={statusRef} className="relative">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-[var(--color-muted)]">
+                  {job.location ? <span>{job.location}</span> : null}
+                  {job.location && job.job_url ? <span>·</span> : null}
+                  {job.job_url ? (
+                    <a
+                      href={job.job_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex max-w-[200px] items-center gap-1 truncate font-medium text-[var(--color-primary-500)] hover:underline"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                      Link
+                    </a>
+                  ) : null}
+                </div>
+                <p className="text-xs text-[var(--color-muted)]">
+                  Added {formatRelativeCreated(job.created_at)}
+                </p>
+              </div>
+
+              <div className="flex w-full flex-col items-stretch gap-3 sm:w-auto sm:shrink-0 sm:items-end">
+                <div ref={statusRef} className="relative w-full sm:w-auto">
                   <button
                     type="button"
                     disabled={statusBusy}
                     onClick={() => setStatusOpen((o) => !o)}
                     className={cn(
-                      'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors duration-200',
+                      'inline-flex w-full min-w-0 items-center justify-center gap-1.5 rounded-full border px-3 py-2 text-xs font-semibold shadow-sm transition sm:w-auto sm:min-w-[8rem] sm:justify-between',
                       cfg
-                        ? cn(cfg.bgColor, cfg.textColor, 'border-transparent')
-                        : 'border-[var(--color-border)] bg-[var(--color-surface-faint)] text-[var(--color-text-secondary)]'
+                        ? cn(
+                            cfg.bgColor,
+                            cfg.textColor,
+                            'border-transparent ring-1 ring-black/5 dark:ring-white/10'
+                          )
+                        : 'border-[var(--color-border)]/50 bg-[var(--color-surface-faint)] text-[var(--color-text-secondary)]'
                     )}
                   >
                     {statusBusy ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
                     ) : cfg ? (
                       <>
-                        <span>{cfg.emoji}</span>
-                        <span>{cfg.label}</span>
+                        <span className="shrink-0">{cfg.emoji}</span>
+                        <span className="min-w-0 truncate text-left sm:flex-1">
+                          {cfg.label}
+                        </span>
                       </>
                     ) : (
                       'Status'
                     )}
-                    <ChevronDown className="h-3.5 w-3.5 opacity-70" />
+                    <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-80" />
                   </button>
                   {statusOpen ? (
-                    <div className="absolute right-0 z-30 mt-1 w-52 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] py-1 shadow-lg">
+                    <div className="absolute right-0 z-30 mt-2 w-56 rounded-xl border border-[var(--color-border)]/60 bg-[var(--color-surface)] py-1 shadow-lg">
                       {TRACKABLE_JOB_STATUSES.map((s) => {
                         const c = JOB_STATUS_CONFIG[s];
                         const sel = displayStatus === s;
@@ -384,7 +444,7 @@ function JobTrackerCard({
                           <button
                             key={s}
                             type="button"
-                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--color-text-primary)] transition-colors hover:bg-[var(--color-hover-surface)]"
+                            className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-[var(--color-text-primary)] transition-colors hover:bg-[var(--color-hover-surface)]"
                             onClick={() => void patchStatus(s)}
                           >
                             {sel ? (
@@ -401,101 +461,90 @@ function JobTrackerCard({
                     </div>
                   ) : null}
                 </div>
-                <div ref={deleteRef} className="relative ml-auto sm:ml-0">
-                  <button
-                    type="button"
-                    className="flex h-8 w-8 items-center justify-center rounded-md text-[var(--color-muted)] transition hover:bg-[var(--color-hover-surface)] hover:text-[var(--color-danger)]"
-                    aria-label="Delete job"
-                    onClick={() => setDeleteOpen((v) => !v)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                  {deleteOpen ? (
-                    <div className="absolute right-0 z-30 mt-1 w-72 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-sm text-[var(--color-text-primary)] shadow-xl">
-                      <p className="font-medium">Delete this job?</p>
-                      {(hasCv || hasCl) && (
-                        <p className="mt-1 text-xs text-[var(--color-muted)]">
-                          {hasCv
-                            ? 'This job has a linked CV — status will be set to None instead of deleting.'
-                            : 'This job has a linked cover letter — status will be set to None instead of deleting.'}
-                        </p>
-                      )}
-                      <div className="mt-3 flex justify-end gap-2">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setDeleteOpen(false)}
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="primary"
-                          onClick={() => void handleDelete()}
-                        >
-                          Confirm
-                        </Button>
-                      </div>
+
+                <div
+                  className="flex flex-wrap items-center justify-end gap-2"
+                  role="toolbar"
+                  aria-label="Job actions"
+                >
+                  <div className="inline-flex items-center gap-0.5 rounded-xl border border-[var(--color-border)]/45 bg-[var(--color-surface-faint)] p-1 shadow-sm">
+                    {hasCv ? (
+                      <Link
+                        href={`/cv/job-specific/${cvs[0].id}/edit`}
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[var(--color-muted)] transition hover:bg-[var(--color-hover-surface)] hover:text-[var(--color-text-primary)]"
+                        title="Edit CV"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Link>
+                    ) : null}
+                    {hasCv ? (
+                      <button
+                        type="button"
+                        onClick={() => setPreview({ type: 'cv', id: cvs[0].id })}
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[var(--color-muted)] transition hover:bg-[var(--color-hover-surface)] hover:text-[var(--color-text-primary)]"
+                        title="View CV"
+                        aria-label="View CV preview"
+                      >
+                        <FileText className="h-4 w-4" />
+                      </button>
+                    ) : null}
+                    {hasCl ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPreview({ type: 'cover_letter', id: cls[0].id })
+                        }
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[var(--color-muted)] transition hover:bg-[var(--color-hover-surface)] hover:text-[var(--color-text-primary)]"
+                        title="View cover letter"
+                        aria-label="View cover letter preview"
+                      >
+                        <Mail className="h-4 w-4" />
+                      </button>
+                    ) : null}
+                    <div ref={deleteRef} className="relative">
+                      <button
+                        type="button"
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[var(--color-muted)] transition hover:bg-red-500/10 hover:text-[var(--color-danger)]"
+                        aria-label="Delete job"
+                        onClick={() => setDeleteOpen((v) => !v)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                      {deleteOpen ? (
+                        <div className="absolute right-0 z-30 mt-2 w-72 max-w-[calc(100vw-2.5rem)] rounded-xl border border-[var(--color-border)]/60 bg-[var(--color-surface)] p-3 text-sm text-[var(--color-text-primary)] shadow-lg">
+                          <p className="font-medium">Delete this job?</p>
+                          {(hasCv || hasCl) && (
+                            <p className="mt-1 text-xs text-[var(--color-muted)]">
+                              {hasCv
+                                ? 'This job has a linked CV — status will be set to None instead of deleting.'
+                                : 'This job has a linked cover letter — status will be set to None instead of deleting.'}
+                            </p>
+                          )}
+                          <div className="mt-3 flex justify-end gap-2">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setDeleteOpen(false)}
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="primary"
+                              onClick={() => void handleDelete()}
+                            >
+                              Confirm
+                            </Button>
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
-                  ) : null}
+                  </div>
                 </div>
               </div>
-              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-[var(--color-muted)]">
-                <span>{job.company_name}</span>
-                {job.location ? (
-                  <>
-                    <span>·</span>
-                    <span>{job.location}</span>
-                  </>
-                ) : null}
-                {job.job_url ? (
-                  <>
-                    <span>·</span>
-                    <a
-                      href={job.job_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex max-w-[200px] items-center gap-1 truncate font-medium text-[var(--color-primary-500)] hover:underline"
-                    >
-                      <ExternalLink className="h-3.5 w-3.5 shrink-0" />
-                      Link
-                    </a>
-                  </>
-                ) : null}
-              </div>
-              <p className="mt-1 text-xs text-[var(--color-muted)]">
-                Added {formatRelativeCreated(job.created_at)}
-              </p>
             </div>
           </div>
         </div>
-
-        {(hasCv || hasCl) && (
-          <div className="mt-4 flex flex-wrap gap-2 border-t border-[var(--color-border)] pt-3">
-            {hasCv ? (
-              <button
-                type="button"
-                onClick={() => setPreview({ type: 'cv', id: cvs[0].id })}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-md text-lg text-[var(--color-muted)] transition hover:bg-[var(--color-hover-surface)] hover:text-[var(--color-text-primary)]"
-                title="View CV"
-              >
-                <FileText className="h-5 w-5" />
-              </button>
-            ) : null}
-            {hasCl ? (
-              <button
-                type="button"
-                onClick={() =>
-                  setPreview({ type: 'cover_letter', id: cls[0].id })
-                }
-                className="inline-flex h-9 w-9 items-center justify-center rounded-md text-lg text-[var(--color-muted)] transition hover:bg-[var(--color-hover-surface)] hover:text-[var(--color-text-primary)]"
-                title="View cover letter"
-              >
-                <Mail className="h-5 w-5" />
-              </button>
-            ) : null}
-          </div>
-        )}
       </div>
 
       {preview ? (
