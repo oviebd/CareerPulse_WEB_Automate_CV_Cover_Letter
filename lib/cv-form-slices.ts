@@ -69,7 +69,8 @@ function workToExp(w: WorkExperience): ExperienceEntry {
   };
 }
 
-function expToWork(e: ExperienceEntry): WorkExperience {
+/** Used by the CV document store for granular experience updates without full form round-trips. */
+export function expToWork(e: ExperienceEntry): WorkExperience {
   return {
     id: e.id || generateId(),
     company: e.company,
@@ -99,7 +100,7 @@ function eduToEntry(e: Education): EducationEntry {
   };
 }
 
-function entryToEdu(e: EducationEntry): Education {
+export function entryToEdu(e: EducationEntry): Education {
   return {
     id: e.id || generateId(),
     institution: e.institution,
@@ -125,7 +126,7 @@ function projToEntry(p: Project): ProjectEntry {
   };
 }
 
-function entryToProj(p: ProjectEntry): Project {
+export function entryToProj(p: ProjectEntry): Project {
   return {
     id: p.id || generateId(),
     name: p.name,
@@ -152,7 +153,7 @@ function certToEntry(c: Certification): CertificationEntry {
   };
 }
 
-function entryToCert(c: CertificationEntry): Certification {
+export function entryToCert(c: CertificationEntry): Certification {
   return {
     id: c.id || generateId(),
     name: c.name,
@@ -177,7 +178,7 @@ function langToEntry(l: Language, i: number): LanguageEntry {
   };
 }
 
-function entryToLang(l: LanguageEntry): Language {
+export function entryToLang(l: LanguageEntry): Language {
   return {
     name: l.language,
     proficiency:
@@ -201,7 +202,7 @@ function refToReferral(r: Reference, i: number): ReferralEntry {
   };
 }
 
-function referralToRef(r: ReferralEntry): Reference {
+export function referralToRef(r: ReferralEntry): Reference {
   return {
     name: r.name,
     role: r.title ?? '',

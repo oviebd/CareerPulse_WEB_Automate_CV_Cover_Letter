@@ -458,7 +458,7 @@ export default function JobCVEditPage() {
     if (!draft || templatesLoading) return;
     const t = window.setTimeout(() => {
       void refreshPreview();
-    }, 700);
+    }, 1200);
     return () => window.clearTimeout(t);
   }, [draft, refreshPreview, templatesLoading]);
 

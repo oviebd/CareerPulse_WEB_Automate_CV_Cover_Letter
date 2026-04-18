@@ -262,7 +262,7 @@ export default function CoverLetterDetailPage() {
     if ((!letter && !isDraftMode) || (isDraftMode && !draftClMeta)) return;
     const t = window.setTimeout(() => {
       void refreshPreview();
-    }, 400);
+    }, 1000);
     return () => window.clearTimeout(t);
   }, [
     letter,

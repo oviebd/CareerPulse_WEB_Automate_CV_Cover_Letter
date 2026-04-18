@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useDeferredValue } from 'react';
 import type { CVData, SubscriptionTier } from '@/types';
 import { CVFormFields, type CVFormTab, type AiJobContext } from '@/components/cv/CVFormFields';
 import { Progress } from '@/components/ui/progress';
@@ -10,10 +10,13 @@ import {
   formSlicesToCvData,
   type FormSlices,
 } from '@/lib/cv-form-slices';
+import { useCVDocumentStore } from '@/src/store/cvStore';
 
 export interface CVEditorPanelProps {
-  value: CVData;
-  onChange: (data: CVData) => void;
+  /** Core CV editor: read/write via Zustand for granular updates + fewer parent re-renders. */
+  useDocumentStore?: boolean;
+  value?: CVData;
+  onChange?: (data: CVData) => void;
   mode?: 'full' | 'compact';
   readOnly?: boolean;
   highlightedKeywords?: string[];
@@ -35,8 +38,9 @@ export interface CVEditorPanelProps {
 }
 
 export function CVEditorPanel({
-  value,
-  onChange,
+  useDocumentStore = false,
+  value: valueProp,
+  onChange: onChangeProp,
   mode = 'full',
   readOnly = false,
   highlightedKeywords,
@@ -56,6 +60,9 @@ export function CVEditorPanel({
   onFontFamilyChange,
   userTier,
 }: CVEditorPanelProps) {
+  const storeCvData = useCVDocumentStore((s) => s.cvData);
+  const value = useDocumentStore ? storeCvData! : valueProp!;
+
   const [internalTab, setInternalTab] = useState<CVFormTab>('photo');
   const isTabControlled = activeTabProp !== undefined && onActiveTabChange !== undefined;
   const tab = isTabControlled ? activeTabProp : internalTab;
@@ -77,13 +84,23 @@ export function CVEditorPanel({
 
   const applyPatch = useCallback(
     (patch: Partial<FormSlices>) => {
+      if (useDocumentStore) {
+        useCVDocumentStore.getState().applyFormSlicesPatch(patch);
+        return;
+      }
+      if (!onChangeProp) return;
       const base = cvDataToFormSlices(value);
-      onChange(formSlicesToCvData(value, { ...base, ...patch }, design));
+      onChangeProp(formSlicesToCvData(value, { ...base, ...patch }, design));
     },
-    [value, onChange, design]
+    [useDocumentStore, value, onChangeProp, design]
   );
 
-  const ats = buildATSReport(value, highlightedKeywords ?? []);
+  const deferredForAts = useDeferredValue(value);
+  const ats = buildATSReport(deferredForAts, highlightedKeywords ?? []);
+
+  if (useDocumentStore && !storeCvData) {
+    return null;
+  }
 
   return (
     <div className="space-y-4">

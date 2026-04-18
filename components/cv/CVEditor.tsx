@@ -1,9 +1,11 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo, useDeferredValue } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
+import { useShallow } from 'zustand/react/shallow';
 import { useCVEditor } from '@/hooks/useCVEditor';
+import { useCvAutosave } from '@/hooks/useCvAutosave';
 import { useSubscription } from '@/hooks/useSubscription';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -28,6 +30,9 @@ import { cn } from '@/lib/utils';
 import { ALL_TEMPLATE_IDS, TEMPLATE_CONFIGS } from '@/src/config/templateConfig';
 import { normalizeTemplateId } from '@/src/utils/cvDefaults';
 import type { TemplateId } from '@/src/types/cv.types';
+import { useCVDocumentStore } from '@/src/store/cvStore';
+
+const PREVIEW_DEBOUNCE_MS = 1200;
 
 function previewPayloadFromCVData(d: CVData): Record<string, unknown> {
   return JSON.parse(JSON.stringify(d)) as Record<string, unknown>;
@@ -56,10 +61,10 @@ export function CVEditor() {
     isDirty,
     saveButtonLabel,
     handleSave,
-    editorState,
-    setEditorState,
     reloadFromServer,
   } = useCVEditor({ cvIdFromRoute: routeId });
+
+  useCvAutosave({ cvId, isNew: cvId === null });
 
   const queryClient = useQueryClient();
 
@@ -90,62 +95,39 @@ export function CVEditor() {
   const { toast } = useToast();
   const { tier } = useSubscription();
 
-  const cvData = editorState.cvData;
-  const selectedTemplateId = editorState.preferred_template_id;
-  const accent = editorState.accent_color;
-  const fontFamily = editorState.font_family;
-
-  const setSelectedTemplateId = useCallback(
-    (id: string) => {
-      setEditorState((prev) => {
-        const tid = normalizeTemplateId(id) as TemplateId;
-        const cfg = TEMPLATE_CONFIGS[tid];
-        return {
-          ...prev,
-          preferred_template_id: tid,
-          cvData: {
-            ...prev.cvData,
-            meta: {
-              ...prev.cvData.meta,
-              templateId: tid,
-              sectionOrder: [...cfg.sectionOrder],
-              layout: cfg.layout === 'two-column' ? 'two-column' : 'single-column',
-              showPhoto: cfg.showPhoto,
-            },
-          },
-        };
-      });
-    },
-    [setEditorState]
+  const { cvData, selectedTemplateId, accent, fontFamily } = useCVDocumentStore(
+    useShallow((s) => ({
+      cvData: s.cvData,
+      selectedTemplateId: s.preferred_template_id,
+      accent: s.accent_color,
+      fontFamily: s.font_family,
+    }))
   );
 
-  const setAccent = useCallback(
-    (v: string) => {
-      setEditorState((prev) => ({
-        ...prev,
-        accent_color: v,
-        cvData: {
-          ...prev.cvData,
-          meta: { ...prev.cvData.meta, colorScheme: v },
-        },
-      }));
-    },
-    [setEditorState]
-  );
+  const setSelectedTemplateId = useCallback((id: string) => {
+    const tid = normalizeTemplateId(id) as TemplateId;
+    const cfg = TEMPLATE_CONFIGS[tid];
+    const st = useCVDocumentStore.getState();
+    st.setPreferredTemplateId(tid);
+    st.setMeta({
+      templateId: tid,
+      sectionOrder: [...cfg.sectionOrder],
+      layout: cfg.layout === 'two-column' ? 'two-column' : 'single-column',
+      showPhoto: cfg.showPhoto,
+    });
+  }, []);
 
-  const setFontFamily = useCallback(
-    (v: string) => {
-      setEditorState((prev) => ({
-        ...prev,
-        font_family: v,
-        cvData: {
-          ...prev.cvData,
-          meta: { ...prev.cvData.meta, fontFamily: v },
-        },
-      }));
-    },
-    [setEditorState]
-  );
+  const setAccent = useCallback((v: string) => {
+    const st = useCVDocumentStore.getState();
+    st.setAccentColor(v);
+    st.setMeta({ colorScheme: v });
+  }, []);
+
+  const setFontFamilyCb = useCallback((v: string) => {
+    const st = useCVDocumentStore.getState();
+    st.setFontFamily(v);
+    st.setMeta({ fontFamily: v });
+  }, []);
 
   const [previewSrc, setPreviewSrc] = useState<string>('');
   const [previewIsPdf, setPreviewIsPdf] = useState(true);
@@ -158,7 +140,6 @@ export function CVEditor() {
   const [focusMode, setFocusMode] = useState<CVEditorFocusMode>('default');
   const [atsDrawerOpen, setAtsDrawerOpen] = useState(false);
   const [previewCollapsed, setPreviewCollapsed] = useState(false);
-  const [autosaveState, setAutosaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [undoPast, setUndoPast] = useState<CVData[]>([]);
   const [undoFuture, setUndoFuture] = useState<CVData[]>([]);
   const burstStartRef = useRef<CVData | null>(null);
@@ -166,7 +147,7 @@ export function CVEditor() {
   const skipHistoryRef = useRef(false);
   const allowUndoHistoryRef = useRef(false);
   const cvDataRef = useRef<CVData | null>(null);
-  cvDataRef.current = cvData;
+  cvDataRef.current = cvData ?? null;
 
   useEffect(() => {
     allowUndoHistoryRef.current = false;
@@ -192,7 +173,6 @@ export function CVEditor() {
 
   const catalogTid = normalizeTemplateId(selectedTemplateId) as TemplateId;
   const templateMeta = templates.find((t) => t.id === catalogTid) ?? null;
-  /** DB row may be missing for some unified ids; export still uses `src/templates/{id}` via `exportCV`. */
   const allowed =
     !ALL_TEMPLATE_IDS.includes(catalogTid)
       ? false
@@ -200,29 +180,26 @@ export function CVEditor() {
         ? canUseTemplate(templateMeta.available_tiers as SubscriptionTier[], tier)
         : true;
 
-  const handleChange = useCallback(
-    (data: CVData) => {
-      setEditorState((prev) => {
-        if (!skipHistoryRef.current && allowUndoHistoryRef.current) {
-          if (burstStartRef.current === null) {
-            burstStartRef.current = cloneCvData(prev.cvData);
-          }
-          if (historyDebounceRef.current) clearTimeout(historyDebounceRef.current);
-          historyDebounceRef.current = setTimeout(() => {
-            const snapshot = burstStartRef.current;
-            burstStartRef.current = null;
-            if (snapshot) {
-              setUndoPast((p) => [...p.slice(-49), snapshot]);
-              setUndoFuture([]);
-            }
-          }, 550);
+  const handleChange = useCallback((data: CVData) => {
+    useCVDocumentStore.setState((prevState) => {
+      if (!skipHistoryRef.current && allowUndoHistoryRef.current && prevState.cvData) {
+        if (burstStartRef.current === null) {
+          burstStartRef.current = cloneCvData(prevState.cvData);
         }
-        skipHistoryRef.current = false;
-        return { ...prev, cvData: data };
-      });
-    },
-    [setEditorState]
-  );
+        if (historyDebounceRef.current) clearTimeout(historyDebounceRef.current);
+        historyDebounceRef.current = setTimeout(() => {
+          const snapshot = burstStartRef.current;
+          burstStartRef.current = null;
+          if (snapshot) {
+            setUndoPast((p) => [...p.slice(-49), snapshot]);
+            setUndoFuture([]);
+          }
+        }, 550);
+      }
+      skipHistoryRef.current = false;
+      return { cvData: data, isDirty: true };
+    });
+  }, []);
 
   const undo = useCallback(() => {
     setUndoPast((p) => {
@@ -233,10 +210,10 @@ export function CVEditor() {
       burstStartRef.current = null;
       const cur = cvDataRef.current;
       if (cur) setUndoFuture((f) => [cloneCvData(cur), ...f].slice(0, 50));
-      setEditorState((prev) => ({ ...prev, cvData: cloneCvData(snapshot) }));
+      useCVDocumentStore.getState().setCvData(cloneCvData(snapshot));
       return p.slice(0, -1);
     });
-  }, [setEditorState]);
+  }, []);
 
   const redo = useCallback(() => {
     setUndoFuture((f) => {
@@ -247,10 +224,10 @@ export function CVEditor() {
       burstStartRef.current = null;
       const cur = cvDataRef.current;
       if (cur) setUndoPast((p) => [...p.slice(-49), cloneCvData(cur)]);
-      setEditorState((prev) => ({ ...prev, cvData: cloneCvData(next) }));
+      useCVDocumentStore.getState().setCvData(cloneCvData(next));
       return f.slice(1);
     });
-  }, [setEditorState]);
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -264,7 +241,6 @@ export function CVEditor() {
     return () => window.removeEventListener('keydown', onKey);
   }, [undo, redo]);
 
-  /** Keep selection when the unified id exists on disk (`src/templates/{id}`); DB may only list a subset of rows. */
   useEffect(() => {
     if (templatesLoading || !templates.length) return;
     const tid = normalizeTemplateId(selectedTemplateId) as TemplateId;
@@ -273,18 +249,23 @@ export function CVEditor() {
   }, [templatesLoading, templates, selectedTemplateId, setSelectedTemplateId]);
 
   const refreshPreview = useCallback(async () => {
-    if (!selectedTemplateId || !cvData) return;
+    const st = useCVDocumentStore.getState();
+    const snapCv = st.cvData;
+    const tid = st.preferred_template_id;
+    const acc = st.accent_color;
+    const ff = st.font_family;
+    if (!tid || !snapCv) return;
     setPreviewBusy(true);
     try {
-      const snapshot = previewPayloadFromCVData(cvData);
+      const snapshot = previewPayloadFromCVData(snapCv);
       const pngRes = await fetch('/api/cv/preview-png', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           cv_snapshot: snapshot,
-          template_id: selectedTemplateId,
-          accent_color: accent,
-          font_family: fontFamily,
+          template_id: tid,
+          accent_color: acc,
+          font_family: ff,
         }),
       });
       if (pngRes.ok) {
@@ -307,9 +288,9 @@ export function CVEditor() {
         body: JSON.stringify({
           type: 'cv',
           id: cvId ?? undefined,
-          template_id: selectedTemplateId,
-          accent_color: accent,
-          font_family: fontFamily,
+          template_id: tid,
+          accent_color: acc,
+          font_family: ff,
           cv_snapshot: snapshot,
         }),
       });
@@ -330,22 +311,15 @@ export function CVEditor() {
     } finally {
       setPreviewBusy(false);
     }
-  }, [selectedTemplateId, cvData, accent, cvId, fontFamily]);
+  }, [cvId]);
 
   useEffect(() => {
     if (!selectedTemplateId || !cvData || templatesLoading) return;
     const t = window.setTimeout(() => {
       void refreshPreview();
-    }, 500);
+    }, PREVIEW_DEBOUNCE_MS);
     return () => window.clearTimeout(t);
-  }, [selectedTemplateId, cvData, templatesLoading, refreshPreview]);
-
-  useEffect(() => {
-    if (!cvData) return;
-    setAutosaveState('saving');
-    const tm = window.setTimeout(() => setAutosaveState('saved'), 500);
-    return () => window.clearTimeout(tm);
-  }, [cvData]);
+  }, [selectedTemplateId, cvData, templatesLoading, refreshPreview, accent, fontFamily]);
 
   useEffect(() => {
     return () => {
@@ -391,7 +365,10 @@ export function CVEditor() {
   }
 
   async function exportPdf() {
-    if (!cvData || !selectedTemplateId) return;
+    const st = useCVDocumentStore.getState();
+    const d = st.cvData;
+    const tid = st.preferred_template_id;
+    if (!d || !tid) return;
     if (!allowed) {
       toast('Upgrade to export with this template.', 'error');
       return;
@@ -404,10 +381,10 @@ export function CVEditor() {
         body: JSON.stringify({
           type: 'cv',
           id: cvId ?? undefined,
-          template_id: selectedTemplateId,
-          accent_color: accent,
-          font_family: fontFamily,
-          cv_snapshot: previewPayloadFromCVData(cvData),
+          template_id: tid,
+          accent_color: st.accent_color,
+          font_family: st.font_family,
+          cv_snapshot: previewPayloadFromCVData(d),
         }),
       });
       if (!res.ok) {
@@ -426,15 +403,23 @@ export function CVEditor() {
     }
   }
 
-  const ats = cvData
-    ? buildATSReport(cvData)
-    : { score: 0, summary: '', suggestions: [], sections: {} };
+  const deferredSidebarCv = useDeferredValue(cvData);
+  const deferredAtsCv = useDeferredValue(cvData);
+
+  const ats = useMemo(
+    () =>
+      deferredAtsCv
+        ? buildATSReport(deferredAtsCv)
+        : { score: 0, summary: '', suggestions: [], sections: {} },
+    [deferredAtsCv]
+  );
 
   const subtitleName = cvData?.personal?.fullName?.trim();
+  const docSaving = useCVDocumentStore((s) => s.isSaving);
   const statusBits: string[] = [];
   if (isDirty) statusBits.push('Unsaved changes');
-  if (!isDirty && (autosaveState === 'saved' || autosaveState === 'saving')) {
-    if (autosaveState === 'saving') statusBits.push('Saving…');
+  else if (cvId) {
+    if (docSaving) statusBits.push('Saving…');
     else statusBits.push('Saved ✓');
   }
 
@@ -449,7 +434,7 @@ export function CVEditor() {
     );
   }
 
-  if (isLoading) {
+  if (isLoading || !cvData) {
     return <p className="text-sm text-[var(--color-muted)]">Loading profile…</p>;
   }
 
@@ -511,7 +496,7 @@ export function CVEditor() {
             <Sidebar
               activeSection={editorTab}
               onSelect={setEditorTab}
-              cvData={cvData}
+              cvData={deferredSidebarCv ?? undefined}
               sectionVisibility={cvData.sectionVisibility}
               onSectionVisibilityChange={(next: CVSectionVisibility) =>
                 handleChange({ ...cvData, sectionVisibility: next })
@@ -529,8 +514,7 @@ export function CVEditor() {
           >
             <div className={CV_EDITOR_CANVAS}>
               <CVEditorPanel
-                value={cvData}
-                onChange={handleChange}
+                useDocumentStore
                 activeTab={editorTab}
                 onActiveTabChange={setEditorTab}
                 hideAtsBanner
@@ -542,7 +526,7 @@ export function CVEditor() {
                 accent={accent}
                 onAccentChange={setAccent}
                 fontFamily={fontFamily}
-                onFontFamilyChange={setFontFamily}
+                onFontFamilyChange={setFontFamilyCb}
                 userTier={tier}
               />
             </div>

@@ -76,7 +76,7 @@ export function Editor({ value, onChange, activeSection }: EditorProps) {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  });
+  }, [undo, redo]);
 
   const sectionView = useMemo(() => {
     if (activeSection === 'summary') {

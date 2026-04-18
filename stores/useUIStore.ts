@@ -10,6 +10,13 @@ interface UIState {
   sidebarCollapsed: boolean;
   setSidebarCollapsed: (collapsed: boolean) => void;
   toggleSidebar: () => void;
+
+  /**
+   * Href user tapped in the main nav — highlights immediately before the route updates.
+   * Cleared when `pathname` matches or navigation settles.
+   */
+  pendingNavHref: string | null;
+  setPendingNavHref: (href: string | null) => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -20,4 +27,7 @@ export const useUIStore = create<UIState>((set) => ({
   sidebarCollapsed: false,
   setSidebarCollapsed: (sidebarCollapsed) => set({ sidebarCollapsed }),
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
+
+  pendingNavHref: null,
+  setPendingNavHref: (pendingNavHref) => set({ pendingNavHref }),
 }));

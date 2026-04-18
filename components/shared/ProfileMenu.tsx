@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { useUIStore } from '@/stores/useUIStore';
 import { useSubscription } from '@/hooks/useSubscription';
 
 function initials(name: string | null | undefined, email: string | undefined) {
@@ -86,10 +87,10 @@ export function ProfileMenu() {
       <AnimatePresence>
         {open ? (
           <motion.div
-            initial={{ opacity: 0, y: -6 }}
+            initial={false}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.15 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.12 }}
             role="menu"
             className="glass-panel absolute right-0 top-[calc(100%+8px)] z-[60] w-[min(100vw-24px,280px)] rounded-card border border-[var(--color-border)] py-2 text-[var(--color-text-primary)] shadow-xl"
           >
@@ -110,9 +111,13 @@ export function ProfileMenu() {
               </div>
               <Link
                 href="/settings/billing"
+                prefetch
                 role="menuitem"
                 className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm text-[var(--color-text-primary)] transition hover:bg-[var(--color-hover-surface)]"
-                onClick={() => setOpen(false)}
+                onClick={() => {
+                  useUIStore.getState().setPendingNavHref('/settings/billing');
+                  setOpen(false);
+                }}
               >
                 <CreditCard className="h-4 w-4 shrink-0 text-[var(--color-muted)]" />
                 Billing &amp; plans
@@ -122,9 +127,13 @@ export function ProfileMenu() {
             <div className="px-2 py-1">
               <Link
                 href="/settings"
+                prefetch
                 role="menuitem"
                 className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm text-[var(--color-text-primary)] transition hover:bg-[var(--color-hover-surface)]"
-                onClick={() => setOpen(false)}
+                onClick={() => {
+                  useUIStore.getState().setPendingNavHref('/settings');
+                  setOpen(false);
+                }}
               >
                 <Settings className="h-4 w-4 shrink-0 text-[var(--color-muted)]" />
                 Settings

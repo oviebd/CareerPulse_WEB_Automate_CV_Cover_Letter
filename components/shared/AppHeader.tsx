@@ -19,9 +19,10 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { ProfileMenu } from '@/components/shared/ProfileMenu';
 import { ThemeToggle } from '@/components/shared/ThemeToggle';
+import { NavigationProgress } from '@/components/shared/NavigationProgress';
 import { cn } from '@/lib/utils';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useTrackedJobsCount } from '@/hooks/useTracker';
@@ -91,6 +92,7 @@ function isCoverLetterChildActive(pathname: string, href: string) {
 function NavLinkContent({
   item,
   pathname,
+  pendingNavHref,
   isFree,
   collapsed,
   onNavigate,
@@ -98,6 +100,7 @@ function NavLinkContent({
 }: {
   item: NavItem;
   pathname: string;
+  pendingNavHref: string | null;
   isFree: boolean;
   collapsed?: boolean;
   onNavigate?: () => void;
@@ -120,16 +123,21 @@ function NavLinkContent({
             {item.children.map((child) => {
               const ChildIcon = child.icon;
               const childActive =
-                item.href === '/cv'
+                pendingNavHref === child.href ||
+                (item.href === '/cv'
                   ? isCvChildActive(pathname, child.href)
                   : item.href === '/cover-letters'
                     ? isCoverLetterChildActive(pathname, child.href)
-                    : pathname === child.href || pathname.startsWith(`${child.href}/`);
+                    : pathname === child.href || pathname.startsWith(`${child.href}/`));
               return (
                 <Link
                   key={child.href}
                   href={child.href}
-                  onClick={onNavigate}
+                  prefetch
+                  onClick={() => {
+                    useUIStore.getState().setPendingNavHref(child.href);
+                    onNavigate?.();
+                  }}
                   className={cn(
                     'relative flex items-center gap-2 rounded-lg py-2 pl-3 pr-3 text-sm font-semibold transition-all duration-200 ease-out',
                     !collapsed &&
@@ -157,11 +165,18 @@ function NavLinkContent({
     );
   }
 
-  const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+  const active =
+    pendingNavHref === item.href ||
+    pathname === item.href ||
+    pathname.startsWith(`${item.href}/`);
   return (
     <Link
       href={item.href}
-      onClick={onNavigate}
+      prefetch
+      onClick={() => {
+        useUIStore.getState().setPendingNavHref(item.href);
+        onNavigate?.();
+      }}
       title={collapsed ? item.label : undefined}
       className={cn(
         'relative flex items-center gap-2 rounded-lg py-2.5 text-sm font-semibold transition-all duration-200 ease-out active:scale-[0.98]',
@@ -196,21 +211,37 @@ export function AppHeader() {
   const { tier } = useSubscription();
   const { data: trackerBadge } = useTrackedJobsCount();
   const isFree = tier === 'free';
-  const { mobileMenuOpen, setMobileMenuOpen, toggleMobileMenu, sidebarCollapsed, toggleSidebar } = useUIStore();
+  const {
+    mobileMenuOpen,
+    setMobileMenuOpen,
+    toggleMobileMenu,
+    sidebarCollapsed,
+    toggleSidebar,
+    pendingNavHref,
+    setPendingNavHref,
+  } = useUIStore();
   const navRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [pathname, setMobileMenuOpen]);
 
+  useEffect(() => {
+    setPendingNavHref(null);
+  }, [pathname, setPendingNavHref]);
+
   const brand = (
     <Link
       href="/dashboard"
+      prefetch
       className={cn(
         "flex items-center gap-2 font-display text-sm font-semibold tracking-tight text-[var(--color-text-primary)] transition hover:opacity-90",
         sidebarCollapsed && "justify-center"
       )}
-      onClick={() => setMobileMenuOpen(false)}
+      onClick={() => {
+        setPendingNavHref('/dashboard');
+        setMobileMenuOpen(false);
+      }}
     >
       <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[var(--color-primary-500)] to-[var(--color-accent-mint)] text-xs font-bold text-white shadow-md">
         CP
@@ -221,6 +252,7 @@ export function AppHeader() {
 
   return (
     <>
+      <NavigationProgress />
       {/* Desktop: fixed sidebar */}
       <aside
         className={cn(
@@ -255,6 +287,7 @@ export function AppHeader() {
               key={item.href}
               item={item}
               pathname={pathname}
+              pendingNavHref={pendingNavHref}
               isFree={isFree}
               collapsed={sidebarCollapsed}
               trackerBadge={trackerBadge}
@@ -330,6 +363,7 @@ export function AppHeader() {
                     key={item.href}
                     item={item}
                     pathname={pathname}
+                    pendingNavHref={pendingNavHref}
                     isFree={isFree}
                     onNavigate={() => setMobileMenuOpen(false)}
                     trackerBadge={trackerBadge}
