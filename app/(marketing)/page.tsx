@@ -4,8 +4,6 @@ import {
   CheckCircle2,
   FileUp,
   Layers,
-  Sparkles,
-  Wand2,
   Mail,
   Kanban,
   FileText,
@@ -88,8 +86,8 @@ export default async function LandingPage() {
             {[
               {
                 step: '1',
-                title: 'Fill in your details',
-                desc: 'Add experience, education, and skills in guided sections.',
+                title: 'Start from scratch or upload your PDF CV',
+                desc: 'Fill manually or load your existing CV from PDF to prefill your details.',
                 icon: FileText,
               },
               {
@@ -123,21 +121,6 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      <section id="templates" className="scroll-mt-20 px-4 py-16 sm:px-6">
-        <div className="mx-auto max-w-6xl">
-          <div className="text-center">
-            <h2 className="font-display text-2xl font-bold text-[var(--color-text-primary)] sm:text-3xl">
-              Professional templates
-            </h2>
-            <p className="mt-2 text-sm text-[var(--color-muted)]">
-              Same templates as in the app—open a full interactive preview or start editing. Export
-              when you create a free account.
-            </p>
-          </div>
-          <LandingTemplateGrid templates={cvTemplates} />
-        </div>
-      </section>
-
       <section
         id="features"
         className="scroll-mt-20 border-t border-[var(--color-border)] bg-[var(--color-surface)]/35 px-4 py-16 sm:px-6"
@@ -152,11 +135,26 @@ export default async function LandingPage() {
         </div>
         <div className="mx-auto mt-10 grid max-w-5xl gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[
-            { icon: Wand2, t: 'AI suggestions', d: 'Rewrite bullets and summary with context-aware help.' },
-            { icon: FileText, t: 'PDF & DOCX export', d: 'Download print-ready documents from the editor.' },
-            { icon: Sparkles, t: 'Multiple saved CVs', d: 'Version and manage core CVs in your dashboard.' },
-            { icon: Mail, t: 'Cover letter builder', d: 'Tailor letters to roles with the same design system.' },
-            { icon: Kanban, t: 'Application tracker', d: 'Move applications from saved to offer in one board.' },
+            {
+              icon: FileText,
+              t: 'Job-tailored CV',
+              d: 'Customize your CV for each role with role-specific improvements.',
+            },
+            {
+              icon: Kanban,
+              t: 'Job tracking',
+              d: 'Track every application stage from applied to offer in one board.',
+            },
+            {
+              icon: FileUp,
+              t: 'Build CV from existing PDF',
+              d: 'Upload your current CV and convert it into an editable, modern format.',
+            },
+            {
+              icon: Mail,
+              t: 'Job-tailored cover letter',
+              d: 'Generate targeted cover letters aligned to each job description.',
+            },
           ].map((f) => (
             <div
               key={f.t}
@@ -169,6 +167,21 @@ export default async function LandingPage() {
               </div>
             </div>
           ))}
+        </div>
+      </section>
+
+      <section id="templates" className="scroll-mt-20 px-4 py-16 sm:px-6">
+        <div className="mx-auto max-w-6xl">
+          <div className="text-center">
+            <h2 className="font-display text-2xl font-bold text-[var(--color-text-primary)] sm:text-3xl">
+              Professional templates
+            </h2>
+            <p className="mt-2 text-sm text-[var(--color-muted)]">
+              Same templates as in the app—open a full interactive preview or start editing. Export
+              when you create a free account.
+            </p>
+          </div>
+          <LandingTemplateGrid templates={cvTemplates} />
         </div>
       </section>
 
