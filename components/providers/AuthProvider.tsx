@@ -5,16 +5,8 @@ import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { applyDevSubscriptionOverride } from '@/lib/dev-subscription';
+import { isProtectedAppPath } from '@/lib/guest-cv-paths';
 import type { Profile } from '@/types';
-
-const PROTECTED_PREFIXES = [
-  '/dashboard',
-  '/cv',
-  '/cover-letters',
-  '/tracker',
-  '/ai-tools',
-  '/settings',
-];
 
 function mapProfile(row: Record<string, unknown> | null): Profile | null {
   if (!row || typeof row.id !== 'string') return null;
@@ -67,8 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (typeof window === 'undefined') return;
       if (redirectingRef.current) return;
       const { pathname } = window.location;
-      const isProtected = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p));
-      if (!isProtected) return;
+      if (!isProtectedAppPath(pathname)) return;
       redirectingRef.current = true;
       const returnTo = encodeURIComponent(pathname);
       window.location.href = `/login?returnTo=${returnTo}`;

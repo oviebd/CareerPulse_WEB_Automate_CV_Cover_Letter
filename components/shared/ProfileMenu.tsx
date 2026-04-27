@@ -19,7 +19,12 @@ function initials(name: string | null | undefined, email: string | undefined) {
   return (email?.[0] ?? 'U').toUpperCase();
 }
 
-export function ProfileMenu() {
+type ProfileMenuProps = {
+  /** Sidebar: open upward so the panel sits above the avatar; header defaults to below. */
+  menuPlacement?: 'above' | 'below';
+};
+
+export function ProfileMenu({ menuPlacement = 'below' }: ProfileMenuProps) {
   const pathname = usePathname();
   const profile = useAuthStore((s) => s.profile);
   const reset = useAuthStore((s) => s.reset);
@@ -58,6 +63,7 @@ export function ProfileMenu() {
   const displayName = profile?.full_name?.trim() || 'Account';
   const email = profile?.email ?? '';
   const planLabel = tier.charAt(0).toUpperCase() + tier.slice(1);
+  const openAbove = menuPlacement === 'above';
 
   return (
     <div ref={wrapRef} className="relative">
@@ -86,18 +92,36 @@ export function ProfileMenu() {
       <AnimatePresence>
         {open ? (
           <motion.div
-            initial={{ opacity: 0, y: -6 }}
+            initial={{ opacity: 0, y: openAbove ? 6 : -6 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
+            exit={{ opacity: 0, y: openAbove ? 6 : -6 }}
             transition={{ duration: 0.15 }}
             role="menu"
-            className="glass-panel absolute right-0 top-[calc(100%+8px)] z-[60] w-[min(100vw-24px,280px)] rounded-card border border-[var(--color-border)] py-2 text-[var(--color-text-primary)] shadow-xl"
+            className={cn(
+              'glass-panel absolute z-[60] w-[min(100vw-24px,280px)] rounded-card border border-[var(--color-border)] py-2 text-[var(--color-text-primary)] shadow-xl',
+              openAbove
+                ? 'bottom-[calc(100%+8px)] left-0'
+                : 'right-0 top-[calc(100%+8px)]'
+            )}
           >
             <div className="border-b border-[var(--color-border)] px-4 pb-3 pt-1">
               <p className="truncate font-semibold text-[var(--color-text-primary)]">{displayName}</p>
               {email ? (
                 <p className="truncate text-xs text-[var(--color-muted)]">{email}</p>
               ) : null}
+            </div>
+
+            <div className="border-b border-[var(--color-border)] px-2 py-2">
+              <button
+                type="button"
+                role="menuitem"
+                disabled={signingOut}
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] transition hover:bg-[var(--color-hover-surface)] disabled:opacity-60"
+                onClick={() => void signOut()}
+              >
+                <LogOut className="h-4 w-4 shrink-0 text-[var(--color-muted)]" />
+                {signingOut ? 'Signing out…' : 'Log out'}
+              </button>
             </div>
 
             <div className="border-b border-[var(--color-border)] px-2 py-2">
@@ -129,16 +153,6 @@ export function ProfileMenu() {
                 <Settings className="h-4 w-4 shrink-0 text-[var(--color-muted)]" />
                 Settings
               </Link>
-              <button
-                type="button"
-                role="menuitem"
-                disabled={signingOut}
-                className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm text-[var(--color-text-primary)] transition hover:bg-[var(--color-hover-surface)] disabled:opacity-60"
-                onClick={() => void signOut()}
-              >
-                <LogOut className="h-4 w-4 shrink-0 text-[var(--color-muted)]" />
-                {signingOut ? 'Signing out…' : 'Log out'}
-              </button>
             </div>
           </motion.div>
         ) : null}

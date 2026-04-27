@@ -1,3 +1,4 @@
+import { AuthHeroPanel } from '@/components/auth/AuthHeroPanel';
 import { RegisterForm } from './register-form';
 
 export default async function RegisterPage({
@@ -8,22 +9,13 @@ export default async function RegisterPage({
   const params = await searchParams;
   const returnTo =
     typeof params.returnTo === 'string' ? params.returnTo : undefined;
+  const preserveGuestCv = params.preserveGuestCv === 'true';
 
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
-      <div className="hidden flex-col justify-between border-r border-[var(--color-border)] bg-gradient-to-br from-[var(--auth-hero-from)] via-[var(--auth-hero-via)] to-[var(--auth-hero-to)] p-10 lg:flex">
-        <div>
-          <p className="font-display text-lg font-semibold text-[var(--color-text-primary)]">
-            CareerPulse
-          </p>
-          <p className="mt-4 max-w-sm text-sm text-[var(--color-muted)]">
-            Join thousands of job seekers who tailor applications faster with AI.
-          </p>
-        </div>
-        <p className="text-xs text-[var(--color-muted)]">Your data stays private and secure.</p>
-      </div>
+      <AuthHeroPanel variant="register" />
       <div className="flex items-center justify-center px-6 py-12">
-        <RegisterForm returnTo={returnTo} />
+        <RegisterForm returnTo={returnTo} preserveGuestCv={preserveGuestCv} />
       </div>
     </div>
   );

@@ -164,6 +164,8 @@ type Props = {
   onAccentChange?: (color: string) => void;
   fontFamily?: string;
   onFontFamilyChange?: (font: string) => void;
+  /** Guest (or unauthenticated) users must sign in before AI rewrites. */
+  onRequireAiAuth?: () => void;
 };
 
 function HighlightedText({ text, keywords }: { text: string; keywords: string[] }) {
@@ -280,6 +282,7 @@ export function CVFormFields(props: Props) {
     onAccentChange,
     fontFamily = 'Inter',
     onFontFamilyChange,
+    onRequireAiAuth,
   } = props;
 
   const visibleTabs = hiddenTabs
@@ -639,7 +642,7 @@ export function CVFormFields(props: Props) {
               placeholder="Street, city, postal code, country"
             />
             <div className="flex flex-wrap justify-end gap-2">
-              <CvAtsPolishButton
+              <CvAtsPolishButton onAuthRequired={onRequireAiAuth}
                 disabled={!address?.trim()}
                 onClick={() =>
                   setRewriteTarget({
@@ -665,7 +668,7 @@ export function CVFormFields(props: Props) {
               onChange={(e) => onSummary(e.target.value)}
             />
             <div className="flex flex-wrap justify-end gap-2">
-              <CvAtsPolishButton
+              <CvAtsPolishButton onAuthRequired={onRequireAiAuth}
                 disabled={!summary?.trim()}
                 onClick={() =>
                   setRewriteTarget({
@@ -779,7 +782,7 @@ export function CVFormFields(props: Props) {
                   }}
                 />
                 <div className="mt-2 flex flex-wrap justify-end gap-2">
-                  <CvAtsPolishButton
+                  <CvAtsPolishButton onAuthRequired={onRequireAiAuth}
                     disabled={!(ex.description ?? '').trim()}
                     onClick={() =>
                       setRewriteTarget({
@@ -815,7 +818,7 @@ export function CVFormFields(props: Props) {
                         }}
                       />
                       <div className="mt-2 flex flex-wrap justify-end gap-2">
-                        <CvAtsPolishButton
+                        <CvAtsPolishButton onAuthRequired={onRequireAiAuth}
                           disabled={!bullet.trim()}
                           onClick={() =>
                             setRewriteTarget({
@@ -993,7 +996,7 @@ export function CVFormFields(props: Props) {
                   }}
                 />
                 <div className="mt-2 flex flex-wrap justify-end gap-2">
-                  <CvAtsPolishButton
+                  <CvAtsPolishButton onAuthRequired={onRequireAiAuth}
                     disabled={!(ed.description ?? '').trim()}
                     onClick={() =>
                       setRewriteTarget({
@@ -1117,7 +1120,7 @@ export function CVFormFields(props: Props) {
                   }}
                 />
                 <div className="mt-2 flex flex-wrap justify-end gap-2">
-                  <CvAtsPolishButton
+                  <CvAtsPolishButton onAuthRequired={onRequireAiAuth}
                     disabled={!(p.description ?? '').trim()}
                     onClick={() =>
                       setRewriteTarget({
@@ -1148,7 +1151,7 @@ export function CVFormFields(props: Props) {
                   }}
                 />
                 <div className="mt-2 flex flex-wrap justify-end gap-2">
-                  <CvAtsPolishButton
+                  <CvAtsPolishButton onAuthRequired={onRequireAiAuth}
                     disabled={!(p.tech_stack ?? []).join('\n').trim()}
                     onClick={() =>
                       setRewriteTarget({
@@ -1638,7 +1641,7 @@ export function CVFormFields(props: Props) {
                   }}
                 />
                 <div className="mt-2 flex flex-wrap justify-end gap-2">
-                  <CvAtsPolishButton
+                  <CvAtsPolishButton onAuthRequired={onRequireAiAuth}
                     disabled={!(a.description ?? '').trim()}
                     onClick={() =>
                       setRewriteTarget({
@@ -1694,6 +1697,7 @@ export function CVFormFields(props: Props) {
           sourceText={rewriteTarget.sourceText}
           extraContext={rewriteTarget.extraContext}
           onSelectSuggestion={(value) => rewriteTarget.onApply(value)}
+          onAuthRequired={onRequireAiAuth}
         />
       ) : null}
     </div>

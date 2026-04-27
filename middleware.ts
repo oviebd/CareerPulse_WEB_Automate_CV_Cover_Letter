@@ -2,15 +2,8 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getSupabasePublicAnonKey } from '@/lib/supabase/public-env';
+import { isProtectedAppPath } from '@/lib/guest-cv-paths';
 
-const PROTECTED_PREFIXES = [
-  '/dashboard',
-  '/cv',
-  '/cover-letters',
-  '/tracker',
-  '/ai-tools',
-  '/settings',
-];
 const AUTH_ROUTES = ['/login', '/register'];
 
 export async function middleware(request: NextRequest) {
@@ -37,7 +30,7 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
   const { pathname } = request.nextUrl;
-  const isProtected = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p));
+  const isProtected = isProtectedAppPath(pathname);
   const isAuthRoute = AUTH_ROUTES.some((p) => pathname.startsWith(p));
 
   if (isProtected && !user) {

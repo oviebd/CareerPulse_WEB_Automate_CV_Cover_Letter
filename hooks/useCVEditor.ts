@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import type { CVData, CVProfile } from '@/types';
 import { cvProfileToCvData } from '@/lib/cv-profile-cvdata';
 import { universalToProfilePayload } from '@/lib/cv-universal-bridge';
@@ -9,14 +9,11 @@ import { createEmptyCVData } from '@/src/utils/cvDefaults';
 import { normalizeTemplateId } from '@/src/utils/cvDefaults';
 import { TEMPLATE_CONFIGS } from '@/src/config/templateConfig';
 import type { TemplateId } from '@/src/types/cv.types';
-
-export interface CVEditorState {
-  cvData: CVData;
-  name: string;
-  preferred_template_id: string;
-  accent_color: string;
-  font_family: string;
-}
+import { useAuthStore } from '@/stores/useAuthStore';
+import { useGuestCvStore } from '@/stores/guestCvStore';
+import { takeGuestEditorStateFromSessionStorage } from '@/lib/guest-cv-handoff';
+import type { CVEditorState } from '@/lib/cv-editor-state';
+import { DEFAULT_EDITOR_STATE } from '@/lib/cv-editor-state';
 
 function applyDesignToCv(
   cv: CVData,
@@ -33,8 +30,7 @@ function applyDesignToCv(
       templateId: tid,
       colorScheme: accent,
       fontFamily: font,
-      layout:
-        cfg.layout === 'two-column' ? 'two-column' : 'single-column',
+      layout: cfg.layout === 'two-column' ? 'two-column' : 'single-column',
       showPhoto: cfg.showPhoto,
       sectionOrder: [...cfg.sectionOrder],
     },
@@ -45,13 +41,7 @@ function serializeEditorState(s: CVEditorState): string {
   return JSON.stringify(s);
 }
 
-const DEFAULT_EDITOR_STATE: CVEditorState = {
-  cvData: createEmptyCVData('classic'),
-  name: 'Untitled CV',
-  preferred_template_id: 'classic',
-  accent_color: '#6C63FF',
-  font_family: 'Inter',
-};
+export type { CVEditorState } from '@/lib/cv-editor-state';
 
 export interface UseCVEditorOptions {
   cvIdFromRoute: string | undefined;
@@ -61,6 +51,7 @@ export interface UseCVEditorReturn {
   cv: CVProfile | null;
   cvId: string | null;
   isNew: boolean;
+  isGuest: boolean;
   isSaving: boolean;
   saveError: string | null;
   loadError: string | null;
@@ -76,6 +67,10 @@ export interface UseCVEditorReturn {
 
 export function useCVEditor({ cvIdFromRoute }: UseCVEditorOptions): UseCVEditorReturn {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const user = useAuthStore((s) => s.user);
+  const authInitialized = useAuthStore((s) => s.initialized);
+
   const [cvId, setCvId] = useState<string | null>(cvIdFromRoute ?? null);
   const [loadedProfile, setLoadedProfile] = useState<CVProfile | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -84,92 +79,177 @@ export function useCVEditor({ cvIdFromRoute }: UseCVEditorOptions): UseCVEditorR
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  const isGuest = Boolean(authInitialized && !user && !cvIdFromRoute);
   const isNew = cvId === null;
+  const searchParamsKey = useMemo(
+    () => (typeof searchParams?.toString === 'function' ? searchParams.toString() : ''),
+    [searchParams]
+  );
 
   useEffect(() => {
     setCvId(cvIdFromRoute ?? null);
   }, [cvIdFromRoute]);
 
+  const setGuestInStore = useGuestCvStore((s) => s.setGuestEditorState);
+
   const loadFromServer = useCallback(async () => {
-    if (!cvIdFromRoute) {
-      setLoadedProfile(null);
+    if (cvIdFromRoute) {
       setLoadError(null);
-      if (typeof window !== 'undefined' && sessionStorage.getItem('cv_draft')) {
-        try {
-          const raw = sessionStorage.getItem('cv_draft');
-          const parsed = raw ? (JSON.parse(raw) as CVData) : createEmptyCVData('classic');
-          setEditorState({
-            cvData: parsed,
-            name: 'Untitled CV',
-            preferred_template_id: parsed.meta?.templateId ?? 'classic',
-            accent_color: parsed.meta?.colorScheme ?? '#6C63FF',
-            font_family: parsed.meta?.fontFamily ?? 'Inter',
-          });
-          setSavedSnapshot(null);
-        } catch {
-          setEditorState({
-            cvData: createEmptyCVData('classic'),
-            name: 'Untitled CV',
-            preferred_template_id: 'classic',
-            accent_color: '#6C63FF',
-            font_family: 'Inter',
-          });
-          setSavedSnapshot(null);
+      try {
+        const res = await fetch(`/api/cvs/${cvIdFromRoute}`);
+        if (!res.ok) {
+          setLoadError('Could not load this CV.');
+          return;
         }
-        return;
+        const profile = (await res.json()) as CVProfile;
+        setLoadedProfile(profile);
+        const tid = profile.preferred_template_id ?? 'classic';
+        let cvData = cvProfileToCvData(profile);
+        cvData = applyDesignToCv(
+          cvData,
+          tid,
+          profile.accent_color ?? '#6C63FF',
+          profile.font_family ?? 'Inter'
+        );
+        const st: CVEditorState = {
+          cvData,
+          name: profile.name ?? 'Untitled CV',
+          preferred_template_id: tid,
+          accent_color: profile.accent_color ?? '#6C63FF',
+          font_family: profile.font_family ?? 'Inter',
+        };
+        setEditorState(st);
+        setSavedSnapshot(serializeEditorState(st));
+      } catch {
+        setLoadError('Could not load this CV.');
       }
-      setEditorState({ ...DEFAULT_EDITOR_STATE });
-      setSavedSnapshot(null);
       return;
     }
 
-    setLoadError(null);
-    try {
-      const res = await fetch(`/api/cvs/${cvIdFromRoute}`);
-      if (!res.ok) {
-        setLoadError('Could not load this CV.');
+    if (!authInitialized) {
+      return;
+    }
+
+    if (isGuest) {
+      setLoadedProfile(null);
+      setLoadError(null);
+      if (searchParams.get('hydrateGuest') === 'true' && typeof window !== 'undefined') {
+        const fromOAuth = takeGuestEditorStateFromSessionStorage();
+        if (fromOAuth) {
+          setEditorState(fromOAuth);
+          setSavedSnapshot(null);
+          setGuestInStore(fromOAuth);
+          const url = new URL(window.location.href);
+          url.searchParams.delete('hydrateGuest');
+          window.history.replaceState({}, '', url.toString());
+          return;
+        }
+      }
+      const fromStore = useGuestCvStore.getState().guestEditorState;
+      if (fromStore) {
+        setEditorState(fromStore);
+        setSavedSnapshot(null);
         return;
       }
-      const profile = (await res.json()) as CVProfile;
-      setLoadedProfile(profile);
-      const tid = profile.preferred_template_id ?? 'classic';
-      let cvData = cvProfileToCvData(profile);
-      cvData = applyDesignToCv(
-        cvData,
-        tid,
-        profile.accent_color ?? '#6C63FF',
-        profile.font_family ?? 'Inter'
-      );
+      const qTemplate = searchParams.get('template');
+      const tid = normalizeTemplateId(qTemplate && qTemplate.length > 0 ? qTemplate : 'classic') as TemplateId;
+      const empty = createEmptyCVData(tid);
+      const cfg = TEMPLATE_CONFIGS[tid];
       const st: CVEditorState = {
-        cvData,
-        name: profile.name ?? 'Untitled CV',
+        name: 'Untitled CV',
         preferred_template_id: tid,
-        accent_color: profile.accent_color ?? '#6C63FF',
-        font_family: profile.font_family ?? 'Inter',
+        accent_color: empty.meta?.colorScheme ?? '#6C63FF',
+        font_family: empty.meta?.fontFamily ?? 'Inter',
+        cvData: {
+          ...empty,
+          meta: {
+            ...empty.meta,
+            templateId: tid,
+            colorScheme: empty.meta?.colorScheme ?? '#6C63FF',
+            fontFamily: empty.meta?.fontFamily ?? 'Inter',
+            layout: cfg.layout === 'two-column' ? 'two-column' : 'single-column',
+            showPhoto: cfg.showPhoto,
+            sectionOrder: [...cfg.sectionOrder],
+          },
+        },
       };
       setEditorState(st);
-      setSavedSnapshot(serializeEditorState(st));
-    } catch {
-      setLoadError('Could not load this CV.');
+      setSavedSnapshot(null);
+      setGuestInStore(st);
+      return;
     }
-  }, [cvIdFromRoute]);
+
+    if (user) {
+      const fromOAuth = takeGuestEditorStateFromSessionStorage();
+      if (fromOAuth) {
+        setEditorState(fromOAuth);
+        setSavedSnapshot(null);
+        return;
+      }
+      const fromGuestZustand = useGuestCvStore.getState().guestEditorState;
+      if (fromGuestZustand) {
+        setEditorState(fromGuestZustand);
+        setSavedSnapshot(null);
+        return;
+      }
+    }
+
+    setLoadedProfile(null);
+    setLoadError(null);
+    if (typeof window !== 'undefined' && sessionStorage.getItem('cv_draft')) {
+      try {
+        const raw = sessionStorage.getItem('cv_draft');
+        const parsed = raw ? (JSON.parse(raw) as CVData) : createEmptyCVData('classic');
+        setEditorState({
+          cvData: parsed,
+          name: 'Untitled CV',
+          preferred_template_id: parsed.meta?.templateId ?? 'classic',
+          accent_color: parsed.meta?.colorScheme ?? '#6C63FF',
+          font_family: parsed.meta?.fontFamily ?? 'Inter',
+        });
+        setSavedSnapshot(null);
+      } catch {
+        setEditorState({
+          cvData: createEmptyCVData('classic'),
+          name: 'Untitled CV',
+          preferred_template_id: 'classic',
+          accent_color: '#6C63FF',
+          font_family: 'Inter',
+        });
+        setSavedSnapshot(null);
+      }
+      return;
+    }
+    setEditorState({ ...DEFAULT_EDITOR_STATE });
+    setSavedSnapshot(null);
+  }, [authInitialized, cvIdFromRoute, isGuest, user, searchParamsKey, setGuestInStore, searchParams]);
 
   useEffect(() => {
     void loadFromServer();
   }, [loadFromServer]);
+
+  useEffect(() => {
+    if (!isGuest) return;
+    if (cvIdFromRoute) return;
+    setGuestInStore(editorState);
+  }, [editorState, isGuest, cvIdFromRoute, setGuestInStore]);
 
   const isDirty = useMemo(() => {
     if (savedSnapshot === null) return true;
     return serializeEditorState(editorState) !== savedSnapshot;
   }, [editorState, savedSnapshot]);
 
-  const isLoading = Boolean(cvIdFromRoute && !loadedProfile && !loadError);
+  const isLoading = Boolean(
+    (cvIdFromRoute && !loadedProfile && !loadError) ||
+      (!cvIdFromRoute && !authInitialized)
+  );
 
   const saveButtonLabel = useMemo(() => {
     if (isSaving) return 'Saving...';
     if (saveError) return 'Retry Save';
+    if (isGuest) return 'Save CV (free account)';
     return isNew ? 'Save CV' : 'Update CV';
-  }, [isSaving, saveError, isNew]);
+  }, [isSaving, saveError, isNew, isGuest]);
 
   const updateField = useCallback(<K extends keyof CVData>(field: K, value: CVData[K]) => {
     setEditorState((prev) => {
@@ -196,6 +276,9 @@ export function useCVEditor({ cvIdFromRoute }: UseCVEditorOptions): UseCVEditorR
   }, []);
 
   const handleSave = useCallback(async () => {
+    if (isGuest) {
+      return;
+    }
     setIsSaving(true);
     setSaveError(null);
     try {
@@ -251,6 +334,7 @@ export function useCVEditor({ cvIdFromRoute }: UseCVEditorOptions): UseCVEditorR
         } catch {
           /* ignore */
         }
+        useGuestCvStore.getState().clearGuestCv();
         router.replace(`/cv/edit/${newId}`);
       } else {
         const patch = buildPatchBody(editorState);
@@ -287,7 +371,7 @@ export function useCVEditor({ cvIdFromRoute }: UseCVEditorOptions): UseCVEditorR
     } finally {
       setIsSaving(false);
     }
-  }, [editorState, isNew, cvId, buildPatchBody, router]);
+  }, [editorState, isNew, isGuest, cvId, buildPatchBody, router]);
 
   useEffect(() => {
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -303,6 +387,7 @@ export function useCVEditor({ cvIdFromRoute }: UseCVEditorOptions): UseCVEditorR
     cv: loadedProfile,
     cvId,
     isNew,
+    isGuest,
     isSaving,
     saveError,
     loadError,

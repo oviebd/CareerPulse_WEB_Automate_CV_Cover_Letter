@@ -38,6 +38,8 @@ interface CVRewriteWithAIModalProps {
   sourceText: string;
   extraContext?: string;
   onSelectSuggestion: (value: string) => void;
+  /** When set, calls this instead of the API (e.g. guest must sign in). */
+  onAuthRequired?: () => void;
 }
 
 type AISuggestion = {
@@ -54,6 +56,7 @@ export function CVRewriteWithAIModal({
   sourceText,
   extraContext,
   onSelectSuggestion,
+  onAuthRequired,
 }: CVRewriteWithAIModalProps) {
   const { toast } = useToast();
   const [selectedTones, setSelectedTones] = useState<string[]>(['professional']);
@@ -86,6 +89,10 @@ export function CVRewriteWithAIModal({
   }
 
   async function generateSuggestions() {
+    if (onAuthRequired) {
+      onAuthRequired();
+      return;
+    }
     if (!sourceText.trim()) {
       toast('Add text first to rewrite with AI.', 'error');
       return;

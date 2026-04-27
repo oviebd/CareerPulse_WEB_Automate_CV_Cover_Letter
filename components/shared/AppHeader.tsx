@@ -66,6 +66,7 @@ function isCvChildActive(pathname: string, href: string) {
     return (
       pathname === '/cv' ||
       pathname === '/cv/edit' ||
+      pathname === '/cv/builder' ||
       pathname === '/cv/upload' ||
       pathname.startsWith('/cv/templates')
     );
@@ -263,13 +264,8 @@ export function AppHeader() {
         </nav>
         <div className="shrink-0 space-y-3 border-t border-[var(--color-border)] p-3">
           <ThemeToggle collapsed={sidebarCollapsed} />
-          <div
-            className={cn(
-              'flex items-center justify-center',
-              !sidebarCollapsed && 'justify-end'
-            )}
-          >
-            <ProfileMenu />
+          <div className="flex items-center justify-start">
+            <ProfileMenu menuPlacement="above" />
           </div>
         </div>
       </aside>

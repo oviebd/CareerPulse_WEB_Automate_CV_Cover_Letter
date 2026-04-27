@@ -15,14 +15,6 @@ function isValidCvTemplateId(id: string): boolean {
 
 export async function GET(request: Request) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const { searchParams } = new URL(request.url);
     const templateId = searchParams.get('template_id') ?? '';
     const accent = searchParams.get('accent') ?? '#2563EB';
@@ -35,6 +27,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
     }
 
+    /** Public sample document only (no user data) — used by marketing + signed-in template gallery. */
     const cvData = getSampleCVData(accent);
     const tid = normalizeTemplateId(templateId) as TemplateId;
     const cfg = TEMPLATE_CONFIGS[tid];
@@ -47,7 +40,7 @@ export async function GET(request: Request) {
       status: 200,
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
-        'Cache-Control': 'private, max-age=60',
+        'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
       },
     });
   } catch (e) {

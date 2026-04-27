@@ -6,12 +6,14 @@ import { Sparkles } from 'lucide-react';
 
 type Props = {
   onClick: () => void;
+  /** When set (e.g. guest), called instead of opening the AI flow. */
+  onAuthRequired?: () => void;
   disabled?: boolean;
   className?: string;
 };
 
 /** Opens AI rewrite modal for the current field. */
-export function CvAtsPolishButton({ onClick, disabled, className }: Props) {
+export function CvAtsPolishButton({ onClick, onAuthRequired, disabled, className }: Props) {
   return (
     <Button
       type="button"
@@ -23,7 +25,13 @@ export function CvAtsPolishButton({ onClick, disabled, className }: Props) {
         className
       )}
       title="Rewrite with stronger verbs, metrics, and ATS-friendly phrasing"
-      onClick={onClick}
+      onClick={() => {
+        if (onAuthRequired) {
+          onAuthRequired();
+          return;
+        }
+        onClick();
+      }}
     >
       <Sparkles className="h-3.5 w-3.5 shrink-0 text-[var(--color-accent-mint)]" />
       Rewrite With AI

@@ -11,6 +11,8 @@ import { useCVProfile } from '@/hooks/useCV';
 import { useSubscription } from '@/hooks/useSubscription';
 import { uploadCvFileWithProgress } from '@/lib/cv-storage-upload';
 import { isAllowedCvFile } from '@/lib/cv-file';
+import { useGuestCvStore } from '@/stores/guestCvStore';
+import { cvProfileToEditorState } from '@/lib/cv-profile-to-editor-state';
 import type { CVProfile } from '@/types';
 
 const MAX = 10 * 1024 * 1024;
@@ -19,6 +21,7 @@ const EXTRACT_ERROR_HINT: Record<string, string> = {
   Unauthorized: 'Session expired — sign in again.',
   fileUrl_required: 'Missing file URL — try uploading again.',
   file_fetch_failed: 'Could not read the file from storage. Check Storage bucket and policies.',
+  fileBase64_required: 'Could not read the file. Try again.',
   invalid_file_type: 'File was not recognized as PDF or DOCX.',
   extraction_failed: 'Text or AI extraction failed. Add ANTHROPIC_API_KEY or try the manual editor.',
   save_failed: 'Could not save your profile to the database.',
@@ -56,9 +59,70 @@ export function CVUploadForm() {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) {
-        setPhase('idle');
-        reportError('You need to be signed in to upload.');
-        router.push('/login');
+        setPhase('analysing');
+        setUploadProgress(40);
+        try {
+          const b64 = await new Promise<string>((resolve, reject) => {
+            const r = new FileReader();
+            r.onload = () => {
+              const res = r.result as string;
+              const parts = res.split(',');
+              resolve(parts[1] ?? '');
+            };
+            r.onerror = () => reject(new Error('read_failed'));
+            r.readAsDataURL(file);
+          });
+          if (!b64) {
+            reportError('Could not read the file.');
+            setPhase('idle');
+            setUploadProgress(0);
+            return;
+          }
+          const res = await fetch('/api/extract', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ guest: true, fileBase64: b64, fileName: file.name, force }),
+          });
+          const raw = await res.text();
+          let json: { error?: string; cvProfile?: CVProfile } = {};
+          try {
+            json = raw
+              ? (JSON.parse(raw) as { error?: string; cvProfile?: CVProfile })
+              : {};
+          } catch {
+            reportError(
+              raw
+                ? `Import failed (${res.status}): ${raw.slice(0, 280)}`
+                : `Import failed: empty response (HTTP ${res.status}).`
+            );
+            setPhase('idle');
+            setUploadProgress(0);
+            return;
+          }
+          if (!res.ok) {
+            const hint =
+              (json.error && EXTRACT_ERROR_HINT[json.error]) ||
+              (json.error ? `Import failed (${json.error}).` : `Import failed (HTTP ${res.status}).`);
+            reportError(hint);
+            setPhase('idle');
+            setUploadProgress(0);
+            return;
+          }
+          if (json.cvProfile) {
+            const st = cvProfileToEditorState(json.cvProfile);
+            useGuestCvStore.getState().setGuestEditorState(st);
+          }
+          setPhase('complete');
+          setUploadProgress(100);
+          toast('CV imported. You can keep editing in the builder.', 'success');
+          router.push('/cv/edit?guest=true');
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          reportError(`Import failed: ${msg}`);
+          setPhase('idle');
+          setUploadProgress(0);
+        }
         return;
       }
 

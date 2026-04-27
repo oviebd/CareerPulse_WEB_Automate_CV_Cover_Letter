@@ -1,9 +1,14 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
+import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { useCVEditor } from '@/hooks/useCVEditor';
+import { useAuthGate } from '@/hooks/useAuthGate';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { useGuestCvStore } from '@/stores/guestCvStore';
+import { createCoreCvFromEditorState } from '@/lib/create-core-cv-from-editor-state';
 import { useSubscription } from '@/hooks/useSubscription';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -49,6 +54,7 @@ export function CVEditor() {
   const {
     cv,
     cvId,
+    isGuest,
     isSaving,
     saveError,
     loadError,
@@ -60,6 +66,10 @@ export function CVEditor() {
     setEditorState,
     reloadFromServer,
   } = useCVEditor({ cvIdFromRoute: routeId });
+
+  const { requireAuth, authModal, openAuthModal } = useAuthGate(editorState);
+  const authedUser = useAuthStore((s) => s.user);
+  const autoGuestSyncRef = useRef(false);
 
   const queryClient = useQueryClient();
 
@@ -76,6 +86,7 @@ export function CVEditor() {
   const isNew = searchParams.get('new') === '1';
 
   useEffect(() => {
+    if (isGuest) return;
     if (isNew && typeof window !== 'undefined') {
       const emptyCv = createEmptyCVData('classic');
       sessionStorage.setItem('cv_draft', JSON.stringify(emptyCv));
@@ -85,10 +96,34 @@ export function CVEditor() {
       url.searchParams.delete('new');
       window.history.replaceState({}, '', url.toString());
     }
-  }, [isNew]);
+  }, [isNew, isGuest]);
 
   const { toast } = useToast();
   const { tier } = useSubscription();
+
+  useEffect(() => {
+    if (isGuest || !authedUser || routeId || autoGuestSyncRef.current) return;
+    const pending = useGuestCvStore.getState().guestEditorState;
+    if (!pending) return;
+    autoGuestSyncRef.current = true;
+    void (async () => {
+      try {
+        const created = await createCoreCvFromEditorState(pending);
+        useGuestCvStore.getState().clearGuestCv();
+        try {
+          sessionStorage.removeItem('cv_draft');
+          window.dispatchEvent(new Event('cv_draft_updated'));
+        } catch {
+          /* ignore */
+        }
+        await queryClient.invalidateQueries({ queryKey: ['cv-versions'] });
+        router.replace(`/cv/edit/${created.id}`);
+      } catch (e) {
+        autoGuestSyncRef.current = false;
+        toast(e instanceof Error ? e.message : 'Could not save your CV', 'error');
+      }
+    })();
+  }, [isGuest, authedUser, routeId, router, queryClient, toast]);
 
   const cvData = editorState.cvData;
   const selectedTemplateId = editorState.preferred_template_id;
@@ -390,7 +425,7 @@ export function CVEditor() {
     void queryClient.invalidateQueries({ queryKey: ['cv-versions'] });
   }
 
-  async function exportPdf() {
+  async function runExportPdf() {
     if (!cvData || !selectedTemplateId) return;
     if (!allowed) {
       toast('Upgrade to export with this template.', 'error');
@@ -455,8 +490,23 @@ export function CVEditor() {
 
   return (
     <div className="cv-editor-text-tune mx-auto max-w-[1800px] pb-8">
+      {authModal}
+      {isGuest ? (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)]/80 px-4 py-3 text-sm text-[var(--color-muted)] backdrop-blur-sm">
+          <span>
+            You&apos;re editing as a guest —{' '}
+            <Link
+              href="/register?returnTo=%2Fcv%2Fedit%3Fguest%3Dtrue&preserveGuestCv=true"
+              className="font-medium text-[var(--color-primary-500)] hover:underline"
+            >
+              Sign up free
+            </Link>{' '}
+            to save your CV to the cloud.
+          </span>
+        </div>
+      ) : null}
       <CVEditorTopBar
-        backHref="/cv"
+        backHref={isGuest ? '/' : '/cv'}
         title="Core CV"
         subtitle={subtitleName || 'Add your name in Header'}
         badge={
@@ -477,14 +527,18 @@ export function CVEditor() {
         secondaryAction={{
           label: 'Export PDF',
           loading: exporting,
-          disabled: !allowed,
-          onClick: () => void exportPdf(),
+          disabled: !isGuest && !allowed,
+          onClick: requireAuth(() => {
+            void runExportPdf();
+          }),
         }}
         primaryAction={{
           label: saveButtonLabel,
           loading: isSaving,
           disabled: isSaving,
-          onClick: () => void onSaveClick(),
+          onClick: requireAuth(() => {
+            void onSaveClick();
+          }),
         }}
         statusLine={
           <>
@@ -544,6 +598,7 @@ export function CVEditor() {
                 fontFamily={fontFamily}
                 onFontFamilyChange={setFontFamily}
                 userTier={tier}
+                onRequireAiAuth={isGuest ? openAuthModal : undefined}
               />
             </div>
           </div>

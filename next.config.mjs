@@ -37,6 +37,8 @@ const nextConfig = {
   },
   poweredByHeader: false,
   reactStrictMode: true,
+  /** Hide the bottom-left dev "N" indicator in development (logout lives in the profile avatar menu). */
+  devIndicators: false,
 };
 
 export default nextConfig;

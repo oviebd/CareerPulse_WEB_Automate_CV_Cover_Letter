@@ -318,3 +318,72 @@ fetchLinkedDocumentsForJobs cover_letters {
  ✓ Compiled in 403ms (3023 modules)
  ✓ Compiled in 304ms (3023 modules)
  GET / 200 in 411ms
+ ✓ Compiled in 645ms (1458 modules)
+ ✓ Compiled in 238ms (168 modules)
+ ✓ Compiled in 56ms (167 modules)
+ ✓ Compiled in 44ms (168 modules)
+ ✓ Compiled in 833ms (3025 modules)
+ ✓ Compiled in 306ms (1459 modules)
+ ✓ Compiled in 861ms (3029 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/habibur_periscope/Documents/Projects/WEB/CareerPulse_WEB/.next/cache/webpack/edge-server-development/2.pack.gz_' -> '/Users/habibur_periscope/Documents/Projects/WEB/CareerPulse_WEB/.next/cache/webpack/edge-server-development/2.pack.gz'
+ ✓ Compiled in 187ms (1461 modules)
+ ✓ Compiled in 162ms (1461 modules)
+ ✓ Compiled in 131ms (1461 modules)
+ ✓ Compiled in 124ms (1461 modules)
+ ✓ Compiled in 648ms (3029 modules)
+ ✓ Compiled in 1398ms (3039 modules)
+ ✓ Compiled in 689ms (3039 modules)
+ ✓ Compiled in 330ms (1466 modules)
+ ✓ Compiled in 136ms (1466 modules)
+ ✓ Compiled in 131ms (1466 modules)
+ ✓ Compiled in 124ms (1466 modules)
+ ✓ Compiled in 170ms (1466 modules)
+ ✓ Compiled in 176ms (1466 modules)
+ ✓ Compiled in 341ms (1466 modules)
+ ✓ Compiled in 370ms (1466 modules)
+ ✓ Compiled in 123ms (1466 modules)
+ ✓ Compiled in 121ms (1466 modules)
+ ✓ Compiled in 206ms (1466 modules)
+ ✓ Compiled in 130ms (1466 modules)
+ ✓ Compiled in 280ms (1466 modules)
+ ✓ Compiled in 184ms (1466 modules)
+ ✓ Compiled in 330ms (1466 modules)
+ ✓ Compiled in 357ms (1466 modules)
+ ✓ Compiled in 334ms (1466 modules)
+ ✓ Compiled in 123ms (1466 modules)
+ ✓ Compiled in 136ms (1466 modules)
+ ✓ Compiled in 265ms (1466 modules)
+ ✓ Compiled in 224ms (1466 modules)
+ ✓ Compiled in 220ms (1466 modules)
+ ✓ Compiled in 126ms (1466 modules)
+ ✓ Compiled in 127ms (1466 modules)
+ ✓ Compiled in 200ms (1466 modules)
+ ✓ Compiled in 1081ms (3193 modules)
+ ✓ Compiled in 181ms (1466 modules)
+ ✓ Compiled in 136ms (1466 modules)
+ ✓ Compiled in 116ms (1466 modules)
+ ✓ Compiled in 108ms (1466 modules)
+ ✓ Compiled in 215ms (1466 modules)
+ ✓ Compiled in 1463ms (3027 modules)
+ ✓ Compiled in 1457ms (3044 modules)
+ ✓ Compiled in 307ms (3058 modules)
+ ✓ Compiled in 247ms (3058 modules)
+ ✓ Compiled in 1297ms (3058 modules)
+ ✓ Compiled in 365ms (3058 modules)
+ ✓ Compiled in 663ms (1467 modules)
+ ✓ Compiled in 563ms (1467 modules)
+ ✓ Compiled in 674ms (1467 modules)
+ ✓ Compiled in 143ms (1467 modules)
+ ✓ Compiled in 154ms (1467 modules)
+ ✓ Compiled in 1135ms (3116 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/habibur_periscope/Documents/Projects/WEB/CareerPulse_WEB/.next/cache/webpack/client-development/5.pack.gz_' -> '/Users/habibur_periscope/Documents/Projects/WEB/CareerPulse_WEB/.next/cache/webpack/client-development/5.pack.gz'
+ ⚠ Found a change in next.config.mjs. Restarting the server to apply the changes...
+   ▲ Next.js 15.5.14
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.0.104:3000
+   - Environments: .env.local
+   - Experiments (use with caution):
+     · optimizePackageImports
+
+ ✓ Starting...
+ ✓ Ready in 1700ms

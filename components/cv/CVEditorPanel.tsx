@@ -32,6 +32,7 @@ export interface CVEditorPanelProps {
   fontFamily?: string;
   onFontFamilyChange?: (font: string) => void;
   userTier?: SubscriptionTier;
+  onRequireAiAuth?: () => void;
 }
 
 export function CVEditorPanel({
@@ -55,6 +56,7 @@ export function CVEditorPanel({
   fontFamily,
   onFontFamilyChange,
   userTier,
+  onRequireAiAuth,
 }: CVEditorPanelProps) {
   const [internalTab, setInternalTab] = useState<CVFormTab>('photo');
   const isTabControlled = activeTabProp !== undefined && onActiveTabChange !== undefined;
@@ -195,6 +197,7 @@ export function CVEditorPanel({
         onAccentChange={onAccentChange}
         fontFamily={fontFamily}
         onFontFamilyChange={onFontFamilyChange}
+        onRequireAiAuth={onRequireAiAuth}
       />
     </div>
   );
