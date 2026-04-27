@@ -1,0 +1,320 @@
+
+> cv-cover-letter-generator@0.1.0 dev
+> next dev
+
+   ▲ Next.js 15.5.14
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.0.104:3000
+   - Environments: .env.local
+   - Experiments (use with caution):
+     · optimizePackageImports
+
+ ✓ Starting...
+ ✓ Ready in 1409ms
+ ✓ Compiled /middleware in 301ms (167 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Serializing big strings (215kiB) impacts deserialization performance (consider using Buffer instead and decode when needed)
+ ○ Compiling /dashboard ...
+ ✓ Compiled /dashboard in 3.6s (2774 modules)
+ GET /dashboard 200 in 3966ms
+ ✓ Compiled in 117ms (1301 modules)
+ GET /dashboard 200 in 55ms
+ GET /dashboard 200 in 75ms
+ GET /dashboard 200 in 62ms
+ GET /dashboard 200 in 57ms
+ GET /dashboard 200 in 64ms
+ GET /dashboard 200 in 45ms
+ GET /dashboard 200 in 36ms
+ ✓ Compiled / in 337ms (2747 modules)
+ GET / 200 in 556ms
+ GET /dashboard 200 in 41ms
+ GET /dashboard 200 in 194ms
+ GET /dashboard 200 in 54ms
+ GET /dashboard 200 in 38ms
+ GET /dashboard 200 in 54ms
+ GET /dashboard 200 in 52ms
+ GET /dashboard 200 in 54ms
+ GET /dashboard 200 in 48ms
+ GET /dashboard 200 in 37ms
+ GET /dashboard 200 in 53ms
+ GET /dashboard 200 in 55ms
+ GET /dashboard 200 in 52ms
+ GET /dashboard 200 in 53ms
+ GET /dashboard 200 in 42ms
+ GET /dashboard 200 in 64ms
+ GET /dashboard 200 in 68ms
+ GET /dashboard 200 in 53ms
+ GET /dashboard 200 in 57ms
+ GET /dashboard 200 in 71ms
+ GET /dashboard 200 in 56ms
+ GET /dashboard 200 in 57ms
+ GET /dashboard 200 in 61ms
+ GET /dashboard 200 in 56ms
+ GET /dashboard 200 in 52ms
+ GET /dashboard 200 in 52ms
+ GET /dashboard 200 in 71ms
+ ✓ Compiled /login in 428ms (2760 modules)
+ GET /login 200 in 690ms
+ GET /dashboard 200 in 42ms
+ GET /dashboard 200 in 16ms
+ ○ Compiling /api/jobs ...
+ ✓ Compiled /api/jobs in 531ms (2839 modules)
+fetchLinkedDocumentsForJobs cover_letters {
+  code: '42703',
+  details: null,
+  hint: null,
+  message: 'column cover_letters.name does not exist'
+}
+ GET /api/jobs 200 in 1948ms
+fetchLinkedDocumentsForJobs cover_letters {
+  code: '42703',
+  details: null,
+  hint: null,
+  message: 'column cover_letters.name does not exist'
+}
+ GET /api/jobs 200 in 877ms
+ GET /dashboard 200 in 356ms
+ GET /dashboard 200 in 100ms
+ GET /dashboard 200 in 81ms
+ GET /dashboard 200 in 67ms
+ GET /dashboard 200 in 61ms
+ GET /dashboard 200 in 26ms
+ GET /dashboard 200 in 57ms
+ GET /dashboard 200 in 45ms
+ GET /dashboard 200 in 56ms
+ GET /dashboard 200 in 67ms
+ GET /dashboard 200 in 58ms
+ GET /dashboard 200 in 59ms
+ GET /dashboard 200 in 50ms
+ GET /dashboard 200 in 44ms
+ GET /dashboard 200 in 30ms
+ GET /dashboard 200 in 45ms
+ GET /dashboard 200 in 45ms
+ GET /dashboard 200 in 34ms
+ GET /dashboard 200 in 32ms
+ GET /dashboard 200 in 41ms
+ GET /dashboard 200 in 49ms
+ GET /dashboard 200 in 32ms
+ GET /dashboard 200 in 45ms
+ GET /dashboard 200 in 48ms
+ GET /dashboard 200 in 31ms
+ GET /dashboard 200 in 33ms
+ GET /dashboard 200 in 49ms
+ GET /dashboard 200 in 48ms
+ GET /dashboard 200 in 49ms
+ GET /dashboard 200 in 48ms
+ GET /dashboard 200 in 47ms
+ GET /dashboard 200 in 47ms
+ GET /dashboard 200 in 48ms
+ GET /dashboard 200 in 94ms
+ GET /dashboard 200 in 51ms
+ GET /dashboard 200 in 55ms
+ GET /dashboard 200 in 67ms
+ GET /dashboard 200 in 66ms
+ GET /dashboard 200 in 51ms
+ GET /dashboard 200 in 55ms
+ GET /dashboard 200 in 57ms
+ GET /dashboard 200 in 36ms
+ GET /dashboard 200 in 61ms
+ GET /dashboard 200 in 51ms
+ GET /dashboard 200 in 57ms
+ GET /dashboard 200 in 68ms
+ GET /dashboard 200 in 54ms
+ GET /dashboard 200 in 64ms
+ GET /dashboard 200 in 22ms
+ GET /dashboard 200 in 30ms
+ GET /dashboard 200 in 28ms
+ GET /dashboard 200 in 24ms
+ GET /dashboard 200 in 56ms
+ GET /dashboard 200 in 25ms
+ GET /dashboard 200 in 45ms
+ GET /dashboard 200 in 23ms
+ ✓ Compiled in 1275ms (2774 modules)
+ GET /dashboard 200 in 1952ms
+ GET /dashboard 200 in 48ms
+ GET /dashboard 200 in 22ms
+ GET /dashboard 200 in 35ms
+ GET /dashboard 200 in 24ms
+ GET /dashboard 200 in 45ms
+ GET /dashboard 200 in 30ms
+ GET /dashboard 200 in 25ms
+ GET /dashboard 200 in 27ms
+ GET /dashboard 200 in 22ms
+ GET /dashboard 200 in 205ms
+ GET /dashboard 200 in 23ms
+ GET /dashboard 200 in 24ms
+ GET /dashboard 200 in 53ms
+ GET /dashboard 200 in 38ms
+ GET /dashboard 200 in 67ms
+ GET /dashboard 200 in 41ms
+ GET /dashboard 200 in 32ms
+ GET /dashboard 200 in 50ms
+ GET /dashboard 200 in 34ms
+ GET /dashboard 200 in 38ms
+ GET /dashboard 200 in 53ms
+ GET /dashboard 200 in 49ms
+ ✓ Compiled in 3.7s (2941 modules)
+ GET /dashboard 200 in 2360ms
+ GET /dashboard 200 in 50ms
+ GET /dashboard 200 in 50ms
+ GET /dashboard 200 in 49ms
+ GET /dashboard 200 in 42ms
+ GET /dashboard 200 in 55ms
+ GET /dashboard 200 in 49ms
+ GET /dashboard 200 in 50ms
+ GET /dashboard 200 in 45ms
+ GET /dashboard 200 in 47ms
+ GET /dashboard 200 in 32ms
+ GET /dashboard 200 in 50ms
+ GET /dashboard 200 in 43ms
+ GET /dashboard 200 in 51ms
+ GET /dashboard 200 in 46ms
+ GET /dashboard 200 in 50ms
+ GET /dashboard 200 in 50ms
+ GET /dashboard 200 in 48ms
+ GET /dashboard 200 in 48ms
+ GET /dashboard 200 in 48ms
+ GET /dashboard 200 in 49ms
+ GET /dashboard 200 in 50ms
+ GET /dashboard 200 in 44ms
+ GET /dashboard 200 in 46ms
+ GET /dashboard 200 in 36ms
+ GET /dashboard 200 in 52ms
+ GET /dashboard 200 in 41ms
+ GET /dashboard 200 in 48ms
+ GET /dashboard 200 in 45ms
+ GET /dashboard 200 in 44ms
+ GET /dashboard 200 in 43ms
+ GET /dashboard 200 in 43ms
+ GET /dashboard 200 in 42ms
+ GET /dashboard 200 in 41ms
+ GET /dashboard 200 in 42ms
+ GET /dashboard 200 in 43ms
+ GET /dashboard 200 in 43ms
+ GET /dashboard 200 in 50ms
+ GET /dashboard 200 in 41ms
+ GET /dashboard 200 in 45ms
+ GET /dashboard 200 in 42ms
+ GET /dashboard 200 in 48ms
+ GET /dashboard 200 in 35ms
+ GET /dashboard 200 in 37ms
+ GET /dashboard 200 in 39ms
+ GET /dashboard 200 in 51ms
+ GET /dashboard 200 in 45ms
+ GET /dashboard 200 in 47ms
+ GET /dashboard 200 in 47ms
+ GET /dashboard 200 in 46ms
+ GET /dashboard 200 in 48ms
+ GET /dashboard 200 in 49ms
+ GET /dashboard 200 in 48ms
+ GET /dashboard 200 in 46ms
+ GET /dashboard 200 in 44ms
+ GET /dashboard 200 in 51ms
+ GET /dashboard 200 in 43ms
+ GET /dashboard 200 in 50ms
+ GET /dashboard 200 in 47ms
+ GET /dashboard 200 in 47ms
+ GET /dashboard 200 in 51ms
+ GET /dashboard 200 in 49ms
+ GET /dashboard 200 in 46ms
+ GET /dashboard 200 in 43ms
+ GET /dashboard 200 in 48ms
+ GET /dashboard 200 in 41ms
+ GET /dashboard 200 in 42ms
+ GET /dashboard 200 in 36ms
+ GET /dashboard 200 in 41ms
+ GET /dashboard 200 in 46ms
+ GET /dashboard 200 in 42ms
+ GET /dashboard 200 in 50ms
+ ✓ Compiled in 737ms (2774 modules)
+ GET /dashboard 200 in 108ms
+ GET /dashboard 200 in 387ms
+ ✓ Compiled in 278ms (2774 modules)
+ ✓ Compiled in 362ms (2774 modules)
+ ✓ Compiled in 242ms (2774 modules)
+ ✓ Compiled in 246ms (2774 modules)
+ ✓ Compiled in 199ms (2774 modules)
+ ✓ Compiled in 777ms (2774 modules)
+ ✓ Compiled in 265ms (2774 modules)
+ ✓ Compiled in 63ms (167 modules)
+ GET / 200 in 210ms
+<w> [webpack.cache.PackFileCacheStrategy] Serializing big strings (215kiB) impacts deserialization performance (consider using Buffer instead and decode when needed)
+ GET /dashboard 200 in 50ms
+ ⨯ Error: Could not find the module "/Users/habibur_periscope/Documents/Projects/WEB/CareerPulse_WEB/node_modules/next/dist/next-devtools/userspace/app/segment-explorer-node.js#SegmentViewNode" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>) {
+  digest: '802789867'
+}
+ ⨯ Error: Could not find the module "/Users/habibur_periscope/Documents/Projects/WEB/CareerPulse_WEB/node_modules/next/dist/next-devtools/userspace/app/segment-explorer-node.js#SegmentViewNode" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>)
+    at stringify (<anonymous>) {
+  digest: '1767270954'
+}
+ ⨯ Error: Could not find the module "/Users/habibur_periscope/Documents/Projects/WEB/CareerPulse_WEB/node_modules/next/dist/next-devtools/userspace/app/segment-explorer-node.js#SegmentViewNode" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>)
+    at stringify (<anonymous>) {
+  digest: '1767270954'
+}
+ ⨯ Error: Could not find the module "/Users/habibur_periscope/Documents/Projects/WEB/CareerPulse_WEB/node_modules/next/dist/next-devtools/userspace/app/segment-explorer-node.js#SegmentViewNode" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>)
+    at stringify (<anonymous>) {
+  digest: '1767270954'
+}
+ ⨯ Error: Could not find the module "/Users/habibur_periscope/Documents/Projects/WEB/CareerPulse_WEB/node_modules/next/dist/next-devtools/userspace/app/segment-explorer-node.js#SegmentViewNode" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>) {
+  digest: '802789867'
+}
+ ⨯ Error: Could not find the module "/Users/habibur_periscope/Documents/Projects/WEB/CareerPulse_WEB/node_modules/next/dist/next-devtools/userspace/app/segment-explorer-node.js#SegmentViewNode" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>)
+    at stringify (<anonymous>) {
+  digest: '1767270954'
+}
+ ⨯ Error: Could not find the module "/Users/habibur_periscope/Documents/Projects/WEB/CareerPulse_WEB/node_modules/next/dist/next-devtools/userspace/app/segment-explorer-node.js#SegmentViewNode" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>)
+    at stringify (<anonymous>) {
+  digest: '1767270954'
+}
+ ⨯ Error: Could not find the module "/Users/habibur_periscope/Documents/Projects/WEB/CareerPulse_WEB/node_modules/next/dist/next-devtools/userspace/app/segment-explorer-node.js#SegmentViewNode" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>) {
+  digest: '802789867'
+}
+ ⨯ Error: Could not find the module "/Users/habibur_periscope/Documents/Projects/WEB/CareerPulse_WEB/node_modules/next/dist/next-devtools/userspace/app/segment-explorer-node.js#SegmentViewNode" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>) {
+  digest: '802789867'
+}
+ ⨯ [TypeError: __webpack_modules__[moduleId] is not a function] {
+  digest: '315304170'
+}
+ ⨯ Error: Could not find the module "/Users/habibur_periscope/Documents/Projects/WEB/CareerPulse_WEB/node_modules/next/dist/next-devtools/userspace/app/segment-explorer-node.js#SegmentViewNode" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>) {
+  digest: '802789867'
+}
+[TypeError: __webpack_modules__[moduleId] is not a function]
+ ⨯ [TypeError: __webpack_modules__[moduleId] is not a function]
+ ⨯ [TypeError: __webpack_modules__[moduleId] is not a function] {
+  page: '/'
+}
+ ○ Compiling /_error ...
+ ✓ Compiled /_error in 861ms (3105 modules)
+ GET /dashboard 200 in 330ms
+ GET / 500 in 2567ms
+ GET /dashboard 200 in 34ms
+ GET / 200 in 175ms
+ GET / 200 in 51ms
+ ✓ Compiled /favicon.ico in 323ms (1677 modules)
+ GET /favicon.ico 200 in 412ms
+ GET / 200 in 176ms
+ GET /favicon.ico 200 in 8ms
+ GET / 200 in 50ms
+ GET /favicon.ico 200 in 8ms
+ GET / 200 in 49ms
+ GET /favicon.ico 200 in 5ms
+ GET /login 200 in 57ms
+ GET /favicon.ico 200 in 6ms
+ GET /login?email=smilesoft4849%40gmail.com&password=1234567890 200 in 49ms
+ GET /favicon.ico 200 in 6ms
+ GET /login?email=smilesoft4849%40gmail.com&password=1234567890 200 in 48ms
+ GET /favicon.ico 200 in 6ms
+ ✓ Compiled in 1906ms (3023 modules)
+ ✓ Compiled in 989ms (3023 modules)
+ ✓ Compiled in 403ms (3023 modules)
+ ✓ Compiled in 304ms (3023 modules)
+ GET / 200 in 411ms

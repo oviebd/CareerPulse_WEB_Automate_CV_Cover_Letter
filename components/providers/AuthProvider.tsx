@@ -34,14 +34,23 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * Session bootstrap: `initialized` in the auth store stays false until getSession/getUser
+ * finishes (equivalent to an isInitializing guard). Do not client-redirect to /login from
+ * init; middleware owns that. AuthGuard shows a spinner until initialized.
+ */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const setUser = useAuthStore((s) => s.setUser);
   const setProfile = useAuthStore((s) => s.setProfile);
   const setInitialized = useAuthStore((s) => s.setInitialized);
   const wasAuthenticatedRef = useRef(false);
   const expiryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const redirectingRef = useRef(false);
+  /** Stops onAuthStateChange from clearing the user while init() is still resolving (new tabs). */
+  const initSessionCompleteRef = useRef(false);
 
   useEffect(() => {
+    initSessionCompleteRef.current = false;
     const supabase = createClient();
     const clearExpiryTimer = () => {
       if (!expiryTimerRef.current) return;
@@ -49,13 +58,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       expiryTimerRef.current = null;
     };
 
+    /**
+     * Client redirect to /login is only for mid-session sign-out / session invalidation
+     * (clearAndRedirect, SIGNED_OUT). init() does not redirect: middleware already gate-keeps
+     * protected and auth routes.
+     */
     const redirectToLoginIfProtected = () => {
       if (typeof window === 'undefined') return;
+      if (redirectingRef.current) return;
       const { pathname } = window.location;
       const isProtected = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p));
       if (!isProtected) return;
+      redirectingRef.current = true;
       const returnTo = encodeURIComponent(pathname);
       window.location.href = `/login?returnTo=${returnTo}`;
+    };
+
+    /**
+     * Clear all auth state and redirect to login.
+     * Used when we detect a truly invalid / expired session.
+     */
+    const clearAndRedirect = async () => {
+      setUser(null);
+      setProfile(null);
+      clearExpiryTimer();
+      try {
+        await supabase.auth.signOut({ scope: 'local' });
+      } catch {
+        // Best-effort — cookies may already be gone
+      }
+      redirectToLoginIfProtected();
     };
 
     const scheduleSessionExpiryCheck = (session: Session | null) => {
@@ -68,14 +100,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       expiryTimerRef.current = setTimeout(async () => {
         try {
+          // Validate against the server, not just local storage
           const {
-            data: { session: currentSession },
-          } = await supabase.auth.getSession();
-          if (!currentSession) {
-            redirectToLoginIfProtected();
+            data: { user },
+            error,
+          } = await supabase.auth.getUser();
+          if (error || !user) {
+            await clearAndRedirect();
           }
         } catch {
-          redirectToLoginIfProtected();
+          await clearAndRedirect();
         }
       }, msUntilCheck);
     };
@@ -109,6 +143,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
+    /**
+     * Get session with retry (handles navigator lock contention).
+     * Since middleware.ts handles strict validation and token refresh on page load,
+     * getSession() is safe to use here. It's much faster than getUser() and
+     * significantly reduces lock contention across multiple tabs.
+     */
     async function getSessionWithRetry(): Promise<Session | null> {
       for (let attempt = 1; attempt <= 3; attempt += 1) {
         try {
@@ -118,8 +158,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return session ?? null;
         } catch (e) {
           const message = e instanceof Error ? e.message : String(e);
-          const isLockContention = isLockContentionErrorMessage(message);
-          if (isLockContention && attempt < 3) {
+          if (isLockContentionErrorMessage(message) && attempt < 3) {
             await sleep(80 * attempt);
             continue;
           }
@@ -129,24 +168,76 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return null;
     }
 
-    async function init() {
-      try {
-        const session = await getSessionWithRetry();
-        const user = session?.user ?? null;
-        setUser(user);
-        scheduleSessionExpiryCheck(session ?? null);
-        wasAuthenticatedRef.current = !!user;
+    async function getUserWithRetry() {
+      for (let attempt = 1; attempt <= 3; attempt += 1) {
+        try {
+          const {
+            data: { user },
+            error,
+          } = await supabase.auth.getUser();
+          if (error) throw error;
+          return user ?? null;
+        } catch (e) {
+          const message = e instanceof Error ? e.message : String(e);
+          if (isLockContentionErrorMessage(message) && attempt < 3) {
+            await sleep(80 * attempt);
+            continue;
+          }
+          console.error('Auth init getUser:', e);
+          return null;
+        }
+      }
+      return null;
+    }
 
-        if (user) {
-          await syncFromUser(user.id);
-        } else {
+    async function init() {
+      let userResolvedWithoutSessionObject = false;
+      try {
+        // Step 1: Read the session from cookies.
+        // The server (middleware.ts) has already validated and potentially refreshed
+        // this session before the page even loaded.
+        let session = await getSessionWithRetry();
+
+        if (!session) {
+          // getSession() can be empty under lock contention while cookies are still valid
+          // (e.g. new tab), getUser() validates with the server.
+          const userFromUser = await getUserWithRetry();
+          if (userFromUser) {
+            const {
+              data: { session: s2 },
+            } = await supabase.auth.getSession();
+            session = s2 ?? null;
+            if (!session) {
+              setUser(userFromUser);
+              wasAuthenticatedRef.current = true;
+              scheduleSessionExpiryCheck(null);
+              await syncFromUser(userFromUser.id);
+              userResolvedWithoutSessionObject = true;
+            }
+          }
+        }
+
+        if (session?.user) {
+          setUser(session.user);
+          wasAuthenticatedRef.current = true;
+          scheduleSessionExpiryCheck(session);
+          await syncFromUser(session.user.id);
+        } else if (!userResolvedWithoutSessionObject) {
+          setUser(null);
           setProfile(null);
+          wasAuthenticatedRef.current = false;
+          try {
+            await supabase.auth.signOut({ scope: 'local' });
+          } catch {
+            // Best-effort cleanup
+          }
         }
       } catch (e) {
         console.error('Auth init unexpected error:', e);
         setUser(null);
         setProfile(null);
       } finally {
+        initSessionCompleteRef.current = true;
         setInitialized(true);
       }
     }
@@ -157,22 +248,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, session: Session | null) => {
       try {
-        // init() already handles first-session bootstrap; skipping this avoids
-        // duplicate session/profile reads that can contend across tabs.
-        if (event === 'INITIAL_SESSION') return;
+        if (!initSessionCompleteRef.current) {
+          return;
+        }
+        if (event === 'INITIAL_SESSION') {
+          return;
+        }
 
-        const user = session?.user ?? null;
-        setUser(user);
+        if (event === 'TOKEN_REFRESHED' && !session) {
+          await clearAndRedirect();
+          return;
+        }
+
+        const nextUser = session?.user ?? null;
+
+        if (nextUser === null) {
+          if (event === 'SIGNED_OUT') {
+            setUser(null);
+            scheduleSessionExpiryCheck(null);
+            await syncFromUser(undefined);
+            const hadSession = wasAuthenticatedRef.current;
+            wasAuthenticatedRef.current = false;
+            if (hadSession) {
+              window.location.href = '/login';
+            }
+          }
+          return;
+        }
+
+        setUser(nextUser);
         scheduleSessionExpiryCheck(session);
-        await syncFromUser(user?.id);
+        await syncFromUser(nextUser.id);
 
         if (event === 'SIGNED_IN') {
           wasAuthenticatedRef.current = true;
-        }
-
-        if (event === 'SIGNED_OUT' && wasAuthenticatedRef.current) {
-          wasAuthenticatedRef.current = false;
-          window.location.href = '/login';
         }
       } catch (e) {
         console.error('Auth state change error:', e);
@@ -182,6 +291,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => {
+      initSessionCompleteRef.current = false;
       clearExpiryTimer();
       subscription.unsubscribe();
     };
