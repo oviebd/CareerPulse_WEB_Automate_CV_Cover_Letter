@@ -9,6 +9,7 @@ import {
 } from '@/lib/cover-letter-html';
 import { exportCV, generatePDF } from '@/lib/pdf';
 import { rateLimitHit } from '@/lib/rate-limit';
+import { CL_TEMPLATE_IDS } from '@/src/config/templateConfig';
 import type { CoverLetter } from '@/types';
 
 export const runtime = 'nodejs';
@@ -211,13 +212,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'invalid_body' }, { status: 400 });
     }
 
-    const { data: tmpl, error: tmplErr } = await supabase
-      .from('cv_templates')
-      .select('id')
-      .eq('id', templateId)
-      .eq('type', 'cover_letter')
-      .maybeSingle();
-    if (tmplErr || !tmpl) {
+    if (!(CL_TEMPLATE_IDS as readonly string[]).includes(templateId)) {
       return NextResponse.json({ error: 'invalid_template' }, { status: 400 });
     }
 

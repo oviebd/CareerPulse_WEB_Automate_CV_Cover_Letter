@@ -52,6 +52,7 @@ export async function POST(request: Request) {
       applicant_phone?: string | null;
       applicant_location?: string | null;
       job_ids?: string[];
+      source_type?: 'job_description' | 'existing_cover_letter' | 'scratch' | null;
     };
     if (typeof body.content !== 'string') {
       return err('content is required', 'VALIDATION', 422);
@@ -76,6 +77,7 @@ export async function POST(request: Request) {
         applicant_phone: body.applicant_phone?.trim() || null,
         applicant_location: body.applicant_location?.trim() || null,
         job_ids: jobIds,
+        source_type: body.source_type ?? null,
       })
       .select()
       .single();

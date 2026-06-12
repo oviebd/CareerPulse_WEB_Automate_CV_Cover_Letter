@@ -185,6 +185,59 @@ export async function generateCoverLetterText(params: {
   return block.type === 'text' ? block.text.trim() : '';
 }
 
+/** Rewrite/enhance an existing cover letter body, preserving the candidate's voice. */
+export async function enhanceCoverLetter(params: {
+  existingContent: string;
+  targetRole?: string;
+  targetCompany?: string;
+  tone?: CoverLetterTone;
+  length?: CoverLetterLength;
+  specificEmphasis?: string;
+}): Promise<string> {
+  const wordTargets = { short: 200, medium: 350, long: 500 };
+  const toneGuide: Record<CoverLetterTone, string> =
+    {
+      professional: 'formal but warm',
+      confident: 'assertive and direct',
+      creative: 'engaging and distinctive',
+      concise: 'brief and punchy',
+      formal: 'traditional and structured',
+    };
+  const tone = params.tone ?? 'professional';
+  const length = params.length ?? 'medium';
+  const targetWords = wordTargets[length];
+  const toneDesc = toneGuide[tone];
+  const roleContext = params.targetRole
+    ? `Target role: ${params.targetRole}`
+    : '';
+  const companyContext = params.targetCompany
+    ? `Target company: ${params.targetCompany}`
+    : '';
+  const emphasisContext = params.specificEmphasis?.trim()
+    ? `Special emphasis: ${params.specificEmphasis}`
+    : '';
+  const contextLines = [roleContext, companyContext, emphasisContext]
+    .filter(Boolean)
+    .join('\n');
+
+  const message = await withRetry(() =>
+    claude.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: 1000,
+      system:
+        'You are an expert cover letter coach. Rewrite and improve the provided cover letter body. Preserve the candidate\'s authentic experiences, achievements, and personal voice. Improve clarity, professional impact, sentence flow, and ATS keyword coverage. Return ONLY the improved body text — no salutation header, no sign-off, no preamble or commentary.',
+      messages: [
+        {
+          role: 'user',
+          content: `EXISTING COVER LETTER:\n${params.existingContent}\n\n---\n\nINSTRUCTIONS:\n- Tone: ${tone} (${toneDesc})\n- Target length: ~${targetWords} words\n${contextLines}\n- Preserve all real achievements, facts, and the candidate's unique voice\n- Improve sentence structure, impact, and ATS alignment\n- Do NOT invent new achievements or metrics\n\nWrite the improved cover letter body now.`,
+        },
+      ],
+    })
+  );
+  const block = message.content[0];
+  return block.type === 'text' ? block.text.trim() : '';
+}
+
 export async function scoreATS(
   jobDescription: string,
   coverLetter: string

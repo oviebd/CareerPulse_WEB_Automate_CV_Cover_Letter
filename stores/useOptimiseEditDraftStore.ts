@@ -29,10 +29,11 @@ export interface CvOptimiseEditDraft {
   coverLetterEmphasis?: string | null;
 }
 
-/** Passed from optimise result → cover letter editor when nothing is saved yet. */
+/** Passed from optimise result or enhance-existing page → cover letter editor when nothing is saved yet. */
 export interface CoverLetterOptimiseEditDraft {
   content: string;
-  originalCvId: string;
+  /** CV row id used to pre-populate applicant contact fields. Null for non-CV flows (e.g. enhance-existing, scratch). */
+  originalCvId: string | null;
   companyName?: string | null;
   jobTitle?: string | null;
   tone?: CoverLetterTone;
@@ -40,6 +41,7 @@ export interface CoverLetterOptimiseEditDraft {
   emphasis?: string | null;
   templateId?: string | null;
   savedJobId?: string | null;
+  sourceType?: 'job_description' | 'existing_cover_letter' | 'scratch' | null;
 }
 
 interface OptimiseEditDraftState {

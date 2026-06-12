@@ -227,6 +227,7 @@ export interface CoverLetter {
   applicant_email: string | null;
   applicant_phone: string | null;
   applicant_location: string | null;
+  source_type: 'job_description' | 'existing_cover_letter' | 'scratch' | null;
   created_at: string;
   updated_at: string;
 }

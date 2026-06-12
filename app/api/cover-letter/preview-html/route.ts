@@ -7,12 +7,13 @@ import {
   getSampleCoverLetterPreviewVars,
   renderCoverLetterPageHtml,
 } from '@/lib/cover-letter-html';
+import { CL_TEMPLATE_IDS, type ClTemplateId } from '@/src/config/templateConfig';
 import type { CoverLetter } from '@/types';
 
 export const runtime = 'nodejs';
 
 function isValidCoverLetterTemplateId(id: string): boolean {
-  return /^cl-[a-z0-9-]+$/i.test(id) && id.length <= 64;
+  return (CL_TEMPLATE_IDS as readonly string[]).includes(id);
 }
 
 export async function GET(request: Request) {
@@ -37,16 +38,6 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
     }
 
-    const { data: tmpl, error: tmplErr } = await supabase
-      .from('cv_templates')
-      .select('id')
-      .eq('id', templateId)
-      .eq('type', 'cover_letter')
-      .maybeSingle();
-    if (tmplErr || !tmpl) {
-      return NextResponse.json({ error: 'template_not_found' }, { status: 404 });
-    }
-
     const { data: profile } = await supabase
       .from('profiles')
       .select('subscription_tier')
@@ -57,7 +48,7 @@ export async function GET(request: Request) {
       process.cwd(),
       'templates',
       'cover-letter',
-      `${templateId}.html`
+      `${templateId as ClTemplateId}.html`
     );
     const templateHtml = await readFile(templatePath, 'utf-8');
     const vars = getSampleCoverLetterPreviewVars(accent);
@@ -114,38 +105,43 @@ export async function POST(request: Request) {
     /** Draft preview: optimise result page before the letter is saved */
     if (!letterId) {
       const draftContent = typeof body.content === 'string' ? body.content : '';
-      if (!draftContent.trim() || !originalCvId) {
+      if (!draftContent.trim()) {
         return NextResponse.json(
-          { error: 'Provide cover_letter_id or (content + original_cv_id)' },
+          { error: 'Provide cover_letter_id or content' },
           { status: 400 }
         );
       }
 
-      const { data: baseCv, error: cvErr } = await supabase
-        .from('cvs')
-        .select(
-          'full_name, professional_title, email, phone, location, linkedin_url'
-        )
-        .eq('id', originalCvId)
-        .eq('user_id', user.id)
-        .maybeSingle();
-      if (cvErr || !baseCv) {
-        return NextResponse.json({ error: 'cv_not_found' }, { status: 404 });
+      // Fetch CV for contact info only when an id is supplied (original optimise flow).
+      // For scratch / enhance-existing flows, originalCvId is absent — use empty CV and
+      // rely on the applicant_* override fields passed in the request body.
+      let baseCv: { full_name: string | null; professional_title: string | null; email: string | null; phone: string | null; location: string | null; linkedin_url: string | null } | null = null;
+      if (originalCvId) {
+        const { data: cvRow, error: cvErr } = await supabase
+          .from('cvs')
+          .select(
+            'full_name, professional_title, email, phone, location, linkedin_url'
+          )
+          .eq('id', originalCvId)
+          .eq('user_id', user.id)
+          .maybeSingle();
+        if (cvErr || !cvRow) {
+          return NextResponse.json({ error: 'cv_not_found' }, { status: 404 });
+        }
+        baseCv = cvRow;
       }
+      const cvForPreview = baseCv ?? {
+        full_name: null,
+        professional_title: null,
+        email: null,
+        phone: null,
+        location: null,
+        linkedin_url: null,
+      };
 
       const templateId = (body.template_id?.trim() || 'cl-classic').trim();
       if (!isValidCoverLetterTemplateId(templateId)) {
         return NextResponse.json({ error: 'invalid_template' }, { status: 400 });
-      }
-
-      const { data: tmpl, error: tmplErr } = await supabase
-        .from('cv_templates')
-        .select('id')
-        .eq('id', templateId)
-        .eq('type', 'cover_letter')
-        .maybeSingle();
-      if (tmplErr || !tmpl) {
-        return NextResponse.json({ error: 'template_not_found' }, { status: 404 });
       }
 
       const { data: profile } = await supabase
@@ -178,7 +174,7 @@ export async function POST(request: Request) {
         `${templateId}.html`
       );
       const templateHtml = await readFile(templatePath, 'utf-8');
-      const vars = buildCoverLetterVariables(baseCv, {
+      const vars = buildCoverLetterVariables(cvForPreview, {
         content: draftContent,
         company_name: companyName,
         job_title: jobTitle,
@@ -221,16 +217,6 @@ export async function POST(request: Request) {
     ).trim();
     if (!isValidCoverLetterTemplateId(templateId)) {
       return NextResponse.json({ error: 'invalid_template' }, { status: 400 });
-    }
-
-    const { data: tmpl, error: tmplErr } = await supabase
-      .from('cv_templates')
-      .select('id')
-      .eq('id', templateId)
-      .eq('type', 'cover_letter')
-      .maybeSingle();
-    if (tmplErr || !tmpl) {
-      return NextResponse.json({ error: 'template_not_found' }, { status: 404 });
     }
 
     const { data: profile } = await supabase

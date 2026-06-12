@@ -5,6 +5,7 @@ import {
   FileText,
   Kanban,
   LayoutDashboard,
+  Mail,
   Menu,
   Settings,
   X,
@@ -33,6 +34,7 @@ const nav: NavItem[] = [
   { href: '/dashboard', label: 'Home', icon: LayoutDashboard },
   { href: '/cv', label: 'My CV', icon: FileText },
   { href: '/applications', label: 'Applications', icon: Kanban },
+  { href: '/cover-letters', label: 'Cover Letters', icon: Mail },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 

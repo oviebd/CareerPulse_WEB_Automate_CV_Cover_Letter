@@ -456,6 +456,17 @@ export const TEMPLATE_CONFIGS: Record<TemplateId, TemplateConfig> = {
   },
 };
 
+/** All valid cover letter template IDs — used as allowlist in API routes instead of DB lookup. */
+export const CL_TEMPLATE_IDS = [
+  'cl-classic',
+  'cl-modern',
+  'cl-minimal',
+  'cl-formal',
+  'cl-creative',
+] as const;
+
+export type ClTemplateId = (typeof CL_TEMPLATE_IDS)[number];
+
 /** Full catalog of unified template ids (for pickers when DB may be a subset). */
 export const ALL_TEMPLATE_IDS: TemplateId[] = [
   'classic',

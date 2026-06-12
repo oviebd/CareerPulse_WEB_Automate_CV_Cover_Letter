@@ -61,6 +61,21 @@ export default function CoverLetterDetailPage() {
   const { tier } = useSubscription();
   const updateLetter = useUpdateCoverLetter();
 
+  const { data: preferredClTemplateId = 'cl-classic' } = useQuery({
+    queryKey: ['profile-cl-template', userId],
+    queryFn: async (): Promise<string> => {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from('profiles')
+        .select('preferred_cl_template_id')
+        .eq('id', userId ?? '')
+        .maybeSingle();
+      return (data?.preferred_cl_template_id as string | null) ?? 'cl-classic';
+    },
+    enabled: Boolean(userId),
+    staleTime: 5 * 60 * 1000,
+  });
+
   const [draftContent, setDraftContent] = useState('');
   const [draftTemplateId, setDraftTemplateId] = useState('cl-classic');
   const [draftCompanyName, setDraftCompanyName] = useState('');
@@ -99,8 +114,8 @@ export default function CoverLetterDetailPage() {
   useEffect(() => {
     if (!isDraftMode) return;
     const payload = useOptimiseEditDraftStore.getState().clEditDraft;
-    if (!payload?.content?.trim() || !payload.originalCvId) {
-      router.replace('/cv/optimise/result');
+    if (!payload?.content?.trim()) {
+      router.replace('/cover-letters/new');
       return;
     }
     setDraftClMeta(payload);
@@ -113,7 +128,7 @@ export default function CoverLetterDetailPage() {
   useEffect(() => {
     if (!isDraftMode || !draftClMeta?.originalCvId) return;
     const supabase = createClient();
-    const cvId = draftClMeta.originalCvId;
+    const cvId = draftClMeta.originalCvId as string;
     let cancelled = false;
     void (async () => {
       const { data } = await supabase
@@ -139,7 +154,7 @@ export default function CoverLetterDetailPage() {
       initLetterIdRef.current = letter.id;
       jobSyncedForLetterRef.current = null;
       setDraftContent(letter.content ?? '');
-      setDraftTemplateId(letter.template_id?.trim() || 'cl-classic');
+      setDraftTemplateId(letter.template_id?.trim() || preferredClTemplateId || 'cl-classic');
       setDraftApplicantName(letter.applicant_name ?? '');
       setDraftApplicantRole(letter.applicant_role ?? '');
       setDraftApplicantEmail(letter.applicant_email ?? '');
@@ -148,7 +163,7 @@ export default function CoverLetterDetailPage() {
       setDraftCompanyName('');
       setDraftJobTitle('');
     }
-  }, [letter]);
+  }, [letter, preferredClTemplateId]);
 
   useEffect(() => {
     if (isDraftMode || !letter || !linkedJob) return;
@@ -169,7 +184,7 @@ export default function CoverLetterDetailPage() {
 
   const refreshPreview = useCallback(async () => {
     if (isDraftMode) {
-      if (!draftClMeta?.originalCvId) return;
+      if (!draftClMeta) return;
       setPreviewLoading(true);
       try {
         const res = await fetch('/api/cover-letter/preview-html', {
@@ -181,7 +196,9 @@ export default function CoverLetterDetailPage() {
             accent_color: accent,
             company_name: draftCompanyName || null,
             job_title: draftJobTitle || null,
-            original_cv_id: draftClMeta.originalCvId,
+            ...(draftClMeta.originalCvId
+              ? { original_cv_id: draftClMeta.originalCvId }
+              : {}),
             applicant_name: draftApplicantName,
             applicant_role: draftApplicantRole,
             applicant_email: draftApplicantEmail,
@@ -323,6 +340,7 @@ export default function CoverLetterDetailPage() {
             applicant_phone: draftApplicantPhone.trim() || null,
             applicant_location: draftApplicantLocation.trim() || null,
             job_ids: draftClMeta.savedJobId ? [draftClMeta.savedJobId] : [],
+            source_type: draftClMeta.sourceType ?? null,
           }),
         });
         if (!res.ok) {
