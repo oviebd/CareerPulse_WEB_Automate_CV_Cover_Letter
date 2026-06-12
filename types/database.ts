@@ -138,7 +138,7 @@ export function isJobSpecificCV(cv: CV): boolean {
   return cv.job_ids.length > 0;
 }
 
-/** `jobs.status` — Postgres enum `job_status` (migration 015) */
+/** `jobs.status` — Postgres enum `job_status` (migrations 015 + 023) */
 export type JobStatus =
   | 'none'
   | 'apply_later'
@@ -150,7 +150,8 @@ export type JobStatus =
   | 'offered'
   | 'rejected'
   | 'withdrawn'
-  | 'ghosted';
+  | 'ghosted'
+  | 'archived';
 
 export interface LinkedCV {
   id: string;

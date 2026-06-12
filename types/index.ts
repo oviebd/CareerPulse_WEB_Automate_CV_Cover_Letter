@@ -170,6 +170,14 @@ export const JOB_STATUS_CONFIG: Record<
     textColor: 'text-slate-600 dark:text-slate-300',
     borderClass: 'border-slate-400 text-slate-700 dark:border-slate-500 dark:text-slate-200',
   },
+  archived: {
+    label: 'Archived',
+    emoji: '📦',
+    color: 'slate',
+    bgColor: 'bg-slate-100 dark:bg-slate-900/50',
+    textColor: 'text-slate-500 dark:text-slate-400',
+    borderClass: 'border-slate-400 text-slate-600 dark:border-slate-500 dark:text-slate-300',
+  },
 };
 
 /** Short label with emoji — buttons and toasts */

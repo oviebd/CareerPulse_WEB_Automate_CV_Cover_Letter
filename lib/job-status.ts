@@ -12,6 +12,7 @@ const VALUES: readonly JobStatus[] = [
   'rejected',
   'withdrawn',
   'ghosted',
+  'archived',
 ] as const;
 
 export function isJobStatus(s: string): s is JobStatus {
@@ -30,4 +31,5 @@ export const TRACKABLE_JOB_STATUSES: Exclude<JobStatus, 'none'>[] = [
   'rejected',
   'withdrawn',
   'ghosted',
+  'archived',
 ];

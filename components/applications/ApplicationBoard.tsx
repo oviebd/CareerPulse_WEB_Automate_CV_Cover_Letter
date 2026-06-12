@@ -101,7 +101,7 @@ export function ApplicationBoard({ compact }: { compact?: boolean }) {
               {items.map((job) => (
                 <ApplicationCard key={job.id} job={job} />
               ))}
-              {col === 'saved' && items.length === 0 ? (
+              {col === 'wishlist' && items.length === 0 ? (
                 <button
                   type="button"
                   className="rounded-lg border border-dashed border-[var(--color-border)] py-4 text-xs text-[var(--color-muted)] hover:border-[var(--color-primary-300)] hover:text-[var(--color-primary-500)]"
@@ -109,7 +109,7 @@ export function ApplicationBoard({ compact }: { compact?: boolean }) {
                     createApp.mutate({
                       company_name: 'New company',
                       job_title: 'Role title',
-                      status: COLUMN_DB_STATUSES.saved[0],
+                      status: COLUMN_DB_STATUSES.wishlist[0],
                     })
                   }
                 >

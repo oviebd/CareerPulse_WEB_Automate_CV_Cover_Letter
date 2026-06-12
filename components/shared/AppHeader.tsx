@@ -4,7 +4,6 @@ import { AnimatePresence, motion } from 'framer-motion';
 import {
   FileText,
   Kanban,
-  LayoutDashboard,
   Mail,
   Menu,
   Settings,
@@ -31,28 +30,25 @@ interface NavItem {
 }
 
 const nav: NavItem[] = [
-  { href: '/dashboard', label: 'Home', icon: LayoutDashboard },
-  { href: '/cv', label: 'My CV', icon: FileText },
-  { href: '/applications', label: 'Applications', icon: Kanban },
+  { href: '/dashboard', label: 'Job Tracker', icon: Kanban },
+  { href: '/cv', label: 'CV Library', icon: FileText },
   { href: '/cover-letters', label: 'Cover Letters', icon: Mail },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
 function isNavActive(pathname: string, href: string): boolean {
   if (href === '/dashboard') {
-    return pathname === '/dashboard' || pathname === '/tracker';
+    return (
+      pathname === '/dashboard' ||
+      pathname === '/tracker' ||
+      pathname.startsWith('/applications')
+    );
   }
   if (href === '/cv') {
     return (
       pathname === '/cv' ||
-      pathname.startsWith('/cv/edit') ||
-      pathname === '/cv/builder' ||
-      pathname === '/cv/upload' ||
-      pathname.startsWith('/cv/templates')
+      pathname.startsWith('/cv/')
     );
-  }
-  if (href === '/applications') {
-    return pathname.startsWith('/applications');
   }
   return pathname === href || pathname.startsWith(`${href}/`);
 }
@@ -144,7 +140,7 @@ function NavLinkContent({
       {!collapsed && (
         <span className="min-w-0 flex-1 truncate">{item.label}</span>
       )}
-      {item.href === '/applications' &&
+      {item.href === '/dashboard' &&
       !collapsed &&
       typeof trackerBadge === 'number' &&
       trackerBadge > 0 ? (

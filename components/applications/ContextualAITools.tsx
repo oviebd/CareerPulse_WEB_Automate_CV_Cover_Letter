@@ -73,7 +73,7 @@ export function ContextualAITools({
     <div className="space-y-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-faint)]/50 p-4">
       <p className="text-sm font-semibold text-[var(--color-text-primary)]">AI tools</p>
       <div className="flex flex-wrap gap-2">
-        {column === 'applied' || column === 'interviewing' ? (
+        {column === 'applied' || column === 'interview' || column === 'assessment' ? (
           <Button
             size="sm"
             variant="secondary"
@@ -83,7 +83,7 @@ export function ContextualAITools({
             Follow-up email
           </Button>
         ) : null}
-        {column === 'interviewing' && limits.interviewPrep ? (
+        {(column === 'interview' || column === 'assessment') && limits.interviewPrep ? (
           <Button
             size="sm"
             variant="secondary"
