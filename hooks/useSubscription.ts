@@ -2,12 +2,14 @@
 
 import { useMemo } from 'react';
 import { useAuthStore } from '@/stores/useAuthStore';
-import { TIER_LIMITS, type SubscriptionTier } from '@/types';
+import { TIER_LIMITS, normalizeSubscriptionTier, type SubscriptionTier } from '@/types';
 
 export function useSubscription() {
   const profile = useAuthStore((s) => s.profile);
   return useMemo(() => {
-    const tier: SubscriptionTier = profile?.subscription_tier ?? 'free';
+    const tier: SubscriptionTier = normalizeSubscriptionTier(
+      profile?.subscription_tier
+    );
     return {
       tier,
       status: profile?.subscription_status ?? 'inactive',

@@ -1,33 +1,29 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
+import {
+  DocumentPrintPreviewFrame,
+  DOCUMENT_PREVIEW_A4_HEIGHT,
+} from '@/components/shared/DocumentPrintPreviewFrame';
 import { cn } from '@/lib/utils';
 
-/** A4 height / width — estimate how many “pages” a tall PNG spans. */
-const A4_H_OVER_W = 297 / 210;
-
 interface PreviewPanelProps {
-  /** Blob URL for PDF iframe, or a data URL / https URL for PNG image preview. */
+  /** Blob URL for rendered HTML preview. */
   previewSrc: string;
-  /** When false, `previewSrc` is rendered as an image (faster live preview). */
-  previewIsPdf: boolean;
   previewBusy: boolean;
   zoom: number;
   onZoomChange: (zoom: number) => void;
   currentPage: number;
   onPageChange: (page: number) => void;
-  /** Collapse to a slim strip to free space for the editor. */
   collapsed?: boolean;
   onToggleCollapse?: () => void;
-  /** Sticky offset under app header; matches CV editor shell top bar. */
   stickyTopClass?: string;
 }
 
 export function PreviewPanel(props: PreviewPanelProps) {
   const {
     previewSrc,
-    previewIsPdf,
     previewBusy,
     zoom,
     onZoomChange,
@@ -39,25 +35,13 @@ export function PreviewPanel(props: PreviewPanelProps) {
   } = props;
 
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [pngNatural, setPngNatural] = useState<{ w: number; h: number } | null>(null);
+  const [pageCount, setPageCount] = useState(1);
 
-  const scale = zoom / 100;
-
-  const pngPageCount = useMemo(() => {
-    if (!pngNatural || pngNatural.w <= 0) return 1;
-    const pageH = pngNatural.w * A4_H_OVER_W;
-    return Math.max(1, Math.ceil(pngNatural.h / pageH));
-  }, [pngNatural]);
-
-  useEffect(() => {
-    setPngNatural(null);
-  }, [previewSrc, previewIsPdf]);
-
-  const scrollPngToPage = useCallback(
+  const scrollToPage = useCallback(
     (page: number) => {
       const el = scrollRef.current;
-      if (!el || previewIsPdf) return;
-      const pages = pngPageCount;
+      if (!el) return;
+      const pages = Math.max(1, pageCount);
       const clamped = Math.min(Math.max(1, page), pages);
       const maxScroll = Math.max(0, el.scrollHeight - el.clientHeight);
       if (pages <= 1 || maxScroll <= 0) {
@@ -66,18 +50,13 @@ export function PreviewPanel(props: PreviewPanelProps) {
       }
       el.scrollTop = ((clamped - 1) / (pages - 1)) * maxScroll;
     },
-    [previewIsPdf, pngPageCount]
+    [pageCount]
   );
 
   useEffect(() => {
-    if (previewIsPdf || !previewSrc) return;
-    scrollPngToPage(currentPage);
-  }, [previewIsPdf, previewSrc, currentPage, scrollPngToPage, zoom, pngPageCount]);
-
-  const showPngPages = !previewIsPdf && pngPageCount > 1;
-
-  /** Logical CV width at 96dpi-ish; `maxWidth: 100%` caps to the sidebar. */
-  const displayWidthPx = 794 * scale;
+    if (!previewSrc) return;
+    scrollToPage(currentPage);
+  }, [previewSrc, currentPage, scrollToPage, zoom, pageCount]);
 
   if (collapsed) {
     return (
@@ -100,6 +79,8 @@ export function PreviewPanel(props: PreviewPanelProps) {
     );
   }
 
+  const showMultiPage = pageCount > 1;
+
   return (
     <aside
       className={cn(
@@ -121,23 +102,23 @@ export function PreviewPanel(props: PreviewPanelProps) {
                 <ChevronUp className="h-4 w-4" aria-hidden />
               </button>
             ) : null}
-          <div className="flex items-center gap-2 font-mono text-xs text-[var(--color-muted)]">
-            <button
-              type="button"
-              className="rounded-btn border border-[var(--color-border)] bg-[var(--color-control-bg)] px-2 py-1 transition duration-200 hover:bg-[var(--color-control-bg-hover)]"
-              onClick={() => onZoomChange(Math.max(70, zoom - 10))}
-            >
-              -
-            </button>
-            <span className="min-w-[3ch] text-center">{zoom}%</span>
-            <button
-              type="button"
-              className="rounded-btn border border-[var(--color-border)] bg-[var(--color-control-bg)] px-2 py-1 transition duration-200 hover:bg-[var(--color-control-bg-hover)]"
-              onClick={() => onZoomChange(Math.min(140, zoom + 10))}
-            >
-              +
-            </button>
-          </div>
+            <div className="flex items-center gap-2 font-mono text-xs text-[var(--color-muted)]">
+              <button
+                type="button"
+                className="rounded-btn border border-[var(--color-border)] bg-[var(--color-control-bg)] px-2 py-1 transition duration-200 hover:bg-[var(--color-control-bg-hover)]"
+                onClick={() => onZoomChange(Math.max(70, zoom - 10))}
+              >
+                -
+              </button>
+              <span className="min-w-[3ch] text-center">{zoom}%</span>
+              <button
+                type="button"
+                className="rounded-btn border border-[var(--color-border)] bg-[var(--color-control-bg)] px-2 py-1 transition duration-200 hover:bg-[var(--color-control-bg-hover)]"
+                onClick={() => onZoomChange(Math.min(140, zoom + 10))}
+              >
+                +
+              </button>
+            </div>
           </div>
         </div>
 
@@ -145,7 +126,7 @@ export function PreviewPanel(props: PreviewPanelProps) {
           ref={scrollRef}
           className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden pr-1"
         >
-          <div className="relative w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-preview-well)] shadow-inner">
+          <div className="relative w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-preview-well)] p-3 shadow-inner">
             {previewBusy ? (
               <div className="absolute inset-0 z-10 flex items-center justify-center bg-[var(--color-preview-overlay)] text-sm text-[var(--color-muted)] backdrop-blur-sm">
                 <div className="flex flex-col items-center gap-2">
@@ -155,56 +136,29 @@ export function PreviewPanel(props: PreviewPanelProps) {
               </div>
             ) : null}
             {previewSrc ? (
-              <div className="flex w-full justify-center p-3">
-                {previewIsPdf ? (
-                  <div
-                    className="mx-auto shadow-lg"
-                    style={{
-                      width: `${displayWidthPx}px`,
-                      maxWidth: '100%',
-                      height: 'min(85vh, 1400px)',
-                    }}
-                  >
-                    <iframe
-                      title="CV live preview"
-                      src={previewSrc}
-                      className="h-full w-full rounded-sm bg-white"
-                    />
-                  </div>
-                ) : (
-                  <div
-                    className="mx-auto shadow-lg"
-                    style={{
-                      width: `${displayWidthPx}px`,
-                      maxWidth: '100%',
-                    }}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={previewSrc}
-                      alt="CV preview"
-                      className="block h-auto w-full bg-white"
-                      style={{ objectFit: 'contain' }}
-                      onLoad={(e) => {
-                        const { naturalWidth, naturalHeight } = e.currentTarget;
-                        if (naturalWidth > 0 && naturalHeight > 0) {
-                          setPngNatural({ w: naturalWidth, h: naturalHeight });
-                        }
-                      }}
-                    />
-                  </div>
-                )}
-              </div>
+              <DocumentPrintPreviewFrame
+                src={previewSrc}
+                title="CV live preview"
+                isLoading={previewBusy}
+                zoom={zoom}
+                onMetricsChange={({ contentHeight }) => {
+                  const pages = Math.max(
+                    1,
+                    Math.ceil(contentHeight / DOCUMENT_PREVIEW_A4_HEIGHT)
+                  );
+                  setPageCount(pages);
+                }}
+              />
             ) : (
               <div className="flex min-h-[200px] items-center justify-center p-8 text-sm text-[var(--color-muted)]">
                 Preview unavailable
               </div>
             )}
           </div>
-          {!previewIsPdf && previewSrc && !previewBusy ? (
+          {previewSrc && !previewBusy ? (
             <p className="mt-2 px-1 text-center text-[11px] text-[var(--color-muted)]">
-              {showPngPages
-                ? `Long CV — about ${pngPageCount} page${pngPageCount > 1 ? 's' : ''}. Scroll the preview or use Previous / Next.`
+              {showMultiPage
+                ? `Long CV — about ${pageCount} page${pageCount > 1 ? 's' : ''}. Scroll the preview or use Previous / Next.`
                 : 'Scroll to see the full preview if content is long.'}
             </p>
           ) : null}
@@ -220,21 +174,15 @@ export function PreviewPanel(props: PreviewPanelProps) {
             Previous
           </button>
           <span className="font-medium text-[var(--color-text-primary)]">
-            {previewIsPdf
-              ? `Page ${currentPage}`
-              : showPngPages
-                ? `Page ${currentPage} / ${pngPageCount}`
-                : `Page ${currentPage}`}
+            {showMultiPage
+              ? `Page ${currentPage} / ${pageCount}`
+              : `Page ${currentPage}`}
           </span>
           <button
             type="button"
-            disabled={!previewIsPdf && currentPage >= pngPageCount}
+            disabled={currentPage >= pageCount}
             className="flex items-center gap-1 rounded-btn border border-[var(--color-border)] bg-[var(--color-control-bg)] px-3 py-1.5 transition duration-200 hover:bg-[var(--color-control-bg-hover)] disabled:cursor-not-allowed disabled:opacity-30"
-            onClick={() =>
-              previewIsPdf
-                ? onPageChange(currentPage + 1)
-                : onPageChange(Math.min(pngPageCount, currentPage + 1))
-            }
+            onClick={() => onPageChange(Math.min(pageCount, currentPage + 1))}
           >
             Next
           </button>

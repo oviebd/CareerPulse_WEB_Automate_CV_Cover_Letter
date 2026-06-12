@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getSampleCVData } from '@/lib/cv-sample-data';
 import { looseProfileToCVData, renderTemplate } from '@/lib/pdf';
 import { renderUnifiedHtml } from '@/src/services/pdfRenderer';
-import { TEMPLATE_CONFIGS } from '@/src/config/templateConfig';
+import { ALL_TEMPLATE_IDS, TEMPLATE_CONFIGS } from '@/src/config/templateConfig';
 import { normalizeTemplateId } from '@/src/utils/cvDefaults';
 import type { TemplateId } from '@/src/types/cv.types';
 
@@ -76,21 +76,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'invalid_body' }, { status: 400 });
     }
 
+    const tid = normalizeTemplateId(templateId) as TemplateId;
+    if (!ALL_TEMPLATE_IDS.includes(tid)) {
+      return NextResponse.json({ error: 'invalid_template' }, { status: 400 });
+    }
+
     const { data: tmpl, error: tErr } = await supabase
       .from('cv_templates')
       .select('id, type')
-      .eq('id', templateId)
+      .eq('id', tid)
       .eq('type', 'cv')
       .maybeSingle();
-    if (tErr || !tmpl) {
-      return NextResponse.json({ error: 'template_not_found' }, { status: 404 });
+    if (tErr) {
+      return NextResponse.json({ error: 'template_lookup_failed' }, { status: 500 });
     }
+    // DB row optional — unified templates exist on disk under src/templates/{id}
+    void tmpl;
 
     const cvData = looseProfileToCVData(body.cv, {
       accent_color: accent,
       watermark: false,
     });
-    const html = renderTemplate(templateId, cvData);
+    const html = renderTemplate(tid, cvData);
     return new NextResponse(html, {
       status: 200,
       headers: {

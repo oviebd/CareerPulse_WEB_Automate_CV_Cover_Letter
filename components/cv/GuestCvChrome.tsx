@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { FileText, LayoutTemplate, Menu, Sparkles, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from '@/components/shared/ThemeToggle';
@@ -15,7 +15,7 @@ const links = [
   { href: '/cv/builder?guest=true', label: 'Build CV' },
 ] as const;
 
-export function GuestCvChrome({ children }: { children: React.ReactNode }) {
+function GuestCvChromeInner({ children }: { children: React.ReactNode }) {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
@@ -135,5 +135,17 @@ export function GuestCvChrome({ children }: { children: React.ReactNode }) {
       </header>
       <div className="relative z-10 pt-16">{children}</div>
     </div>
+  );
+}
+
+export function GuestCvChrome({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[var(--color-background)] pt-16">{children}</div>
+      }
+    >
+      <GuestCvChromeInner>{children}</GuestCvChromeInner>
+    </Suspense>
   );
 }

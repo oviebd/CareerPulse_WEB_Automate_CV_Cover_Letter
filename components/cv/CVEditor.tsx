@@ -183,8 +183,8 @@ export function CVEditor() {
   );
 
   const [previewSrc, setPreviewSrc] = useState<string>('');
-  const [previewIsPdf, setPreviewIsPdf] = useState(true);
   const [previewBusy, setPreviewBusy] = useState(false);
+  const previewUrlRef = useRef<string | null>(null);
   const [settingDefault, setSettingDefault] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [editorTab, setEditorTab] = useState<CVFormTab>('photo');
@@ -312,60 +312,36 @@ export function CVEditor() {
     setPreviewBusy(true);
     try {
       const snapshot = previewPayloadFromCVData(cvData);
-      const pngRes = await fetch('/api/cv/preview-png', {
+      const res = await fetch('/api/cv/preview-html', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          cv_snapshot: snapshot,
           template_id: selectedTemplateId,
           accent_color: accent,
-          font_family: fontFamily,
+          cv: {
+            ...snapshot,
+            font_family: fontFamily,
+            preferred_template_id: selectedTemplateId,
+            accent_color: accent,
+          },
         }),
       });
-      if (pngRes.ok) {
-        const data = (await pngRes.json()) as { png?: string };
-        if (data.png) {
-          setPreviewIsPdf(false);
-          setPreviewSrc((prev) => {
-            if (prev.startsWith('blob:')) {
-              URL.revokeObjectURL(prev.split('#')[0]);
-            }
-            return `data:image/png;base64,${data.png}`;
-          });
-          return;
-        }
-      }
-
-      const res = await fetch('/api/export', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'cv',
-          id: cvId ?? undefined,
-          template_id: selectedTemplateId,
-          accent_color: accent,
-          font_family: fontFamily,
-          cv_snapshot: snapshot,
-        }),
-      });
+      const text = await res.text();
       if (!res.ok) {
         setPreviewSrc('');
         return;
       }
-      const blob = await res.blob();
-      const rawUrl = URL.createObjectURL(blob);
-      const decoratedUrl = `${rawUrl}#toolbar=0&navpanes=0&scrollbar=0`;
-      setPreviewIsPdf(true);
-      setPreviewSrc((prev) => {
-        if (prev.startsWith('blob:')) {
-          URL.revokeObjectURL(prev.split('#')[0]);
-        }
-        return decoratedUrl;
-      });
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+      }
+      const blob = new Blob([text], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      previewUrlRef.current = url;
+      setPreviewSrc(url);
     } finally {
       setPreviewBusy(false);
     }
-  }, [selectedTemplateId, cvData, accent, cvId, fontFamily]);
+  }, [selectedTemplateId, cvData, accent, fontFamily]);
 
   useEffect(() => {
     if (!selectedTemplateId || !cvData || templatesLoading) return;
@@ -384,12 +360,10 @@ export function CVEditor() {
 
   useEffect(() => {
     return () => {
-      setPreviewSrc((prev) => {
-        if (prev.startsWith('blob:')) {
-          URL.revokeObjectURL(prev.split('#')[0]);
-        }
-        return '';
-      });
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = null;
+      }
     };
   }, []);
 
@@ -608,7 +582,6 @@ export function CVEditor() {
           <div className="min-w-0 space-y-3">
             <PreviewPanel
               previewSrc={previewSrc}
-              previewIsPdf={previewIsPdf}
               previewBusy={previewBusy}
               zoom={zoom}
               onZoomChange={setZoom}
@@ -617,7 +590,7 @@ export function CVEditor() {
               collapsed={previewCollapsed}
               onToggleCollapse={() => setPreviewCollapsed((c) => !c)}
             />
-            <FeatureGate requiredTier={['pro', 'premium', 'career']} userTier={tier}>
+            <FeatureGate requiredTier={['pro']} userTier={tier}>
               <p className="text-xs text-[var(--color-muted)]">Pro settings unlocked</p>
             </FeatureGate>
           </div>

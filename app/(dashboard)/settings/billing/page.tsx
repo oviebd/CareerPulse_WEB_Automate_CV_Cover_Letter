@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { PRICING, type PricingPlanKey } from '@/types';
+import { PRICING, type PricingPlanKey, TIER_LIMITS } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -12,8 +12,11 @@ import { formatDate } from '@/lib/utils';
 
 type Payment = { id: string; plan: string; amount: number; status: string; created_at: string };
 
+const PRO_PLANS: PricingPlanKey[] = ['pro_monthly', 'pro_yearly'];
+
 export default function BillingPage() {
   const { tier, status, expiresAt, profile } = useSubscription();
+  const limits = TIER_LIMITS[tier];
 
   const { data: payments = [] } = useQuery({
     queryKey: ['payments'],
@@ -55,32 +58,41 @@ export default function BillingPage() {
           {tier} · {status}
           {expiresAt ? ` · renews / ends ${formatDate(expiresAt)}` : ''}
         </p>
+        <p className="mt-2 text-xs text-[var(--color-muted)]">
+          {tier === 'free'
+            ? `${limits.generationsPerMonth} tailored applications per month`
+            : 'Unlimited tailored applications'}
+        </p>
         <p className="mt-1 text-xs text-[var(--color-muted)]">{profile?.email}</p>
       </Card>
-      <div>
-        <h2 className="mb-4 font-display font-semibold">Upgrade</h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {(Object.keys(PRICING) as PricingPlanKey[]).map((key) => {
-            const p = PRICING[key];
-            return (
-              <Card key={key} padding="sm">
-                <div className="text-xs uppercase text-[var(--color-muted)]">{key}</div>
-                <div className="text-xl font-bold">
-                  ${p.amount}/{p.period === 'monthly' ? 'mo' : 'yr'}
-                </div>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  className="mt-3 w-full"
-                  onClick={() => void pay(key)}
-                >
-                  Pay with SSLCommerz
-                </Button>
-              </Card>
-            );
-          })}
+      {tier === 'free' ? (
+        <div>
+          <h2 className="mb-4 font-display font-semibold">Upgrade to Pro</h2>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {PRO_PLANS.map((key) => {
+              const p = PRICING[key];
+              return (
+                <Card key={key} padding="sm">
+                  <div className="text-xs uppercase text-[var(--color-muted)]">
+                    {p.period === 'monthly' ? 'Monthly' : 'Yearly'}
+                  </div>
+                  <div className="text-xl font-bold">
+                    ${p.amount}/{p.period === 'monthly' ? 'mo' : 'yr'}
+                  </div>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    className="mt-3 w-full"
+                    onClick={() => void pay(key)}
+                  >
+                    Pay with SSLCommerz
+                  </Button>
+                </Card>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      ) : null}
       <Card>
         <h2 className="font-semibold">Payment history</h2>
         <table className="mt-4 w-full text-left text-sm">

@@ -70,9 +70,9 @@ export function CVEditorPanel({
 
   const design = useMemo(
     () => ({
-      preferred_template_id: selectedTemplateId ?? value.meta.templateId,
-      accent_color: accent ?? value.meta.colorScheme,
-      font_family: fontFamily ?? value.meta.fontFamily,
+      preferred_template_id: selectedTemplateId ?? value.meta?.templateId ?? 'classic',
+      accent_color: accent ?? value.meta?.colorScheme ?? '#6C63FF',
+      font_family: fontFamily ?? value.meta?.fontFamily ?? 'Inter',
     }),
     [selectedTemplateId, accent, fontFamily, value.meta]
   );

@@ -2,17 +2,11 @@
 
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  Briefcase,
   FileText,
   Kanban,
   LayoutDashboard,
-  LayoutTemplate,
-  Mail,
   Menu,
   Settings,
-  Sparkles,
-  User,
-  Wand2,
   X,
   ChevronsLeft,
   ChevronsRight,
@@ -36,55 +30,27 @@ interface NavItem {
 }
 
 const nav: NavItem[] = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  {
-    href: '/cv',
-    label: 'CV',
-    icon: FileText,
-    children: [
-      { href: '/cv', label: 'My CV', icon: User },
-      { href: '/cv/optimise', label: 'Tailor for Job', icon: Wand2, proOnly: true },
-      { href: '/cv/job-specific', label: 'Job CVs', icon: Briefcase },
-    ],
-  },
-  {
-    href: '/cover-letters',
-    label: 'Cover letters',
-    icon: Mail,
-    children: [
-      { href: '/cover-letters', label: 'My letters', icon: Mail },
-      { href: '/cover-letters/templates', label: 'Templates', icon: LayoutTemplate },
-    ],
-  },
-  { href: '/tracker', label: 'Tracker', icon: Kanban },
-  { href: '/ai-tools', label: 'AI tools', icon: Sparkles },
+  { href: '/dashboard', label: 'Home', icon: LayoutDashboard },
+  { href: '/cv', label: 'My CV', icon: FileText },
+  { href: '/applications', label: 'Applications', icon: Kanban },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
-function isCvChildActive(pathname: string, href: string) {
+function isNavActive(pathname: string, href: string): boolean {
+  if (href === '/dashboard') {
+    return pathname === '/dashboard' || pathname === '/tracker';
+  }
   if (href === '/cv') {
     return (
       pathname === '/cv' ||
-      pathname === '/cv/edit' ||
+      pathname.startsWith('/cv/edit') ||
       pathname === '/cv/builder' ||
       pathname === '/cv/upload' ||
       pathname.startsWith('/cv/templates')
     );
   }
-  return pathname === href || pathname.startsWith(`${href}/`);
-}
-
-function isCoverLetterChildActive(pathname: string, href: string) {
-  if (href === '/cover-letters') {
-    return (
-      pathname === '/cover-letters' ||
-      pathname.startsWith('/cover-letters/new') ||
-      (pathname.startsWith('/cover-letters/') &&
-        !pathname.startsWith('/cover-letters/templates'))
-    );
-  }
-  if (href === '/cover-letters/templates') {
-    return pathname.startsWith('/cover-letters/templates');
+  if (href === '/applications') {
+    return pathname.startsWith('/applications');
   }
   return pathname === href || pathname.startsWith(`${href}/`);
 }
@@ -121,11 +87,7 @@ function NavLinkContent({
             {item.children.map((child) => {
               const ChildIcon = child.icon;
               const childActive =
-                item.href === '/cv'
-                  ? isCvChildActive(pathname, child.href)
-                  : item.href === '/cover-letters'
-                    ? isCoverLetterChildActive(pathname, child.href)
-                    : pathname === child.href || pathname.startsWith(`${child.href}/`);
+                pathname === child.href || pathname.startsWith(`${child.href}/`);
               return (
                 <Link
                   key={child.href}
@@ -158,7 +120,7 @@ function NavLinkContent({
     );
   }
 
-  const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+  const active = isNavActive(pathname, item.href);
   return (
     <Link
       href={item.href}
@@ -180,7 +142,7 @@ function NavLinkContent({
       {!collapsed && (
         <span className="min-w-0 flex-1 truncate">{item.label}</span>
       )}
-      {item.href === '/tracker' &&
+      {item.href === '/applications' &&
       !collapsed &&
       typeof trackerBadge === 'number' &&
       trackerBadge > 0 ? (

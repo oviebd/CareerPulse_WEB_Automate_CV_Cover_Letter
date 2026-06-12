@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
+import { isVisibleTemplate } from '@/src/config/templateConfig';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
@@ -65,7 +66,7 @@ function TemplatePreviewThumb({
   );
 }
 
-export default function CVTemplatesPage() {
+function CVTemplatesPageContent() {
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const jobCvId = searchParams.get('job_cv_id');
@@ -176,7 +177,7 @@ export default function CVTemplatesPage() {
       <p className="text-sm text-[var(--color-muted)]">
         Browse layouts with sample previews. Open a template to edit your CV with a live preview, then export PDF.
       </p>
-      <FeatureGate requiredTier={['pro', 'premium', 'career']} userTier={tier}>
+      <FeatureGate requiredTier={['pro']} userTier={tier}>
         <div className="flex flex-wrap gap-2">
           <span className="text-sm text-[var(--color-muted)]">Gallery accent:</span>
           {SWATCHES.map((c) => (
@@ -191,7 +192,7 @@ export default function CVTemplatesPage() {
         </div>
       </FeatureGate>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {templates.map((t) => {
+        {templates.filter((t) => isVisibleTemplate(t.id)).map((t) => {
           const allowed = canUseTemplate(
             t.available_tiers as SubscriptionTier[],
             tier
@@ -270,5 +271,13 @@ export default function CVTemplatesPage() {
         })}
       </div>
     </div>
+  );
+}
+
+export default function CVTemplatesPage() {
+  return (
+    <Suspense fallback={<p className="text-sm text-[var(--color-muted)]">Loading templates…</p>}>
+      <CVTemplatesPageContent />
+    </Suspense>
   );
 }

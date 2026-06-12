@@ -1,5 +1,6 @@
 import {
   PRICING,
+  normalizeSubscriptionTier,
   type PricingPlanKey,
   type Profile,
   type SubscriptionTier,
@@ -37,7 +38,7 @@ export function resolveEffectiveTier(
 ): SubscriptionTier {
   const o = getDevSubscriptionOverride();
   if (o) return o.tier;
-  return (dbTier ?? 'free') as SubscriptionTier;
+  return normalizeSubscriptionTier(dbTier);
 }
 
 export function applyDevSubscriptionOverride(profile: Profile | null): Profile | null {

@@ -61,9 +61,10 @@ export function applyCoverLetterWatermark(
  */
 export function injectPreviewStyles(html: string): string {
   const previewCss = [
+    'html{margin:0!important;padding:0!important;overflow:hidden!important;}',
     'html,body{min-height:0!important;height:auto!important;}',
-    'html{overflow:hidden!important;}',
-    'body{overflow:visible!important;}',
+    'body{box-sizing:border-box!important;width:794px!important;',
+    'overflow:visible!important;margin:0 auto!important;}',
   ].join('');
   return html.replace('</head>', `<style>${previewCss}</style></head>`);
 }

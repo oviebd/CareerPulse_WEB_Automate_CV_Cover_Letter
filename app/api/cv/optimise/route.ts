@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { CLAUDE_MODEL, generateCoverLetterText } from '@/lib/claude';
 import { rateLimitHit } from '@/lib/rate-limit';
 import { resolveEffectiveTier } from '@/lib/dev-subscription';
-import { canAccessFeature } from '@/lib/subscription';
+import { assertGenerationAllowed } from '@/lib/subscription';
 import Anthropic from '@anthropic-ai/sdk';
 import type {
   CVData,
@@ -318,15 +318,21 @@ export async function POST(request: Request) {
       .single();
     const tier = resolveEffectiveTier(prof?.subscription_tier);
 
-    if (!canAccessFeature(tier, 'aiExtrasAccess')) {
-      return NextResponse.json(
-        {
-          error: 'UPGRADE_REQUIRED',
-          message: 'This feature requires a Pro plan or above.',
-          upgrade_url: '/settings/billing',
-        },
-        { status: 403 }
-      );
+    try {
+      await assertGenerationAllowed(user.id, tier, supabase);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '';
+      if (msg.startsWith('GENERATION_LIMIT_REACHED')) {
+        return NextResponse.json(
+          {
+            error: 'GENERATION_LIMIT_REACHED',
+            message: 'Monthly tailored application limit reached. Upgrade to Pro for unlimited.',
+            upgrade_url: '/settings/billing',
+          },
+          { status: 402 }
+        );
+      }
+      throw e;
     }
 
     let cvRow: CvRow | null = null;

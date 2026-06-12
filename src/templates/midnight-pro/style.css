@@ -174,4 +174,8 @@
   .tpl-midnight-pro .midnight-side {
     min-height: 0;
   }
+  .tpl-midnight-pro .midnight-main .cv-section {
+    page-break-inside: auto;
+    break-inside: auto;
+  }
 }

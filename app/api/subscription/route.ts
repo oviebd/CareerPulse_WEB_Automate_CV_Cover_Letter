@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDevSubscriptionOverride, resolveEffectiveTier } from '@/lib/dev-subscription';
 import { createClient } from '@/lib/supabase/server';
+import { countTailoredApplicationsThisMonth } from '@/lib/subscription';
 import { TIER_LIMITS } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -14,34 +15,21 @@ export async function GET() {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
-    const startOfPeriod = new Date();
-    startOfPeriod.setDate(1);
-    startOfPeriod.setHours(0, 0, 0, 0);
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select(
+        'subscription_tier, subscription_status, subscription_expires_at, email'
+      )
+      .eq('id', user.id)
+      .single();
 
-    const [profileResult, countResult] = await Promise.all([
-      supabase
-        .from('profiles')
-        .select(
-          'subscription_tier, subscription_status, subscription_expires_at, email'
-        )
-        .eq('id', user.id)
-        .single(),
-      supabase
-        .from('cover_letters')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .gte('created_at', startOfPeriod.toISOString()),
-    ]);
-
-    const { data: profile, error } = profileResult;
     if (error || !profile) {
       return NextResponse.json({ error: 'profile_not_found' }, { status: 404 });
     }
     const dev = getDevSubscriptionOverride();
     const tier = resolveEffectiveTier(profile.subscription_tier);
-    const { count } = countResult;
+    const used = await countTailoredApplicationsThisMonth(user.id, supabase);
     const limit = TIER_LIMITS[tier].generationsPerMonth;
-    const used = count ?? 0;
     const remaining =
       limit === Number.POSITIVE_INFINITY
         ? null

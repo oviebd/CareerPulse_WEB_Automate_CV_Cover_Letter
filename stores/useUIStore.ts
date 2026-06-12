@@ -10,6 +10,10 @@ interface UIState {
   sidebarCollapsed: boolean;
   setSidebarCollapsed: (collapsed: boolean) => void;
   toggleSidebar: () => void;
+
+  /** V3: skill proficiency ratings hidden by default */
+  showSkillProficiency: boolean;
+  setShowSkillProficiency: (show: boolean) => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -20,4 +24,7 @@ export const useUIStore = create<UIState>((set) => ({
   sidebarCollapsed: false,
   setSidebarCollapsed: (sidebarCollapsed) => set({ sidebarCollapsed }),
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
+
+  showSkillProficiency: false,
+  setShowSkillProficiency: (showSkillProficiency) => set({ showSkillProficiency }),
 }));

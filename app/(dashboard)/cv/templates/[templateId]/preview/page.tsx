@@ -638,7 +638,7 @@ export default function CVTemplatePreviewPage() {
         </p>
       ) : null}
 
-      <FeatureGate requiredTier={['pro', 'premium', 'career']} userTier={tier}>
+      <FeatureGate requiredTier={['pro']} userTier={tier}>
         <div className="flex flex-wrap gap-2">
           <span className="text-sm text-[var(--color-muted)]">Accent:</span>
           {SWATCHES.map((c) => (
@@ -784,7 +784,7 @@ export default function CVTemplatePreviewPage() {
                   width={794}
                   height={1123}
                   srcDoc={previewHtml}
-                  sandbox="allow-same-origin allow-popups"
+                  sandbox="allow-same-origin allow-scripts"
                 />
               </div>
             ) : (

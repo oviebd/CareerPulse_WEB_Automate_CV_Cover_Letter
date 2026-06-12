@@ -587,12 +587,11 @@ export default function CoverLetterDetailPage() {
           <p className="mb-3 text-xs text-[var(--color-muted)]">
             Matches the PDF (including footer on Free plans).
           </p>
-          <div className="relative h-[70vh] overflow-auto rounded-xl border border-[var(--color-border)] bg-slate-50 shadow-sm">
+          <div className="max-h-[min(70vh,720px)] overflow-y-auto overflow-x-hidden rounded-xl border border-[var(--color-border)] bg-slate-50 p-3 shadow-sm">
             <CoverLetterPrintPreviewFrame
               src={previewUrl}
               title="Cover letter print preview"
               isLoading={previewLoading}
-              containerHeight="70vh"
             />
           </div>
         </div>

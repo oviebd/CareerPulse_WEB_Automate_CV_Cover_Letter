@@ -85,6 +85,60 @@ export function cvProfileToCVData(
   return data;
 }
 
+/**
+ * Build CVData for PDF/HTML from a DB row and/or editor snapshot.
+ * Editor snapshots use universal CVData (`personal`, `meta`); migrateLegacyCVData
+ * handles both that shape and flat CVProfile rows — same path as preview-png.
+ */
+export function mergedRowAndSnapshotToCVData(
+  cvRow: CVProfile | null,
+  snapshot: (Partial<CVProfile> & Record<string, unknown>) | null | undefined,
+  options: {
+    accent_color?: string;
+    watermark?: boolean;
+    fontFamily?: string;
+    templateId: TemplateId;
+  }
+): CVData {
+  const snap =
+    snapshot && typeof snapshot === 'object'
+      ? (() => {
+          const { id: _i, user_id: _u, ...rest } = snapshot;
+          return rest as Record<string, unknown>;
+        })()
+      : {};
+
+  const merged: Record<string, unknown> = {
+    ...(cvRow ?? {}),
+    ...snap,
+    preferred_template_id:
+      snap.preferred_template_id ??
+      (cvRow as CVProfile | null)?.preferred_template_id ??
+      options.templateId,
+    accent_color:
+      options.accent_color ??
+      snap.accent_color ??
+      (cvRow as CVProfile | null)?.accent_color,
+    font_family:
+      options.fontFamily ??
+      snap.font_family ??
+      (cvRow as CVProfile | null)?.font_family,
+  };
+
+  let data = migrateLegacyCVData(merged);
+  const visibility =
+    (merged.section_visibility as CVData['sectionVisibility']) ??
+    data.sectionVisibility;
+  data = applyCvSectionVisibility(data, visibility);
+  data.meta.templateId = options.templateId;
+  data.meta.colorScheme = options.accent_color ?? data.meta.colorScheme;
+  if (options.fontFamily?.trim()) {
+    data.meta.fontFamily = options.fontFamily.trim();
+  }
+  data.watermark = options.watermark ?? false;
+  return data;
+}
+
 export async function exportCV(
   userId: string,
   templateId: string,
@@ -119,7 +173,7 @@ export async function exportCV(
     if (!ALL_TEMPLATE_IDS.includes(normalizedId)) {
       throw new Error('TEMPLATE_NOT_FOUND');
     }
-    tiers = ['free', 'pro', 'premium', 'career'];
+    tiers = ['free', 'pro'];
   } else {
     tiers = tmpl.available_tiers as SubscriptionTier[];
   }
@@ -151,22 +205,18 @@ export async function exportCV(
     throw new Error('CV_NOT_FOUND');
   }
 
-  let cv = (cvRow ?? {}) as CVProfile;
-  if (snapshot && typeof snapshot === 'object') {
-    const { id: _i, user_id: _u, ...rest } = snapshot;
-    cv = { ...cv, ...rest } as CVProfile;
-  }
-
   const watermark = tier === 'free';
-  const cvData = cvProfileToCVData(cv, {
+  const cvData = mergedRowAndSnapshotToCVData(cvRow, snapshot, {
     accent_color: accentColor ?? '#6C63FF',
     watermark,
+    fontFamily,
+    templateId: normalizedId,
   });
-  if (fontFamily) cvData.meta.fontFamily = fontFamily;
-  cvData.meta.templateId = normalizedId;
 
   const pdf = await generateCVPdf(cvData);
-  const nameSlug = slugifyName(cvData.personal.fullName ?? cv.full_name ?? 'untitled');
+  const nameSlug = slugifyName(
+    cvData.personal.fullName ?? cvRow?.full_name ?? 'untitled'
+  );
   const filename = `cv-${nameSlug}-${normalizedId}.pdf`;
   return { pdf, filename };
 }

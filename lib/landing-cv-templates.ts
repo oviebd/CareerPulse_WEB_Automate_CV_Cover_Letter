@@ -15,7 +15,7 @@ function fallbackFromConfig(): CVTemplate[] {
       preview_image_url: null,
       category: cfg.layout === 'two-column' ? 'Modern' : 'Classic',
       is_premium: false,
-      available_tiers: ['free', 'pro', 'premium', 'career'],
+      available_tiers: ['free', 'pro'],
       sort_order: i,
     } satisfies CVTemplate;
   });

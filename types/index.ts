@@ -1,7 +1,16 @@
 import type { JobStatus } from './database';
 
-// Subscription tiers
-export type SubscriptionTier = 'free' | 'pro' | 'premium' | 'career';
+// Subscription tiers (V3: free + pro only; legacy premium/career normalize to pro)
+export type SubscriptionTier = 'free' | 'pro';
+export type LegacySubscriptionTier = 'premium' | 'career';
+export type RawSubscriptionTier = SubscriptionTier | LegacySubscriptionTier;
+
+export function normalizeSubscriptionTier(
+  tier: string | null | undefined
+): SubscriptionTier {
+  if (tier === 'pro' || tier === 'premium' || tier === 'career') return 'pro';
+  return 'free';
+}
 export type SubscriptionStatus = 'active' | 'inactive' | 'cancelled' | 'past_due';
 export type CoverLetterTone =
   | 'professional'
@@ -431,84 +440,58 @@ export interface Payment {
   updated_at: string;
 }
 
-// Tier limits
+// Tier limits (V3: free tracker + ATS visibility; pro unlocks AI generation & auto-fix)
 export const TIER_LIMITS: Record<
   SubscriptionTier,
   {
+    /** Tailored applications per month (job + CV bundle) */
     generationsPerMonth: number;
     cvUploads: number;
     trackerAccess: boolean;
     atsAccess: boolean;
+    atsAutoFix: boolean;
     aiExtrasAccess: boolean;
+    docxExport: boolean;
+    interviewPrep: boolean;
   }
 > = {
   free: {
     generationsPerMonth: 3,
-    cvUploads: 1,
-    trackerAccess: false,
-    atsAccess: false,
+    cvUploads: Number.POSITIVE_INFINITY,
+    trackerAccess: true,
+    atsAccess: true,
+    atsAutoFix: false,
     aiExtrasAccess: false,
+    docxExport: false,
+    interviewPrep: false,
   },
   pro: {
-    generationsPerMonth: 30,
-    cvUploads: Infinity,
+    generationsPerMonth: Number.POSITIVE_INFINITY,
+    cvUploads: Number.POSITIVE_INFINITY,
     trackerAccess: true,
     atsAccess: true,
+    atsAutoFix: true,
     aiExtrasAccess: true,
-  },
-  premium: {
-    generationsPerMonth: 100,
-    cvUploads: Infinity,
-    trackerAccess: true,
-    atsAccess: true,
-    aiExtrasAccess: true,
-  },
-  career: {
-    generationsPerMonth: Infinity,
-    cvUploads: Infinity,
-    trackerAccess: true,
-    atsAccess: true,
-    aiExtrasAccess: true,
+    docxExport: true,
+    interviewPrep: true,
   },
 };
 
-// Pricing
+// Pricing (SSLCommerz plans — payment callbacks unchanged)
 export const PRICING = {
   pro_monthly: {
     amount: 9.99,
     period: 'monthly' as const,
     tier: 'pro' as SubscriptionTier,
     days: 30,
+    label: 'Pro',
   },
   pro_yearly: {
     amount: 89.99,
     period: 'yearly' as const,
     tier: 'pro' as SubscriptionTier,
     days: 365,
-  },
-  premium_monthly: {
-    amount: 19.99,
-    period: 'monthly' as const,
-    tier: 'premium' as SubscriptionTier,
-    days: 30,
-  },
-  premium_yearly: {
-    amount: 179.99,
-    period: 'yearly' as const,
-    tier: 'premium' as SubscriptionTier,
-    days: 365,
-  },
-  career_monthly: {
-    amount: 29.99,
-    period: 'monthly' as const,
-    tier: 'career' as SubscriptionTier,
-    days: 30,
-  },
-  career_yearly: {
-    amount: 269.99,
-    period: 'yearly' as const,
-    tier: 'career' as SubscriptionTier,
-    days: 365,
+    label: 'Pro',
   },
 };
 

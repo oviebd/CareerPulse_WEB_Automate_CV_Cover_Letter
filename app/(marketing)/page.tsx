@@ -24,33 +24,29 @@ export default async function LandingPage() {
         <div className="mx-auto grid max-w-6xl gap-12 lg:grid-cols-2 lg:items-center lg:gap-16">
           <div>
             <p className="text-sm font-medium uppercase tracking-wider text-[var(--color-primary-500)]">
-              Professional CV builder
+              Application-ready in minutes
             </p>
             <h1 className="mt-3 font-display text-4xl font-bold tracking-tight text-[var(--color-text-primary)] sm:text-5xl lg:text-[3.2rem] lg:leading-tight">
-              Build a CV that gets you hired
+              Land more interviews with AI-tailored applications
             </h1>
             <p className="mt-5 max-w-xl text-lg text-[var(--color-muted)]">
-              Structured sections, live preview, and polished templates. Start free in your browser—no
-              account needed to design your CV. Sign up to export, unlock AI, and save everything to
-              the cloud.
-            </p>
-            <p className="mt-2 text-sm text-[var(--color-muted)]">
-              No account needed to get started.
+              Paste a job description and get a tailored CV, cover letter, and ATS score in minutes.
+              Track every application from one board.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
-                href="/cv/builder?guest=true"
+                href="/register?returnTo=%2Fapplications%2Fnew"
                 className="inline-flex items-center gap-2 rounded-btn bg-[var(--color-primary-500)] px-6 py-3.5 text-base font-semibold text-white shadow-lg transition hover:brightness-110 active:scale-[0.99]"
               >
-                Build my CV — free
+                Paste job description
                 <ArrowRight className="h-4 w-4" />
               </Link>
-              <a
-                href="#templates"
+              <Link
+                href="/cv/builder?guest=true"
                 className="inline-flex items-center justify-center rounded-btn border-2 border-[var(--color-border)] bg-[var(--color-surface)]/60 px-6 py-3.5 text-base font-semibold text-[var(--color-text-primary)] backdrop-blur transition hover:border-[var(--color-primary-300)] hover:text-[var(--color-primary-500)]"
               >
-                View templates
-              </a>
+                Build CV from scratch
+              </Link>
             </div>
           </div>
           <div className="relative">

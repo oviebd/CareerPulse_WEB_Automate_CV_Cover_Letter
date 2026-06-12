@@ -24,15 +24,17 @@ import { Tabs } from '@/components/ui/tabs';
 import { Tooltip } from '@/components/ui/tooltip';
 import { useOptimiseDraftStore } from '@/stores/useOptimiseDraftStore';
 import { useOptimiseEditDraftStore } from '@/stores/useOptimiseEditDraftStore';
-import { parseOptimisedCvText } from '@/lib/optimise-result';
+import { CoverLetterPrintPreviewFrame } from '@/components/cover-letter/CoverLetterPrintPreviewFrame';
+import { DocumentPrintPreviewFrame } from '@/components/shared/DocumentPrintPreviewFrame';
+import {
+  optimisedCvJsonToCvData,
+  parseOptimisedCvText,
+} from '@/lib/optimise-result';
 import { cn } from '@/lib/utils';
 import type { GenerationType, JobStatus } from '@/types';
 
 const btnSecondarySm =
   'inline-flex min-w-[88px] items-center justify-center gap-2 rounded-btn border border-[var(--color-border)] bg-[var(--color-glass-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--color-text-primary)] backdrop-blur-sm transition hover:bg-[var(--color-hover-surface)] hover:border-[var(--color-border-hover)] active:scale-[0.98]';
-
-const CV_DOC_WIDTH = 794;
-const CV_DOC_HEIGHT = 1123;
 
 export default function OptimiseResultPage() {
   const router = useRouter();
@@ -55,7 +57,7 @@ export default function OptimiseResultPage() {
   const [cvPreviewBusy, setCvPreviewBusy] = useState(false);
   const [cvPreviewError, setCvPreviewError] = useState<string | null>(null);
 
-  const [clPreviewHtml, setClPreviewHtml] = useState('');
+  const [clPreviewUrl, setClPreviewUrl] = useState<string | null>(null);
   const [clPreviewBusy, setClPreviewBusy] = useState(false);
   const [clPreviewError, setClPreviewError] = useState<string | null>(null);
 
@@ -64,6 +66,15 @@ export default function OptimiseResultPage() {
       router.replace('/cv/optimise');
     }
   }, [draft, router]);
+
+  useEffect(() => {
+    return () => {
+      setClPreviewUrl((prev) => {
+        if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev);
+        return null;
+      });
+    };
+  }, []);
 
   const savedJobId = draft?.savedJobId ?? null;
 
@@ -98,6 +109,7 @@ export default function OptimiseResultPage() {
       setCvPreviewHtml('');
       return;
     }
+    const cvData = optimisedCvJsonToCvData(parsed.object);
     let cancelled = false;
     setCvPreviewBusy(true);
     setCvPreviewError(null);
@@ -109,7 +121,7 @@ export default function OptimiseResultPage() {
           body: JSON.stringify({
             template_id: 'classic',
             accent_color: '#6C63FF',
-            cv: parsed.object,
+            cv: JSON.parse(JSON.stringify(cvData)) as Record<string, unknown>,
           }),
         });
         const text = await res.text();
@@ -136,7 +148,10 @@ export default function OptimiseResultPage() {
 
   useEffect(() => {
     if (gen !== 'coverLetter' && gen !== 'both') {
-      setClPreviewHtml('');
+      setClPreviewUrl((prev) => {
+        if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev);
+        return null;
+      });
       setClPreviewError(null);
       return;
     }
@@ -146,7 +161,10 @@ export default function OptimiseResultPage() {
           ? 'Missing base CV reference for letter preview.'
           : null
       );
-      setClPreviewHtml('');
+      setClPreviewUrl((prev) => {
+        if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev);
+        return null;
+      });
       return;
     }
     let cancelled = false;
@@ -171,11 +189,21 @@ export default function OptimiseResultPage() {
           console.error('cover-letter preview-html', text);
           if (!cancelled) {
             setClPreviewError('Could not render cover letter preview.');
-            setClPreviewHtml('');
+            setClPreviewUrl((prev) => {
+              if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev);
+              return null;
+            });
           }
           return;
         }
-        if (!cancelled) setClPreviewHtml(text);
+        if (!cancelled) {
+          const blob = new Blob([text], { type: 'text/html;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          setClPreviewUrl((prev) => {
+            if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev);
+            return url;
+          });
+        }
       } catch (e) {
         console.error(e);
         if (!cancelled) {
@@ -701,7 +729,7 @@ export default function OptimiseResultPage() {
               <ClPreviewPane
                 busy={clPreviewBusy}
                 error={clPreviewError}
-                html={clPreviewHtml}
+                previewUrl={clPreviewUrl}
               />
             )}
           </div>
@@ -709,7 +737,7 @@ export default function OptimiseResultPage() {
           <ClPreviewPane
             busy={clPreviewBusy}
             error={clPreviewError}
-            html={clPreviewHtml}
+            previewUrl={clPreviewUrl}
           />
         ) : (
           <CvPreviewPane
@@ -778,8 +806,24 @@ function CvPreviewPane({
   busy: boolean;
   error: string | null;
 }) {
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!html) {
+      setPreviewUrl((prev) => {
+        if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev);
+        return null;
+      });
+      return;
+    }
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [html]);
+
   return (
-    <div className="relative max-h-[min(70vh,720px)] overflow-y-auto overflow-x-auto rounded-xl border border-[var(--color-border)] bg-slate-100">
+    <div className="relative max-h-[min(70vh,720px)] overflow-y-auto overflow-x-hidden rounded-xl border border-[var(--color-border)] bg-slate-100 p-3">
       {busy ? (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/80 text-sm text-[var(--color-muted)]">
           <Loader2 className="mr-2 h-5 w-5 animate-spin" />
@@ -789,25 +833,12 @@ function CvPreviewPane({
       {error ? (
         <p className="p-4 text-sm text-[var(--color-accent-coral)]">{error}</p>
       ) : null}
-      {!error && html ? (
-        <div
-          className="mx-auto flex justify-center p-4"
-          style={{ minWidth: CV_DOC_WIDTH + 32 }}
-        >
-          <div
-            className="relative overflow-hidden rounded-md bg-white shadow-sm"
-            style={{ width: CV_DOC_WIDTH, minHeight: 400 }}
-          >
-            <iframe
-              title="CV preview"
-              className="pointer-events-none block max-w-none border-0"
-              width={CV_DOC_WIDTH}
-              height={CV_DOC_HEIGHT}
-              srcDoc={html}
-              sandbox="allow-same-origin allow-popups"
-            />
-          </div>
-        </div>
+      {!error && previewUrl ? (
+        <DocumentPrintPreviewFrame
+          src={previewUrl}
+          title="CV preview"
+          isLoading={busy}
+        />
       ) : !error && !busy ? (
         <p className="p-4 text-sm text-[var(--color-muted)]">No preview.</p>
       ) : null}
@@ -816,16 +847,16 @@ function CvPreviewPane({
 }
 
 function ClPreviewPane({
-  html,
+  previewUrl,
   busy,
   error,
 }: {
-  html: string;
+  previewUrl: string | null;
   busy: boolean;
   error: string | null;
 }) {
   return (
-    <div className="relative max-h-[min(70vh,720px)] overflow-y-auto overflow-x-auto rounded-xl border border-[var(--color-border)] bg-slate-100">
+    <div className="relative max-h-[min(70vh,720px)] overflow-y-auto overflow-x-hidden rounded-xl border border-[var(--color-border)] bg-slate-100 p-3">
       {busy ? (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/80 text-sm text-[var(--color-muted)]">
           <Loader2 className="mr-2 h-5 w-5 animate-spin" />
@@ -835,22 +866,12 @@ function ClPreviewPane({
       {error ? (
         <p className="p-4 text-sm text-[var(--color-accent-coral)]">{error}</p>
       ) : null}
-      {!error && html ? (
-        <div className="mx-auto flex justify-center p-4">
-          <div
-            className="relative overflow-hidden rounded-md bg-white shadow-sm"
-            style={{ width: 794, minHeight: 200 }}
-          >
-            <iframe
-              title="Cover letter preview"
-              className="block max-w-none border-0"
-              width={794}
-              height={1123}
-              srcDoc={html}
-              sandbox="allow-same-origin allow-popups"
-            />
-          </div>
-        </div>
+      {!error && previewUrl ? (
+        <CoverLetterPrintPreviewFrame
+          src={previewUrl}
+          title="Cover letter preview"
+          isLoading={busy}
+        />
       ) : !error && !busy ? (
         <p className="p-4 text-sm text-[var(--color-muted)]">No preview.</p>
       ) : null}

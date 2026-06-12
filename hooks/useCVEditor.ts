@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import type { CVData, CVProfile } from '@/types';
 import { cvProfileToCvData } from '@/lib/cv-profile-cvdata';
 import { universalToProfilePayload } from '@/lib/cv-universal-bridge';
-import { createEmptyCVData } from '@/src/utils/cvDefaults';
+import { createEmptyCVData, migrateLegacyCVData } from '@/src/utils/cvDefaults';
 import { normalizeTemplateId } from '@/src/utils/cvDefaults';
 import { TEMPLATE_CONFIGS } from '@/src/config/templateConfig';
 import type { TemplateId } from '@/src/types/cv.types';
@@ -199,13 +199,15 @@ export function useCVEditor({ cvIdFromRoute }: UseCVEditorOptions): UseCVEditorR
     if (typeof window !== 'undefined' && sessionStorage.getItem('cv_draft')) {
       try {
         const raw = sessionStorage.getItem('cv_draft');
-        const parsed = raw ? (JSON.parse(raw) as CVData) : createEmptyCVData('classic');
+        const parsed = raw
+          ? migrateLegacyCVData(JSON.parse(raw))
+          : createEmptyCVData('classic');
         setEditorState({
           cvData: parsed,
           name: 'Untitled CV',
-          preferred_template_id: parsed.meta?.templateId ?? 'classic',
-          accent_color: parsed.meta?.colorScheme ?? '#6C63FF',
-          font_family: parsed.meta?.fontFamily ?? 'Inter',
+          preferred_template_id: parsed.meta.templateId ?? 'classic',
+          accent_color: parsed.meta.colorScheme ?? '#6C63FF',
+          font_family: parsed.meta.fontFamily ?? 'Inter',
         });
         setSavedSnapshot(null);
       } catch {

@@ -24,7 +24,7 @@ import type {
 import { generateId } from '@/lib/utils';
 import type { TemplateId } from '@/src/types/cv.types';
 import { TEMPLATE_CONFIGS } from '@/src/config/templateConfig';
-import { normalizeTemplateId } from '@/src/utils/cvDefaults';
+import { createEmptyCVData, normalizeTemplateId } from '@/src/utils/cvDefaults';
 
 export type FormSlices = {
   full_name: string;
@@ -213,7 +213,8 @@ function referralToRef(r: ReferralEntry): Reference {
 }
 
 export function cvDataToFormSlices(cv: CVData): FormSlices {
-  const p = cv.personal;
+  const p = cv.personal ?? createEmptyCVData().personal;
+  const pLinks = p.links ?? {};
   const links: ProfileLink[] = [];
   let n = 0;
   const add = (label: string, url: string | undefined) => {
@@ -221,22 +222,22 @@ export function cvDataToFormSlices(cv: CVData): FormSlices {
     if (!u) return;
     links.push({ id: `l-${n++}`, label, url: u });
   };
-  add('Portfolio', p.links.portfolio);
-  add('Behance', p.links.behance);
-  add('Dribbble', p.links.dribbble);
-  add('Website', p.links.website);
-  add('ORCID', p.links.orcid);
-  add('Google Scholar', p.links.googleScholar);
-  add('ResearchGate', p.links.researchGate);
+  add('Portfolio', pLinks.portfolio);
+  add('Behance', pLinks.behance);
+  add('Dribbble', pLinks.dribbble);
+  add('Website', pLinks.website);
+  add('ORCID', pLinks.orcid);
+  add('Google Scholar', pLinks.googleScholar);
+  add('ResearchGate', pLinks.researchGate);
 
   return {
-    full_name: p.fullName,
-    professional_title: p.title,
-    email: p.email,
-    phone: p.phone,
-    location: p.location,
-    linkedin_url: p.links.linkedin ?? '',
-    github_url: p.links.github ?? '',
+    full_name: p.fullName ?? '',
+    professional_title: p.title ?? '',
+    email: p.email ?? '',
+    phone: p.phone ?? '',
+    location: p.location ?? '',
+    linkedin_url: pLinks.linkedin ?? '',
+    github_url: pLinks.github ?? '',
     links,
     address: cv.postalAddress ?? '',
     photo_url: p.photo ?? '',

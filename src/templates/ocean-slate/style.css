@@ -260,4 +260,8 @@
   .tpl-ocean-slate .ocean-side {
     min-height: 0;
   }
+  .tpl-ocean-slate .ocean-main .cv-section {
+    page-break-inside: auto;
+    break-inside: auto;
+  }
 }

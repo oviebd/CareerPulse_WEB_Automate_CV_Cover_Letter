@@ -168,8 +168,7 @@ Bullet: ${bullet}`,
     }
 
     if (tool === 'interview_questions') {
-      const needPremium = !['premium', 'career'].includes(tier);
-      if (needPremium) {
+      if (!canAccessFeature(tier, 'interviewPrep')) {
         return NextResponse.json({ error: 'upgrade_required' }, { status: 402 });
       }
       const jd = str('jobDescription');

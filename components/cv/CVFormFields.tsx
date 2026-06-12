@@ -34,7 +34,8 @@ import { TemplateThumbnail } from '@/components/cv/TemplateThumbnail';
 import { cn, generateId, moveIndexInArray } from '@/lib/utils';
 import { CV_FORM_CARD as FORM_CARD } from '@/lib/cv-editor-styles';
 import { canUseTemplate } from '@/lib/subscription';
-import { ALL_TEMPLATE_IDS, TEMPLATE_CONFIGS } from '@/src/config/templateConfig';
+import { TEMPLATE_CONFIGS, VISIBLE_TEMPLATE_IDS } from '@/src/config/templateConfig';
+import { useUIStore } from '@/stores/useUIStore';
 import {
   CustomSectionsForm,
   InterestsSection,
@@ -367,9 +368,12 @@ export function CVFormFields(props: Props) {
     [handleSkillsChangeDebounced]
   );
 
+  const showSkillProficiency = useUIStore((s) => s.showSkillProficiency);
+  const setShowSkillProficiency = useUIStore((s) => s.setShowSkillProficiency);
   const showSkillRatingUi = useMemo(
-    () => templateShowsSkillRatingEditor(selectedTemplateId),
-    [selectedTemplateId]
+    () =>
+      showSkillProficiency && templateShowsSkillRatingEditor(selectedTemplateId),
+    [selectedTemplateId, showSkillProficiency]
   );
 
   return (
@@ -425,13 +429,13 @@ export function CVFormFields(props: Props) {
                 Select Template
               </p>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {ALL_TEMPLATE_IDS.map((tid) => {
+                {VISIBLE_TEMPLATE_IDS.map((tid) => {
                   const cfg = TEMPLATE_CONFIGS[tid];
                   const row = templates.find((t) => t.id === tid);
                   const name = row?.name ?? cfg.label;
                   const targetLabel = cfg.targetUsers;
                   const swatchColor = cfg.templateAccent ?? accent;
-                  const tiers = row?.available_tiers ?? ['free', 'pro', 'premium', 'career'];
+                  const tiers = row?.available_tiers ?? ['free', 'pro'];
                   const allowed = canUseTemplate(tiers, userTier);
                   return (
                     <button
@@ -1050,10 +1054,16 @@ export function CVFormFields(props: Props) {
           <div className="space-y-4">
             <p className="text-sm text-[var(--color-muted)]">
               Group skills by category and add them to your CV.
-              {showSkillRatingUi
-                ? ' This layout shows skill levels (1–5) in the preview — use the rating controls when adding a skill.'
-                : ' This layout only lists skill names in the preview, so rating controls are hidden. Switch to a template with skill bars or dots (e.g. Violet Edge, Modern) to set levels.'}
             </p>
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-[var(--color-text-secondary)]">
+              <input
+                type="checkbox"
+                checked={showSkillProficiency}
+                onChange={(e) => setShowSkillProficiency(e.target.checked)}
+                className="rounded border-[var(--color-border)]"
+              />
+              Show skill proficiency (1–5 ratings)
+            </label>
             <SkillsEditor
               skills={skillsShown}
               onChange={handleSkillsEditorChange}

@@ -472,3 +472,17 @@ export const ALL_TEMPLATE_IDS: TemplateId[] = [
   'ocean-slate',
   'violet-edge',
 ];
+
+/** V3: visible in template selector (archived templates remain in DB + ALL_TEMPLATE_IDS). */
+export const VISIBLE_TEMPLATE_IDS: TemplateId[] = [
+  'classic',
+  'modern',
+  'academic',
+  'technical',
+  'entry-level',
+  'creative',
+];
+
+export function isVisibleTemplate(id: string): boolean {
+  return (VISIBLE_TEMPLATE_IDS as readonly string[]).includes(id);
+}

@@ -264,4 +264,8 @@
   .tpl-golden-hour .golden-side {
     min-height: 0;
   }
+  .tpl-golden-hour .golden-main .cv-section {
+    page-break-inside: auto;
+    break-inside: auto;
+  }
 }

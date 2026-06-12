@@ -1,117 +1,143 @@
 'use client';
 
-/**
- * CV dashboard (/cv) — UX refactor (layout & hierarchy only; behavior preserved):
- * - Before: 50/50 columns and equally heavy action cards → weak scan path and wasted center space.
- * - Before: Core rows lacked completion affordance; primary “tailor” action had no emphasis.
- * Now: ~65/35 split, compact action row with highlighted Tailor, progress + recency on core rows,
- * clearer job cards and improved empty states. Data, routes, and delete-confirm flow unchanged.
- */
-
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
+import Link from 'next/link';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { PageHeader } from '@/components/shared/PageHeader';
+import { PrimaryActionBar } from '@/components/shared/PrimaryActionBar';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 import { useCoreCVVersions, useDeleteCoreCVVersion } from '@/hooks/useCV';
-import { useArchiveJobSpecificCV, useJobSpecificCVs } from '@/hooks/useJobSpecificCVs';
-import { CVHeader } from '@/components/cv/dashboard/CVHeader';
-import { CVActionCards } from '@/components/cv/dashboard/CVActionCards';
-import { CoreCVSection } from '@/components/cv/dashboard/CoreCVSection';
-import { JobCVSection } from '@/components/cv/dashboard/JobCVSection';
+import { CoreCVCard } from '@/components/cv/dashboard/CVCard';
+import { relativeTime } from '@/components/cv/dashboard/cv-dashboard-utils';
 
-export default function CVOverviewPage() {
+export default function MyCVPage() {
   const { toast } = useToast();
-  const [confirmDeleteCoreId, setConfirmDeleteCoreId] = useState<string | null>(null);
-  const [confirmDeleteJobId, setConfirmDeleteJobId] = useState<string | null>(null);
-  const {
-    data: coreVersions = [],
-    isLoading: coreVersionsLoading,
-  } = useCoreCVVersions();
+  const [versionsOpen, setVersionsOpen] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const { data: versions = [], isLoading } = useCoreCVVersions();
   const deleteCore = useDeleteCoreCVVersion();
 
-  const { data: jobCVs, isLoading: jobLoading } = useJobSpecificCVs();
-  const archiveJob = useArchiveJobSpecificCV();
+  const primary = versions[0];
+  const otherVersions = versions.slice(1);
 
-  const [jobSearch, setJobSearch] = useState('');
-  const [jobSort, setJobSort] = useState<'newest' | 'oldest'>('newest');
-
-  const filteredJobCVs = useMemo(() => {
-    if (!jobCVs) return [];
-    let list = [...jobCVs];
-    if (jobSearch.trim()) {
-      const q = jobSearch.toLowerCase();
-      list = list.filter(
-        (cv) =>
-          (cv.company_name ?? '').toLowerCase().includes(q) ||
-          cv.job_title.toLowerCase().includes(q)
-      );
-    }
-    list.sort((a, b) => {
-      const d = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-      return jobSort === 'newest' ? -d : d;
-    });
-    return list;
-  }, [jobCVs, jobSearch, jobSort]);
-
-  const handleDeleteCore = async (id: string) => {
+  const handleDelete = async (id: string) => {
     try {
       await deleteCore.mutateAsync(id);
-      toast('Core CV version deleted.', 'success');
+      toast('CV version deleted.', 'success');
     } catch {
-      toast('Failed to delete core CV.', 'error');
-    }
-  };
-
-  const handleDeleteJob = async (id: string) => {
-    try {
-      await archiveJob.mutateAsync(id);
-      toast('Job CV deleted.', 'success');
-    } catch {
-      toast('Failed to delete job CV.', 'error');
+      toast('Failed to delete.', 'error');
     }
   };
 
   return (
-    <div className="relative mx-auto max-w-6xl">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -inset-x-4 -inset-y-2 -z-10 rounded-[1.5rem] bg-[radial-gradient(ellipse_90%_50%_at_50%_-30%,var(--color-primary-500)/10,transparent_55%),radial-gradient(ellipse_70%_45%_at_100%_0%,var(--color-accent-mint)/8,transparent_50%),radial-gradient(ellipse_60%_40%_at_0%_100%,var(--color-primary-500)/6,transparent_55%)] sm:-inset-x-6"
+    <div className="mx-auto max-w-3xl space-y-8">
+      <PageHeader
+        title="My CV"
+        subtitle="Your base CV powers every tailored application."
+        actions={
+          <PrimaryActionBar>
+            <Link href="/cv/upload">
+              <Button variant="secondary" size="sm">
+                Upload CV
+              </Button>
+            </Link>
+            <Link href="/cv/edit">
+              <Button variant="primary" size="sm">
+                Edit CV
+              </Button>
+            </Link>
+          </PrimaryActionBar>
+        }
       />
 
-      <CVHeader />
-      <CVActionCards />
+      <section className="space-y-4">
+        <SectionHeader title="Base CV" description="Primary profile used when tailoring applications." />
+        <Card hoverable>
+          {isLoading ? (
+            <p className="text-sm text-[var(--color-muted)]">Loading…</p>
+          ) : primary ? (
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <p className="font-semibold text-[var(--color-text-primary)]">
+                  {primary.name || primary.full_name || 'My CV'}
+                </p>
+                <p className="mt-1 text-sm text-[var(--color-muted)]">
+                  {primary.completion_percentage}% complete · Updated{' '}
+                  {relativeTime(primary.updated_at)}
+                </p>
+                <p className="mt-1 text-xs text-[var(--color-muted)]">
+                  Template: {primary.preferred_template_id || 'classic'}
+                </p>
+              </div>
+              <Link href={`/cv/edit/${primary.id}`}>
+                <Button variant="primary" size="sm">
+                  Edit
+                </Button>
+              </Link>
+            </div>
+          ) : (
+            <div className="text-center py-6">
+              <p className="text-sm text-[var(--color-muted)]">No CV yet.</p>
+              <Link href="/cv/upload" className="mt-3 inline-block">
+                <Button variant="primary" size="sm">
+                  Upload or build your CV
+                </Button>
+              </Link>
+            </div>
+          )}
+        </Card>
+      </section>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)] lg:items-start lg:gap-8">
-        <CoreCVSection
-          versions={coreVersions}
-          loading={coreVersionsLoading}
-          confirmDeleteId={confirmDeleteCoreId}
-          onRequestDelete={(id) => {
-            if (confirmDeleteCoreId === id) {
-              setConfirmDeleteCoreId(null);
-              void handleDeleteCore(id);
-              return;
-            }
-            setConfirmDeleteCoreId(id);
-          }}
-        />
-        <JobCVSection
-          jobSearch={jobSearch}
-          onJobSearchChange={setJobSearch}
-          jobSort={jobSort}
-          onToggleSort={() => setJobSort(jobSort === 'newest' ? 'oldest' : 'newest')}
-          filteredJobCVs={filteredJobCVs}
-          jobCVs={jobCVs}
-          jobLoading={jobLoading}
-          confirmDeleteId={confirmDeleteJobId}
-          onRequestDelete={(id) => {
-            if (confirmDeleteJobId === id) {
-              setConfirmDeleteJobId(null);
-              void handleDeleteJob(id);
-              return;
-            }
-            setConfirmDeleteJobId(id);
-          }}
-        />
-      </div>
+      {otherVersions.length > 0 ? (
+        <section className="space-y-3">
+          <button
+            type="button"
+            className="flex w-full items-center justify-between rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-faint)] px-4 py-3 text-left text-sm font-semibold"
+            onClick={() => setVersionsOpen((o) => !o)}
+          >
+            Versions ({otherVersions.length})
+            {versionsOpen ? (
+              <ChevronUp className="h-4 w-4 text-[var(--color-muted)]" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-[var(--color-muted)]" />
+            )}
+          </button>
+          {versionsOpen ? (
+            <div className="space-y-2">
+              {otherVersions.map((v) => (
+                <div key={v.id}>
+                  <CoreCVCard
+                    cv={v}
+                    onDelete={() => {
+                      if (confirmDeleteId === v.id) {
+                        setConfirmDeleteId(null);
+                        void handleDelete(v.id);
+                        return;
+                      }
+                      setConfirmDeleteId(v.id);
+                    }}
+                  />
+                  {confirmDeleteId === v.id ? (
+                    <p className="mt-1 text-xs text-red-600">Click delete again to confirm.</p>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      <section>
+        <Link
+          href="/cv/templates"
+          className="text-sm font-semibold text-[var(--color-primary)] hover:underline"
+        >
+          Browse templates →
+        </Link>
+      </section>
     </div>
   );
 }

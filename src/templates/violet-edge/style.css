@@ -240,4 +240,8 @@
   .tpl-violet-edge .violet-side {
     min-height: 0;
   }
+  .tpl-violet-edge .violet-main .cv-section {
+    page-break-inside: auto;
+    break-inside: auto;
+  }
 }

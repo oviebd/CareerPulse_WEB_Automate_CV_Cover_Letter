@@ -23,7 +23,6 @@ body {
 }
 
 .cv-section {
-  page-break-inside: avoid;
   margin-bottom: 12pt;
 }
 
@@ -84,13 +83,21 @@ a {
 }
 
 @media print {
-  .cv-section,
+  /*
+   * Sections may split across pages so the next section can use leftover space.
+   * Cards (.cv-card) and compact blocks stay atomic — no mid-entry splits.
+   */
+  .cv-section {
+    page-break-inside: auto;
+    break-inside: auto;
+  }
   .cv-card,
   .exp-block,
   .edu-block,
   .proj-block,
   .pub-row {
     page-break-inside: avoid;
+    break-inside: avoid;
   }
 }
 
@@ -174,15 +181,16 @@ a {
   .cv-two-col {
     align-items: stretch;
   }
-  .cv-sidebar {
-    min-height: 0;
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
+  .cv-sidebar,
   .cv-main {
+    min-height: 0;
     break-inside: auto;
+    page-break-inside: auto;
   }
-  .skill-category-block {
+  .cv-sidebar .cv-section,
+  .skill-category-block,
+  .skill-group--compact {
     page-break-inside: avoid;
+    break-inside: avoid;
   }
 }

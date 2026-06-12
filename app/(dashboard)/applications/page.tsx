@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
 
-export default function AIToolsRedirectPage() {
+export default function ApplicationsPage() {
   redirect('/dashboard');
 }
