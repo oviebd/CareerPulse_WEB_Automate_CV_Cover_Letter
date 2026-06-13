@@ -96,7 +96,13 @@ export default function CoverLettersPage() {
       </div>
 
       {/* List */}
-      {isLoading ? <p className="text-sm text-[var(--color-muted)]">Loading…</p> : null}
+      {isLoading ? (
+        <ul className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <li key={i} className="h-[72px] animate-pulse rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]" />
+          ))}
+        </ul>
+      ) : null}
 
       {!isLoading && letters.length === 0 ? (
         <div className="rounded-xl border border-dashed border-[var(--color-border)] py-12 text-center">

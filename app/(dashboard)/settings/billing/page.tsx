@@ -52,7 +52,7 @@ export default function BillingPage() {
   const setProfile = useAuthStore((s) => s.setProfile);
   const { toast } = useToast();
 
-  const { data: payments = [] } = useQuery({
+  const { data: payments = [], isLoading: paymentsLoading } = useQuery({
     queryKey: ['payments'],
     queryFn: async (): Promise<Payment[]> => {
       const supabase = createClient();
@@ -65,6 +65,7 @@ export default function BillingPage() {
     staleTime: 5 * 60 * 1000,
   });
 
+  const [payLoadingPlan, setPayLoadingPlan] = useState<PricingPlanKey | null>(null);
   const [showPromo, setShowPromo] = useState(false);
   const [promoCode, setPromoCode] = useState('');
   const [promoLoading, setPromoLoading] = useState(false);
@@ -75,17 +76,24 @@ export default function BillingPage() {
   const [cancelLoading, setCancelLoading] = useState(false);
 
   async function pay(plan: PricingPlanKey) {
-    const res = await fetch('/api/payment/initiate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ plan }),
-    });
-    if (!res.ok) {
+    setPayLoadingPlan(plan);
+    try {
+      const res = await fetch('/api/payment/initiate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan }),
+      });
+      if (!res.ok) {
+        toast('Payment initiation failed. Please try again.', 'error');
+        return;
+      }
+      const j = await res.json();
+      if (j.gatewayUrl) window.location.href = j.gatewayUrl;
+    } catch {
       toast('Payment initiation failed. Please try again.', 'error');
-      return;
+    } finally {
+      setPayLoadingPlan(null);
     }
-    const j = await res.json();
-    if (j.gatewayUrl) window.location.href = j.gatewayUrl;
   }
 
   async function applyPromo() {
@@ -294,6 +302,8 @@ export default function BillingPage() {
                     size="sm"
                     className="mt-5 w-full"
                     onClick={() => void pay(key)}
+                    loading={payLoadingPlan === key}
+                    disabled={!!payLoadingPlan}
                   >
                     Pay with SSLCommerz
                   </Button>
@@ -350,7 +360,13 @@ export default function BillingPage() {
       {/* Payment history */}
       <Card>
         <h2 className="font-semibold">Payment History</h2>
-        {payments.length === 0 ? (
+        {paymentsLoading ? (
+          <div className="mt-4 space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-10 animate-pulse rounded-lg bg-[var(--color-surface-2)]" />
+            ))}
+          </div>
+        ) : payments.length === 0 ? (
           <div className="mt-4 flex flex-col items-center gap-2 py-10 text-center">
             <CreditCard className="h-8 w-8 text-[var(--color-muted)]" />
             <p className="text-sm font-medium text-[var(--color-text-primary)]">No payments yet</p>

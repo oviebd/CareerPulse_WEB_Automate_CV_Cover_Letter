@@ -95,6 +95,7 @@ export default function CoverLetterDetailPage() {
     null
   );
   const [draftSaveBusy, setDraftSaveBusy] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
   const initLetterIdRef = useRef<string | null>(null);
   const jobSyncedForLetterRef = useRef<string | null>(null);
   const previewUrlRef = useRef<string | null>(null);
@@ -415,30 +416,35 @@ export default function CoverLetterDetailPage() {
       return;
     }
     if (!letter) return;
-    const res = await fetch('/api/export', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: 'cover_letter',
-        id: letter.id,
-        templateId: draftTemplateId,
-        content: draftContent,
-        accent_color: accent,
-        company_name: draftCompanyName,
-        job_title: draftJobTitle,
-        applicant_name: draftApplicantName,
-        applicant_role: draftApplicantRole,
-        applicant_email: draftApplicantEmail,
-        applicant_phone: draftApplicantPhone,
-        applicant_location: draftApplicantLocation,
-      }),
-    });
-    const j = (await res.json()) as { pdfUrl?: string; error?: string };
-    if (j.pdfUrl) {
-      window.open(j.pdfUrl, '_blank');
-      return;
+    setExportingPdf(true);
+    try {
+      const res = await fetch('/api/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'cover_letter',
+          id: letter.id,
+          templateId: draftTemplateId,
+          content: draftContent,
+          accent_color: accent,
+          company_name: draftCompanyName,
+          job_title: draftJobTitle,
+          applicant_name: draftApplicantName,
+          applicant_role: draftApplicantRole,
+          applicant_email: draftApplicantEmail,
+          applicant_phone: draftApplicantPhone,
+          applicant_location: draftApplicantLocation,
+        }),
+      });
+      const j = (await res.json()) as { pdfUrl?: string; error?: string };
+      if (j.pdfUrl) {
+        window.open(j.pdfUrl, '_blank');
+        return;
+      }
+      toast(j.error === 'invalid_template' ? 'This template is not available.' : 'Export failed.', 'error');
+    } finally {
+      setExportingPdf(false);
     }
-    toast(j.error === 'invalid_template' ? 'This template is not available.' : 'Export failed.', 'error');
   }
 
   if ((!isDraftMode && isLoading) || (isDraftMode && !draftClMeta)) {
@@ -493,6 +499,7 @@ export default function CoverLetterDetailPage() {
             variant="secondary"
             size="sm"
             disabled={isDraftMode}
+            loading={exportingPdf}
             onClick={() => void handleExportPdf()}
           >
             Export PDF

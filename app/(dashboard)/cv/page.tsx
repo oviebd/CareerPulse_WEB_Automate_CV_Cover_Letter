@@ -41,9 +41,11 @@ function useAllCVs() {
 function CVCard({
   cv,
   onDelete,
+  deleting,
 }: {
   cv: CVProfile;
   onDelete: (id: string) => void;
+  deleting: boolean;
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const isJobSpecific = (cv.job_ids?.length ?? 0) > 0;
@@ -101,17 +103,21 @@ function CVCard({
         </Link>
         {confirmDelete ? (
           <div className="flex items-center gap-1.5">
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="sm"
               className="text-xs text-red-600 hover:underline"
               onClick={() => onDelete(cv.id)}
+              loading={deleting}
+              disabled={deleting}
             >
               Confirm
-            </button>
+            </Button>
             <button
               type="button"
               className="text-xs text-[var(--color-muted)] hover:underline"
               onClick={() => setConfirmDelete(false)}
+              disabled={deleting}
             >
               Cancel
             </button>
@@ -135,8 +141,10 @@ export default function CVLibraryPage() {
   const router = useRouter();
   const { toast } = useToast();
   const qc = useQueryClient();
+  const userId = useAuthStore((s) => s.user?.id);
   const [filter, setFilter] = useState<FilterTab>('all');
   const [creating, setCreating] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const { data: cvs = [], isLoading } = useAllCVs();
 
   const filtered = cvs.filter((cv) => {
@@ -165,14 +173,20 @@ export default function CVLibraryPage() {
   }
 
   async function handleDelete(id: string) {
+    setDeletingId(id);
+    qc.setQueryData(['all-cvs', userId], (old: CVProfile[] | undefined) =>
+      old?.filter((cv) => cv.id !== id) ?? []
+    );
     try {
       const res = await fetch(`/api/cvs/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Failed to delete');
       toast('CV deleted.', 'success');
-      void qc.invalidateQueries({ queryKey: ['all-cvs'] });
       void qc.invalidateQueries({ queryKey: ['cv-versions'] });
     } catch {
+      void qc.invalidateQueries({ queryKey: ['all-cvs'] });
       toast('Failed to delete CV.', 'error');
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -212,10 +226,17 @@ export default function CVLibraryPage() {
           className="flex items-start gap-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-left transition hover:border-[var(--color-primary-300)] hover:bg-[var(--color-surface-2)] disabled:opacity-50"
         >
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--color-primary-100)] text-[var(--color-primary)]">
-            <FilePlus2 className="h-5 w-5" />
+            {creating ? (
+              <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+              </svg>
+            ) : (
+              <FilePlus2 className="h-5 w-5" />
+            )}
           </div>
           <div>
-            <p className="font-semibold text-[var(--color-text-primary)]">Create CV</p>
+            <p className="font-semibold text-[var(--color-text-primary)]">{creating ? 'Creating…' : 'Create CV'}</p>
             <p className="mt-0.5 text-sm text-[var(--color-muted)]">
               Start from scratch or build your general CV.
             </p>
@@ -279,7 +300,7 @@ export default function CVLibraryPage() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((cv) => (
-            <CVCard key={cv.id} cv={cv} onDelete={handleDelete} />
+            <CVCard key={cv.id} cv={cv} onDelete={handleDelete} deleting={deletingId === cv.id} />
           ))}
         </div>
       )}

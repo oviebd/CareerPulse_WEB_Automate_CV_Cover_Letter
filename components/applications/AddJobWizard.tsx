@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
@@ -41,8 +41,6 @@ export function AddJobWizard() {
   const [analysisResult, setAnalysisResult] = useState<JobAnalysisResult | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
 
-  const postGenerateNavRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   const jdLength = jobDescription.trim().length;
   const canContinueStep1 = Boolean(selectedCV);
   const canContinueStep2 = jdLength >= 100;
@@ -55,16 +53,6 @@ export function AddJobWizard() {
       setSelectedCV(coreVersions[0].id);
     }
   }, [coreVersionsLoading, coreVersions, selectedCV]);
-
-  useEffect(
-    () => () => {
-      if (postGenerateNavRef.current) {
-        clearTimeout(postGenerateNavRef.current);
-        postGenerateNavRef.current = null;
-      }
-    },
-    []
-  );
 
   const maxAccessibleStep = useMemo<StepId>(() => {
     if (!canContinueStep1) return 1;
@@ -122,10 +110,6 @@ export function AddJobWizard() {
   const handleGenerate = useCallback(async () => {
     if (!selectedCV) return;
     setIsGenerating(true);
-    if (postGenerateNavRef.current) {
-      clearTimeout(postGenerateNavRef.current);
-      postGenerateNavRef.current = null;
-    }
 
     try {
       const res = await fetch('/api/cv/optimise', {
@@ -206,10 +190,7 @@ export function AddJobWizard() {
         coverLetterEmphasis: draft.coverLetterEmphasis ?? null,
       });
 
-      postGenerateNavRef.current = setTimeout(() => {
-        postGenerateNavRef.current = null;
-        router.push('/cv/optimise/result');
-      }, 400);
+      router.push('/cv/optimise/result');
     } catch {
       toast('Something went wrong. Please try again.', 'error');
     } finally {

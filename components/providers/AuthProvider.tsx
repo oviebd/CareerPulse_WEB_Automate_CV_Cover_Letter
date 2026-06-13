@@ -108,6 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async function syncFromUser(userId: string | undefined) {
       if (!userId) {
         setProfile(null);
+        sessionStorage.removeItem('cp_profile');
         return;
       }
       for (let attempt = 1; attempt <= 3; attempt += 1) {
@@ -118,7 +119,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .maybeSingle();
 
         if (!error) {
-          setProfile(mapProfile(data as Record<string, unknown> | null));
+          const mapped = mapProfile(data as Record<string, unknown> | null);
+          setProfile(mapped);
+          if (mapped) {
+            try { sessionStorage.setItem('cp_profile', JSON.stringify(mapped)); } catch { /* quota */ }
+          }
           return;
         }
 
@@ -182,7 +187,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     async function init() {
+      // Fast path: pre-populate profile from sessionStorage so it's available
+      // the moment initialized fires (avoids null-profile flash on repeat visits).
+      try {
+        const cachedRaw = sessionStorage.getItem('cp_profile');
+        if (cachedRaw) {
+          const cached = JSON.parse(cachedRaw) as Profile;
+          setProfile(cached);
+        }
+      } catch { /* ignore parse errors or SSR */ }
+
       let userResolvedWithoutSessionObject = false;
+      let initializedEarly = false;
       try {
         // Step 1: Read the session from cookies.
         // The server (middleware.ts) has already validated and potentially refreshed
@@ -202,7 +218,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               setUser(userFromUser);
               wasAuthenticatedRef.current = true;
               scheduleSessionExpiryCheck(null);
-              await syncFromUser(userFromUser.id);
+              // Release the guard immediately — profile arrives in background.
+              initSessionCompleteRef.current = true;
+              setInitialized(true);
+              initializedEarly = true;
+              void syncFromUser(userFromUser.id);
               userResolvedWithoutSessionObject = true;
             }
           }
@@ -212,10 +232,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(session.user);
           wasAuthenticatedRef.current = true;
           scheduleSessionExpiryCheck(session);
-          await syncFromUser(session.user.id);
+          // Release the guard immediately — profile arrives in background.
+          initSessionCompleteRef.current = true;
+          setInitialized(true);
+          initializedEarly = true;
+          void syncFromUser(session.user.id);
         } else if (!userResolvedWithoutSessionObject) {
           setUser(null);
           setProfile(null);
+          sessionStorage.removeItem('cp_profile');
           wasAuthenticatedRef.current = false;
           try {
             await supabase.auth.signOut({ scope: 'local' });
@@ -228,8 +253,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(null);
         setProfile(null);
       } finally {
-        initSessionCompleteRef.current = true;
-        setInitialized(true);
+        if (!initializedEarly) {
+          initSessionCompleteRef.current = true;
+          setInitialized(true);
+        }
       }
     }
 

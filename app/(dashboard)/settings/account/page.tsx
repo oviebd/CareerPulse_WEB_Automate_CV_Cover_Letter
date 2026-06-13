@@ -13,33 +13,45 @@ export default function AccountSettingsPage() {
   const setProfile = useAuthStore((s) => s.setProfile);
   const [name, setName] = useState(profile?.full_name ?? '');
   const [deletePhrase, setDeletePhrase] = useState('');
+  const [savingName, setSavingName] = useState(false);
+  const [exportingData, setExportingData] = useState(false);
 
   async function saveName() {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    await supabase.from('profiles').update({ full_name: name }).eq('id', user.id);
-    if (profile) setProfile({ ...profile, full_name: name });
-    toast('Profile updated.', 'success');
+    setSavingName(true);
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      await supabase.from('profiles').update({ full_name: name }).eq('id', user.id);
+      if (profile) setProfile({ ...profile, full_name: name });
+      toast('Profile updated.', 'success');
+    } finally {
+      setSavingName(false);
+    }
   }
 
   async function exportData() {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const [cv, letters, apps] = await Promise.all([
-      supabase.from('cvs').select('*').eq('user_id', user.id),
-      supabase.from('cover_letters').select('*').eq('user_id', user.id),
-      supabase.from('jobs').select('*').eq('user_id', user.id),
-    ]);
-    const blob = new Blob(
-      [JSON.stringify({ cv: cv.data, cover_letters: letters.data, applications: apps.data }, null, 2)],
-      { type: 'application/json' }
-    );
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'cv-app-export.json';
-    a.click();
+    setExportingData(true);
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const [cv, letters, apps] = await Promise.all([
+        supabase.from('cvs').select('*').eq('user_id', user.id),
+        supabase.from('cover_letters').select('*').eq('user_id', user.id),
+        supabase.from('jobs').select('*').eq('user_id', user.id),
+      ]);
+      const blob = new Blob(
+        [JSON.stringify({ cv: cv.data, cover_letters: letters.data, applications: apps.data }, null, 2)],
+        { type: 'application/json' }
+      );
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'cv-app-export.json';
+      a.click();
+    } finally {
+      setExportingData(false);
+    }
   }
 
   return (
@@ -47,7 +59,7 @@ export default function AccountSettingsPage() {
       <h1 className="font-display text-2xl font-bold">Account</h1>
       <div className="space-y-3">
         <Input label="Display name" value={name} onChange={(e) => setName(e.target.value)} />
-        <Button variant="primary" size="sm" onClick={() => void saveName()}>
+        <Button variant="primary" size="sm" onClick={() => void saveName()} loading={savingName}>
           Save name
         </Button>
         <p className="text-xs text-[var(--color-muted)]">
@@ -56,7 +68,7 @@ export default function AccountSettingsPage() {
       </div>
       <div>
         <h2 className="font-semibold">Data export (GDPR)</h2>
-        <Button variant="secondary" className="mt-2" onClick={() => void exportData()}>
+        <Button variant="secondary" className="mt-2" onClick={() => void exportData()} loading={exportingData}>
           Download JSON
         </Button>
       </div>

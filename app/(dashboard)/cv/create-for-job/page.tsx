@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, Target, Briefcase, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -32,20 +32,11 @@ export default function CreateCVForJobPage() {
   const [jobUrl, setJobUrl] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
 
-  const navRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   useEffect(() => {
     if (!cvsLoading && selectedCvId == null && coreVersions.length > 0) {
       setSelectedCvId(coreVersions[0].id);
     }
   }, [cvsLoading, coreVersions, selectedCvId]);
-
-  useEffect(
-    () => () => {
-      if (navRef.current) clearTimeout(navRef.current);
-    },
-    []
-  );
 
   // When a tracked job is selected, pre-fill title and company
   useEffect(() => {
@@ -152,10 +143,7 @@ export default function CreateCVForJobPage() {
         coverLetterEmphasis: null,
       });
 
-      navRef.current = setTimeout(() => {
-        navRef.current = null;
-        router.push('/cv/optimise/result');
-      }, 400);
+      router.push('/cv/optimise/result');
     } catch {
       toast('Something went wrong. Please try again.', 'error');
     } finally {
