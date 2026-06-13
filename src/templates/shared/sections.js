@@ -897,14 +897,6 @@
             var rc = skillRatingFromItem(it);
             piece +=
               ' <span class="skill-inline-level">(' + esc(RATING_LABEL[rc] || '') + ')</span>';
-          } else if (it && typeof it === 'object') {
-            var r0 = skillRatingFromItem(it);
-            piece +=
-              ' <span class="skill-level skill-level-' +
-              r0 +
-              '">' +
-              esc(RATING_LABEL[r0] || '') +
-              '</span>';
           }
           parts.push(piece);
         });
@@ -922,13 +914,6 @@
         if (cfg.showSkillBars) {
           html += '<span class="skill-label">' + esc(RATING_LABEL[rr] || '') + '</span>';
           html += skillBarFromItem(it && typeof it === 'object' ? it : { name: String(name) });
-        } else {
-          html +=
-            '<span class="skill-level skill-level-' +
-            rr +
-            '">' +
-            esc(RATING_LABEL[rr] || '') +
-            '</span>';
         }
         html += '</div>';
       });
