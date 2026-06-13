@@ -261,6 +261,7 @@
 }
 
 @media print {
+  .tpl-golden-hour .golden-grid,
   .tpl-golden-hour .golden-side {
     min-height: 0;
   }

@@ -171,6 +171,7 @@
 }
 
 @media print {
+  .tpl-midnight-pro .midnight-grid,
   .tpl-midnight-pro .midnight-side {
     min-height: 0;
   }

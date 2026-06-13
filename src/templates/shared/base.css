@@ -141,8 +141,15 @@ a {
 }
 
 .cv-sidebar {
-  min-height: 100vh;
   align-self: stretch;
+}
+
+/* Extend sidebar background to full page height in browser/screen view only.
+   Print and PDF use @media print where min-height is reset to 0 (below). */
+@media screen {
+  .cv-sidebar {
+    min-height: 100vh;
+  }
 }
 
 .cv-main {

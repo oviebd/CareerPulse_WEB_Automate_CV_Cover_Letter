@@ -8,6 +8,38 @@ import {
 } from '@/components/shared/DocumentPrintPreviewFrame';
 import { cn } from '@/lib/utils';
 
+/**
+ * CV templates use `min-height: 100vh` on sidebars and grid wrappers so the
+ * coloured sidebar fills the full page in browser view.  Inside a preview
+ * iframe the measurement probe temporarily sets the iframe to 10 000 px tall,
+ * making `100vh = 10 000px`, which inflates scrollHeight and produces a large
+ * blank area.  This override resets all viewport-relative min-heights to 0
+ * before measuring so the iframe sizes to actual content only.
+ */
+function injectCVPreviewOverrides(iframe: HTMLIFrameElement): void {
+  try {
+    const doc = iframe.contentDocument;
+    if (!doc?.head) return;
+    const existing = doc.getElementById('__cv-preview-overrides');
+    if (existing) return;
+    const style = doc.createElement('style');
+    style.id = '__cv-preview-overrides';
+    // Reset all viewport-relative min-heights so the measurement probe
+    // (which expands the iframe to 10 000 px) doesn't inflate content height.
+    // Also pin html/body to auto height so html.scrollHeight reflects content,
+    // not the inflated viewport.
+    style.textContent =
+      'html{height:auto!important;overflow:hidden!important;}' +
+      'body{min-height:0!important;height:auto!important;}' +
+      '.cv-sidebar,.cv-two-col,' +
+      '.amber-grid,.golden-grid,.midnight-grid,.ocean-grid,' +
+      '.violet-wrap,.violet-side,.violet-side-main{min-height:0!important;}';
+    doc.head.appendChild(style);
+  } catch {
+    // cross-origin frames are silently ignored
+  }
+}
+
 interface PreviewPanelProps {
   /** Blob URL for rendered HTML preview. */
   previewSrc: string;
@@ -141,6 +173,7 @@ export function PreviewPanel(props: PreviewPanelProps) {
                 title="CV live preview"
                 isLoading={previewBusy}
                 zoom={zoom}
+                injectOverrides={injectCVPreviewOverrides}
                 onMetricsChange={({ contentHeight }) => {
                   const pages = Math.max(
                     1,

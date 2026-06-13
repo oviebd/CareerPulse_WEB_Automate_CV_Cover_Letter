@@ -45,12 +45,13 @@ function measureIframeContentHeight(iframe: HTMLIFrameElement): number {
     iframe.style.height = '10000px';
     void iframe.offsetHeight;
     try {
-      const root = doc.documentElement;
       const body = doc.body;
       const bodyRect = body?.getBoundingClientRect();
+      // Measure only the body — NOT documentElement. The <html> element fills
+      // the iframe viewport (10 000 px during the probe), so root.scrollHeight
+      // is always the probe height regardless of actual content.  body.scrollHeight
+      // correctly reflects the rendered content including padding and overflow.
       const h = Math.max(
-        root.scrollHeight,
-        root.offsetHeight,
         body?.scrollHeight ?? 0,
         body?.offsetHeight ?? 0,
         bodyRect ? Math.ceil(bodyRect.height) : 0,

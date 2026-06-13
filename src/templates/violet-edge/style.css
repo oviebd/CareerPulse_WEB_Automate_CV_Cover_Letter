@@ -237,7 +237,9 @@
 }
 
 @media print {
-  .tpl-violet-edge .violet-side {
+  .tpl-violet-edge .violet-wrap,
+  .tpl-violet-edge .violet-side,
+  .tpl-violet-edge .violet-side-main {
     min-height: 0;
   }
   .tpl-violet-edge .violet-main .cv-section {

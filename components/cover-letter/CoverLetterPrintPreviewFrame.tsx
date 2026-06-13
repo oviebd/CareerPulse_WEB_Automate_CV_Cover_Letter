@@ -27,7 +27,8 @@ function injectCoverLetterPreviewOverrides(iframe: HTMLIFrameElement): void {
     const style = doc.createElement('style');
     style.id = '__cl-preview-overrides';
     style.textContent = [
-      'html{overflow:hidden!important;margin:0!important;padding:0!important;}',
+      'html{height:auto!important;overflow:hidden!important;',
+      'margin:0!important;padding:0!important;}',
       'body{box-sizing:border-box!important;width:794px!important;',
       'min-height:0!important;height:auto!important;overflow:visible!important;}',
     ].join('');

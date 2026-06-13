@@ -257,6 +257,7 @@
 }
 
 @media print {
+  .tpl-ocean-slate .ocean-grid,
   .tpl-ocean-slate .ocean-side {
     min-height: 0;
   }
