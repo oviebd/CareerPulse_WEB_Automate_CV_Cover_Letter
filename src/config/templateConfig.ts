@@ -484,7 +484,7 @@ export const ALL_TEMPLATE_IDS: TemplateId[] = [
   'violet-edge',
 ];
 
-/** V3: visible in template selector (archived templates remain in DB + ALL_TEMPLATE_IDS). */
+/** All templates visible in the selector. */
 export const VISIBLE_TEMPLATE_IDS: TemplateId[] = [
   'classic',
   'modern',
@@ -492,6 +492,13 @@ export const VISIBLE_TEMPLATE_IDS: TemplateId[] = [
   'technical',
   'entry-level',
   'creative',
+  'minimal',
+  'healthcare',
+  'amber-strike',
+  'midnight-pro',
+  'golden-hour',
+  'ocean-slate',
+  'violet-edge',
 ];
 
 export function isVisibleTemplate(id: string): boolean {

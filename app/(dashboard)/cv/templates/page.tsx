@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useEffect, useRef, useState } from 'react';
-import { isVisibleTemplate } from '@/src/config/templateConfig';
+import { VISIBLE_TEMPLATE_IDS, TEMPLATE_CONFIGS } from '@/src/config/templateConfig';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
@@ -192,34 +192,38 @@ function CVTemplatesPageContent() {
         </div>
       </FeatureGate>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {templates.filter((t) => isVisibleTemplate(t.id)).map((t) => {
-          const allowed = canUseTemplate(
-            t.available_tiers as SubscriptionTier[],
-            tier
-          );
+        {VISIBLE_TEMPLATE_IDS.map((tid) => {
+          const cfg = TEMPLATE_CONFIGS[tid];
+          const row = templates.find((t) => t.id === tid);
+          const name = row?.name ?? cfg.label;
+          const description = row?.description ?? cfg.description;
+          const category = row?.category ?? cfg.layout;
+          const isPremium = row ? row.is_premium : false;
+          const availableTiers = (row?.available_tiers ?? ['free', 'pro']) as SubscriptionTier[];
+          const allowed = canUseTemplate(availableTiers, tier);
           return (
-            <Card key={t.id} padding="none" className="flex flex-col overflow-hidden">
-              <TemplatePreviewThumb templateId={t.id} accent={color} name={t.name} />
+            <Card key={tid} padding="none" className="flex flex-col overflow-hidden">
+              <TemplatePreviewThumb templateId={tid} accent={cfg.templateAccent ?? color} name={name} />
               <div className="flex flex-1 flex-col p-5">
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <h2 className="font-semibold">{t.name}</h2>
+                    <h2 className="font-semibold">{name}</h2>
                     <Badge variant="default" className="mt-1 capitalize">
-                      {t.category}
+                      {category}
                     </Badge>
                   </div>
-                  {t.is_premium ? (
+                  {isPremium ? (
                     <Badge variant="warning">Pro+</Badge>
                   ) : (
                     <Badge variant="success">Free</Badge>
                   )}
                 </div>
-                <p className="mt-2 flex-1 text-sm text-[var(--color-muted)]">{t.description}</p>
+                <p className="mt-2 flex-1 text-sm text-[var(--color-muted)]">{description}</p>
                 <div className="mt-4 flex flex-col gap-2">
                   <Link
                     href={
                       hasEditableCv
-                        ? `/cv/templates/${t.id}/preview${
+                        ? `/cv/templates/${tid}/preview${
                             jobCvId
                               ? `?job_cv_id=${encodeURIComponent(jobCvId)}`
                               : ''
@@ -239,7 +243,7 @@ function CVTemplatesPageContent() {
                     Preview &amp; edit
                   </Link>
                   <TemplateGate
-                    availableTiers={t.available_tiers as SubscriptionTier[]}
+                    availableTiers={availableTiers}
                     userTier={tier}
                   >
                     <div className="flex flex-wrap gap-2">
@@ -248,7 +252,7 @@ function CVTemplatesPageContent() {
                           variant="secondary"
                           size="sm"
                           disabled={!cv || !allowed || draftActive}
-                          onClick={() => void setPreferredTemplate(t.id)}
+                          onClick={() => void setPreferredTemplate(tid)}
                         >
                           Use as default
                         </Button>
@@ -256,9 +260,9 @@ function CVTemplatesPageContent() {
                       <Button
                         variant="secondary"
                         size="sm"
-                        loading={exporting === t.id}
+                        loading={exporting === tid}
                         disabled={!hasEditableCv || !allowed || (!jobCvId && draftActive)}
-                        onClick={() => void exportPdf(t.id)}
+                        onClick={() => void exportPdf(tid)}
                       >
                         Export PDF
                       </Button>
