@@ -21,6 +21,7 @@ import {
 } from '@/hooks/useCoverLetters';
 import { useSubscription } from '@/hooks/useSubscription';
 import { createClient } from '@/lib/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 import { canUseTemplate } from '@/lib/subscription';
 import { formatDate } from '@/lib/utils';
 import type { CVTemplate, SubscriptionTier } from '@/types';
@@ -60,6 +61,7 @@ export default function CoverLetterDetailPage() {
   });
   const { tier } = useSubscription();
   const updateLetter = useUpdateCoverLetter();
+  const qc = useQueryClient();
 
   const { data: preferredClTemplateId = 'cl-classic' } = useQuery({
     queryKey: ['profile-cl-template', userId],
@@ -358,6 +360,7 @@ export default function CoverLetterDetailPage() {
             savedCoverLetterId: created.id,
           });
         }
+        void qc.invalidateQueries({ queryKey: ['cover-letters'] });
         toast('Cover letter saved.', 'success');
         router.replace(`/cover-letters/${created.id}`);
       } catch (e) {

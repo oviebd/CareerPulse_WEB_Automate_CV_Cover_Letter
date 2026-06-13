@@ -41,6 +41,7 @@ export async function POST(request: Request) {
     if (!user) return err('Unauthorized', 'UNAUTHORIZED', 401);
 
     const body = (await request.json().catch(() => ({}))) as {
+      name?: string | null;
       content?: string;
       tone?: string | null;
       length?: string | null;
@@ -66,6 +67,7 @@ export async function POST(request: Request) {
       .from('cover_letters')
       .insert({
         user_id: user.id,
+        ...(body.name?.trim() ? { name: body.name.trim() } : {}),
         content: body.content,
         tone: body.tone ?? null,
         length: body.length ?? null,

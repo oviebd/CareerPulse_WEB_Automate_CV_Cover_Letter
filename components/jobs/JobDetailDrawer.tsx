@@ -17,6 +17,7 @@ import {
   User,
   Link2,
 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
 import { useUpsertJobApplication, useUpdateApplicationStatus } from '@/hooks/useTracker';
@@ -75,6 +76,7 @@ function EditableField({
 
 export function JobDetailDrawer({ job, onClose, onJobUpdate }: JobDetailDrawerProps) {
   const { toast } = useToast();
+  const qc = useQueryClient();
   const upsert = useUpsertJobApplication();
   const updateStatus = useUpdateApplicationStatus();
 
@@ -170,6 +172,8 @@ export function JobDetailDrawer({ job, onClose, onJobUpdate }: JobDetailDrawerPr
       } else {
         toast('Job has linked documents — it was removed from the board.', 'info');
       }
+      void qc.invalidateQueries({ queryKey: ['job-applications'] });
+      void qc.invalidateQueries({ queryKey: ['tracked-jobs-count'] });
       onClose();
     } catch {
       toast('Failed to delete job.', 'error');

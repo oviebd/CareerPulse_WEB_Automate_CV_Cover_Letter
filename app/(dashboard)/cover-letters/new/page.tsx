@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Briefcase, FileText, PenLine } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -12,6 +13,7 @@ import { createClient } from '@/lib/supabase/client';
 export default function NewCoverLetterPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const qc = useQueryClient();
   const userId = useAuthStore((s) => s.user?.id);
   const [scratchBusy, setScratchBusy] = useState(false);
 
@@ -53,6 +55,7 @@ export default function NewCoverLetterPage() {
         return;
       }
       const created = (await res.json()) as { id: string };
+      void qc.invalidateQueries({ queryKey: ['cover-letters'] });
       router.push(`/cover-letters/${created.id}`);
     } catch {
       toast('Could not create cover letter. Please try again.', 'error');
@@ -84,13 +87,13 @@ export default function NewCoverLetterPage() {
               From Job Description
             </h2>
             <p className="mt-1 text-sm text-[var(--color-muted)]">
-              Paste a job description and AI will generate a tailored cover letter using your CV.
+              Paste a job description and AI will generate a tailored resume and cover letter together.
             </p>
           </div>
           <Button
             variant="secondary"
             size="sm"
-            onClick={() => router.push('/cv/optimise')}
+            onClick={() => router.push('/applications/new')}
           >
             Get started
           </Button>

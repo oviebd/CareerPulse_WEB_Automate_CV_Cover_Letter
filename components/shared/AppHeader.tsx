@@ -2,11 +2,11 @@
 
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  FileText,
+  FolderOpen,
   Kanban,
-  Mail,
   Menu,
   Settings,
+  Sparkles,
   X,
   ChevronsLeft,
   ChevronsRight,
@@ -30,9 +30,8 @@ interface NavItem {
 }
 
 const nav: NavItem[] = [
-  { href: '/dashboard', label: 'Job Tracker', icon: Kanban },
-  { href: '/cv', label: 'CV Library', icon: FileText },
-  { href: '/cover-letters', label: 'Cover Letters', icon: Mail },
+  { href: '/dashboard', label: 'Applications', icon: Kanban },
+  { href: '/documents', label: 'Documents', icon: FolderOpen },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -44,10 +43,14 @@ function isNavActive(pathname: string, href: string): boolean {
       pathname.startsWith('/applications')
     );
   }
-  if (href === '/cv') {
+  if (href === '/documents') {
     return (
+      pathname === '/documents' ||
+      pathname.startsWith('/documents/') ||
       pathname === '/cv' ||
-      pathname.startsWith('/cv/')
+      pathname.startsWith('/cv/') ||
+      pathname === '/cover-letters' ||
+      pathname.startsWith('/cover-letters/')
     );
   }
   return pathname === href || pathname.startsWith(`${href}/`);
@@ -221,6 +224,20 @@ export function AppHeader() {
               trackerBadge={trackerBadge}
             />
           ))}
+          {isFree ? (
+            <Link
+              href="/settings/billing"
+              title={sidebarCollapsed ? 'Upgrade to Pro' : undefined}
+              className={cn(
+                'mt-1 flex items-center gap-2 rounded-lg py-2.5 text-sm font-semibold transition-all duration-200 ease-out active:scale-[0.98]',
+                'bg-gradient-to-r from-[var(--color-accent-gold)]/15 to-[var(--color-primary-100)] text-[var(--color-accent-gold)] hover:from-[var(--color-accent-gold)]/25 hover:to-[var(--color-primary-200)]',
+                sidebarCollapsed ? 'justify-center px-0' : 'pl-3 pr-3'
+              )}
+            >
+              <Sparkles className="h-4 w-4 shrink-0" />
+              {!sidebarCollapsed && <span className="min-w-0 flex-1 truncate">Upgrade to Pro</span>}
+            </Link>
+          ) : null}
         </nav>
         <div className="shrink-0 space-y-3 border-t border-[var(--color-border)] p-3">
           <ThemeToggle collapsed={sidebarCollapsed} />
@@ -291,6 +308,16 @@ export function AppHeader() {
                     trackerBadge={trackerBadge}
                   />
                 ))}
+                {isFree ? (
+                  <Link
+                    href="/settings/billing"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="mt-1 flex items-center gap-2 rounded-lg py-2.5 pl-3 pr-3 text-sm font-semibold transition-all duration-200 ease-out bg-gradient-to-r from-[var(--color-accent-gold)]/15 to-[var(--color-primary-100)] text-[var(--color-accent-gold)] hover:from-[var(--color-accent-gold)]/25 hover:to-[var(--color-primary-200)]"
+                  >
+                    <Sparkles className="h-4 w-4 shrink-0" />
+                    <span>Upgrade to Pro</span>
+                  </Link>
+                ) : null}
               </nav>
               <div className="border-t border-[var(--color-border)] px-3 pb-2">
                 <ThemeToggle />

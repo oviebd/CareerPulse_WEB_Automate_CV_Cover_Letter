@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -22,6 +23,7 @@ const TONES: { id: CoverLetterTone; label: string }[] = [
 export function GenerateCoverLetterForm() {
   const { toast } = useToast();
   const { tier } = useSubscription();
+  const qc = useQueryClient();
   const [jobDescription, setJd] = useState('');
   const [companyName, setCompany] = useState('');
   const [jobTitle, setJobTitle] = useState('');
@@ -207,6 +209,7 @@ export function GenerateCoverLetterForm() {
               }
               const data = (await res.json()) as { id: string };
               setLetterId(data.id);
+              void qc.invalidateQueries({ queryKey: ['cover-letters'] });
               toast('Saved to your cover letters.', 'success');
             }}
           >
