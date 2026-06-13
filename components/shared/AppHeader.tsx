@@ -2,11 +2,11 @@
 
 import { AnimatePresence, motion } from 'framer-motion';
 import {
+  CreditCard,
   FolderOpen,
   Kanban,
   Menu,
   Settings,
-  Sparkles,
   X,
   ChevronsLeft,
   ChevronsRight,
@@ -52,6 +52,10 @@ function isNavActive(pathname: string, href: string): boolean {
       pathname === '/cover-letters' ||
       pathname.startsWith('/cover-letters/')
     );
+  }
+  if (href === '/settings') {
+    return (pathname === '/settings' || pathname.startsWith('/settings/')) &&
+      pathname !== '/settings/billing';
   }
   return pathname === href || pathname.startsWith(`${href}/`);
 }
@@ -224,20 +228,24 @@ export function AppHeader() {
               trackerBadge={trackerBadge}
             />
           ))}
-          {isFree ? (
-            <Link
-              href="/settings/billing"
-              title={sidebarCollapsed ? 'Upgrade to Pro' : undefined}
-              className={cn(
-                'mt-1 flex items-center gap-2 rounded-lg py-2.5 text-sm font-semibold transition-all duration-200 ease-out active:scale-[0.98]',
-                'bg-gradient-to-r from-[var(--color-accent-gold)]/15 to-[var(--color-primary-100)] text-[var(--color-accent-gold)] hover:from-[var(--color-accent-gold)]/25 hover:to-[var(--color-primary-200)]',
-                sidebarCollapsed ? 'justify-center px-0' : 'pl-3 pr-3'
-              )}
-            >
-              <Sparkles className="h-4 w-4 shrink-0" />
-              {!sidebarCollapsed && <span className="min-w-0 flex-1 truncate">Upgrade to Pro</span>}
-            </Link>
-          ) : null}
+          <Link
+            href="/settings/billing"
+            title={sidebarCollapsed ? 'Billing' : undefined}
+            className={cn(
+              'relative mt-1 flex items-center gap-2 rounded-lg py-2.5 text-sm font-semibold transition-all duration-200 ease-out active:scale-[0.98]',
+              sidebarCollapsed ? 'justify-center px-0' : 'pl-3 pr-3',
+              !sidebarCollapsed &&
+                'before:pointer-events-none before:absolute before:left-0 before:top-1/2 before:h-[65%] before:w-[3px] before:-translate-y-1/2 before:rounded-full before:bg-[var(--color-primary-500)] before:transition-opacity before:duration-200',
+              !sidebarCollapsed && pathname !== '/settings/billing' && 'before:opacity-0',
+              !sidebarCollapsed && pathname === '/settings/billing' && 'before:opacity-100',
+              pathname === '/settings/billing'
+                ? 'bg-[var(--color-primary-100)] text-[var(--color-primary-500)] shadow-[var(--shadow-nav-active-glow)]'
+                : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-hover-surface)] hover:text-[var(--color-text-primary)]'
+            )}
+          >
+            <CreditCard className="h-4 w-4 shrink-0" />
+            {!sidebarCollapsed && <span className="min-w-0 flex-1 truncate">Billing</span>}
+          </Link>
         </nav>
         <div className="shrink-0 space-y-3 border-t border-[var(--color-border)] p-3">
           <ThemeToggle collapsed={sidebarCollapsed} />
@@ -308,23 +316,25 @@ export function AppHeader() {
                     trackerBadge={trackerBadge}
                   />
                 ))}
-                {isFree ? (
-                  <Link
-                    href="/settings/billing"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="mt-1 flex items-center gap-2 rounded-lg py-2.5 pl-3 pr-3 text-sm font-semibold transition-all duration-200 ease-out bg-gradient-to-r from-[var(--color-accent-gold)]/15 to-[var(--color-primary-100)] text-[var(--color-accent-gold)] hover:from-[var(--color-accent-gold)]/25 hover:to-[var(--color-primary-200)]"
-                  >
-                    <Sparkles className="h-4 w-4 shrink-0" />
-                    <span>Upgrade to Pro</span>
-                  </Link>
-                ) : null}
+                <Link
+                  href="/settings/billing"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={cn(
+                    'relative mt-1 flex items-center gap-2 rounded-lg py-2.5 pl-3 pr-3 text-sm font-semibold transition-all duration-200 ease-out',
+                    'before:pointer-events-none before:absolute before:left-0 before:top-1/2 before:h-[65%] before:w-[3px] before:-translate-y-1/2 before:rounded-full before:bg-[var(--color-primary-500)] before:transition-opacity before:duration-200',
+                    pathname === '/settings/billing' ? 'before:opacity-100' : 'before:opacity-0',
+                    pathname === '/settings/billing'
+                      ? 'bg-[var(--color-primary-100)] text-[var(--color-primary-500)]'
+                      : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-hover-surface)] hover:text-[var(--color-text-primary)]'
+                  )}
+                >
+                  <CreditCard className="h-4 w-4 shrink-0" />
+                  <span className="flex-1">Billing</span>
+                </Link>
               </nav>
               <div className="border-t border-[var(--color-border)] px-3 pb-2">
                 <ThemeToggle />
               </div>
-              <p className="border-t border-[var(--color-border)] px-4 py-3 text-xs text-[var(--color-muted)]">
-                Account and billing live in the profile menu (top right).
-              </p>
             </motion.aside>
           </>
         ) : null}

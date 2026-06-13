@@ -228,6 +228,8 @@ export interface Profile {
   is_onboarded: boolean;
   /** Default cover letter template id (see migration 011 on `profiles`) */
   preferred_cl_template_id?: string | null;
+  /** Promo code redeemed by this user (null = none used) */
+  promo_code_used?: string | null;
   created_at: string;
   updated_at: string;
 }
