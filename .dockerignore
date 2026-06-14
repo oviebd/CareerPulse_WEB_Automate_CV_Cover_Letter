@@ -1,0 +1,27 @@
+# Dependencies and build output (rebuilt inside Docker)
+node_modules
+.next
+npm-debug.log*
+
+# Git
+.git
+.gitignore
+
+# Secrets — never bake into the image
+.env.local
+.env.prod
+.env.production
+
+# Dev/build tooling not needed in the image
+Build/
+*.zip
+*.tar.gz
+
+# Editor and OS files
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+
+# Tests
+coverage/

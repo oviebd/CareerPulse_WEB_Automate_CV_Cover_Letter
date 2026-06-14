@@ -1,0 +1,24 @@
+version: "3.9"
+
+services:
+  app:
+    build:
+      context: .
+      # NEXT_PUBLIC_* vars are baked into the client bundle at build time.
+      # Run with: docker compose --env-file .env.prod up --build
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+        NEXT_PUBLIC_DEV_SUBSCRIPTION_PLAN: ${NEXT_PUBLIC_DEV_SUBSCRIPTION_PLAN}
+    image: careerpulse:latest
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    # Loads all runtime secrets (API keys, DB credentials, etc.) from .env.prod
+    env_file:
+      - .env.prod
+    environment:
+      NODE_ENV: production
+      PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium
+      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: "true"
