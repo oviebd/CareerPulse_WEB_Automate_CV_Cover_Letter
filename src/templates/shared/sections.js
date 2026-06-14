@@ -1038,10 +1038,11 @@
     return headerBlock(d, cfg);
   }
 
-  function sectionSummary(d, cfg) {
+  function sectionSummary(d, cfg, tpl) {
     if (shouldSkip('summary', d, cfg)) return '';
+    var title = tpl === 'high-school' ? 'Objective' : 'Summary';
     return (
-      '<section class="cv-section"><div class="cv-section-title">Summary</div><div class="cv-summary">' +
+      '<section class="cv-section"><div class="cv-section-title">' + title + '</div><div class="cv-summary">' +
       esc(d.summary || '') +
       '</div></section>'
     );
@@ -1148,18 +1149,38 @@
 
   function sectionPublications(d, cfg, tpl) {
     if (shouldSkip('publications', d, cfg)) return '';
-    var html =
-      '<section class="cv-section"><div class="cv-section-title">Publications</div><ol class="pub-list">';
-    (d.publications || []).forEach(function (p, i) {
-      html += '<li class="pub-row">';
-      if (tpl === 'academic') {
-        html += esc(p.authors && p.authors.length ? p.authors.join(', ') : '') + ' ';
-      }
-      html += esc(p.title) + '. <em>' + esc(p.journal) + '</em> (' + esc(p.year) + ').';
-      if (p.doi) html += ' DOI: ' + esc(p.doi);
-      html += '</li>';
-    });
-    html += '</ol></section>';
+    var pubs = d.publications || [];
+    var html = '<section class="cv-section"><div class="cv-section-title">Publications</div>';
+    if (tpl === 'researcher') {
+      html += '<ol class="pub-list">';
+      pubs.forEach(function (p, i) {
+        var authors = p.authors && p.authors.length ? p.authors.join(', ') : '';
+        var vol = p.volume ? ', ' + esc(p.volume) : '';
+        var issue = p.issue ? '(' + esc(p.issue) + ')' : '';
+        var pages = p.pages ? ', ' + esc(p.pages) : '';
+        html += '<li class="pub-row">';
+        html += '[' + (i + 1) + '] ';
+        if (authors) html += esc(authors) + ' ';
+        if (p.year) html += '(' + esc(p.year) + '). ';
+        html += esc(p.title) + '. <em>' + esc(p.journal) + '</em>' + vol + issue + pages + '.';
+        if (p.doi) html += ' DOI: ' + esc(p.doi);
+        html += '</li>';
+      });
+      html += '</ol>';
+    } else {
+      html += '<ol class="pub-list">';
+      pubs.forEach(function (p) {
+        html += '<li class="pub-row">';
+        if (tpl === 'academic') {
+          html += esc(p.authors && p.authors.length ? p.authors.join(', ') : '') + ' ';
+        }
+        html += esc(p.title) + '. <em>' + esc(p.journal) + '</em> (' + esc(p.year) + ').';
+        if (p.doi) html += ' DOI: ' + esc(p.doi);
+        html += '</li>';
+      });
+      html += '</ol>';
+    }
+    html += '</section>';
     return html;
   }
 
@@ -1320,7 +1341,7 @@
       case 'personal':
         return sectionPersonal(d, cfg);
       case 'summary':
-        return sectionSummary(d, cfg);
+        return sectionSummary(d, cfg, tpl);
       case 'experience':
         return sectionExperience(d, cfg, tpl);
       case 'education':
@@ -1358,6 +1379,132 @@
     }
   }
 
+  var STRUCTURED_IDS = { europass: true };
+
+  function isStructuredTpl(id) {
+    return !!STRUCTURED_IDS[id];
+  }
+
+  function buildEuropassHtml(d, cfg, order) {
+    var p = d.personal || {};
+    var lk = p.links || {};
+    var photoAllowed = !d.sectionVisibility || d.sectionVisibility.photo !== false;
+    var showPh = cfg.showPhoto && d.meta && d.meta.showPhoto && photoAllowed;
+
+    var html = '';
+    html += '<div class="eu-page">';
+
+    /* Header */
+    html += '<header class="eu-header">';
+    html += '<div class="eu-header-text">';
+    html += '<div class="eu-label">Curriculum Vitae</div>';
+    html += '<h1 class="eu-name">' + esc(p.fullName || '') + '</h1>';
+    if (p.title) html += '<div class="eu-jobtitle">' + esc(p.title) + '</div>';
+    html += '</div>';
+    if (showPh && p.photo) {
+      html += '<img class="eu-photo" src="' + esc(p.photo) + '" alt="" />';
+    }
+    html += '</header>';
+
+    /* Personal info block */
+    html += '<section class="eu-section eu-personal-info">';
+    html += '<div class="eu-sec-title">Personal Information</div>';
+    html += '<table class="eu-info-table">';
+    if (p.email) html += '<tr><td class="eu-info-label">Email</td><td>' + esc(p.email) + '</td></tr>';
+    if (p.phone) html += '<tr><td class="eu-info-label">Phone</td><td>' + esc(p.phone) + '</td></tr>';
+    if (p.location) html += '<tr><td class="eu-info-label">Address</td><td>' + esc(p.location) + '</td></tr>';
+    if (p.dateOfBirth) html += '<tr><td class="eu-info-label">Date of birth</td><td>' + esc(p.dateOfBirth) + '</td></tr>';
+    if (p.nationality) html += '<tr><td class="eu-info-label">Nationality</td><td>' + esc(p.nationality) + '</td></tr>';
+    if (lk.linkedin) html += '<tr><td class="eu-info-label">LinkedIn</td><td><a href="' + esc(lk.linkedin) + '">' + esc(linkDisplayUrl(lk.linkedin)) + '</a></td></tr>';
+    if (lk.website) html += '<tr><td class="eu-info-label">Website</td><td><a href="' + esc(lk.website) + '">' + esc(linkDisplayUrl(lk.website)) + '</a></td></tr>';
+    if (lk.github) html += '<tr><td class="eu-info-label">GitHub</td><td><a href="' + esc(lk.github) + '">' + esc(linkDisplayUrl(lk.github)) + '</a></td></tr>';
+    html += '</table>';
+    html += '</section>';
+
+    /* Render all other sections in order */
+    order.forEach(function (key) {
+      if (key === 'personal') return;
+
+      if (key === 'experience' && !shouldSkip('experience', d, cfg)) {
+        html += '<section class="eu-section">';
+        html += '<div class="eu-sec-title">Work Experience</div>';
+        (d.experience || []).forEach(function (e) {
+          html += '<div class="eu-timeline-row cv-card">';
+          html += '<div class="eu-date-col">' + range(e.startDate, e.endDate, e.current) + '</div>';
+          html += '<div class="eu-content-col">';
+          html += '<div class="eu-role-title">' + esc(e.role) + '</div>';
+          html += '<div class="eu-org">' + esc(e.company);
+          if (e.location) html += ' · ' + esc(e.location);
+          html += '</div>';
+          if (e.bullets && e.bullets.length) {
+            html += '<ul class="cv-bullets">';
+            e.bullets.forEach(function (b) { html += '<li>' + esc(b) + '</li>'; });
+            html += '</ul>';
+          }
+          html += '</div></div>';
+        });
+        html += '</section>';
+        return;
+      }
+
+      if (key === 'education' && !shouldSkip('education', d, cfg)) {
+        html += '<section class="eu-section">';
+        html += '<div class="eu-sec-title">Education and Training</div>';
+        (d.education || []).forEach(function (e) {
+          html += '<div class="eu-timeline-row cv-card">';
+          html += '<div class="eu-date-col">' + range(e.startDate, e.endDate, e.current) + '</div>';
+          html += '<div class="eu-content-col">';
+          html += '<div class="eu-role-title">' + esc(e.degree) + (e.field ? ' — ' + esc(e.field) : '') + '</div>';
+          html += '<div class="eu-org">' + esc(e.institution) + '</div>';
+          if (e.thesis) html += '<div class="eu-muted">Thesis: ' + esc(e.thesis) + '</div>';
+          if (e.advisor) html += '<div class="eu-muted">Advisor: ' + esc(e.advisor) + '</div>';
+          if (e.gpa) html += '<div class="eu-muted">GPA: ' + esc(e.gpa) + '</div>';
+          html += '</div></div>';
+        });
+        html += '</section>';
+        return;
+      }
+
+      if (key === 'languages' && !shouldSkip('languages', d, cfg)) {
+        html += '<section class="eu-section">';
+        html += '<div class="eu-sec-title">Language Skills</div>';
+        var hasCefr = (d.languages || []).some(function (l) { return l.cefr; });
+        if (hasCefr) {
+          html += '<table class="eu-cefr-table">';
+          html += '<thead><tr>';
+          html += '<th class="eu-lang-col">Language</th>';
+          html += '<th>Listening</th><th>Reading</th><th>Spoken</th><th>Writing</th><th>Overall</th>';
+          html += '</tr></thead><tbody>';
+          (d.languages || []).forEach(function (l) {
+            html += '<tr>';
+            html += '<td class="eu-lang-name">' + esc(l.name) + '</td>';
+            if (l.cefr) {
+              html += '<td>' + esc(l.cefr.listening || '') + '</td>';
+              html += '<td>' + esc(l.cefr.reading || '') + '</td>';
+              html += '<td>' + esc(l.cefr.spoken || '') + '</td>';
+              html += '<td>' + esc(l.cefr.writing || '') + '</td>';
+              html += '<td>' + esc(langProfLabel(l.proficiency)) + '</td>';
+            } else {
+              html += '<td colspan="4">—</td>';
+              html += '<td>' + esc(langProfLabel(l.proficiency)) + '</td>';
+            }
+            html += '</tr>';
+          });
+          html += '</tbody></table>';
+        } else {
+          html += renderLanguages(d);
+        }
+        html += '</section>';
+        return;
+      }
+
+      html += renderMainSection(key, d, cfg, 'europass');
+    });
+
+    html += '</div>';
+    return html;
+  }
+
   function render() {
     var d = window.__CV_DATA__;
     var cfg = window.__TEMPLATE_CONFIG__;
@@ -1366,7 +1513,7 @@
     if (!root || !d) return;
 
     document.body.className = 'cv-page tpl-' + tpl;
-    if (d.meta && d.meta.colorScheme && !isPremiumTpl(tpl)) {
+    if (d.meta && d.meta.colorScheme && !isPremiumTpl(tpl) && !isStructuredTpl(tpl)) {
       document.documentElement.style.setProperty('--cv-accent', d.meta.colorScheme);
     }
 
@@ -1383,7 +1530,9 @@
         '<div class="cv-postal">' + esc(d.postalAddress) + '</div>';
     }
 
-    if (isPremiumTpl(tpl)) {
+    if (isStructuredTpl(tpl)) {
+      html += buildEuropassHtml(d, cfg, order);
+    } else if (isPremiumTpl(tpl)) {
       html += buildPremiumHtml(tpl, d, cfg, order);
     } else if (cfg.layout === 'two-column') {
       html += '<div class="cv-two-col">';

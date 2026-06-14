@@ -154,6 +154,10 @@ export function CVEditorPanel({
         onAddress={(v) => applyPatch({ address: v })}
         photo_url={slices.photo_url}
         onPhotoUrl={(v) => applyPatch({ photo_url: v ?? '' })}
+        date_of_birth={slices.date_of_birth}
+        onDateOfBirth={(v) => applyPatch({ date_of_birth: v })}
+        nationality={slices.nationality}
+        onNationality={(v) => applyPatch({ nationality: v })}
         summary={slices.summary}
         onSummary={(v) => applyPatch({ summary: v })}
         sectionVisibility={slices.section_visibility}

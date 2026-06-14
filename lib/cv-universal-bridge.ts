@@ -109,7 +109,7 @@ function universalCertsToEntries(
 
 function universalLangsToEntries(
   langs: CVData['languages']
-): LanguageEntry[] {
+): (LanguageEntry & { cefr?: CVData['languages'][number]['cefr'] })[] {
   return (langs ?? []).map((l, i) => ({
     id: `lang-${i}`,
     language: l.name,
@@ -121,6 +121,7 @@ function universalLangsToEntries(
           : l.proficiency === 'conversational'
             ? 'intermediate'
             : 'fluent',
+    ...(l.cefr ? { cefr: l.cefr } : {}),
   }));
 }
 
@@ -143,16 +144,22 @@ export type CVExtraPayload = {
   volunteer: CVData['volunteer'];
   interests: CVData['interests'];
   custom: CVData['custom'];
+  personalExtra?: { dateOfBirth?: string; nationality?: string };
 };
 
 export function universalToProfilePayload(cv: CVData): Record<string, unknown> {
   const personal = cv.personal;
+  const personalExtra: CVExtraPayload['personalExtra'] = {};
+  if (personal.dateOfBirth) personalExtra.dateOfBirth = personal.dateOfBirth;
+  if (personal.nationality) personalExtra.nationality = personal.nationality;
+
   const extra: CVExtraPayload = {
     publications: cv.publications ?? [],
     research: cv.research ?? [],
     volunteer: cv.volunteer ?? [],
     interests: cv.interests ?? [],
     custom: cv.custom ?? [],
+    ...(Object.keys(personalExtra).length > 0 ? { personalExtra } : {}),
   };
 
   const links: ProfileLink[] = [];

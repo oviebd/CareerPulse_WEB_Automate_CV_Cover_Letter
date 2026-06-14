@@ -8,7 +8,8 @@
     "build:hosting": "bash Build/package-hosting.sh",
     "start": "next start",
     "lint": "next lint",
-    "test-templates": "tsx scripts/test-templates.ts"
+    "test-templates": "tsx scripts/test-templates.ts",
+    "validate-templates": "tsx scripts/validate-templates.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",

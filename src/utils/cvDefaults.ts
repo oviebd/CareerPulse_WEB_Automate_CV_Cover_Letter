@@ -22,6 +22,11 @@ const ALL_TEMPLATE_IDS = new Set<string>([
   'golden-hour',
   'ocean-slate',
   'violet-edge',
+  'ats-plain',
+  'high-school',
+  'executive',
+  'researcher',
+  'europass',
 ]);
 
 /** Map retired template ids (DB / bookmarks) to the unified catalog. */
@@ -29,7 +34,6 @@ export const LEGACY_TEMPLATE_ID_MAP: Record<string, TemplateId> = {
   sidebar: 'modern',
   'bold-header': 'creative',
   'two-column': 'technical',
-  executive: 'minimal',
   apex: 'modern',
   nova: 'technical',
 };
@@ -481,11 +485,20 @@ export function migrateLegacyCVData(legacyData: unknown): CVData {
       return { name: '', proficiency: 'professional' as const };
     }
     const r = row;
-    return {
+    const lang: CVData['languages'][number] = {
       name: str(r.name ?? r.language),
       proficiency: mapLangProf(str(r.proficiency)),
     };
+    if (isRecord(r.cefr)) lang.cefr = r.cefr as CVData['languages'][number]['cefr'];
+    return lang;
   });
+
+  // Europass civic fields stored in cv_extra.personalExtra
+  if (xtra && isRecord(xtra.personalExtra)) {
+    const pe = xtra.personalExtra as Record<string, unknown>;
+    if (pe.dateOfBirth) out.personal.dateOfBirth = str(pe.dateOfBirth);
+    if (pe.nationality) out.personal.nationality = str(pe.nationality);
+  }
 
   {
     const ints = coalesceArr('interests');

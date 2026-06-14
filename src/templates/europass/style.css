@@ -1,0 +1,235 @@
+/* Europass — EU standardized CV format */
+
+.tpl-europass {
+  font-family: inherit;
+  font-size: 10pt;
+  color: #1a1a2e;
+}
+
+.eu-page {
+  max-width: 100%;
+}
+
+/* Header bar */
+.eu-header {
+  background: #003399;
+  color: #fff;
+  padding: 14pt 16pt;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0;
+}
+
+.eu-header-text {
+  flex: 1;
+}
+
+.eu-label {
+  font-size: 8pt;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: rgba(255,255,255,0.75);
+  margin-bottom: 4pt;
+}
+
+.eu-name {
+  font-size: 22pt;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 3pt;
+  line-height: 1.1;
+}
+
+.eu-jobtitle {
+  font-size: 11pt;
+  color: rgba(255,255,255,0.85);
+  font-style: italic;
+}
+
+.eu-photo {
+  width: 60pt;
+  height: 72pt;
+  object-fit: cover;
+  border: 2pt solid rgba(255,255,255,0.4);
+  margin-left: 14pt;
+  flex-shrink: 0;
+}
+
+/* Sections */
+.eu-section {
+  margin-bottom: 0;
+  padding: 10pt 16pt;
+  border-bottom: 0.5pt solid #e2e8f0;
+}
+
+.eu-section:last-child {
+  border-bottom: none;
+}
+
+.eu-sec-title {
+  font-size: 9pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #003399;
+  margin-bottom: 7pt;
+  padding-bottom: 2pt;
+  border-bottom: 1pt solid #003399;
+}
+
+/* Personal info table */
+.eu-info-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 9.5pt;
+}
+
+.eu-info-table tr {
+  border: none;
+}
+
+.eu-info-label {
+  font-weight: 600;
+  color: #475569;
+  width: 110pt;
+  padding: 1.5pt 8pt 1.5pt 0;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.eu-info-table td:last-child {
+  color: #1a1a2e;
+}
+
+.eu-info-table a {
+  color: #003399;
+  text-decoration: underline;
+}
+
+/* Timeline rows (experience / education) */
+.eu-timeline-row {
+  display: flex;
+  gap: 10pt;
+  margin-bottom: 8pt;
+  padding: 6pt 0;
+  border: none;
+  background: none;
+  border-radius: 0;
+  border-left: 2pt solid #003399;
+  padding-left: 8pt;
+}
+
+.eu-date-col {
+  width: 80pt;
+  min-width: 80pt;
+  font-size: 8.5pt;
+  color: #64748b;
+  padding-top: 1pt;
+  flex-shrink: 0;
+}
+
+.eu-content-col {
+  flex: 1;
+}
+
+.eu-role-title {
+  font-weight: 700;
+  font-size: 10pt;
+  color: #1a1a2e;
+  margin-bottom: 2pt;
+}
+
+.eu-org {
+  font-size: 9.5pt;
+  color: #475569;
+  margin-bottom: 3pt;
+}
+
+.eu-muted {
+  font-size: 9pt;
+  color: #64748b;
+}
+
+/* Bullets */
+.tpl-europass .cv-bullets {
+  margin: 3pt 0 0 12pt;
+  padding: 0;
+}
+
+.tpl-europass .cv-bullets li {
+  margin-bottom: 2pt;
+  font-size: 9.5pt;
+}
+
+/* CEFR language grid */
+.eu-cefr-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 9pt;
+}
+
+.eu-cefr-table th {
+  background: #003399;
+  color: #fff;
+  font-weight: 600;
+  font-size: 8.5pt;
+  padding: 3pt 6pt;
+  text-align: center;
+  border: 0.5pt solid #004bb5;
+}
+
+.eu-cefr-table th.eu-lang-col {
+  text-align: left;
+}
+
+.eu-cefr-table td {
+  padding: 3pt 6pt;
+  border: 0.5pt solid #e2e8f0;
+  text-align: center;
+  color: #1a1a2e;
+}
+
+.eu-cefr-table td.eu-lang-name {
+  text-align: left;
+  font-weight: 600;
+}
+
+.eu-cefr-table tbody tr:nth-child(even) td {
+  background: #f8fafc;
+}
+
+/* Standard section wrappers when delegated to renderMainSection */
+.tpl-europass .cv-section {
+  margin-bottom: 0;
+}
+
+.tpl-europass .cv-section-title {
+  font-size: 9pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #003399;
+  margin-bottom: 7pt;
+  padding-bottom: 2pt;
+  border-bottom: 1pt solid #003399;
+}
+
+.tpl-europass .cv-card {
+  background: none;
+  border: none;
+  border-radius: 0;
+  margin-bottom: 6pt;
+}
+
+.tpl-europass .cv-strong { font-weight: 700; }
+.tpl-europass .cv-role { font-size: 9.5pt; color: #475569; }
+.tpl-europass .cv-dates { font-size: 8.5pt; color: #64748b; }
+.tpl-europass .cv-muted { font-size: 9pt; color: #64748b; }
+.tpl-europass .cv-line { display: flex; justify-content: space-between; align-items: baseline; }
+.tpl-europass .skill-bar { display: none; }
+
+@media print {
+  .eu-timeline-row { page-break-inside: avoid; }
+  .tpl-europass .cv-card { page-break-inside: avoid; }
+}

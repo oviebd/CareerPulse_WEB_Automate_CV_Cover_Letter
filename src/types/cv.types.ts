@@ -13,7 +13,12 @@ export type TemplateId =
   | 'midnight-pro'
   | 'golden-hour'
   | 'ocean-slate'
-  | 'violet-edge';
+  | 'violet-edge'
+  | 'ats-plain'
+  | 'high-school'
+  | 'executive'
+  | 'researcher'
+  | 'europass';
 
 export type LayoutType = 'single-column' | 'two-column' | 'sidebar';
 
@@ -34,6 +39,8 @@ export interface PersonalInfo {
   phone: string;
   location: string;
   photo?: string;
+  dateOfBirth?: string;
+  nationality?: string;
   links: {
     linkedin?: string;
     github?: string;
@@ -130,6 +137,9 @@ export interface Publication {
   year: string;
   doi?: string;
   url?: string;
+  volume?: string;
+  issue?: string;
+  pages?: string;
   type: 'journal' | 'conference' | 'book-chapter' | 'preprint' | 'thesis';
   status: 'published' | 'in-press' | 'under-review';
 }
@@ -172,9 +182,17 @@ export interface Volunteer {
   description: string;
 }
 
+export type CefrLevel = 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2' | 'Native';
+
 export interface Language {
   name: string;
   proficiency: 'basic' | 'conversational' | 'professional' | 'native';
+  cefr?: {
+    listening?: CefrLevel;
+    reading?: CefrLevel;
+    spoken?: CefrLevel;
+    writing?: CefrLevel;
+  };
 }
 
 export interface Reference {

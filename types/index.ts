@@ -300,6 +300,12 @@ export interface LanguageEntry {
   id: string;
   language: string;
   proficiency: 'native' | 'fluent' | 'advanced' | 'intermediate' | 'basic';
+  cefr?: {
+    listening?: string;
+    reading?: string;
+    spoken?: string;
+    writing?: string;
+  };
 }
 
 export interface AwardEntry {

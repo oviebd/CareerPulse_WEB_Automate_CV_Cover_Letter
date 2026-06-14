@@ -1,0 +1,121 @@
+/* High School — education-first, approachable single-column */
+
+.tpl-high-school {
+  font-family: inherit;
+  font-size: 10pt;
+  color: #1a1a2e;
+}
+
+/* Header */
+.tpl-high-school .cv-header {
+  text-align: center;
+  padding-bottom: 10pt;
+  margin-bottom: 12pt;
+  border-bottom: 2pt solid var(--cv-accent, #6366f1);
+}
+
+.tpl-high-school .cv-name {
+  font-size: 20pt;
+  font-weight: 700;
+  color: var(--cv-accent, #6366f1);
+  letter-spacing: -0.01em;
+}
+
+.tpl-high-school .cv-subtitle {
+  font-size: 11pt;
+  color: #475569;
+  margin-top: 2pt;
+}
+
+.tpl-high-school .cv-contact-line {
+  font-size: 9pt;
+  color: #64748b;
+  margin-top: 5pt;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6pt;
+}
+
+.tpl-high-school .plink-icon { display: none; }
+
+/* Section headings */
+.tpl-high-school .cv-section {
+  margin-bottom: 12pt;
+}
+
+.tpl-high-school .cv-section-title {
+  font-size: 10.5pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--cv-accent, #6366f1);
+  border-bottom: 1.5pt solid var(--cv-accent, #6366f1);
+  padding-bottom: 2pt;
+  margin-bottom: 6pt;
+}
+
+/* "Objective" label for summary section */
+.tpl-high-school .cv-section[data-section="summary"] .cv-section-title,
+.tpl-high-school .cv-section:has(.cv-summary) .cv-section-title {
+  /* This is handled in sections.js via tpl === 'high-school' check */
+}
+
+/* Cards */
+.tpl-high-school .cv-card,
+.tpl-high-school .exp-block,
+.tpl-high-school .edu-block,
+.tpl-high-school .proj-block {
+  margin-bottom: 7pt;
+  padding: 5pt 7pt;
+  background: #f8fafc;
+  border-radius: 3pt;
+  border-left: 2.5pt solid var(--cv-accent, #6366f1);
+}
+
+.tpl-high-school .cv-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.tpl-high-school .cv-strong { font-weight: 700; }
+
+.tpl-high-school .cv-role {
+  font-size: 9.5pt;
+  color: #475569;
+  font-style: italic;
+}
+
+.tpl-high-school .cv-dates {
+  font-size: 8.5pt;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.tpl-high-school .cv-muted {
+  font-size: 8.5pt;
+  color: #64748b;
+}
+
+/* Bullets */
+.tpl-high-school .cv-bullets {
+  margin: 3pt 0 0 10pt;
+  padding: 0;
+}
+
+.tpl-high-school .cv-bullets li {
+  margin-bottom: 2pt;
+  font-size: 9.5pt;
+}
+
+/* Skills — plain, no bars */
+.tpl-high-school .skill-bar { display: none; }
+.tpl-high-school .cv-skills-group { margin-bottom: 4pt; }
+
+/* Summary / Objective */
+.tpl-high-school .cv-summary {
+  font-size: 9.5pt;
+  color: #334155;
+  line-height: 1.5;
+}

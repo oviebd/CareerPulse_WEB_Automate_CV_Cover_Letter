@@ -1,0 +1,156 @@
+/* Executive — conservative serif, navy + gold, competencies grid */
+
+@import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@300;400;600;700&display=swap');
+
+.tpl-executive {
+  font-family: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+  font-size: 10pt;
+  color: #1e2d4a;
+}
+
+/* Header */
+.tpl-executive .cv-header {
+  padding-bottom: 10pt;
+  margin-bottom: 14pt;
+  border-bottom: 0.5pt solid #c9a84c;
+  position: relative;
+}
+
+.tpl-executive .cv-header::before {
+  content: '';
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3pt;
+  background: #1e2d4a;
+}
+
+.tpl-executive .cv-name {
+  font-size: 22pt;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #1e2d4a;
+  margin-top: 8pt;
+}
+
+.tpl-executive .cv-subtitle {
+  font-size: 12pt;
+  color: #c9a84c;
+  font-weight: 400;
+  font-style: italic;
+  margin-top: 2pt;
+}
+
+.tpl-executive .cv-contact-line {
+  font-size: 9pt;
+  color: #4a5568;
+  margin-top: 6pt;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8pt;
+}
+
+.tpl-executive .plink-icon { color: #c9a84c; }
+
+/* Section headings */
+.tpl-executive .cv-section {
+  margin-bottom: 13pt;
+}
+
+.tpl-executive .cv-section-title {
+  font-size: 9.5pt;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #1e2d4a;
+  border-bottom: 0.5pt solid #c9a84c;
+  padding-bottom: 3pt;
+  margin-bottom: 7pt;
+}
+
+/* Cards */
+.tpl-executive .cv-card,
+.tpl-executive .exp-block,
+.tpl-executive .edu-block,
+.tpl-executive .proj-block {
+  margin-bottom: 8pt;
+  padding: 0;
+  background: none;
+  border: none;
+}
+
+.tpl-executive .cv-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.tpl-executive .cv-strong {
+  font-weight: 700;
+  color: #1e2d4a;
+}
+
+.tpl-executive .cv-role {
+  font-size: 10pt;
+  color: #4a5568;
+  font-style: italic;
+}
+
+.tpl-executive .cv-dates {
+  font-size: 9pt;
+  color: #718096;
+  white-space: nowrap;
+}
+
+.tpl-executive .cv-muted {
+  font-size: 9pt;
+  color: #718096;
+}
+
+/* Bullets */
+.tpl-executive .cv-bullets {
+  margin: 4pt 0 0 12pt;
+  padding: 0;
+}
+
+.tpl-executive .cv-bullets li {
+  margin-bottom: 2.5pt;
+  font-size: 9.5pt;
+  line-height: 1.45;
+}
+
+/* Core Competencies grid — multi-column plain layout from skills section */
+.tpl-executive .cv-skills-group {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2pt 10pt;
+  margin-bottom: 3pt;
+}
+
+.tpl-executive .cv-skills-group-label {
+  grid-column: 1 / -1;
+  font-size: 9.5pt;
+  font-weight: 600;
+  color: #1e2d4a;
+  margin-bottom: 2pt;
+  font-style: italic;
+}
+
+.tpl-executive .skill-bar { display: none; }
+
+.tpl-executive .cv-tech-chip {
+  font-size: 9pt;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+/* Summary */
+.tpl-executive .cv-summary {
+  font-size: 10pt;
+  color: #2d3748;
+  line-height: 1.55;
+  font-style: italic;
+}

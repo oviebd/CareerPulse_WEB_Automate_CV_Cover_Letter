@@ -37,6 +37,8 @@ export type FormSlices = {
   links: ProfileLink[];
   address: string;
   photo_url: string;
+  date_of_birth: string;
+  nationality: string;
   summary: string;
   section_visibility: CVSectionVisibility;
   experience: ExperienceEntry[];
@@ -170,15 +172,17 @@ function langToEntry(l: Language, i: number): LanguageEntry {
       : l.proficiency === 'conversational'
         ? 'intermediate'
         : 'fluent';
-  return {
+  const entry: LanguageEntry = {
     id: `lang-${i}`,
     language: l.name,
     proficiency: prof,
   };
+  if (l.cefr) entry.cefr = l.cefr;
+  return entry;
 }
 
 function entryToLang(l: LanguageEntry): Language {
-  return {
+  const lang: Language = {
     name: l.language,
     proficiency:
       l.proficiency === 'native'
@@ -187,6 +191,8 @@ function entryToLang(l: LanguageEntry): Language {
           ? 'basic'
           : 'professional',
   };
+  if (l.cefr) lang.cefr = l.cefr as Language['cefr'];
+  return lang;
 }
 
 function refToReferral(r: Reference, i: number): ReferralEntry {
@@ -241,6 +247,8 @@ export function cvDataToFormSlices(cv: CVData): FormSlices {
     links,
     address: cv.postalAddress ?? '',
     photo_url: p.photo ?? '',
+    date_of_birth: p.dateOfBirth ?? '',
+    nationality: p.nationality ?? '',
     summary: cv.summary ?? '',
     section_visibility: (cv.sectionVisibility ?? {}) as CVSectionVisibility,
     experience: (cv.experience ?? []).map(workToExp),
@@ -296,6 +304,8 @@ export function formSlicesToCvData(
       phone: slices.phone,
       location: slices.location,
       photo: slices.photo_url || undefined,
+      dateOfBirth: slices.date_of_birth || undefined,
+      nationality: slices.nationality || undefined,
       links: {
         linkedin: slices.linkedin_url || undefined,
         github: slices.github_url || undefined,

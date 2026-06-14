@@ -117,6 +117,10 @@ type Props = {
   onAddress: (v: string) => void;
   photo_url: string;
   onPhotoUrl: (v: string | null) => void;
+  date_of_birth?: string;
+  onDateOfBirth?: (v: string) => void;
+  nationality?: string;
+  onNationality?: (v: string) => void;
   summary: string;
   onSummary: (v: string) => void;
   sectionVisibility: CVSectionVisibility | undefined;
@@ -239,6 +243,10 @@ export function CVFormFields(props: Props) {
     onAddress,
     photo_url,
     onPhotoUrl,
+    date_of_birth,
+    onDateOfBirth,
+    nationality,
+    onNationality,
     summary,
     onSummary,
     sectionVisibility,
@@ -580,6 +588,22 @@ export function CVFormFields(props: Props) {
                 value={github_url}
                 onChange={(e) => onGithubUrl(e.target.value)}
               />
+              {selectedTemplateId === 'europass' && (
+                <>
+                  <Input
+                    label="Date of birth (Europass)"
+                    placeholder="e.g. 1990-06-15"
+                    value={date_of_birth ?? ''}
+                    onChange={(e) => onDateOfBirth?.(e.target.value)}
+                  />
+                  <Input
+                    label="Nationality (Europass)"
+                    placeholder="e.g. French"
+                    value={nationality ?? ''}
+                    onChange={(e) => onNationality?.(e.target.value)}
+                  />
+                </>
+              )}
             </div>
             <div className="col-span-2">
               <p className="mb-2 text-sm font-medium text-[var(--color-text-primary)]">Additional links</p>
@@ -1326,6 +1350,32 @@ export function CVFormFields(props: Props) {
                     }}
                   />
                 </div>
+                {selectedTemplateId === 'europass' && (
+                  <div className="mt-3">
+                    <p className="mb-2 text-xs font-medium text-[var(--color-muted)]">CEFR levels (optional)</p>
+                    <div className="grid gap-2 sm:grid-cols-4">
+                      {(['listening', 'reading', 'spoken', 'writing'] as const).map((skill) => (
+                        <Select
+                          key={skill}
+                          label={skill.charAt(0).toUpperCase() + skill.slice(1)}
+                          value={lang.cefr?.[skill] ?? ''}
+                          options={[
+                            { value: '', label: '—' },
+                            ...['A1','A2','B1','B2','C1','C2','Native'].map((v) => ({ value: v, label: v })),
+                          ]}
+                          onChange={(e) => {
+                            const n = [...languages];
+                            n[i] = {
+                              ...lang,
+                              cefr: { ...lang.cefr, [skill]: e.target.value || undefined },
+                            };
+                            onLanguagesChange(n);
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <Button
                   variant="ghost"
                   size="sm"

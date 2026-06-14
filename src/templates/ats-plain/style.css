@@ -1,0 +1,141 @@
+/* ATS Plain — maximum-compatibility single-column, no graphics */
+
+.tpl-ats-plain {
+  font-family: Inter, Arial, sans-serif;
+  font-size: 10pt;
+  color: #000;
+  background: #fff;
+}
+
+/* Header */
+.tpl-ats-plain .cv-header {
+  margin-bottom: 14pt;
+  border-bottom: 1pt solid #000;
+  padding-bottom: 6pt;
+}
+
+.tpl-ats-plain .cv-name {
+  font-size: 18pt;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: #000;
+}
+
+.tpl-ats-plain .cv-subtitle {
+  font-size: 11pt;
+  color: #000;
+  margin-top: 2pt;
+}
+
+.tpl-ats-plain .cv-contact-line {
+  font-size: 9pt;
+  color: #000;
+  margin-top: 4pt;
+}
+
+.tpl-ats-plain .plink-icon { display: none; }
+.tpl-ats-plain .plink-label { font-size: 9pt; color: #000; }
+.tpl-ats-plain .cv-contact-line a { color: #000; text-decoration: underline; }
+
+/* Section headings — bold + underline, no colors */
+.tpl-ats-plain .cv-section {
+  margin-bottom: 10pt;
+}
+
+.tpl-ats-plain .cv-section-title {
+  font-size: 11pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #000;
+  border-bottom: 1pt solid #000;
+  padding-bottom: 2pt;
+  margin-bottom: 5pt;
+  /* No background, no accent color */
+  background: none;
+  text-decoration: none;
+}
+
+/* Cards — no background, no border radius */
+.tpl-ats-plain .cv-card,
+.tpl-ats-plain .exp-block,
+.tpl-ats-plain .edu-block,
+.tpl-ats-plain .proj-block {
+  background: none;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  margin-bottom: 7pt;
+}
+
+.tpl-ats-plain .cv-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.tpl-ats-plain .cv-strong {
+  font-weight: 700;
+  color: #000;
+}
+
+.tpl-ats-plain .cv-role {
+  font-style: italic;
+  color: #000;
+}
+
+.tpl-ats-plain .cv-dates {
+  font-size: 9pt;
+  color: #000;
+  white-space: nowrap;
+}
+
+.tpl-ats-plain .cv-muted {
+  font-size: 9pt;
+  color: #000;
+}
+
+/* Bullets */
+.tpl-ats-plain .cv-bullets {
+  margin: 3pt 0 0 12pt;
+  padding: 0;
+  list-style: disc;
+}
+
+.tpl-ats-plain .cv-bullets li {
+  margin-bottom: 2pt;
+  font-size: 9.5pt;
+  color: #000;
+}
+
+/* Skills — plain comma list, no pills, no bars */
+.tpl-ats-plain .skill-bar { display: none; }
+.tpl-ats-plain .skill-bar-fill { display: none; }
+.tpl-ats-plain .cv-skill-chip { background: none; border: none; padding: 0; }
+.tpl-ats-plain .cv-skills-group { margin-bottom: 4pt; }
+.tpl-ats-plain .cv-skills-group-label {
+  font-weight: 700;
+  font-size: 9.5pt;
+  color: #000;
+}
+
+/* Tech chips — plain text */
+.tpl-ats-plain .cv-tech-row { margin-top: 3pt; }
+.tpl-ats-plain .cv-tech-chip {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 9pt;
+  color: #000;
+}
+.tpl-ats-plain .cv-tech-chip + .cv-tech-chip::before { content: ', '; }
+
+/* Publications */
+.tpl-ats-plain .pub-list { margin: 0; padding-left: 14pt; }
+.tpl-ats-plain .pub-row { margin-bottom: 5pt; font-size: 9.5pt; }
+
+/* Summary */
+.tpl-ats-plain .cv-summary { font-size: 9.5pt; color: #000; }
+
+/* Remove any accent color effects */
+.tpl-ats-plain { --cv-accent: #000; }

@@ -1,0 +1,139 @@
+/* Researcher / PhD — publication-led academic CV, multi-page aware */
+
+.tpl-researcher {
+  font-family: inherit;
+  font-size: 10pt;
+  color: #1a1a2e;
+}
+
+/* Header */
+.tpl-researcher .cv-header {
+  padding-bottom: 8pt;
+  margin-bottom: 12pt;
+  border-bottom: 1pt solid #334155;
+}
+
+.tpl-researcher .cv-name {
+  font-size: 20pt;
+  font-weight: 700;
+  color: #1a1a2e;
+  letter-spacing: -0.01em;
+}
+
+.tpl-researcher .cv-subtitle {
+  font-size: 11pt;
+  color: #475569;
+  margin-top: 2pt;
+}
+
+.tpl-researcher .cv-contact-line {
+  font-size: 9pt;
+  color: #64748b;
+  margin-top: 5pt;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6pt;
+}
+
+.tpl-researcher .plink-icon {
+  font-size: 8pt;
+  color: var(--cv-accent, #6366f1);
+}
+
+/* Sections */
+.tpl-researcher .cv-section {
+  margin-bottom: 12pt;
+}
+
+.tpl-researcher .cv-section-title {
+  font-size: 10.5pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #1a1a2e;
+  border-bottom: 1pt solid var(--cv-accent, #6366f1);
+  padding-bottom: 2pt;
+  margin-bottom: 6pt;
+}
+
+/* Cards */
+.tpl-researcher .cv-card,
+.tpl-researcher .exp-block,
+.tpl-researcher .edu-block,
+.tpl-researcher .proj-block {
+  margin-bottom: 7pt;
+  padding: 0;
+  background: none;
+  border: none;
+}
+
+.tpl-researcher .cv-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.tpl-researcher .cv-strong { font-weight: 700; }
+
+.tpl-researcher .cv-role {
+  font-size: 9.5pt;
+  color: #475569;
+}
+
+.tpl-researcher .cv-dates {
+  font-size: 9pt;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.tpl-researcher .cv-muted {
+  font-size: 9pt;
+  color: #64748b;
+}
+
+/* Bullets */
+.tpl-researcher .cv-bullets {
+  margin: 3pt 0 0 12pt;
+  padding: 0;
+}
+
+.tpl-researcher .cv-bullets li {
+  margin-bottom: 2pt;
+  font-size: 9.5pt;
+}
+
+/* Publications — numbered list with hanging indent */
+.tpl-researcher .pub-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  counter-reset: pub-counter;
+}
+
+.tpl-researcher .pub-row {
+  padding-left: 2.5em;
+  text-indent: -2.5em;
+  margin-bottom: 6pt;
+  font-size: 9.5pt;
+  line-height: 1.5;
+}
+
+/* No skill bars */
+.tpl-researcher .skill-bar { display: none; }
+
+/* Summary (Research Interests) */
+.tpl-researcher .cv-summary {
+  font-size: 9.5pt;
+  color: #334155;
+  line-height: 1.5;
+}
+
+/* Multi-page: keep cards on same page */
+@media print {
+  .tpl-researcher .cv-card,
+  .tpl-researcher .pub-row,
+  .tpl-researcher .exp-block,
+  .tpl-researcher .edu-block {
+    page-break-inside: avoid;
+  }
+}
