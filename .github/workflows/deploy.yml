@@ -1,0 +1,55 @@
+name: Deploy CareerPulse
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            --build-arg NEXT_PUBLIC_SUPABASE_URL="${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" \
+            --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY="${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" \
+            --build-arg NEXT_PUBLIC_APP_URL="${{ secrets.NEXT_PUBLIC_APP_URL }}" \
+            --build-arg NEXT_PUBLIC_DEV_SUBSCRIPTION_PLAN="${{ secrets.NEXT_PUBLIC_DEV_SUBSCRIPTION_PLAN }}" \
+            -t careerpulse:latest .
+
+      - name: Save image
+        run: |
+          docker save careerpulse:latest | gzip > careerpulse.tar.gz
+
+      - name: Copy image to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          source: "careerpulse.tar.gz"
+          target: "/tmp"
+
+      - name: Deploy on VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            gunzip -c /tmp/careerpulse.tar.gz | docker load
+
+            cd /opt/careerpulse
+
+            docker compose down || true
+
+            docker compose up -d
+
+            docker image prune -af
