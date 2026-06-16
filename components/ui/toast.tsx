@@ -10,7 +10,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { cn } from '@/lib/utils';
+import { cn, generateId } from '@/lib/utils';
 
 type ToastKind = 'success' | 'error' | 'info';
 
@@ -41,7 +41,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const toast = useCallback(
     (message: string, kind: ToastKind = 'info') => {
-      const id = crypto.randomUUID();
+      const id = generateId();
       setItems((prev) => [...prev, { id, message, kind }]);
       const timer = setTimeout(() => dismiss(id), 4000);
       timersRef.current.set(id, timer);
