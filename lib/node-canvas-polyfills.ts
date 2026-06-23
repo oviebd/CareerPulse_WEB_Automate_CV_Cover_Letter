@@ -11,13 +11,13 @@ export async function ensureNodeCanvasPolyfills(): Promise<void> {
   const canvas = await import('@napi-rs/canvas');
 
   if (!globalThis.DOMMatrix && canvas.DOMMatrix) {
-    globalThis.DOMMatrix = canvas.DOMMatrix as typeof DOMMatrix;
+    globalThis.DOMMatrix = canvas.DOMMatrix as unknown as typeof DOMMatrix;
   }
   if (!globalThis.ImageData && canvas.ImageData) {
-    globalThis.ImageData = canvas.ImageData as typeof ImageData;
+    globalThis.ImageData = canvas.ImageData as unknown as typeof ImageData;
   }
   if (!globalThis.Path2D && canvas.Path2D) {
-    globalThis.Path2D = canvas.Path2D as typeof Path2D;
+    globalThis.Path2D = canvas.Path2D as unknown as typeof Path2D;
   }
   if (!globalThis.navigator?.language) {
     globalThis.navigator = {
