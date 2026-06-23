@@ -37,7 +37,7 @@ const PDF_LOAD_OPTS = {
   disableFontFace: true,
 } as const;
 
-export async function extractPdfText(data: Uint8Array): Promise<string> {
+async function extractPdfTextWithPdfjs(data: Uint8Array): Promise<string> {
   const pdfjs = await ensurePdfjsServerReady();
   const doc = await pdfjs.getDocument({ data, ...PDF_LOAD_OPTS }).promise;
 
@@ -60,6 +60,26 @@ export async function extractPdfText(data: Uint8Array): Promise<string> {
   }
 
   return parts.join('\n\n');
+}
+
+async function extractPdfTextWithPdfParse(data: Uint8Array): Promise<string> {
+  const { PDFParse } = await import('pdf-parse');
+  const parser = new PDFParse({ data: Buffer.from(data) });
+  try {
+    const result = await parser.getText();
+    return result.text ?? '';
+  } finally {
+    await parser.destroy();
+  }
+}
+
+export async function extractPdfText(data: Uint8Array): Promise<string> {
+  try {
+    return await extractPdfTextWithPdfjs(data);
+  } catch (primaryErr) {
+    console.warn('pdfjs text extraction failed, trying pdf-parse fallback', primaryErr);
+    return extractPdfTextWithPdfParse(data);
+  }
 }
 
 declare global {

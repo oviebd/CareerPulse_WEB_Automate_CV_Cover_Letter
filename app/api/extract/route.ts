@@ -34,6 +34,10 @@ function clientIp(request: Request) {
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
+function anthropicApiKeyConfigured(): boolean {
+  return Boolean(process.env.ANTHROPIC_API_KEY?.trim());
+}
+
 async function extractFromBuffer(buf: Buffer) {
   assertFileSize(buf.length);
   const kind = validatePdfOrDocx(buf);
@@ -55,19 +59,28 @@ async function extractFromBuffer(buf: Buffer) {
       hyperlinkPromptSection = formatHyperlinksForPrompt(hyperlinks);
     } catch (e) {
       console.error('PDF text extraction failed', e);
-      return { error: 'extraction_failed' as const };
+      return { error: 'pdf_parse_failed' as const };
     }
   } else {
-    const [textResult, hyperlinks] = await Promise.all([
-      mammoth.extractRawText({ buffer: buf }),
-      extractDocxHyperlinks(buf).catch(() => []),
-    ]);
-    rawText = textResult.value;
-    hyperlinkPromptSection = formatHyperlinksForPrompt(hyperlinks);
+    try {
+      const [textResult, hyperlinks] = await Promise.all([
+        mammoth.extractRawText({ buffer: buf }),
+        extractDocxHyperlinks(buf).catch(() => []),
+      ]);
+      rawText = textResult.value;
+      hyperlinkPromptSection = formatHyperlinksForPrompt(hyperlinks);
+    } catch (e) {
+      console.error('DOCX text extraction failed', e);
+      return { error: 'pdf_parse_failed' as const };
+    }
   }
 
   if (!rawText.trim()) {
-    return { error: 'extraction_failed' as const };
+    return { error: 'empty_document' as const };
+  }
+
+  if (!anthropicApiKeyConfigured()) {
+    return { error: 'missing_api_key' as const };
   }
 
   let parsed: Record<string, unknown>;
@@ -76,7 +89,7 @@ async function extractFromBuffer(buf: Buffer) {
     parsed = normalizeExtractedCV(extracted as Record<string, unknown>);
   } catch (e) {
     console.error('Claude extract failed', e);
-    return { error: 'extraction_failed' as const };
+    return { error: 'ai_extract_failed' as const };
   }
 
   const { percentage, isComplete } = computeCompletionPercentage(
@@ -112,6 +125,9 @@ export async function POST(request: Request) {
       if ('error' in result && result.error) {
         if (result.error === 'invalid_file_type') {
           return NextResponse.json({ error: 'invalid_file_type' }, { status: 400 });
+        }
+        if (result.error === 'missing_api_key') {
+          return NextResponse.json({ error: 'missing_api_key' }, { status: 503 });
         }
         return NextResponse.json({ error: result.error }, { status: 422 });
       }
@@ -196,6 +212,9 @@ export async function POST(request: Request) {
       if (ex.error === 'invalid_file_type') {
         return NextResponse.json({ error: 'invalid_file_type' }, { status: 400 });
       }
+      if (ex.error === 'missing_api_key') {
+        return NextResponse.json({ error: 'missing_api_key' }, { status: 503 });
+      }
       return NextResponse.json({ error: ex.error }, { status: 422 });
     }
     const { parsed, percentage, isComplete } = ex;
@@ -249,6 +268,6 @@ export async function POST(request: Request) {
     if (msg === 'FILE_TOO_LARGE') {
       return NextResponse.json({ error: 'file_too_large' }, { status: 400 });
     }
-    return NextResponse.json({ error: 'extraction_failed' }, { status: 500 });
+    return NextResponse.json({ error: 'ai_extract_failed' }, { status: 500 });
   }
 }
