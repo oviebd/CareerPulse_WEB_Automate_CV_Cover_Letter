@@ -23,7 +23,14 @@ const nextConfig = {
       '@dnd-kit/utilities',
     ],
   },
-  serverExternalPackages: ['puppeteer', 'pdf-parse', 'pdfjs-dist'],
+  serverExternalPackages: ['puppeteer', 'pdf-parse'],
+  /** Standalone Docker builds omit pdf.worker.mjs unless explicitly traced. */
+  outputFileTracingIncludes: {
+    '/api/extract': [
+      './node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs',
+      './node_modules/pdfjs-dist/legacy/build/pdf.mjs',
+    ],
+  },
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production'
       ? { exclude: ['error', 'warn'] }

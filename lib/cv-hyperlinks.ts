@@ -20,9 +20,8 @@ export interface ExtractedHyperlink {
 export async function extractPdfHyperlinks(
   data: Uint8Array
 ): Promise<ExtractedHyperlink[]> {
-  // pdfjs-dist ships ESM under legacy/build; the legacy build avoids
-  // needing a canvas polyfill in Node.
-  const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  const { ensurePdfjsServerReady } = await import('@/lib/pdfjs-server');
+  const pdfjsLib = await ensurePdfjsServerReady();
 
   const doc = await pdfjsLib.getDocument({
     data,

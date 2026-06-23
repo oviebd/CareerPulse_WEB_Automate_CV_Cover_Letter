@@ -15,6 +15,7 @@ import {
   extractDocxHyperlinks,
   formatHyperlinksForPrompt,
 } from '@/lib/cv-hyperlinks';
+import { ensurePdfjsServerReady } from '@/lib/pdfjs-server';
 import type { CVProfile } from '@/types';
 
 function isAllowedStorageUrl(url: string): boolean {
@@ -46,19 +47,25 @@ async function extractFromBuffer(buf: Buffer) {
   const uint8 = new Uint8Array(buf);
 
   if (kind === 'pdf') {
-    const [textResult, hyperlinks] = await Promise.all([
-      (async () => {
-        const parser = new PDFParse({ data: uint8 });
-        try {
-          return await parser.getText();
-        } finally {
-          await parser.destroy();
-        }
-      })(),
-      extractPdfHyperlinks(uint8).catch(() => []),
-    ]);
-    rawText = textResult.text;
-    hyperlinkPromptSection = formatHyperlinksForPrompt(hyperlinks);
+    try {
+      await ensurePdfjsServerReady();
+      const [textResult, hyperlinks] = await Promise.all([
+        (async () => {
+          const parser = new PDFParse({ data: uint8 });
+          try {
+            return await parser.getText();
+          } finally {
+            await parser.destroy();
+          }
+        })(),
+        extractPdfHyperlinks(uint8).catch(() => []),
+      ]);
+      rawText = textResult.text;
+      hyperlinkPromptSection = formatHyperlinksForPrompt(hyperlinks);
+    } catch (e) {
+      console.error('PDF text extraction failed', e);
+      return { error: 'extraction_failed' as const };
+    }
   } else {
     const [textResult, hyperlinks] = await Promise.all([
       mammoth.extractRawText({ buffer: buf }),
