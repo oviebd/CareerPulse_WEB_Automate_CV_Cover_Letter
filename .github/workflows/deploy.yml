@@ -33,7 +33,7 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
-          source: "careerpulse.tar.gz"
+          source: "careerpulse.tar.gz,docker-compose.yml"
           target: "/tmp"
 
       - name: Deploy on VPS
@@ -46,10 +46,13 @@ jobs:
           script: |
             gunzip -c /tmp/careerpulse.tar.gz | docker load
 
+            mkdir -p /opt/careerpulse
+            cp /tmp/docker-compose.yml /opt/careerpulse/docker-compose.yml
+
             cd /opt/careerpulse
 
             docker compose down || true
 
-            docker compose up -d
+            docker compose up -d --pull never
 
-            docker image prune -af
+            docker image prune -f

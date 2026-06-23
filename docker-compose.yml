@@ -12,6 +12,8 @@ services:
         NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
         NEXT_PUBLIC_DEV_SUBSCRIPTION_PLAN: ${NEXT_PUBLIC_DEV_SUBSCRIPTION_PLAN}
     image: careerpulse:latest
+    # VPS deploy loads the image via `docker load` — never pull from a registry.
+    pull_policy: never
     restart: unless-stopped
     ports:
       - "3000:3000"
