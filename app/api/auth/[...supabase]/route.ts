@@ -9,8 +9,11 @@ type RouteContext = { params: Promise<{ supabase: string[] }> };
  * OAuth / magic-link / email confirmation callback (PKCE code exchange).
  * Configure Supabase redirect URL: `{NEXT_PUBLIC_APP_URL}/api/auth/callback`
  */
+const appUrl =
+  process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') ?? 'http://localhost:3000';
+
 export async function GET(request: NextRequest, context: RouteContext) {
-  const { searchParams, origin } = new URL(request.url);
+  const { searchParams } = new URL(request.url);
   const code = searchParams.get('code');
   const nextRaw =
     searchParams.get('next') ??
@@ -22,16 +25,16 @@ export async function GET(request: NextRequest, context: RouteContext) {
   const segments = routeSegments ?? [];
   const last = segments[segments.length - 1];
   if (last !== 'callback' && !code) {
-    return NextResponse.redirect(new URL('/login', origin));
+    return NextResponse.redirect(new URL('/login', appUrl));
   }
 
   if (!code) {
     return NextResponse.redirect(
-      new URL('/login?error=missing_code', origin)
+      new URL('/login?error=missing_code', appUrl)
     );
   }
 
-  const redirectUrl = new URL(next, origin);
+  const redirectUrl = new URL(next, appUrl);
   const response = NextResponse.redirect(redirectUrl);
 
   const supabase = createServerClient(
@@ -57,7 +60,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     return NextResponse.redirect(
       new URL(
         `/login?error=${encodeURIComponent(error.message)}`,
-        origin
+        appUrl
       )
     );
   }
