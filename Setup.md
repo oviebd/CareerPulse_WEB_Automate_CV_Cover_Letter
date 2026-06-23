@@ -56,7 +56,7 @@ Loaded at container start from `.env.prod`. Keep this file out of version contro
 Build and run the container locally before deploying:
 
 ```bash
-docker compose up --build
+docker compose -f docker-compose.dev.yml --env-file .env.prod up --build
 ```
 
 Visit `http://localhost:3000` to verify the app works. Check logs with:
@@ -129,7 +129,7 @@ Verify it's running:
 
 ```bash
 docker ps
-docker logs careerpulse-app-1 -f
+docker logs careerpulse -f
 ```
 
 ---

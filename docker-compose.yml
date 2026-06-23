@@ -1,23 +1,15 @@
-version: "3.9"
+# Production compose for VPS — uses a pre-built image loaded via `docker load`.
+# Runtime secrets: /opt/careerpulse/.env.prod
+# Local builds: use docker-compose.dev.yml
 
 services:
   app:
-    build:
-      context: .
-      # NEXT_PUBLIC_* vars are baked into the client bundle at build time.
-      # Run with: docker compose --env-file .env.prod up --build
-      args:
-        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
-        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
-        NEXT_PUBLIC_DEV_SUBSCRIPTION_PLAN: ${NEXT_PUBLIC_DEV_SUBSCRIPTION_PLAN}
     image: careerpulse:latest
-    # VPS deploy loads the image via `docker load` — never pull from a registry.
+    container_name: careerpulse
     pull_policy: never
     restart: unless-stopped
     ports:
       - "3000:3000"
-    # Loads all runtime secrets (API keys, DB credentials, etc.) from .env.prod
     env_file:
       - .env.prod
     environment:

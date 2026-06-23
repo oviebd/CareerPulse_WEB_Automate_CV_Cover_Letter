@@ -53,6 +53,9 @@ jobs:
 
             docker compose down || true
 
-            docker compose up -d --pull never
+            docker compose --env-file .env.prod up -d --pull never
+
+            docker compose ps
+            docker compose logs --tail=30 app
 
             docker image prune -f
