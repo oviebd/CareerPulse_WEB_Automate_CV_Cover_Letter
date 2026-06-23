@@ -59,8 +59,9 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 
-# Belt-and-suspenders: ship full pdfjs-dist for CV PDF parsing in standalone output
+# Belt-and-suspenders: ship pdfjs + native canvas for CV PDF parsing in standalone output
 COPY --from=builder /app/node_modules/pdfjs-dist ./node_modules/pdfjs-dist
+COPY --from=builder /app/node_modules/@napi-rs ./node_modules/@napi-rs
 
 EXPOSE 3000
 
