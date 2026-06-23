@@ -23,12 +23,14 @@ const nextConfig = {
       '@dnd-kit/utilities',
     ],
   },
-  serverExternalPackages: ['puppeteer', 'pdf-parse'],
-  /** Standalone Docker builds omit pdf.worker.mjs unless explicitly traced. */
+  serverExternalPackages: ['puppeteer'],
+  /** pdfjs worker assets must ship with standalone/Docker output for CV upload. */
   outputFileTracingIncludes: {
     '/api/extract': [
       './node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs',
       './node_modules/pdfjs-dist/legacy/build/pdf.mjs',
+      './node_modules/pdfjs-dist/cmaps/**',
+      './node_modules/pdfjs-dist/standard_fonts/**',
     ],
   },
   compiler: {

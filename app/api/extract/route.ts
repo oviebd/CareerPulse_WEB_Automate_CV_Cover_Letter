@@ -1,4 +1,3 @@
-import { PDFParse } from 'pdf-parse';
 import mammoth from 'mammoth';
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
@@ -15,7 +14,7 @@ import {
   extractDocxHyperlinks,
   formatHyperlinksForPrompt,
 } from '@/lib/cv-hyperlinks';
-import { ensurePdfjsServerReady } from '@/lib/pdfjs-server';
+import { extractPdfText } from '@/lib/pdfjs-server';
 import type { CVProfile } from '@/types';
 
 function isAllowedStorageUrl(url: string): boolean {
@@ -48,19 +47,11 @@ async function extractFromBuffer(buf: Buffer) {
 
   if (kind === 'pdf') {
     try {
-      await ensurePdfjsServerReady();
-      const [textResult, hyperlinks] = await Promise.all([
-        (async () => {
-          const parser = new PDFParse({ data: uint8 });
-          try {
-            return await parser.getText();
-          } finally {
-            await parser.destroy();
-          }
-        })(),
+      const [text, hyperlinks] = await Promise.all([
+        extractPdfText(uint8),
         extractPdfHyperlinks(uint8).catch(() => []),
       ]);
-      rawText = textResult.text;
+      rawText = text;
       hyperlinkPromptSection = formatHyperlinksForPrompt(hyperlinks);
     } catch (e) {
       console.error('PDF text extraction failed', e);

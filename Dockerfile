@@ -59,6 +59,9 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 
+# Belt-and-suspenders: ship full pdfjs-dist for CV PDF parsing in standalone output
+COPY --from=builder /app/node_modules/pdfjs-dist ./node_modules/pdfjs-dist
+
 EXPOSE 3000
 
 CMD ["node", "server.js"]
