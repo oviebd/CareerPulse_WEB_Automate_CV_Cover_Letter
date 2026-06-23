@@ -5,6 +5,7 @@
  * directly — no `pdf-parse` dependency on this path.
  */
 import type * as PdfJs from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { ensureNodeCanvasPolyfills } from '@/lib/node-canvas-polyfills';
 
 type PdfJsModule = typeof PdfJs;
 
@@ -12,6 +13,8 @@ let pdfjsModule: PdfJsModule | null = null;
 
 export async function ensurePdfjsServerReady(): Promise<PdfJsModule> {
   if (pdfjsModule) return pdfjsModule;
+
+  await ensureNodeCanvasPolyfills();
 
   const [pdfjs, worker] = await Promise.all([
     import('pdfjs-dist/legacy/build/pdf.mjs'),
