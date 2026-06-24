@@ -75,6 +75,7 @@ export async function GET() {
     {
       status,
       timestamp: new Date().toISOString(),
+      revision: 'export-auth-client-v2',
       checks,
     },
     { status: httpStatus }

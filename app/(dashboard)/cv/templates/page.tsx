@@ -15,6 +15,7 @@ import { useJobSpecificCV } from '@/hooks/useJobSpecificCVs';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useToast } from '@/components/ui/toast';
 import type { CVTemplate, SubscriptionTier } from '@/types';
+import { cvProfileToExportSnapshot } from '@/lib/cv-export-snapshot';
 import { canUseTemplate } from '@/lib/subscription';
 import { cn } from '@/lib/utils';
 
@@ -150,12 +151,13 @@ function CVTemplatesPageContent() {
     const res = await fetch('/api/export', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: 'cv',
-        id: cv.id,
-        template_id: templateId,
-        accent_color: color,
-      }),
+        body: JSON.stringify({
+          type: 'cv',
+          id: cv.id,
+          template_id: templateId,
+          accent_color: color,
+          cv_snapshot: cvProfileToExportSnapshot(cv),
+        }),
     });
     setExporting(null);
     if (!res.ok) {

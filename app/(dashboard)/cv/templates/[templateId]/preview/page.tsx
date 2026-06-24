@@ -56,31 +56,7 @@ function patchCvExtra(d: CVProfile, patch: Partial<CVExtraPayload>): CVProfile {
   return { ...d, cv_extra: { ...prev, ...patch } };
 }
 
-function previewPayloadFromProfile(d: CVProfile): Record<string, unknown> {
-  return {
-    full_name: d.full_name,
-    professional_title: d.professional_title,
-    email: d.email,
-    phone: d.phone,
-    location: d.location,
-    linkedin_url: d.linkedin_url,
-    github_url: d.github_url,
-    links: d.links ?? [],
-    address: d.address ?? null,
-    photo_url: d.photo_url ?? null,
-    summary: d.summary,
-    section_visibility: d.section_visibility ?? {},
-    experience: d.experience ?? [],
-    education: d.education ?? [],
-    skills: d.skills ?? [],
-    projects: d.projects ?? [],
-    certifications: d.certifications ?? [],
-    languages: d.languages ?? [],
-    referrals: (d.referrals ?? []).slice(0, 2),
-    awards: d.awards ?? [],
-    cv_extra: d.cv_extra ?? {},
-  };
-}
+import { cvProfileToExportSnapshot } from '@/lib/cv-export-snapshot';
 
 function draftFromJobSpecificCV(j: JobSpecificCV): CVProfile {
   return {
@@ -230,7 +206,7 @@ export default function CVTemplatePreviewPage() {
         body: JSON.stringify({
           template_id: templateId,
           accent_color: accent,
-          cv: previewPayloadFromProfile(draft),
+          cv: cvProfileToExportSnapshot(draft),
         }),
       });
       if (!res.ok) {
@@ -456,14 +432,14 @@ export default function CVTemplatePreviewPage() {
               job_cv_id: jobCvId,
               template_id: templateId,
               accent_color: accent,
-              cv_snapshot: previewPayloadFromProfile(draft),
+              cv_snapshot: cvProfileToExportSnapshot(draft),
             }
           : {
               type: 'cv',
               id: cv?.id,
               template_id: templateId,
               accent_color: accent,
-              cv_snapshot: previewPayloadFromProfile(draft),
+              cv_snapshot: cvProfileToExportSnapshot(draft),
             }
       ),
     });

@@ -146,6 +146,16 @@ export async function POST(request: Request) {
             },
           });
         } catch (e) {
+          const msg = e instanceof Error ? e.message : '';
+          if (msg === 'TEMPLATE_NOT_FOUND') {
+            return NextResponse.json({ error: 'template_not_found' }, { status: 404 });
+          }
+          if (msg === 'TEMPLATE_FORBIDDEN') {
+            return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+          }
+          if (msg === 'CV_NOT_FOUND') {
+            return NextResponse.json({ error: 'cv_not_found' }, { status: 404 });
+          }
           console.error('export job cv', e);
           return NextResponse.json({ error: 'export_failed' }, { status: 500 });
         }
@@ -200,13 +210,13 @@ export async function POST(request: Request) {
           return NextResponse.json({ error: 'forbidden' }, { status: 403 });
         }
         if (msg === 'CV_NOT_FOUND') {
-          return NextResponse.json({ error: 'not_found' }, { status: 404 });
+          return NextResponse.json({ error: 'cv_not_found' }, { status: 404 });
         }
         if (msg === 'CV_INCOMPLETE') {
           return NextResponse.json({ error: 'cv_incomplete' }, { status: 422 });
         }
         if (msg === 'PROFILE_NOT_FOUND') {
-          return NextResponse.json({ error: 'not_found' }, { status: 404 });
+          return NextResponse.json({ error: 'profile_not_found' }, { status: 404 });
         }
         console.error('export cv', e);
         return NextResponse.json({ error: 'export_failed' }, { status: 500 });

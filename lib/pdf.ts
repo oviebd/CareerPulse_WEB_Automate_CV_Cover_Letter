@@ -148,15 +148,12 @@ export async function exportCV(
   coreCvId?: string | null,
   fontFamily?: string
 ): Promise<{ pdf: Buffer; filename: string }> {
-  const { data: profile, error: pErr } = await supabase
+  const { data: profile } = await supabase
     .from('profiles')
     .select('subscription_tier')
     .eq('id', userId)
-    .single();
-  if (pErr || !profile) {
-    throw new Error('PROFILE_NOT_FOUND');
-  }
-  const tier = resolveEffectiveTier(profile.subscription_tier);
+    .maybeSingle();
+  const tier = resolveEffectiveTier(profile?.subscription_tier ?? 'free');
 
   const normalizedId = normalizeTemplateId(templateId) as TemplateId;
 
