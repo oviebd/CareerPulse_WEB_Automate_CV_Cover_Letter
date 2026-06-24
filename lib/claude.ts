@@ -4,10 +4,57 @@ import type {
   CoverLetterTone,
   CVProfile,
 } from '@/types';
+import { parseClaudeJson } from '@/lib/parse-claude-json';
 
 const claude = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 export const CLAUDE_MODEL =
   process.env.ANTHROPIC_MODEL?.trim() || 'claude-sonnet-4-20250514';
+
+const MAX_CV_TEXT_CHARS = 60_000;
+
+export function describeAnthropicError(err: unknown): string {
+  if (err instanceof Error && err.message) {
+    return err.message.slice(0, 240);
+  }
+  if (!err || typeof err !== 'object') return 'unknown';
+  const o = err as {
+    status?: number;
+    message?: string;
+    error?: { type?: string; message?: string };
+  };
+  if (o.error?.message) {
+    const type = o.error.type ?? 'api_error';
+    return `${type}: ${o.error.message}`.slice(0, 240);
+  }
+  if (o.message) return o.message.slice(0, 240);
+  if (typeof o.status === 'number') return `http_${o.status}`;
+  return 'unknown';
+}
+
+export async function checkAnthropicConnectivity(): Promise<{
+  ok: boolean;
+  detail?: string;
+}> {
+  if (!process.env.ANTHROPIC_API_KEY?.trim()) {
+    return { ok: false, detail: 'not_set' };
+  }
+  try {
+    await claude.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: 16,
+      messages: [{ role: 'user', content: 'Reply with OK only.' }],
+    });
+    return { ok: true };
+  } catch (e) {
+    console.error('health: anthropic check failed', e);
+    return { ok: false, detail: describeAnthropicError(e) };
+  }
+}
+
+function truncateCvText(text: string): string {
+  if (text.length <= MAX_CV_TEXT_CHARS) return text;
+  return `${text.slice(0, MAX_CV_TEXT_CHARS)}\n\n[TRUNCATED — document exceeded ${MAX_CV_TEXT_CHARS} characters]`;
+}
 
 function isRetryable(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false;
@@ -38,11 +85,12 @@ export async function extractCVFromText(
   const hyperlinkSection = embeddedHyperlinks?.trim()
     ? `\n\n${embeddedHyperlinks}`
     : '';
+  const cvText = truncateCvText(rawText);
 
   const message = await withRetry(() =>
     claude.messages.create({
       model: CLAUDE_MODEL,
-      max_tokens: 4096,
+      max_tokens: 8192,
       system: `You are a CV parsing expert. Extract structured information from the provided CV text and return ONLY valid JSON with no other text. The JSON must match the exact schema provided.
 
 IMPORTANT — Link extraction rules:
@@ -84,15 +132,17 @@ Schema:
 }
 
 CV TEXT:
-${rawText}${hyperlinkSection}`,
+${cvText}${hyperlinkSection}`,
         },
       ],
     })
   );
   const block = message.content[0];
   const text = block.type === 'text' ? block.text : '';
-  const clean = text.replace(/```json|```/g, '').trim();
-  return JSON.parse(clean) as Partial<CVProfile>;
+  if (!text.trim()) {
+    throw new Error('empty_model_response');
+  }
+  return parseClaudeJson<Partial<CVProfile>>(text);
 }
 
 export function generateCoverLetterStream(params: {

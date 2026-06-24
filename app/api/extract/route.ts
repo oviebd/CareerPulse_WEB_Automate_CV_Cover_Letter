@@ -2,7 +2,7 @@ import mammoth from 'mammoth';
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { createClient } from '@/lib/supabase/server';
-import { extractCVFromText } from '@/lib/claude';
+import { extractCVFromText, describeAnthropicError } from '@/lib/claude';
 import { computeCompletionPercentage } from '@/lib/cv-completion';
 import { assertFileSize, validatePdfOrDocx } from '@/lib/file-magic';
 import { normalizeExtractedCV } from '@/lib/cv-parse-payload';
@@ -89,7 +89,10 @@ async function extractFromBuffer(buf: Buffer) {
     parsed = normalizeExtractedCV(extracted as Record<string, unknown>);
   } catch (e) {
     console.error('Claude extract failed', e);
-    return { error: 'ai_extract_failed' as const };
+    return {
+      error: 'ai_extract_failed' as const,
+      detail: describeAnthropicError(e),
+    };
   }
 
   const { percentage, isComplete } = computeCompletionPercentage(
@@ -97,6 +100,19 @@ async function extractFromBuffer(buf: Buffer) {
   );
 
   return { parsed, percentage, isComplete };
+}
+
+function extractErrorResponse(result: { error: string; detail?: string }) {
+  const payload = result.detail
+    ? { error: result.error, detail: result.detail }
+    : { error: result.error };
+  if (result.error === 'invalid_file_type') {
+    return NextResponse.json(payload, { status: 400 });
+  }
+  if (result.error === 'missing_api_key') {
+    return NextResponse.json(payload, { status: 503 });
+  }
+  return NextResponse.json(payload, { status: 422 });
 }
 
 export async function POST(request: Request) {
@@ -123,13 +139,7 @@ export async function POST(request: Request) {
       }
       const result = await extractFromBuffer(buf);
       if ('error' in result && result.error) {
-        if (result.error === 'invalid_file_type') {
-          return NextResponse.json({ error: 'invalid_file_type' }, { status: 400 });
-        }
-        if (result.error === 'missing_api_key') {
-          return NextResponse.json({ error: 'missing_api_key' }, { status: 503 });
-        }
-        return NextResponse.json({ error: result.error }, { status: 422 });
+        return extractErrorResponse(result);
       }
       const { parsed, percentage, isComplete } = result;
       const now = new Date().toISOString();
@@ -209,13 +219,7 @@ export async function POST(request: Request) {
     const buf = Buffer.from(await fileRes.arrayBuffer());
     const ex = await extractFromBuffer(buf);
     if ('error' in ex && ex.error) {
-      if (ex.error === 'invalid_file_type') {
-        return NextResponse.json({ error: 'invalid_file_type' }, { status: 400 });
-      }
-      if (ex.error === 'missing_api_key') {
-        return NextResponse.json({ error: 'missing_api_key' }, { status: 503 });
-      }
-      return NextResponse.json({ error: ex.error }, { status: 422 });
+      return extractErrorResponse(ex);
     }
     const { parsed, percentage, isComplete } = ex;
 

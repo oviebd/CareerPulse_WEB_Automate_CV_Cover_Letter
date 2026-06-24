@@ -89,10 +89,10 @@ export function CVUploadForm() {
             body: JSON.stringify({ guest: true, fileBase64: b64, fileName: file.name, force }),
           });
           const raw = await res.text();
-          let json: { error?: string; cvProfile?: CVProfile } = {};
+          let json: { error?: string; detail?: string; cvProfile?: CVProfile } = {};
           try {
             json = raw
-              ? (JSON.parse(raw) as { error?: string; cvProfile?: CVProfile })
+              ? (JSON.parse(raw) as { error?: string; detail?: string; cvProfile?: CVProfile })
               : {};
           } catch {
             reportError(
@@ -108,7 +108,7 @@ export function CVUploadForm() {
             const hint =
               (json.error && EXTRACT_ERROR_HINT[json.error]) ||
               (json.error ? `Import failed (${json.error}).` : `Import failed (HTTP ${res.status}).`);
-            reportError(hint);
+            reportError(json.detail ? `${hint} (${json.detail})` : hint);
             setPhase('idle');
             setUploadProgress(0);
             return;
@@ -194,10 +194,10 @@ export function CVUploadForm() {
         }
 
         const raw = await res.text();
-        let json: { error?: string; cvProfile?: CVProfile } = {};
+        let json: { error?: string; detail?: string; cvProfile?: CVProfile } = {};
         try {
           json = raw
-            ? (JSON.parse(raw) as { error?: string; cvProfile?: CVProfile })
+            ? (JSON.parse(raw) as { error?: string; detail?: string; cvProfile?: CVProfile })
             : {};
         } catch {
           reportError(
@@ -216,7 +216,7 @@ export function CVUploadForm() {
             (json.error
               ? `Import failed (${json.error}).`
               : `Import failed (HTTP ${res.status}).`);
-          reportError(hint);
+          reportError(json.detail ? `${hint} (${json.detail})` : hint);
           setPhase('idle');
           setUploadProgress(0);
           if (json.error === 'Unauthorized') {
