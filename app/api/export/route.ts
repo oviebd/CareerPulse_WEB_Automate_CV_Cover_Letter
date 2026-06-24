@@ -121,6 +121,7 @@ export async function POST(request: Request) {
           : baseSnapshot;
         try {
           const { pdf } = await exportCV(
+            supabase,
             user.id,
             templateId,
             jobCvAccent,
@@ -159,7 +160,8 @@ export async function POST(request: Request) {
 
       try {
         const snapshot = body.cv_snapshot ?? null;
-        if (!snapshot && coreCvId) {
+        let resolvedCoreCvId = coreCvId;
+        if (coreCvId) {
           const { data: cvRow, error: cvRowErr } = await supabase
             .from('cvs')
             .select('id')
@@ -167,15 +169,19 @@ export async function POST(request: Request) {
             .eq('id', coreCvId)
             .maybeSingle();
           if (cvRowErr || !cvRow) {
-            return NextResponse.json({ error: 'not_found' }, { status: 404 });
+            if (!snapshot) {
+              return NextResponse.json({ error: 'not_found' }, { status: 404 });
+            }
+            resolvedCoreCvId = undefined;
           }
         }
         const { pdf, filename } = await exportCV(
+          supabase,
           user.id,
           templateId,
           accent,
           snapshot,
-          coreCvId,
+          resolvedCoreCvId,
           body.font_family
         );
         return new NextResponse(new Uint8Array(pdf), {

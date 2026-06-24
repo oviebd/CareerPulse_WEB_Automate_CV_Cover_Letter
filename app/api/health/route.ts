@@ -58,6 +58,7 @@ export async function GET() {
     },
     supabase_url: supabase.url,
     supabase_anon_key: supabase.anon_key,
+    supabase_service_role_key: envConfigured('SUPABASE_SERVICE_ROLE_KEY'),
     pdf_parser: await checkPdfParser(),
   };
 

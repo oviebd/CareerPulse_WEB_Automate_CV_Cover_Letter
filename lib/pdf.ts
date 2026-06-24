@@ -1,4 +1,4 @@
-import { createAdminClient } from '@/lib/supabase/server';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { applyCvSectionVisibility } from '@/lib/cv-section-visibility';
 import { profileToUniversalCV } from '@/lib/cv-universal-bridge';
 import type { CVProfile, SubscriptionTier } from '@/types';
@@ -140,6 +140,7 @@ export function mergedRowAndSnapshotToCVData(
 }
 
 export async function exportCV(
+  supabase: SupabaseClient,
   userId: string,
   templateId: string,
   accentColor?: string,
@@ -147,7 +148,6 @@ export async function exportCV(
   coreCvId?: string | null,
   fontFamily?: string
 ): Promise<{ pdf: Buffer; filename: string }> {
-  const supabase = createAdminClient();
   const { data: profile, error: pErr } = await supabase
     .from('profiles')
     .select('subscription_tier')
