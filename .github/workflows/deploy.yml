@@ -8,6 +8,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     steps:
       - name: Checkout
@@ -22,40 +23,77 @@ jobs:
             --build-arg NEXT_PUBLIC_DEV_SUBSCRIPTION_PLAN="${{ secrets.NEXT_PUBLIC_DEV_SUBSCRIPTION_PLAN }}" \
             -t careerpulse:latest .
 
-      - name: Save image
+      - name: Report image size
         run: |
-          docker save careerpulse:latest | gzip > careerpulse.tar.gz
+          docker image ls careerpulse:latest
+          docker save careerpulse:latest | gzip -1 | wc -c | awk '{printf "Compressed stream size: %.1f MB\n", $1/1024/1024}'
 
-      - name: Copy image to VPS
+      - name: Prepare VPS disk space
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          command_timeout: 10m
+          script: |
+            set -e
+            mkdir -p /opt/careerpulse
+            echo "=== Disk before cleanup ==="
+            df -h / /tmp /opt /var/lib/docker 2>/dev/null || df -h
+            docker image prune -af || true
+            docker builder prune -af || true
+            rm -f /tmp/careerpulse.tar.gz
+            echo "=== Disk after cleanup ==="
+            df -h / /tmp /opt /var/lib/docker 2>/dev/null || df -h
+
+      - name: Copy docker-compose to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
-          source: "careerpulse.tar.gz,docker-compose.yml"
-          target: "/tmp"
+          source: docker-compose.yml
+          target: /opt/careerpulse
+          overwrite: true
+          timeout: 60s
+
+      - name: Stream Docker image to VPS
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p "$VPS_PORT" -H "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+          echo "Streaming image to VPS (no /tmp tarball — avoids disk-full SCP failures)..."
+          docker save careerpulse:latest | gzip -1 | ssh \
+            -i ~/.ssh/deploy_key \
+            -p "$VPS_PORT" \
+            -o StrictHostKeyChecking=accept-new \
+            -o ServerAliveInterval=30 \
+            -o ServerAliveCountMax=20 \
+            "$VPS_USER@$VPS_HOST" \
+            'gunzip | docker load'
 
       - name: Deploy on VPS
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
+          command_timeout: 10m
           script: |
-            gunzip -c /tmp/careerpulse.tar.gz | docker load
-
-            mkdir -p /opt/careerpulse
-            cp /tmp/docker-compose.yml /opt/careerpulse/docker-compose.yml
-
+            set -e
             cd /opt/careerpulse
-
             docker compose down || true
-
             docker compose --env-file .env.prod up -d --pull never
-
             docker compose ps
             docker compose logs --tail=30 app
-
             docker image prune -f
