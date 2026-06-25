@@ -32,7 +32,8 @@ import { CVRewriteWithAIModal } from '@/components/cv/CVRewriteWithAIModal';
 import { CvAtsPolishButton } from '@/components/cv/CvAtsPolishButton';
 import { TemplateThumbnail } from '@/components/cv/TemplateThumbnail';
 import { cn, generateId, moveIndexInArray } from '@/lib/utils';
-import { CV_FORM_CARD as FORM_CARD } from '@/lib/cv-editor-styles';
+import { CV_FORM_CARD as FORM_CARD, CV_FORM_STACK, CV_FORM_GRID_GAP } from '@/lib/cv-editor-styles';
+import { RemoveEntryButton } from '@/components/cv/RemoveEntryButton';
 import { canUseTemplate } from '@/lib/subscription';
 import { TEMPLATE_CONFIGS, VISIBLE_TEMPLATE_IDS } from '@/src/config/templateConfig';
 import { useUIStore } from '@/stores/useUIStore';
@@ -172,6 +173,12 @@ type Props = {
   /** Guest (or unauthenticated) users must sign in before AI rewrites. */
   onRequireAiAuth?: () => void;
 };
+
+function keywordMatchesText(text: string, keyword: string): boolean {
+  if (!text.trim() || !keyword.trim()) return false;
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(escaped, 'i').test(text);
+}
 
 function HighlightedText({ text, keywords }: { text: string; keywords: string[] }) {
   if (!keywords.length || !text) return <>{text}</>;
@@ -385,7 +392,7 @@ export function CVFormFields(props: Props) {
   );
 
   return (
-    <div className="space-y-5">
+    <div className={CV_FORM_STACK}>
       {!hideVisibilityPanel && (
         <div className={FORM_CARD}>
           <CVSectionVisibilityPanel
@@ -567,17 +574,18 @@ export function CVFormFields(props: Props) {
         ) : null}
 
         {tab === 'header' ? (
-          <div className={cn('space-y-4', FORM_CARD)}>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Input label="Full name" value={full_name} onChange={(e) => onFullName(e.target.value)} />
+          <div className={cn(CV_FORM_STACK, FORM_CARD)}>
+            <div className={cn('grid sm:grid-cols-2', CV_FORM_GRID_GAP)}>
+              <Input label="Your full name" value={full_name} onChange={(e) => onFullName(e.target.value)} />
               <Input
-                label="Professional title"
+                label="Job title or headline"
+                placeholder="e.g. Marketing graduate"
                 value={professional_title}
                 onChange={(e) => onProfessionalTitle(e.target.value)}
               />
-              <Input label="Email" type="email" value={email} onChange={(e) => onEmail(e.target.value)} />
-              <Input label="Phone" value={phone} onChange={(e) => onPhone(e.target.value)} />
-              <Input label="Location" value={location} onChange={(e) => onLocation(e.target.value)} />
+              <Input label="Email address" type="email" value={email} onChange={(e) => onEmail(e.target.value)} />
+              <Input label="Phone number" placeholder="e.g. +44 7700 900000" value={phone} onChange={(e) => onPhone(e.target.value)} />
+              <Input label="City or region" placeholder="e.g. London, UK" value={location} onChange={(e) => onLocation(e.target.value)} />
               <Input
                 label="LinkedIn URL"
                 value={linkedin_url}
@@ -633,14 +641,11 @@ export function CVFormFields(props: Props) {
                       }}
                       className="min-w-0 flex-1"
                     />
-                    <Button
-                      variant="ghost"
-                      size="sm"
+                    <RemoveEntryButton
+                      itemLabel="this link"
                       className="mb-0.5 shrink-0"
-                      onClick={() => onLinksChange(links.filter((_, j) => j !== li))}
-                    >
-                      Remove
-                    </Button>
+                      onConfirm={() => onLinksChange(links.filter((_, j) => j !== li))}
+                    />
                   </div>
                 ))}
               </div>
@@ -687,10 +692,11 @@ export function CVFormFields(props: Props) {
         ) : null}
 
         {tab === 'summary' ? (
-          <div className={cn('space-y-3', FORM_CARD)}>
+          <div className={cn(CV_FORM_STACK, FORM_CARD)}>
             <Textarea
               className="min-h-[140px]"
-              label="Summary"
+              label="About you"
+              placeholder="A short intro about who you are and what you're looking for…"
               maxLength={2000}
               value={summary}
               onChange={(e) => onSummary(e.target.value)}
@@ -711,17 +717,38 @@ export function CVFormFields(props: Props) {
             </div>
             {kw.length > 0 && summary && (
               <div className="rounded-btn border border-[var(--color-accent-gold)]/25 bg-[var(--color-accent-gold)]/10 p-3">
-                <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-accent-gold)]">Preview with highlights</span>
-                <p className="mt-1 text-sm text-[var(--color-text-primary)]">
-                  <HighlightedText text={summary} keywords={kw} />
+                <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-accent-gold)]">
+                  Keyword check
+                </span>
+                <p className="mt-1 text-xs text-[var(--color-muted)]">
+                  Words from the job description found in your summary:
                 </p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {kw.map((k) => {
+                    const matched = keywordMatchesText(summary, k);
+                    return (
+                      <span
+                        key={k}
+                        className={cn(
+                          'rounded-badge border px-2 py-0.5 text-xs font-medium',
+                          matched
+                            ? 'border-[var(--color-accent-mint)]/40 bg-[var(--color-accent-mint)]/15 text-[var(--color-accent-mint)]'
+                            : 'border-[var(--color-border)] bg-[var(--color-control-bg)] text-[var(--color-muted)]'
+                        )}
+                      >
+                        {k}
+                        {matched ? ' ✓' : ''}
+                      </span>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
         ) : null}
 
         {tab === 'experience' ? (
-          <div className="space-y-4">
+          <div className={CV_FORM_STACK}>
             {experience.map((ex, i) => (
               <div key={ex.id} className={FORM_CARD}>
                 <div className="mb-3 flex items-center justify-between gap-2 border-b border-[var(--color-border)] pb-2">
@@ -732,9 +759,10 @@ export function CVFormFields(props: Props) {
                     onMove={(from, to) => onExperienceChange(moveIndexInArray(experience, from, to))}
                   />
                 </div>
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className={cn('grid sm:grid-cols-2', CV_FORM_GRID_GAP)}>
                   <Input
                     label="Job title"
+                    placeholder="e.g. Sales assistant"
                     value={ex.title}
                     onChange={(e) => {
                       const n = [...experience];
@@ -743,7 +771,7 @@ export function CVFormFields(props: Props) {
                     }}
                   />
                   <Input
-                    label="Company"
+                    label="Company or organisation"
                     value={ex.company}
                     onChange={(e) => {
                       const n = [...experience];
@@ -752,7 +780,8 @@ export function CVFormFields(props: Props) {
                     }}
                   />
                   <Input
-                    label="Location"
+                    label="Location (optional)"
+                    placeholder="e.g. Manchester"
                     value={ex.location ?? ''}
                     onChange={(e) => {
                       const n = [...experience];
@@ -761,7 +790,7 @@ export function CVFormFields(props: Props) {
                     }}
                   />
                   <Input
-                    label="Start (month)"
+                    label="When did you start?"
                     type="month"
                     value={ex.start_date?.slice(0, 7) ?? ''}
                     onChange={(e) => {
@@ -771,7 +800,7 @@ export function CVFormFields(props: Props) {
                     }}
                   />
                   <Input
-                    label="End (month)"
+                    label="When did you finish?"
                     type="month"
                     value={ex.end_date?.slice(0, 7) ?? ''}
                     disabled={ex.is_current}
@@ -801,7 +830,8 @@ export function CVFormFields(props: Props) {
                 </label>
                 <Textarea
                   className="mt-3"
-                  label="Role description (optional)"
+                  label="What did you do in this role? (optional)"
+                  placeholder="Brief overview of your responsibilities…"
                   value={ex.description ?? ''}
                   onChange={(e) => {
                     const n = [...experience];
@@ -864,18 +894,15 @@ export function CVFormFields(props: Props) {
                             })
                           }
                         />
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
+                        <RemoveEntryButton
+                          itemLabel="this bullet"
+                          onConfirm={() => {
                             const n = [...experience];
                             const nextBullets = (ex.bullets ?? []).filter((_, idx) => idx !== bi);
                             n[i] = { ...ex, bullets: nextBullets };
                             onExperienceChange(n);
                           }}
-                        >
-                          - Remove
-                        </Button>
+                        />
                       </div>
                     </div>
                   ))}
@@ -907,14 +934,11 @@ export function CVFormFields(props: Props) {
                     </ul>
                   </div>
                 )}
-                <Button
-                  variant="ghost"
-                  size="sm"
+                <RemoveEntryButton
+                  itemLabel={`position ${i + 1}`}
                   className="mt-2"
-                  onClick={() => onExperienceChange(experience.filter((_, j) => j !== i))}
-                >
-                  Remove
-                </Button>
+                  onConfirm={() => onExperienceChange(experience.filter((_, j) => j !== i))}
+                />
               </div>
             ))}
             <Button
@@ -942,7 +966,7 @@ export function CVFormFields(props: Props) {
         ) : null}
 
         {tab === 'education' ? (
-          <div className="space-y-4">
+          <div className={CV_FORM_STACK}>
             {education.map((ed, i) => (
               <div key={ed.id} className={FORM_CARD}>
                 <div className="mb-3 flex items-center justify-between gap-2 border-b border-[var(--color-border)] pb-2">
@@ -953,10 +977,10 @@ export function CVFormFields(props: Props) {
                     onMove={(from, to) => onEducationChange(moveIndexInArray(education, from, to))}
                   />
                 </div>
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className={cn('grid sm:grid-cols-2', CV_FORM_GRID_GAP)}>
                   <Input
                     className="sm:col-span-2"
-                    label="Institution"
+                    label="School, college, or university"
                     value={ed.institution}
                     onChange={(e) => {
                       const n = [...education];
@@ -975,7 +999,8 @@ export function CVFormFields(props: Props) {
                     }}
                   />
                   <Input
-                    label="Field of study"
+                    label="Subject or major"
+                    placeholder="e.g. Computer science"
                     value={ed.field_of_study ?? ''}
                     onChange={(e) => {
                       const n = [...education];
@@ -984,7 +1009,7 @@ export function CVFormFields(props: Props) {
                     }}
                   />
                   <Input
-                    label="Start (month)"
+                    label="When did you start?"
                     type="month"
                     value={ed.start_date?.slice(0, 7) ?? ''}
                     onChange={(e) => {
@@ -994,7 +1019,7 @@ export function CVFormFields(props: Props) {
                     }}
                   />
                   <Input
-                    label="End (month)"
+                    label="When did you finish?"
                     type="month"
                     value={ed.end_date?.slice(0, 7) ?? ''}
                     onChange={(e) => {
@@ -1041,14 +1066,11 @@ export function CVFormFields(props: Props) {
                     }
                   />
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
+                <RemoveEntryButton
+                  itemLabel={`education entry ${i + 1}`}
                   className="mt-2"
-                  onClick={() => onEducationChange(education.filter((_, j) => j !== i))}
-                >
-                  Remove
-                </Button>
+                  onConfirm={() => onEducationChange(education.filter((_, j) => j !== i))}
+                />
               </div>
             ))}
             <Button
@@ -1123,7 +1145,7 @@ export function CVFormFields(props: Props) {
         ) : null}
 
         {tab === 'projects' ? (
-          <div className="space-y-4">
+          <div className={CV_FORM_STACK}>
             {projects.map((p, i) => (
               <div key={p.id} className={FORM_CARD}>
                 <div className="mb-3 flex items-center justify-between gap-2 border-b border-[var(--color-border)] pb-2">
@@ -1173,7 +1195,8 @@ export function CVFormFields(props: Props) {
                 </div>
                 <Textarea
                   className="mt-3 min-h-[88px]"
-                  label="Tech stack (one per line)"
+                  label="What tools did you use?"
+                  placeholder={'One per line, e.g.\nReact\nFigma\nPython'}
                   value={(p.tech_stack ?? []).join('\n')}
                   onChange={(e) => {
                     const n = [...projects];
@@ -1208,9 +1231,9 @@ export function CVFormFields(props: Props) {
                     }
                   />
                 </div>
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <div className={cn('mt-3 grid sm:grid-cols-2', CV_FORM_GRID_GAP)}>
                   <Input
-                    label="Start (month)"
+                    label="When did you start?"
                     type="month"
                     value={p.start_date?.slice(0, 7) ?? ''}
                     onChange={(e) => {
@@ -1220,7 +1243,7 @@ export function CVFormFields(props: Props) {
                     }}
                   />
                   <Input
-                    label="End (month)"
+                    label="When did you finish?"
                     type="month"
                     value={p.end_date?.slice(0, 7) ?? ''}
                     onChange={(e) => {
@@ -1262,18 +1285,15 @@ export function CVFormFields(props: Props) {
                           }}
                           className="min-w-0 flex-1"
                         />
-                        <Button
-                          variant="ghost"
-                          size="sm"
+                        <RemoveEntryButton
+                          itemLabel="this project link"
                           className="mb-0.5 shrink-0"
-                          onClick={() => {
+                          onConfirm={() => {
                             const n = [...projects];
                             n[i] = { ...p, links: (p.links ?? []).filter((_, j) => j !== li) };
                             onProjectsChange(n);
                           }}
-                        >
-                          Remove
-                        </Button>
+                        />
                       </div>
                     ))}
                   </div>
@@ -1290,14 +1310,11 @@ export function CVFormFields(props: Props) {
                     + Add link
                   </Button>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
+                <RemoveEntryButton
+                  itemLabel={`project ${i + 1}`}
                   className="mt-2"
-                  onClick={() => onProjectsChange(projects.filter((_, j) => j !== i))}
-                >
-                  Remove
-                </Button>
+                  onConfirm={() => onProjectsChange(projects.filter((_, j) => j !== i))}
+                />
               </div>
             ))}
             <Button
@@ -1323,7 +1340,7 @@ export function CVFormFields(props: Props) {
         ) : null}
 
         {tab === 'languages' ? (
-          <div className="space-y-4">
+          <div className={CV_FORM_STACK}>
             {languages.map((lang, i) => (
               <div key={lang.id} className={FORM_CARD}>
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -1376,14 +1393,11 @@ export function CVFormFields(props: Props) {
                     </div>
                   </div>
                 )}
-                <Button
-                  variant="ghost"
-                  size="sm"
+                <RemoveEntryButton
+                  itemLabel={`language entry ${i + 1}`}
                   className="mt-2"
-                  onClick={() => onLanguagesChange(languages.filter((_, j) => j !== i))}
-                >
-                  Remove
-                </Button>
+                  onConfirm={() => onLanguagesChange(languages.filter((_, j) => j !== i))}
+                />
               </div>
             ))}
             <Button
@@ -1401,7 +1415,7 @@ export function CVFormFields(props: Props) {
         ) : null}
 
         {tab === 'certifications' ? (
-          <div className="space-y-4">
+          <div className={CV_FORM_STACK}>
             {certifications.map((c, i) => (
               <div key={c.id} className={FORM_CARD}>
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -1475,18 +1489,15 @@ export function CVFormFields(props: Props) {
                             }}
                             className="min-w-0 flex-1"
                           />
-                          <Button
-                            variant="ghost"
-                            size="sm"
+                          <RemoveEntryButton
+                            itemLabel="this credential link"
                             className="mb-0.5 shrink-0"
-                            onClick={() => {
+                            onConfirm={() => {
                               const n = [...certifications];
                               n[i] = { ...c, links: (c.links ?? []).filter((_, j) => j !== li) };
                               onCertificationsChange(n);
                             }}
-                          >
-                            Remove
-                          </Button>
+                          />
                         </div>
                       ))}
                     </div>
@@ -1504,14 +1515,11 @@ export function CVFormFields(props: Props) {
                     </Button>
                   </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
+                <RemoveEntryButton
+                  itemLabel={`certification ${i + 1}`}
                   className="mt-2"
-                  onClick={() => onCertificationsChange(certifications.filter((_, j) => j !== i))}
-                >
-                  Remove
-                </Button>
+                  onConfirm={() => onCertificationsChange(certifications.filter((_, j) => j !== i))}
+                />
               </div>
             ))}
             <Button
@@ -1536,7 +1544,7 @@ export function CVFormFields(props: Props) {
         ) : null}
 
         {tab === 'references' ? (
-          <div className="space-y-4">
+          <div className={CV_FORM_STACK}>
             <p className="text-sm text-[var(--color-muted)]">
               Add up to two professional references (name, role, and contact optional).
             </p>
@@ -1601,14 +1609,11 @@ export function CVFormFields(props: Props) {
                     }}
                   />
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
+                <RemoveEntryButton
+                  itemLabel={`reference ${i + 1}`}
                   className="mt-2"
-                  onClick={() => onReferralsChange(referrals.filter((_, j) => j !== i))}
-                >
-                  Remove
-                </Button>
+                  onConfirm={() => onReferralsChange(referrals.filter((_, j) => j !== i))}
+                />
               </div>
             ))}
             {referrals.length < 2 ? (
@@ -1656,7 +1661,7 @@ export function CVFormFields(props: Props) {
         ) : null}
 
         {tab === 'awards' ? (
-          <div className="space-y-4">
+          <div className={CV_FORM_STACK}>
             {awards.map((a, i) => (
               <div key={a.id} className={FORM_CARD}>
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -1718,14 +1723,11 @@ export function CVFormFields(props: Props) {
                     }
                   />
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
+                <RemoveEntryButton
+                  itemLabel={`award ${i + 1}`}
                   className="mt-2"
-                  onClick={() => onAwardsChange(awards.filter((_, j) => j !== i))}
-                >
-                  Remove
-                </Button>
+                  onConfirm={() => onAwardsChange(awards.filter((_, j) => j !== i))}
+                />
               </div>
             ))}
             <Button

@@ -8,11 +8,17 @@
 */
 
 export const CV_FORM_CARD =
-  'rounded-card border border-[var(--color-border)] bg-[var(--color-surface)]/90 p-4 shadow-sm backdrop-blur-sm sm:p-5';
+  'rounded-card border border-[var(--color-border)] bg-[var(--color-surface)]/90 p-5 shadow-sm backdrop-blur-sm sm:p-6';
+
+/** Vertical rhythm between form sections and list blocks. */
+export const CV_FORM_STACK = 'space-y-6';
+
+/** Gap inside multi-field grids within a card. */
+export const CV_FORM_GRID_GAP = 'gap-5';
 
 /** Primary editing canvas — extra breathing room vs. the legacy card. */
 export const CV_EDITOR_CANVAS =
-  'rounded-2xl border border-[var(--color-border)]/80 bg-[var(--color-surface)] p-4 shadow-[var(--shadow-card)] backdrop-blur-sm sm:p-6';
+  'rounded-2xl border border-[var(--color-border)]/80 bg-[var(--color-surface)] p-5 shadow-[var(--shadow-card)] backdrop-blur-sm sm:p-7';
 
 export const CV_SECTION_H2 = 'font-display text-lg font-semibold text-[var(--color-text-primary)]';
 

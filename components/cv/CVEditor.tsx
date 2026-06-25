@@ -27,6 +27,8 @@ import type { CVTemplate, SubscriptionTier } from '@/types';
 import { canUseTemplate } from '@/lib/subscription';
 import { buildATSReport } from '@/lib/cv-ats';
 import { CV_EDITOR_CANVAS } from '@/lib/cv-editor-styles';
+import { readPreviewCollapsedDefault, persistPreviewExpanded } from '@/lib/cv-preview-prefs';
+import { CVEditorMobileBar } from '@/components/cv/premium/CVEditorMobileBar';
 import { cloneCvData } from '@/lib/cv-clone';
 import { createEmptyCVData } from '@/src/utils/cvDefaults';
 import { cn } from '@/lib/utils';
@@ -192,7 +194,9 @@ export function CVEditor() {
   const [page, setPage] = useState(1);
   const [focusMode, setFocusMode] = useState<CVEditorFocusMode>('default');
   const [atsDrawerOpen, setAtsDrawerOpen] = useState(false);
-  const [previewCollapsed, setPreviewCollapsed] = useState(false);
+  const [previewCollapsed, setPreviewCollapsed] = useState(() =>
+    typeof window !== 'undefined' ? readPreviewCollapsedDefault() : true
+  );
   const [autosaveState, setAutosaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [undoPast, setUndoPast] = useState<CVData[]>([]);
   const [undoFuture, setUndoFuture] = useState<CVData[]>([]);
@@ -463,7 +467,7 @@ export function CVEditor() {
   }
 
   return (
-    <div className="cv-editor-text-tune mx-auto max-w-[1800px] pb-8">
+    <div className="cv-editor-text-tune mx-auto max-w-[1800px] pb-24 md:pb-8">
       {authModal}
       {isGuest ? (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)]/80 px-4 py-3 text-sm text-[var(--color-muted)] backdrop-blur-sm">
@@ -588,7 +592,13 @@ export function CVEditor() {
               currentPage={page}
               onPageChange={setPage}
               collapsed={previewCollapsed}
-              onToggleCollapse={() => setPreviewCollapsed((c) => !c)}
+              onToggleCollapse={() =>
+                setPreviewCollapsed((c) => {
+                  const next = !c;
+                  persistPreviewExpanded(!next);
+                  return next;
+                })
+              }
             />
             <FeatureGate requiredTier={['pro']} userTier={tier}>
               <p className="text-xs text-[var(--color-muted)]">Pro settings unlocked</p>
@@ -596,6 +606,15 @@ export function CVEditor() {
           </div>
         ) : null}
       </div>
+
+      <CVEditorMobileBar
+        primaryLabel={saveButtonLabel}
+        primaryLoading={isSaving}
+        primaryDisabled={isSaving}
+        onPrimaryClick={requireAuth(() => {
+          void onSaveClick();
+        })}
+      />
     </div>
   );
 }

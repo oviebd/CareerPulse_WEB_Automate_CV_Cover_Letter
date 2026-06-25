@@ -1,7 +1,77 @@
 import type { CVData, CVSectionVisibilityKey } from '@/types';
+import type { CVFormTab } from '@/components/cv/CVFormFields';
 
 function nz(s: unknown): string {
   return typeof s === 'string' ? s.trim() : '';
+}
+
+/** Header tab has no visibility key — check core contact fields. */
+export function cvHeaderHasFilledContent(cv: CVData): boolean {
+  const p = cv.personal ?? {};
+  const linkUrls = Object.values(p.links ?? {}).filter(
+    (u): u is string => typeof u === 'string' && nz(u).length > 0
+  );
+  return (
+    nz(p.fullName).length > 0 ||
+    nz(p.title).length > 0 ||
+    nz(p.email).length > 0 ||
+    nz(p.phone).length > 0 ||
+    nz(p.location).length > 0 ||
+    linkUrls.length > 0
+  );
+}
+
+export function cvFormTabHasFilledContent(tab: CVFormTab, cv: CVData): boolean {
+  if (tab === 'design') return false;
+  if (tab === 'header') return cvHeaderHasFilledContent(cv);
+  const key = TAB_TO_VISIBILITY_KEY[tab];
+  return key ? cvSectionHasFilledContent(key, cv) : false;
+}
+
+const TAB_TO_VISIBILITY_KEY: Partial<Record<CVFormTab, CVSectionVisibilityKey>> = {
+  photo: 'photo',
+  address: 'address',
+  summary: 'summary',
+  experience: 'experience',
+  education: 'education',
+  skills: 'skills',
+  projects: 'projects',
+  publications: 'publications',
+  research: 'research',
+  languages: 'languages',
+  certifications: 'certifications',
+  references: 'referrals',
+  awards: 'awards',
+  volunteer: 'volunteer',
+  interests: 'interests',
+  custom: 'custom',
+};
+
+/** Tabs tracked for sidebar completion % (excludes design). */
+export const CV_COMPLETION_TABS: CVFormTab[] = [
+  'photo',
+  'header',
+  'address',
+  'summary',
+  'experience',
+  'education',
+  'skills',
+  'projects',
+  'publications',
+  'research',
+  'languages',
+  'certifications',
+  'references',
+  'awards',
+  'volunteer',
+  'interests',
+  'custom',
+];
+
+export function cvCompletionPercent(cv: CVData): number {
+  if (!cv) return 0;
+  const filled = CV_COMPLETION_TABS.filter((tab) => cvFormTabHasFilledContent(tab, cv)).length;
+  return Math.round((filled / CV_COMPLETION_TABS.length) * 100);
 }
 
 /** True when this section has enough content to meaningfully appear on a CV. */

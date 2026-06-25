@@ -6,6 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select } from '@/components/ui/select';
 import type { CustomSection, Publication, Research, Volunteer } from '@/types';
 import { CV_FORM_CARD as FORM_CARD } from '@/lib/cv-editor-styles';
+import { RemoveEntryButton } from '@/components/cv/RemoveEntryButton';
 import { generateId, moveIndexInArray } from '@/lib/utils';
 import { ListReorderArrows } from '@/components/cv/ListReorderArrows';
 
@@ -128,14 +129,11 @@ export function PublicationsSection({ publications, onChange }: PubProps) {
               }}
             />
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
+          <RemoveEntryButton
+            itemLabel={`publication ${i + 1}`}
             className="mt-2"
-            onClick={() => onChange(publications.filter((_, j) => j !== i))}
-          >
-            Remove
-          </Button>
+            onConfirm={() => onChange(publications.filter((_, j) => j !== i))}
+          />
         </div>
       ))}
       <Button
@@ -250,14 +248,11 @@ export function ResearchSection({ research, onChange }: ResearchProps) {
               onChange(n);
             }}
           />
-          <Button
-            variant="ghost"
-            size="sm"
+          <RemoveEntryButton
+            itemLabel={`research entry ${i + 1}`}
             className="mt-2"
-            onClick={() => onChange(research.filter((_, j) => j !== i))}
-          >
-            Remove
-          </Button>
+            onConfirm={() => onChange(research.filter((_, j) => j !== i))}
+          />
         </div>
       ))}
       <Button
@@ -352,14 +347,11 @@ export function VolunteerSection({ volunteer, onChange }: VolProps) {
               onChange(n);
             }}
           />
-          <Button
-            variant="ghost"
-            size="sm"
+          <RemoveEntryButton
+            itemLabel={`volunteer entry ${i + 1}`}
             className="mt-2"
-            onClick={() => onChange(volunteer.filter((_, j) => j !== i))}
-          >
-            Remove
-          </Button>
+            onConfirm={() => onChange(volunteer.filter((_, j) => j !== i))}
+          />
         </div>
       ))}
       <Button
@@ -520,19 +512,16 @@ export function CustomSectionsForm({ custom, onChange }: CustomProps) {
                     onChange(n);
                   }}
                 />
-                <Button
-                  variant="ghost"
-                  size="sm"
+                <RemoveEntryButton
+                  itemLabel="this custom section item"
                   className="mt-2"
-                  onClick={() => {
+                  onConfirm={() => {
                     const n = [...custom];
                     const items = (block.items ?? []).filter((_, j) => j !== ii);
                     n[bi] = { ...block, items };
                     onChange(n);
                   }}
-                >
-                  Remove item
-                </Button>
+                />
               </div>
             ))}
             <Button
@@ -551,14 +540,11 @@ export function CustomSectionsForm({ custom, onChange }: CustomProps) {
               + Add item in this section
             </Button>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
+          <RemoveEntryButton
+            itemLabel="this entire custom section"
             className="mt-3"
-            onClick={() => onChange(custom.filter((_, j) => j !== bi))}
-          >
-            Remove entire section
-          </Button>
+            onConfirm={() => onChange(custom.filter((_, j) => j !== bi))}
+          />
         </div>
       ))}
       <Button

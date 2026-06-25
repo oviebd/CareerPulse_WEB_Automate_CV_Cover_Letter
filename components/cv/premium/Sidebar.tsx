@@ -6,12 +6,17 @@ import type { ComponentType } from 'react';
 import type { CVFormTab } from '@/components/cv/CVFormFields';
 import type { CVData, CVSectionVisibility, CVSectionVisibilityKey } from '@/types';
 import { isCvSectionVisible, toggleCvSectionVisibility } from '@/lib/cv-section-visibility';
-import { cvSectionHasFilledContent } from '@/lib/cv-sidebar-content';
+import {
+  cvCompletionPercent,
+  cvFormTabHasFilledContent,
+  cvSectionHasFilledContent,
+} from '@/lib/cv-sidebar-content';
 import {
   Award,
   BookOpen,
   BriefcaseBusiness,
   Camera,
+  Check,
   ChevronDown,
   ChevronRight,
   FileBadge2,
@@ -60,19 +65,63 @@ const ITEMS: Array<{
   { id: 'custom', label: 'Custom sections', icon: Layers, visibilityKey: 'custom' },
 ];
 
-const CONTENT_IDS = new Set<CVFormTab>([
-  'photo',
-  'header',
-  'address',
-  'summary',
-  'experience',
-  'education',
-  'skills',
-]);
+const NAV_GROUPS: { title: string; hint: string; ids: CVFormTab[]; defaultOpen?: boolean }[] = [
+  {
+    title: 'Basics',
+    hint: 'Photo, contact, and intro',
+    ids: ['photo', 'header', 'address', 'summary'],
+    defaultOpen: true,
+  },
+  {
+    title: 'Experience',
+    hint: 'Jobs and education',
+    ids: ['experience', 'education'],
+    defaultOpen: true,
+  },
+  {
+    title: 'Showcase',
+    hint: 'Skills and projects',
+    ids: ['skills', 'projects'],
+    defaultOpen: true,
+  },
+  {
+    title: 'Extras',
+    hint: 'Optional sections — toggle on when ready',
+    ids: [
+      'publications',
+      'research',
+      'languages',
+      'certifications',
+      'references',
+      'awards',
+      'volunteer',
+      'interests',
+      'custom',
+    ],
+    defaultOpen: false,
+  },
+];
 
-const OPTIONAL_IDS = new Set<CVFormTab>(
-  ITEMS.map((i) => i.id).filter((id) => !CONTENT_IDS.has(id))
-);
+const ITEM_BY_ID = new Map(ITEMS.map((i) => [i.id, i]));
+
+function CompletionDot({ complete }: { complete: boolean }) {
+  if (!complete) {
+    return (
+      <span
+        className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-border)]"
+        aria-hidden
+      />
+    );
+  }
+  return (
+    <span
+      className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[var(--color-accent-mint)]/15 text-[var(--color-accent-mint)]"
+      aria-label="Section has content"
+    >
+      <Check className="h-2.5 w-2.5" strokeWidth={3} />
+    </span>
+  );
+}
 
 function VisibilitySwitch({
   on,
@@ -107,7 +156,7 @@ function VisibilitySwitch({
     >
       <span
         className={cn(
-          'pointer-events-none block h-4 w-4 rounded-full bg-white shadow-sm ring-1 ring-black/5 transition-transform duration-200',
+          'pointer-events-none block h-4 w-4 rounded-full bg-[var(--color-surface)] shadow-sm ring-1 ring-[var(--color-border)] transition-transform duration-200',
           on ? 'translate-x-4' : 'translate-x-0.5'
         )}
       />
@@ -173,15 +222,22 @@ export function Sidebar({
 }: SidebarProps) {
   const showToggles = Boolean(onSectionVisibilityChange);
 
-  const contentItems = useMemo(() => ITEMS.filter((i) => CONTENT_IDS.has(i.id)), []);
-  const optionalItems = useMemo(() => ITEMS.filter((i) => OPTIONAL_IDS.has(i.id)), []);
+  const completionPct = useMemo(
+    () => (cvData ? cvCompletionPercent(cvData) : 0),
+    [cvData]
+  );
 
   const renderRow = (item: (typeof ITEMS)[number]) => {
     const Icon = item.icon;
     const active = item.id === activeSection;
     const vKey = item.visibilityKey;
     const exportVisible = vKey ? isCvSectionVisible(vKey, sectionVisibility) : true;
-    const filled = vKey && cvData ? cvSectionHasFilledContent(vKey, cvData) : false;
+    const filled =
+      cvData && vKey
+        ? cvSectionHasFilledContent(vKey, cvData)
+        : cvData
+          ? cvFormTabHasFilledContent(item.id, cvData)
+          : false;
     const switchOn = Boolean(vKey && filled && exportVisible);
     const toggleDisabled = Boolean(vKey && (!cvData || !filled));
 
@@ -205,8 +261,9 @@ export function Sidebar({
               : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
           )}
         >
+          <CompletionDot complete={filled} />
           <Icon className="h-4 w-4 shrink-0" />
-          <span className={cn(!switchOn && vKey && 'opacity-55')}>{item.label}</span>
+          <span className={cn('truncate', !switchOn && vKey && 'opacity-55')}>{item.label}</span>
         </button>
         {showToggles && vKey ? (
           <VisibilitySwitch
@@ -229,7 +286,22 @@ export function Sidebar({
   };
 
   return (
-    <aside className="glass-panel w-full rounded-2xl border border-[var(--color-border)]/80 p-3 shadow-[0_8px_30px_rgba(0,0,0,0.06)] xl:sticky xl:top-[72px] xl:max-h-[calc(100vh-5.5rem)] xl:w-full xl:overflow-y-auto xl:overscroll-contain">
+    <aside className="glass-panel w-full rounded-2xl border border-[var(--color-border)]/80 p-3 shadow-[var(--shadow-card)] xl:sticky xl:top-[72px] xl:max-h-[calc(100vh-5.5rem)] xl:w-full xl:overflow-y-auto xl:overscroll-contain">
+      {cvData ? (
+        <div className="mb-3 px-2">
+          <div className="flex items-center justify-between gap-2 text-[10px] font-medium text-[var(--color-muted)]">
+            <span>CV progress</span>
+            <span className="tabular-nums text-[var(--color-accent-mint)]">{completionPct}%</span>
+          </div>
+          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[var(--color-progress-track)]">
+            <div
+              className="h-full rounded-full bg-[var(--color-accent-mint)] transition-all duration-300"
+              style={{ width: `${completionPct}%` }}
+            />
+          </div>
+        </div>
+      ) : null}
+
       <CollapsibleNavGroup title="Design & layout" hint="Template, colours, typography" defaultOpen>
         <button
           type="button"
@@ -246,21 +318,17 @@ export function Sidebar({
         </button>
       </CollapsibleNavGroup>
 
-      <div className="my-3 border-t border-[var(--color-border)]/70" />
-
-      <CollapsibleNavGroup
-        title="Content"
-        hint="Core sections recruiters scan first"
-        defaultOpen
-      >
-        {contentItems.map(renderRow)}
-      </CollapsibleNavGroup>
-
-      <div className="my-3 border-t border-[var(--color-border)]/70" />
-
-      <CollapsibleNavGroup title="Optional sections" hint="Toggle visibility per section" defaultOpen>
-        {optionalItems.map(renderRow)}
-      </CollapsibleNavGroup>
+      {NAV_GROUPS.map((group) => (
+        <div key={group.title}>
+          <div className="my-3 border-t border-[var(--color-border)]/70" />
+          <CollapsibleNavGroup title={group.title} hint={group.hint} defaultOpen={group.defaultOpen}>
+            {group.ids.map((id) => {
+              const item = ITEM_BY_ID.get(id);
+              return item ? renderRow(item) : null;
+            })}
+          </CollapsibleNavGroup>
+        </div>
+      ))}
 
       {showToggles ? (
         <p className="mt-4 px-2 text-[10px] leading-snug text-[var(--color-muted)]">

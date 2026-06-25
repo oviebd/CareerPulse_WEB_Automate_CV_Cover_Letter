@@ -32,6 +32,8 @@ import { buildATSReport } from '@/lib/cv-ats';
 import { cloneCvData } from '@/lib/cv-clone';
 import { useToast } from '@/components/ui/toast';
 import { CV_EDITOR_CANVAS } from '@/lib/cv-editor-styles';
+import { readPreviewCollapsedDefault, persistPreviewExpanded } from '@/lib/cv-preview-prefs';
+import { CVEditorMobileBar } from '@/components/cv/premium/CVEditorMobileBar';
 import {
   parseOptimisedCvText,
   optimisedCvJsonToCvData,
@@ -152,7 +154,9 @@ export function JobTailoredCVEditor() {
   const [keywordsPopoverOpen, setKeywordsPopoverOpen] = useState(false);
   const [atsDrawerOpen, setAtsDrawerOpen] = useState(false);
   const [focusMode, setFocusMode] = useState<CVEditorFocusMode>('default');
-  const [previewCollapsed, setPreviewCollapsed] = useState(false);
+  const [previewCollapsed, setPreviewCollapsed] = useState(() =>
+    typeof window !== 'undefined' ? readPreviewCollapsedDefault() : true
+  );
 
   const { tier } = useSubscription();
   const { toast } = useToast();
@@ -1169,7 +1173,13 @@ export function JobTailoredCVEditor() {
                   currentPage={page}
                   onPageChange={setPage}
                   collapsed={previewCollapsed}
-                  onToggleCollapse={() => setPreviewCollapsed((c) => !c)}
+                  onToggleCollapse={() =>
+                    setPreviewCollapsed((c) => {
+                      const next = !c;
+                      persistPreviewExpanded(!next);
+                      return next;
+                    })
+                  }
                 />
                 {!templatesLoading && !allowed && templateMeta ? (
                   <p className="rounded-xl border border-[var(--color-accent-gold)]/35 bg-[var(--color-accent-gold)]/10 px-3 py-2 text-sm text-[var(--color-accent-gold)]">
@@ -1182,31 +1192,28 @@ export function JobTailoredCVEditor() {
         )}
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-2 border-t border-[var(--color-border)] bg-[var(--color-surface)]/95 p-3 backdrop-blur-md md:hidden">
-        <button
-          type="button"
-          onClick={() => {
-            setPendingTrackStatus(
-              trackStatus && trackStatus !== 'none' ? trackStatus : 'apply_later'
-            );
-            setTrackPopupOpen(true);
-          }}
-          className={cn(
-            'rounded-full border-2 px-3 py-2 text-xs font-semibold',
-            trackRingClass
-          )}
-        >
-          {trackButtonLabel}
-        </button>
-        <Button
-          variant="primary"
-          size="sm"
-          loading={pageSaveState === 'saving'}
-          onClick={() => void saveJobCv()}
-        >
-          {pageSaveState === 'saving' ? 'Saving…' : 'Save'}
-        </Button>
-      </div>
+      <CVEditorMobileBar
+        leftSlot={
+          <button
+            type="button"
+            onClick={() => {
+              setPendingTrackStatus(
+                trackStatus && trackStatus !== 'none' ? trackStatus : 'apply_later'
+              );
+              setTrackPopupOpen(true);
+            }}
+            className={cn(
+              'rounded-full border-2 px-3 py-2 text-xs font-semibold',
+              trackRingClass
+            )}
+          >
+            {trackButtonLabel}
+          </button>
+        }
+        primaryLabel={pageSaveState === 'saving' ? 'Saving…' : 'Save'}
+        primaryLoading={pageSaveState === 'saving'}
+        onPrimaryClick={() => void saveJobCv()}
+      />
 
       <Modal
         isOpen={trackPopupOpen}
