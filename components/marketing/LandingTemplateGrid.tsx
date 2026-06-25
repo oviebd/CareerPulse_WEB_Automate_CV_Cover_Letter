@@ -7,6 +7,7 @@ import type { CVTemplate } from '@/types';
 import { TEMPLATE_CONFIGS } from '@/src/config/templateConfig';
 import { normalizeTemplateId } from '@/src/utils/cvDefaults';
 import type { TemplateId } from '@/src/types/cv.types';
+import { BuildCvLink } from '@/components/marketing/BuildCvLink';
 import { cn } from '@/lib/utils';
 
 const CV_DOC_WIDTH = 794;
@@ -118,12 +119,12 @@ export function LandingTemplateGrid({ templates }: { templates: CVTemplate[] }) 
                   <ExternalLink className="h-3.5 w-3.5" aria-hidden />
                   Full preview
                 </Link>
-                <Link
-                  href={`/cv/builder?template=${encodeURIComponent(t.id)}&guest=true`}
+                <BuildCvLink
+                  builderPath={`/cv/builder?template=${encodeURIComponent(t.id)}`}
                   className="inline-flex flex-1 items-center justify-center rounded-btn bg-[var(--color-primary-500)] py-2.5 text-sm font-semibold text-white transition hover:brightness-110"
                 >
                   Use template
-                </Link>
+                </BuildCvLink>
               </div>
             </div>
           </div>

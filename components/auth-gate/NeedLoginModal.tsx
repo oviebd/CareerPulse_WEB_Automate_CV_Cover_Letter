@@ -5,35 +5,25 @@ import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { X, FileText, Wand2, Cloud, Share2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { stashGuestEditorStateForOAuth } from '@/lib/guest-cv-handoff';
-import type { CVEditorState } from '@/lib/cv-editor-state';
 
-function buildReturnToParam(
-  pathname: string,
-  searchToString: string,
-  addHydrate: boolean
-) {
+function buildReturnToParam(pathname: string, searchToString: string) {
   const rel = `${pathname}${searchToString ? `?${searchToString}` : ''}`;
-  const u = new URL(rel, 'http://localhost');
-  if (addHydrate) u.searchParams.set('hydrateGuest', 'true');
-  return encodeURIComponent(u.pathname + u.search);
+  return encodeURIComponent(rel);
 }
 
 type NeedLoginModalProps = {
   open: boolean;
   onClose: () => void;
-  /** When set, stashed to sessionStorage before OAuth (survives full page reload). */
-  guestStateForOauth: CVEditorState | null;
 };
 
-export function NeedLoginModal({ open, onClose, guestStateForOauth }: NeedLoginModalProps) {
+export function NeedLoginModal({ open, onClose }: NeedLoginModalProps) {
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const firstFocusRef = useRef<HTMLButtonElement>(null);
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const search = searchParams.toString();
-  const returnTo = buildReturnToParam(pathname, search, guestStateForOauth !== null);
+  const returnTo = buildReturnToParam(pathname, search);
 
   useEffect(() => {
     if (!open) return;
@@ -100,11 +90,7 @@ export function NeedLoginModal({ open, onClose, guestStateForOauth }: NeedLoginM
 
   if (!open) return null;
 
-  const onBeforeAuthNavigation = () => {
-    if (guestStateForOauth) stashGuestEditorStateForOAuth(guestStateForOauth);
-  };
-
-  const qs = `returnTo=${returnTo}&preserveGuestCv=true`;
+  const qs = `returnTo=${returnTo}`;
 
   return (
     <div
@@ -161,7 +147,6 @@ export function NeedLoginModal({ open, onClose, guestStateForOauth }: NeedLoginM
         <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">
           <Link
             href={`/register?${qs}`}
-            onClick={onBeforeAuthNavigation}
             className={cn(
               'inline-flex h-10 items-center justify-center rounded-btn px-4 text-sm font-semibold text-white',
               'bg-[var(--color-primary-500)] shadow-sm transition hover:brightness-110'
@@ -171,7 +156,6 @@ export function NeedLoginModal({ open, onClose, guestStateForOauth }: NeedLoginM
           </Link>
           <Link
             href={`/login?${qs}`}
-            onClick={onBeforeAuthNavigation}
             className={cn(
               'inline-flex h-10 items-center justify-center rounded-btn border border-[var(--color-border)] px-4',
               'text-sm font-semibold text-[var(--color-text-primary)] transition hover:bg-[var(--color-hover-surface)]'

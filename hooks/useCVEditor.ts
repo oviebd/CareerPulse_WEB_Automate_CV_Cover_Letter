@@ -10,8 +10,6 @@ import { normalizeTemplateId } from '@/src/utils/cvDefaults';
 import { TEMPLATE_CONFIGS } from '@/src/config/templateConfig';
 import type { TemplateId } from '@/src/types/cv.types';
 import { useAuthStore } from '@/stores/useAuthStore';
-import { useGuestCvStore } from '@/stores/guestCvStore';
-import { takeGuestEditorStateFromSessionStorage } from '@/lib/guest-cv-handoff';
 import type { CVEditorState } from '@/lib/cv-editor-state';
 import { DEFAULT_EDITOR_STATE } from '@/lib/cv-editor-state';
 
@@ -51,7 +49,6 @@ export interface UseCVEditorReturn {
   cv: CVProfile | null;
   cvId: string | null;
   isNew: boolean;
-  isGuest: boolean;
   isSaving: boolean;
   saveError: string | null;
   loadError: string | null;
@@ -68,7 +65,6 @@ export interface UseCVEditorReturn {
 export function useCVEditor({ cvIdFromRoute }: UseCVEditorOptions): UseCVEditorReturn {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const user = useAuthStore((s) => s.user);
   const authInitialized = useAuthStore((s) => s.initialized);
 
   const [cvId, setCvId] = useState<string | null>(cvIdFromRoute ?? null);
@@ -79,7 +75,6 @@ export function useCVEditor({ cvIdFromRoute }: UseCVEditorOptions): UseCVEditorR
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  const isGuest = Boolean(authInitialized && !user && !cvIdFromRoute);
   const isNew = cvId === null;
   const searchParamsKey = useMemo(
     () => (typeof searchParams?.toString === 'function' ? searchParams.toString() : ''),
@@ -89,8 +84,6 @@ export function useCVEditor({ cvIdFromRoute }: UseCVEditorOptions): UseCVEditorR
   useEffect(() => {
     setCvId(cvIdFromRoute ?? null);
   }, [cvIdFromRoute]);
-
-  const setGuestInStore = useGuestCvStore((s) => s.setGuestEditorState);
 
   const loadFromServer = useCallback(async () => {
     if (cvIdFromRoute) {
@@ -130,70 +123,6 @@ export function useCVEditor({ cvIdFromRoute }: UseCVEditorOptions): UseCVEditorR
       return;
     }
 
-    if (isGuest) {
-      setLoadedProfile(null);
-      setLoadError(null);
-      if (searchParams.get('hydrateGuest') === 'true' && typeof window !== 'undefined') {
-        const fromOAuth = takeGuestEditorStateFromSessionStorage();
-        if (fromOAuth) {
-          setEditorState(fromOAuth);
-          setSavedSnapshot(null);
-          setGuestInStore(fromOAuth);
-          const url = new URL(window.location.href);
-          url.searchParams.delete('hydrateGuest');
-          window.history.replaceState({}, '', url.toString());
-          return;
-        }
-      }
-      const fromStore = useGuestCvStore.getState().guestEditorState;
-      if (fromStore) {
-        setEditorState(fromStore);
-        setSavedSnapshot(null);
-        return;
-      }
-      const qTemplate = searchParams.get('template');
-      const tid = normalizeTemplateId(qTemplate && qTemplate.length > 0 ? qTemplate : 'classic') as TemplateId;
-      const empty = createEmptyCVData(tid);
-      const cfg = TEMPLATE_CONFIGS[tid];
-      const st: CVEditorState = {
-        name: 'Untitled CV',
-        preferred_template_id: tid,
-        accent_color: empty.meta?.colorScheme ?? '#6C63FF',
-        font_family: empty.meta?.fontFamily ?? 'Inter',
-        cvData: {
-          ...empty,
-          meta: {
-            ...empty.meta,
-            templateId: tid,
-            colorScheme: empty.meta?.colorScheme ?? '#6C63FF',
-            fontFamily: empty.meta?.fontFamily ?? 'Inter',
-            layout: cfg.layout === 'two-column' ? 'two-column' : 'single-column',
-            showPhoto: cfg.showPhoto,
-            sectionOrder: [...cfg.sectionOrder],
-          },
-        },
-      };
-      setEditorState(st);
-      setSavedSnapshot(null);
-      setGuestInStore(st);
-      return;
-    }
-
-    if (user) {
-      const fromOAuth = takeGuestEditorStateFromSessionStorage();
-      if (fromOAuth) {
-        setEditorState(fromOAuth);
-        setSavedSnapshot(null);
-        return;
-      }
-      const fromGuestZustand = useGuestCvStore.getState().guestEditorState;
-      if (fromGuestZustand) {
-        setEditorState(fromGuestZustand);
-        setSavedSnapshot(null);
-        return;
-      }
-    }
-
     setLoadedProfile(null);
     setLoadError(null);
     if (typeof window !== 'undefined' && sessionStorage.getItem('cv_draft')) {
@@ -224,17 +153,11 @@ export function useCVEditor({ cvIdFromRoute }: UseCVEditorOptions): UseCVEditorR
     }
     setEditorState({ ...DEFAULT_EDITOR_STATE });
     setSavedSnapshot(null);
-  }, [authInitialized, cvIdFromRoute, isGuest, user, searchParamsKey, setGuestInStore, searchParams]);
+  }, [authInitialized, cvIdFromRoute, searchParamsKey]);
 
   useEffect(() => {
     void loadFromServer();
   }, [loadFromServer]);
-
-  useEffect(() => {
-    if (!isGuest) return;
-    if (cvIdFromRoute) return;
-    setGuestInStore(editorState);
-  }, [editorState, isGuest, cvIdFromRoute, setGuestInStore]);
 
   const isDirty = useMemo(() => {
     if (savedSnapshot === null) return true;
@@ -249,9 +172,8 @@ export function useCVEditor({ cvIdFromRoute }: UseCVEditorOptions): UseCVEditorR
   const saveButtonLabel = useMemo(() => {
     if (isSaving) return 'Saving...';
     if (saveError) return 'Retry Save';
-    if (isGuest) return 'Save CV (free account)';
     return isNew ? 'Save CV' : 'Update CV';
-  }, [isSaving, saveError, isNew, isGuest]);
+  }, [isSaving, saveError, isNew]);
 
   const updateField = useCallback(<K extends keyof CVData>(field: K, value: CVData[K]) => {
     setEditorState((prev) => {
@@ -278,9 +200,6 @@ export function useCVEditor({ cvIdFromRoute }: UseCVEditorOptions): UseCVEditorR
   }, []);
 
   const handleSave = useCallback(async (displayName?: string): Promise<boolean> => {
-    if (isGuest) {
-      return false;
-    }
     setIsSaving(true);
     setSaveError(null);
     try {
@@ -340,7 +259,6 @@ export function useCVEditor({ cvIdFromRoute }: UseCVEditorOptions): UseCVEditorR
         } catch {
           /* ignore */
         }
-        useGuestCvStore.getState().clearGuestCv();
         router.replace(`/cv/edit/${newId}`);
       } else {
         const patch = buildPatchBody(stateForSave);
@@ -379,7 +297,7 @@ export function useCVEditor({ cvIdFromRoute }: UseCVEditorOptions): UseCVEditorR
     } finally {
       setIsSaving(false);
     }
-  }, [editorState, isNew, isGuest, cvId, buildPatchBody, router]);
+  }, [editorState, isNew, cvId, buildPatchBody, router]);
 
   useEffect(() => {
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -395,7 +313,6 @@ export function useCVEditor({ cvIdFromRoute }: UseCVEditorOptions): UseCVEditorR
     cv: loadedProfile,
     cvId,
     isNew,
-    isGuest,
     isSaving,
     saveError,
     loadError,

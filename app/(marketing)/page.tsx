@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { getCvTemplatesForLanding } from '@/lib/landing-cv-templates';
 import { LandingTemplateGrid } from '@/components/marketing/LandingTemplateGrid';
+import { BuildCvLink } from '@/components/marketing/BuildCvLink';
 
 /** Free stock image (Unsplash License — free to use). Document / desk context. */
 const HERO_CV_PREVIEW_IMAGE =
@@ -41,12 +42,11 @@ export default async function LandingPage() {
                 Paste job description
                 <ArrowRight className="h-4 w-4" />
               </Link>
-              <Link
-                href="/cv/builder?guest=true"
+              <BuildCvLink
                 className="inline-flex items-center justify-center rounded-btn border-2 border-[var(--color-border)] bg-[var(--color-surface)]/60 px-6 py-3.5 text-base font-semibold text-[var(--color-text-primary)] backdrop-blur transition hover:border-[var(--color-primary-300)] hover:text-[var(--color-primary-500)]"
               >
                 Build CV from scratch
-              </Link>
+              </BuildCvLink>
             </div>
           </div>
           <div className="relative">
@@ -212,14 +212,13 @@ export default async function LandingPage() {
           <h2 className="font-display text-2xl font-bold text-[var(--color-text-primary)] sm:text-3xl">
             Ready to build your CV?
           </h2>
-          <p className="mt-2 text-sm text-[var(--color-muted)]">No credit card. No account required to start.</p>
-          <Link
-            href="/cv/builder?guest=true"
+          <p className="mt-2 text-sm text-[var(--color-muted)]">Free to use — sign in to get started.</p>
+          <BuildCvLink
             className="mt-6 inline-flex items-center gap-2 rounded-btn bg-[var(--color-primary-500)] px-8 py-3.5 text-base font-semibold text-white shadow-lg transition hover:brightness-110"
           >
             Build my CV — free
             <ArrowRight className="h-4 w-4" />
-          </Link>
+          </BuildCvLink>
         </div>
       </section>
     </main>

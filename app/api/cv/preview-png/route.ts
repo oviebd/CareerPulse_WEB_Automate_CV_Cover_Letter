@@ -16,24 +16,17 @@ type Body = {
   font_family?: string;
 };
 
-function clientIp(request: Request) {
-  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
-}
-
 export async function POST(request: Request) {
   try {
     const supabase = await createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (user) {
-      if (rateLimitHit(`cv-preview-png:${user.id}`)) {
-        return NextResponse.json({ error: 'RATE_LIMIT' }, { status: 429 });
-      }
-    } else {
-      if (rateLimitHit(`cv-preview-png:guest:${clientIp(request)}`)) {
-        return NextResponse.json({ error: 'RATE_LIMIT' }, { status: 429 });
-      }
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    if (rateLimitHit(`cv-preview-png:${user.id}`)) {
+      return NextResponse.json({ error: 'RATE_LIMIT' }, { status: 429 });
     }
 
     const body = (await request.json()) as Body;

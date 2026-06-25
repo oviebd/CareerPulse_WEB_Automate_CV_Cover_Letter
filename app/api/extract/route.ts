@@ -27,9 +27,6 @@ function isAllowedStorageUrl(url: string): boolean {
   }
 }
 
-function clientIp(request: Request) {
-  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
-}
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -118,56 +115,9 @@ function extractErrorResponse(result: { error: string; detail?: string }) {
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as {
-      guest?: boolean;
-      fileBase64?: string;
       fileUrl?: string;
       force?: boolean;
     };
-
-    if (body.guest === true) {
-      if (typeof body.fileBase64 !== 'string' || !body.fileBase64.trim()) {
-        return NextResponse.json({ error: 'fileBase64_required' }, { status: 400 });
-      }
-      if (rateLimitHit(`extract:guest:${clientIp(request)}`)) {
-        return NextResponse.json({ error: 'RATE_LIMIT' }, { status: 429 });
-      }
-      let buf: Buffer;
-      try {
-        buf = Buffer.from(body.fileBase64, 'base64');
-      } catch {
-        return NextResponse.json({ error: 'invalid_body' }, { status: 400 });
-      }
-      const result = await extractFromBuffer(buf);
-      if ('error' in result && result.error) {
-        return extractErrorResponse(result);
-      }
-      const { parsed, percentage, isComplete } = result;
-      const now = new Date().toISOString();
-      const GUEST_USER = '00000000-0000-0000-0000-000000000000';
-      const cvProfile: CVProfile = {
-        id: randomUUID(),
-        user_id: GUEST_USER,
-        name: 'Imported CV',
-        ...parsed,
-        experience: (parsed.experience ?? []) as CVProfile['experience'],
-        education: (parsed.education ?? []) as CVProfile['education'],
-        skills: (parsed.skills ?? []) as CVProfile['skills'],
-        projects: (parsed.projects ?? []) as CVProfile['projects'],
-        certifications: (parsed.certifications ?? []) as CVProfile['certifications'],
-        languages: (parsed.languages ?? []) as CVProfile['languages'],
-        awards: (parsed.awards ?? []) as CVProfile['awards'],
-        referrals: (parsed.referrals ?? []) as CVProfile['referrals'],
-        section_visibility: (parsed.section_visibility ?? {}) as CVProfile['section_visibility'],
-        completion_percentage: percentage,
-        is_complete: isComplete,
-        original_cv_file_url: null,
-        preferred_template_id: 'classic',
-        preferred_cl_template_id: 'cl-classic',
-        created_at: now,
-        updated_at: now,
-      } as CVProfile;
-      return NextResponse.json({ success: true, cvProfile });
-    }
 
     const supabase = await createClient();
     const {

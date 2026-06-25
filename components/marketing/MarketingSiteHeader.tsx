@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { FileText, LayoutTemplate, Menu, Sparkles, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { MarketingThemeToggle } from '@/components/shared/MarketingThemeToggle';
+import { BuildCvLink } from '@/components/marketing/BuildCvLink';
 import { useAuthStore } from '@/stores/useAuthStore';
 
 const nav = [
@@ -57,13 +58,12 @@ export function MarketingSiteHeader() {
               {item.label}
             </Link>
           ))}
-          <Link
-            href="/cv/builder?guest=true"
+          <BuildCvLink
             className="ml-1 flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-[var(--color-primary-500)] transition hover:bg-[var(--color-primary-100)]/50"
           >
             <FileText className="h-4 w-4" />
             Build CV
-          </Link>
+          </BuildCvLink>
         </nav>
         <div className="hidden items-center gap-2 sm:flex">
           <MarketingThemeToggle />
@@ -117,13 +117,12 @@ export function MarketingSiteHeader() {
                 {item.label}
               </Link>
             ))}
-            <Link
-              href="/cv/builder?guest=true"
+            <BuildCvLink
               onClick={() => setOpen(false)}
               className="py-2 text-sm font-semibold text-[var(--color-primary-500)]"
             >
               Build CV
-            </Link>
+            </BuildCvLink>
             {initialized && user ? (
               <Link
                 href="/dashboard"

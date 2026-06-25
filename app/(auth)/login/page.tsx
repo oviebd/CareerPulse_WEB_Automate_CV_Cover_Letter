@@ -9,7 +9,6 @@ export default async function LoginPage({
   const params = await searchParams;
   const returnTo =
     typeof params.returnTo === 'string' ? params.returnTo : undefined;
-  const preserveGuestCv = params.preserveGuestCv === 'true';
   const error =
     typeof params.error === 'string' ? params.error : undefined;
 
@@ -19,7 +18,6 @@ export default async function LoginPage({
       <div className="flex items-center justify-center px-6 py-12">
         <LoginForm
           returnTo={returnTo}
-          preserveGuestCv={preserveGuestCv}
           urlError={error}
         />
       </div>

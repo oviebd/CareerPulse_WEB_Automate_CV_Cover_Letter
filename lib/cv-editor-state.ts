@@ -2,7 +2,7 @@ import type { CVData } from '@/types';
 import { createEmptyCVData } from '@/src/utils/cvDefaults';
 
 /**
- * In-memory editor bundle for the core CV screen (useCVEditor / guest hydration).
+ * In-memory editor bundle for the core CV screen (useCVEditor).
  * Kept in a small module to avoid import cycles with hooks/stores.
  */
 export interface CVEditorState {

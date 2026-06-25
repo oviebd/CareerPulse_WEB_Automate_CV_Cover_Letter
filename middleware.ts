@@ -36,7 +36,8 @@ export async function middleware(request: NextRequest) {
   if (isProtected && !user) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
-    url.searchParams.set('returnTo', pathname);
+    const returnPath = `${pathname}${request.nextUrl.search}`;
+    url.searchParams.set('returnTo', returnPath);
     const redirectResponse = NextResponse.redirect(url);
     // Supabase may refresh the session; copy full cookies (name + value + options) to the redirect
     response.cookies.getAll().forEach((cookie) => {

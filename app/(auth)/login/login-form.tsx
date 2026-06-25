@@ -6,8 +6,6 @@ import { useCallback, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { authErrorMessage } from '@/lib/auth-errors';
 import { safeRedirectPath } from '@/lib/redirect';
-import { stashGuestEditorStateForOAuth } from '@/lib/guest-cv-handoff';
-import { useGuestCvStore } from '@/stores/guestCvStore';
 
 const appUrl =
   process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') ?? 'http://localhost:3000';
@@ -35,25 +33,16 @@ function GoogleIcon() {
   );
 }
 
-function withHydrateGuestParam(path: string) {
-  const u = new URL(path, 'http://localhost');
-  u.searchParams.set('hydrateGuest', 'true');
-  return u.pathname + u.search;
-}
-
 export function LoginForm({
   returnTo,
-  preserveGuestCv,
   urlError,
 }: {
   returnTo?: string;
-  preserveGuestCv?: boolean;
   urlError?: string;
 }) {
   const router = useRouter();
   const safeNext = safeRedirectPath(returnTo);
-  const nextAfterAuth = preserveGuestCv ? withHydrateGuestParam(safeNext) : safeNext;
-  const callbackUrl = `${appUrl}/api/auth/callback?next=${encodeURIComponent(nextAfterAuth)}`;
+  const callbackUrl = `${appUrl}/api/auth/callback?next=${encodeURIComponent(safeNext)}`;
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -68,10 +57,6 @@ export function LoginForm({
   const onGoogle = useCallback(async () => {
     setError(null);
     setLoading(true);
-    if (preserveGuestCv) {
-      const g = useGuestCvStore.getState().guestEditorState;
-      if (g) stashGuestEditorStateForOAuth(g);
-    }
     const supabase = createClient();
     const { error: err } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -79,7 +64,7 @@ export function LoginForm({
     });
     setLoading(false);
     if (err) setError(authErrorMessage(err.message));
-  }, [callbackUrl, preserveGuestCv]);
+  }, [callbackUrl]);
 
   const onEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,7 +80,7 @@ export function LoginForm({
       setError(authErrorMessage(err.message));
       return;
     }
-    router.push(nextAfterAuth);
+    router.push(safeNext);
     router.refresh();
   };
 
@@ -238,15 +223,7 @@ export function LoginForm({
       <p className="text-center text-sm text-[var(--color-muted)]">
         No account?{' '}
         <Link
-          href={
-            returnTo
-              ? `/register?returnTo=${encodeURIComponent(returnTo)}${
-                  preserveGuestCv ? '&preserveGuestCv=true' : ''
-                }`
-              : preserveGuestCv
-                ? '/register?preserveGuestCv=true'
-                : '/register'
-          }
+          href={returnTo ? `/register?returnTo=${encodeURIComponent(returnTo)}` : '/register'}
           className="font-medium text-[var(--color-primary)] hover:underline"
         >
           Create one

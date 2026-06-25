@@ -1,14 +1,10 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { useCVEditor } from '@/hooks/useCVEditor';
 import { useAuthGate } from '@/hooks/useAuthGate';
-import { useAuthStore } from '@/stores/useAuthStore';
-import { useGuestCvStore } from '@/stores/guestCvStore';
-import { createCoreCvFromEditorState } from '@/lib/create-core-cv-from-editor-state';
 import { useSubscription } from '@/hooks/useSubscription';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -58,7 +54,6 @@ export function CVEditor() {
   const {
     cv,
     cvId,
-    isGuest,
     isSaving,
     saveError,
     loadError,
@@ -71,9 +66,7 @@ export function CVEditor() {
     reloadFromServer,
   } = useCVEditor({ cvIdFromRoute: routeId });
 
-  const { requireAuth, authModal, openAuthModal } = useAuthGate(editorState);
-  const authedUser = useAuthStore((s) => s.user);
-  const autoGuestSyncRef = useRef(false);
+  const { requireAuth, authModal } = useAuthGate();
 
   const queryClient = useQueryClient();
 
@@ -93,7 +86,6 @@ export function CVEditor() {
   const isNew = searchParams.get('new') === '1';
 
   useEffect(() => {
-    if (isGuest) return;
     if (isNew && typeof window !== 'undefined') {
       const emptyCv = createEmptyCVData('classic');
       sessionStorage.setItem('cv_draft', JSON.stringify(emptyCv));
@@ -103,34 +95,10 @@ export function CVEditor() {
       url.searchParams.delete('new');
       window.history.replaceState({}, '', url.toString());
     }
-  }, [isNew, isGuest]);
+  }, [isNew]);
 
   const { toast } = useToast();
   const { tier } = useSubscription();
-
-  useEffect(() => {
-    if (isGuest || !authedUser || routeId || autoGuestSyncRef.current) return;
-    const pending = useGuestCvStore.getState().guestEditorState;
-    if (!pending) return;
-    autoGuestSyncRef.current = true;
-    void (async () => {
-      try {
-        const created = await createCoreCvFromEditorState(pending);
-        useGuestCvStore.getState().clearGuestCv();
-        try {
-          sessionStorage.removeItem('cv_draft');
-          window.dispatchEvent(new Event('cv_draft_updated'));
-        } catch {
-          /* ignore */
-        }
-        await queryClient.invalidateQueries({ queryKey: ['cv-versions'] });
-        router.replace(`/cv/edit/${created.id}`);
-      } catch (e) {
-        autoGuestSyncRef.current = false;
-        toast(e instanceof Error ? e.message : 'Could not save your CV', 'error');
-      }
-    })();
-  }, [isGuest, authedUser, routeId, router, queryClient, toast]);
 
   const cvData = editorState.cvData;
   const selectedTemplateId = editorState.preferred_template_id;
@@ -492,22 +460,8 @@ export function CVEditor() {
         isSubmitting={isSaving}
         submitLabel={saveButtonLabel}
       />
-      {isGuest ? (
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)]/80 px-4 py-3 text-sm text-[var(--color-muted)] backdrop-blur-sm">
-          <span>
-            You&apos;re editing as a guest —{' '}
-            <Link
-              href="/register?returnTo=%2Fcv%2Fedit%3Fguest%3Dtrue&preserveGuestCv=true"
-              className="font-medium text-[var(--color-primary-500)] hover:underline"
-            >
-              Sign up free
-            </Link>{' '}
-            to save your CV to the cloud.
-          </span>
-        </div>
-      ) : null}
       <CVEditorTopBar
-        backHref={isGuest ? '/' : '/cv'}
+        backHref="/cv"
         title="Core CV"
         subtitle={subtitleName || 'Add your name in Header'}
         badge={
@@ -528,7 +482,7 @@ export function CVEditor() {
         secondaryAction={{
           label: 'Export PDF',
           loading: exporting,
-          disabled: !isGuest && !allowed,
+          disabled: !allowed,
           onClick: requireAuth(() => {
             void runExportPdf();
           }),
@@ -599,7 +553,6 @@ export function CVEditor() {
                 fontFamily={fontFamily}
                 onFontFamilyChange={setFontFamily}
                 userTier={tier}
-                onRequireAiAuth={isGuest ? openAuthModal : undefined}
               />
             </div>
           </div>
