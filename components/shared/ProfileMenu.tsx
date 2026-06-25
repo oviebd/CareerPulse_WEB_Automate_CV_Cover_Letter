@@ -1,13 +1,12 @@
 'use client';
 
-import { useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
 import { CreditCard, LogOut, Settings } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
+import { signOutAndGoHome } from '@/lib/sign-out-client';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useSubscription } from '@/hooks/useSubscription';
 
@@ -27,8 +26,6 @@ type ProfileMenuProps = {
 export function ProfileMenu({ menuPlacement = 'below' }: ProfileMenuProps) {
   const pathname = usePathname();
   const profile = useAuthStore((s) => s.profile);
-  const reset = useAuthStore((s) => s.reset);
-  const queryClient = useQueryClient();
   const { tier } = useSubscription();
   const [open, setOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -46,19 +43,10 @@ export function ProfileMenu({ menuPlacement = 'below' }: ProfileMenuProps) {
     setOpen(false);
   }, [pathname]);
 
-  const signOut = useCallback(async () => {
+  const signOut = useCallback(() => {
     setSigningOut(true);
-    const supabase = createClient();
-    try {
-      await fetch('/api/auth/signout', { method: 'POST', credentials: 'same-origin' });
-    } catch {
-      // ignore
-    }
-    await supabase.auth.signOut();
-    reset();
-    queryClient.clear();
-    window.location.href = '/login';
-  }, [queryClient, reset]);
+    signOutAndGoHome();
+  }, []);
 
   const displayName = profile?.full_name?.trim() || 'Account';
   const email = profile?.email ?? '';

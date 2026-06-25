@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { applyDevSubscriptionOverride } from '@/lib/dev-subscription';
 import { isProtectedAppPath } from '@/lib/guest-cv-paths';
+import { isClientSigningOut, isAuthSessionMissingError, clearClientSigningOutFlag } from '@/lib/sign-out-client';
 import type { Profile } from '@/types';
 
 function mapProfile(row: Record<string, unknown> | null): Profile | null {
@@ -70,6 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
      * Used when we detect a truly invalid / expired session.
      */
     const clearAndRedirect = async () => {
+      if (isClientSigningOut()) return;
       setUser(null);
       setProfile(null);
       clearExpiryTimer();
@@ -90,6 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const msUntilCheck = Math.max(0, expiresAtMs - Date.now() + 1000);
 
       expiryTimerRef.current = setTimeout(async () => {
+        if (isClientSigningOut()) return;
         try {
           // Validate against the server, not just local storage
           const {
@@ -165,15 +168,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     async function getUserWithRetry() {
+      if (isClientSigningOut()) return null;
       for (let attempt = 1; attempt <= 3; attempt += 1) {
         try {
           const {
             data: { user },
             error,
           } = await supabase.auth.getUser();
-          if (error) throw error;
+          if (error) {
+            if (isAuthSessionMissingError(error) || isClientSigningOut()) return null;
+            throw error;
+          }
           return user ?? null;
         } catch (e) {
+          if (isAuthSessionMissingError(e) || isClientSigningOut()) return null;
           const message = e instanceof Error ? e.message : String(e);
           if (isLockContentionErrorMessage(message) && attempt < 3) {
             await sleep(80 * attempt);
@@ -196,6 +204,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setProfile(cached);
         }
       } catch { /* ignore parse errors or SSR */ }
+
+      if (isClientSigningOut()) {
+        setUser(null);
+        setProfile(null);
+        sessionStorage.removeItem('cp_profile');
+        wasAuthenticatedRef.current = false;
+        initSessionCompleteRef.current = true;
+        setInitialized(true);
+        clearClientSigningOutFlag();
+        return;
+      }
 
       let userResolvedWithoutSessionObject = false;
       let initializedEarly = false;
@@ -242,20 +261,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setProfile(null);
           sessionStorage.removeItem('cp_profile');
           wasAuthenticatedRef.current = false;
-          try {
-            await supabase.auth.signOut({ scope: 'local' });
-          } catch {
-            // Best-effort cleanup
+          if (!isClientSigningOut()) {
+            try {
+              await supabase.auth.signOut({ scope: 'local' });
+            } catch {
+              // Best-effort cleanup
+            }
           }
         }
       } catch (e) {
-        console.error('Auth init unexpected error:', e);
+        if (!isAuthSessionMissingError(e) && !isClientSigningOut()) {
+          console.error('Auth init unexpected error:', e);
+        }
         setUser(null);
         setProfile(null);
       } finally {
         if (!initializedEarly) {
           initSessionCompleteRef.current = true;
           setInitialized(true);
+        }
+        if (isClientSigningOut()) {
+          clearClientSigningOutFlag();
         }
       }
     }
@@ -266,6 +292,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, session: Session | null) => {
       try {
+        if (isClientSigningOut()) {
+          return;
+        }
         if (!initSessionCompleteRef.current) {
           return;
         }
@@ -288,7 +317,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const hadSession = wasAuthenticatedRef.current;
             wasAuthenticatedRef.current = false;
             if (hadSession) {
-              window.location.href = '/login';
+              window.location.replace('/');
             }
           }
           return;
@@ -302,7 +331,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           wasAuthenticatedRef.current = true;
         }
       } catch (e) {
-        console.error('Auth state change error:', e);
+        if (!isAuthSessionMissingError(e) && !isClientSigningOut()) {
+          console.error('Auth state change error:', e);
+        }
       } finally {
         setInitialized(true);
       }

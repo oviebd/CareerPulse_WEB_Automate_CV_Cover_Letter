@@ -1,9 +1,11 @@
 import { useAuthStore } from '@/stores/useAuthStore';
+import { isClientSigningOut } from '@/lib/sign-out-client';
 
 let redirecting = false;
 
 function handleUnauthorized() {
   if (redirecting) return;
+  if (isClientSigningOut()) return;
   redirecting = true;
   useAuthStore.getState().reset();
   if (typeof window !== 'undefined') {

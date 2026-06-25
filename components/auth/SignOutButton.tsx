@@ -1,35 +1,15 @@
 'use client';
 
-import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
-import { useAuthStore } from '@/stores/useAuthStore';
+import { signOutAndGoHome } from '@/lib/sign-out-client';
 import { cn } from '@/lib/utils';
 
 export function SignOutButton({ className }: { className?: string }) {
-  const queryClient = useQueryClient();
-  const reset = useAuthStore((s) => s.reset);
   const [loading, setLoading] = useState(false);
 
-  async function signOut() {
+  function signOut() {
     setLoading(true);
-    const supabase = createClient();
-
-    try {
-      await fetch('/api/auth/signout', {
-        method: 'POST',
-        credentials: 'same-origin',
-      });
-    } catch {
-      // Non-critical — client signOut below also clears cookies
-    }
-
-    await supabase.auth.signOut();
-
-    reset();
-    queryClient.clear();
-
-    window.location.href = '/login';
+    signOutAndGoHome();
   }
 
   return (
