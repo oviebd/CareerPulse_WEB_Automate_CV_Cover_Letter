@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import type { GenerationType } from '@/types';
 import type { Json } from '@/types/database';
 import { CLAUDE_MODEL } from '@/lib/claude';
+import { defaultJobCvDisplayName } from '@/lib/cv-display-name';
 
 function err(
   msg: string,
@@ -36,6 +37,7 @@ export async function POST(request: Request) {
       coverLetterLength?: string | null;
       coverLetterEmphasis?: string | null;
       coverLetterTemplateId?: string | null;
+      name?: string | null;
     };
 
     const originalCvId =
@@ -99,12 +101,12 @@ export async function POST(request: Request) {
       ? rawKw.filter((k): k is string => typeof k === 'string')
       : [];
 
+    const clientCvName =
+      typeof body.name === 'string' && body.name.trim() ? body.name.trim() : null;
+
     if (hasCv) {
       if (!jobId) {
-        const cvName =
-          gen === 'both' || gen === 'cv'
-            ? 'Tailored CV'
-            : 'Tailored CV';
+        const cvName = clientCvName ?? 'Tailored CV';
         const { data, error } = await supabase
           .from('cvs')
           .insert({
@@ -158,7 +160,8 @@ export async function POST(request: Request) {
         }
         const resolvedJobTitle = String(jobRow.job_title ?? '').trim() || 'Untitled role';
         const resolvedCompanyName = String(jobRow.company_name ?? '').trim() || 'Company';
-        const cvName = `${resolvedJobTitle} — ${resolvedCompanyName}`;
+        const cvName =
+          clientCvName ?? defaultJobCvDisplayName(resolvedJobTitle, resolvedCompanyName);
 
         const { data, error } = await supabase
           .from('cvs')

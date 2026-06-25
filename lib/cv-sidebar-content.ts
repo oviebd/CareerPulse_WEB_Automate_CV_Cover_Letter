@@ -47,25 +47,14 @@ const TAB_TO_VISIBILITY_KEY: Partial<Record<CVFormTab, CVSectionVisibilityKey>> 
   custom: 'custom',
 };
 
-/** Tabs tracked for sidebar completion % (excludes design). */
+/** Tabs tracked for sidebar completion % (Basics, Experience, Showcase — excludes Design, Photo, Address & Extras). */
 export const CV_COMPLETION_TABS: CVFormTab[] = [
-  'photo',
   'header',
-  'address',
   'summary',
   'experience',
   'education',
   'skills',
   'projects',
-  'publications',
-  'research',
-  'languages',
-  'certifications',
-  'references',
-  'awards',
-  'volunteer',
-  'interests',
-  'custom',
 ];
 
 export function cvCompletionPercent(cv: CVData): number {

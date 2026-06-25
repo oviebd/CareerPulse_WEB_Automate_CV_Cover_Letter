@@ -29,6 +29,8 @@ import { buildATSReport } from '@/lib/cv-ats';
 import { CV_EDITOR_CANVAS } from '@/lib/cv-editor-styles';
 import { readPreviewCollapsedDefault, persistPreviewExpanded } from '@/lib/cv-preview-prefs';
 import { CVEditorMobileBar } from '@/components/cv/premium/CVEditorMobileBar';
+import { CvTitleModal } from '@/components/cv/CvTitleModal';
+import { defaultCoreCvDisplayName } from '@/lib/cv-display-name';
 import { cloneCvData } from '@/lib/cv-clone';
 import { createEmptyCVData } from '@/src/utils/cvDefaults';
 import { cn } from '@/lib/utils';
@@ -74,6 +76,9 @@ export function CVEditor() {
   const autoGuestSyncRef = useRef(false);
 
   const queryClient = useQueryClient();
+
+  const [titleModalOpen, setTitleModalOpen] = useState(false);
+  const [titleModalDefault, setTitleModalDefault] = useState('');
 
   const [draftActive, setDraftActive] = useState(false);
   useEffect(() => {
@@ -398,9 +403,19 @@ export function CVEditor() {
     }
   }
 
-  async function onSaveClick() {
-    await handleSave();
-    void queryClient.invalidateQueries({ queryKey: ['cv-versions'] });
+  function openSaveTitleModal() {
+    const generated = defaultCoreCvDisplayName(editorState.cvData.personal.fullName);
+    const current = editorState.name?.trim();
+    setTitleModalDefault(current && current !== 'Untitled CV' ? current : generated);
+    setTitleModalOpen(true);
+  }
+
+  async function confirmSaveWithTitle(title: string) {
+    const ok = await handleSave(title);
+    if (ok) {
+      setTitleModalOpen(false);
+      void queryClient.invalidateQueries({ queryKey: ['cv-versions'] });
+    }
   }
 
   async function runExportPdf() {
@@ -469,6 +484,14 @@ export function CVEditor() {
   return (
     <div className="cv-editor-text-tune mx-auto max-w-[1800px] pb-24 md:pb-8">
       {authModal}
+      <CvTitleModal
+        isOpen={titleModalOpen}
+        defaultTitle={titleModalDefault}
+        onClose={() => setTitleModalOpen(false)}
+        onConfirm={confirmSaveWithTitle}
+        isSubmitting={isSaving}
+        submitLabel={saveButtonLabel}
+      />
       {isGuest ? (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)]/80 px-4 py-3 text-sm text-[var(--color-muted)] backdrop-blur-sm">
           <span>
@@ -515,7 +538,7 @@ export function CVEditor() {
           loading: isSaving,
           disabled: isSaving,
           onClick: requireAuth(() => {
-            void onSaveClick();
+            openSaveTitleModal();
           }),
         }}
         statusLine={
@@ -612,7 +635,7 @@ export function CVEditor() {
         primaryLoading={isSaving}
         primaryDisabled={isSaving}
         onPrimaryClick={requireAuth(() => {
-          void onSaveClick();
+          openSaveTitleModal();
         })}
       />
     </div>

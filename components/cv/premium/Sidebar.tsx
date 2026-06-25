@@ -289,9 +289,16 @@ export function Sidebar({
     <aside className="glass-panel w-full rounded-2xl border border-[var(--color-border)]/80 p-3 shadow-[var(--shadow-card)] xl:sticky xl:top-[72px] xl:max-h-[calc(100vh-5.5rem)] xl:w-full xl:overflow-y-auto xl:overscroll-contain">
       {cvData ? (
         <div className="mb-3 px-2">
-          <div className="flex items-center justify-between gap-2 text-[10px] font-medium text-[var(--color-muted)]">
-            <span>CV progress</span>
-            <span className="tabular-nums text-[var(--color-accent-mint)]">{completionPct}%</span>
+          <div className="flex items-start justify-between gap-2">
+            <span className="text-[10px] font-medium text-[var(--color-muted)]">
+              <span className="block">CV progress</span>
+              <span className="mt-0.5 block text-[9px] font-normal text-[var(--color-muted)]/90">
+                Core sections only
+              </span>
+            </span>
+            <span className="shrink-0 tabular-nums text-[10px] font-medium text-[var(--color-accent-mint)]">
+              {completionPct}%
+            </span>
           </div>
           <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[var(--color-progress-track)]">
             <div

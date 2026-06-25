@@ -58,7 +58,7 @@ export interface UseCVEditorReturn {
   isLoading: boolean;
   isDirty: boolean;
   saveButtonLabel: string;
-  handleSave: () => Promise<void>;
+  handleSave: (displayName?: string) => Promise<boolean>;
   editorState: CVEditorState;
   setEditorState: React.Dispatch<React.SetStateAction<CVEditorState>>;
   updateField: <K extends keyof CVData>(field: K, value: CVData[K]) => void;
@@ -277,18 +277,22 @@ export function useCVEditor({ cvIdFromRoute }: UseCVEditorOptions): UseCVEditorR
     };
   }, []);
 
-  const handleSave = useCallback(async () => {
+  const handleSave = useCallback(async (displayName?: string): Promise<boolean> => {
     if (isGuest) {
-      return;
+      return false;
     }
     setIsSaving(true);
     setSaveError(null);
     try {
+      const resolvedName =
+        displayName?.trim() ||
+        editorState.name.trim() ||
+        editorState.cvData.personal.fullName?.trim() ||
+        'Untitled CV';
+      const stateForSave: CVEditorState = { ...editorState, name: resolvedName };
+
       if (isNew) {
-        const name =
-          editorState.name.trim() ||
-          editorState.cvData.personal.fullName?.trim() ||
-          'Untitled CV';
+        const name = resolvedName;
         const createRes = await fetch('/api/cvs', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -300,7 +304,7 @@ export function useCVEditor({ cvIdFromRoute }: UseCVEditorOptions): UseCVEditorR
         }
         const created = (await createRes.json()) as CVProfile;
         const newId = created.id;
-        const patch = buildPatchBody(editorState);
+        const patch = buildPatchBody(stateForSave);
         const patchRes = await fetch(`/api/cvs/${newId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -339,7 +343,7 @@ export function useCVEditor({ cvIdFromRoute }: UseCVEditorOptions): UseCVEditorR
         useGuestCvStore.getState().clearGuestCv();
         router.replace(`/cv/edit/${newId}`);
       } else {
-        const patch = buildPatchBody(editorState);
+        const patch = buildPatchBody(stateForSave);
         const patchRes = await fetch(`/api/cvs/${cvId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -368,8 +372,10 @@ export function useCVEditor({ cvIdFromRoute }: UseCVEditorOptions): UseCVEditorR
         setEditorState(st);
         setSavedSnapshot(serializeEditorState(st));
       }
+      return true;
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : 'Save failed');
+      return false;
     } finally {
       setIsSaving(false);
     }

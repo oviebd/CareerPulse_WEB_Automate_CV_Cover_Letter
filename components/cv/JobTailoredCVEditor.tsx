@@ -49,6 +49,8 @@ import { JOB_STATUS_CONFIG, jobStatusShortLabel } from '@/types';
 import { TRACKABLE_JOB_STATUSES } from '@/lib/job-status';
 import { computeCvDiffSections, summarizeDiff } from '@/lib/cv-diff';
 import type { CVProfile } from '@/types';
+import { CvTitleModal } from '@/components/cv/CvTitleModal';
+import { defaultJobCvDisplayName } from '@/lib/cv-display-name';
 import { Modal } from '@/components/ui/modal';
 import { Tabs } from '@/components/ui/tabs';
 import {
@@ -193,6 +195,8 @@ export function JobTailoredCVEditor() {
   >([]);
   const [trackPopupSaving, setTrackPopupSaving] = useState(false);
   const [pageSaveState, setPageSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [titleModalOpen, setTitleModalOpen] = useState(false);
+  const [titleModalDefault, setTitleModalDefault] = useState('');
   const [uncollapsedDiffSections, setUncollapsedDiffSections] = useState<Record<string, boolean>>(
     {}
   );
@@ -511,9 +515,9 @@ export function JobTailoredCVEditor() {
     );
   }, [coreVersions]);
 
-  const saveJobCv = useCallback(async () => {
-    if (!draft) return;
-    if (isDraftMode && !draftMeta) return;
+  const saveJobCv = useCallback(async (displayName?: string): Promise<boolean> => {
+    if (!draft) return false;
+    if (isDraftMode && !draftMeta) return false;
 
     setPageSaveState('saving');
     try {
@@ -521,6 +525,7 @@ export function JobTailoredCVEditor() {
       const cvContent = cvDataToOptimisedCvJson(draft);
       const cl =
         gen === 'coverLetter' || gen === 'both' ? coverLetterText.trim() : '';
+      const resolvedName = displayName?.trim();
 
       if (isDraftMode && draftMeta) {
         let jobId = sessionSavedJobId ?? draftMeta.savedJobId ?? null;
@@ -544,7 +549,7 @@ export function JobTailoredCVEditor() {
             if (!jobRes.ok) {
               toast('Failed to save job.', 'error');
               setPageSaveState('idle');
-              return;
+              return false;
             }
             const jobJson = (await jobRes.json()) as { id: string };
             jobId = jobJson.id;
@@ -566,12 +571,13 @@ export function JobTailoredCVEditor() {
               coverLetterTone: draftMeta.coverLetterTone,
               coverLetterLength: draftMeta.coverLetterLength,
               coverLetterEmphasis: draftMeta.coverLetterEmphasis ?? null,
+              name: resolvedName,
             }),
           });
           if (!soRes.ok) {
             toast('Failed to save CV.', 'error');
             setPageSaveState('idle');
-            return;
+            return false;
           }
           const soJson = (await soRes.json()) as {
             cvId: string | null;
@@ -615,12 +621,13 @@ export function JobTailoredCVEditor() {
             body: JSON.stringify({
               cvContent,
               coverLetterContent: gen !== 'cv' ? cl : undefined,
+              ...(resolvedName ? { name: resolvedName } : {}),
             }),
           });
           if (!patchRes.ok) {
             toast('Could not save changes.', 'error');
             setPageSaveState('idle');
-            return;
+            return false;
           }
           toast('Changes saved', 'success');
           void queryClient.invalidateQueries({ queryKey: ['job-detail'] });
@@ -632,12 +639,13 @@ export function JobTailoredCVEditor() {
           body: JSON.stringify({
             cvContent,
             coverLetterContent: gen !== 'cv' ? cl : undefined,
+            ...(resolvedName ? { name: resolvedName } : {}),
           }),
         });
         if (!patchRes.ok) {
           toast('Could not save changes.', 'error');
           setPageSaveState('idle');
-          return;
+          return false;
         }
         toast('Changes saved', 'success');
         void queryClient.invalidateQueries({ queryKey: ['job-specific-cv', id] });
@@ -645,9 +653,11 @@ export function JobTailoredCVEditor() {
 
       setPageSaveState('saved');
       window.setTimeout(() => setPageSaveState('idle'), 1800);
+      return true;
     } catch {
       toast('Could not save.', 'error');
       setPageSaveState('idle');
+      return false;
     }
   }, [
     draft,
@@ -663,6 +673,37 @@ export function JobTailoredCVEditor() {
     queryClient,
     id,
   ]);
+
+  const openSaveTitleModal = useCallback(() => {
+    const role =
+      jobTitle ||
+      draftMeta?.jobTitle ||
+      draftMeta?.analysis?.jobTitle ||
+      draft?.personal?.title;
+    const company =
+      companyName ?? draftMeta?.companyName ?? draftMeta?.analysis?.company;
+    const generated = defaultJobCvDisplayName(role, company);
+    const current = jobCV?.name?.trim();
+    setTitleModalDefault(
+      !isDraftMode && current && current !== 'Tailored CV' ? current : generated
+    );
+    setTitleModalOpen(true);
+  }, [
+    jobTitle,
+    draftMeta,
+    draft?.personal?.title,
+    companyName,
+    jobCV?.name,
+    isDraftMode,
+  ]);
+
+  const confirmSaveWithTitle = useCallback(
+    async (title: string) => {
+      const ok = await saveJobCv(title);
+      if (ok) setTitleModalOpen(false);
+    },
+    [saveJobCv]
+  );
 
   const openDiffViewer = useCallback(async () => {
     if (!draft) return;
@@ -699,23 +740,33 @@ export function JobTailoredCVEditor() {
   }, [draft, draftMeta?.originalCvId, targetCoreCvId, coreVersions]);
 
   const handleTrackPopupSave = useCallback(async () => {
-    if (!pendingTrackStatus || !draftMeta) return;
+    if (!pendingTrackStatus) return;
+    if (isDraftMode && !draftMeta) return;
     setTrackPopupSaving(true);
     try {
-      let jobId = sessionSavedJobId ?? draftMeta.savedJobId ?? effectiveJobId ?? null;
+      let jobId = sessionSavedJobId ?? draftMeta?.savedJobId ?? effectiveJobId ?? null;
       if (!jobId) {
+        const jobSaveBody = draftMeta
+          ? {
+              url: draftMeta.jobUrl || undefined,
+              keywords: draftMeta.analysis?.keywords?.length
+                ? draftMeta.analysis.keywords
+                : draftMeta.extractedKeywords ?? [],
+              jobSummary: draftMeta.analysis?.jobSummary ?? '',
+              title: draftMeta.analysis?.jobTitle ?? draftMeta.jobTitle ?? undefined,
+              company: draftMeta.analysis?.company ?? draftMeta.companyName ?? undefined,
+            }
+          : {
+              keywords,
+              jobSummary: jobCV?.job_description ?? '',
+              title: jobTitle || undefined,
+              company: companyName ?? undefined,
+            };
+
         const jobRes = await fetch('/api/jobs/save', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            url: draftMeta.jobUrl || undefined,
-            keywords: draftMeta.analysis?.keywords?.length
-              ? draftMeta.analysis.keywords
-              : draftMeta.extractedKeywords ?? [],
-            jobSummary: draftMeta.analysis?.jobSummary ?? '',
-            title: draftMeta.analysis?.jobTitle ?? draftMeta.jobTitle ?? undefined,
-            company: draftMeta.analysis?.company ?? draftMeta.companyName ?? undefined,
-          }),
+          body: JSON.stringify(jobSaveBody),
         });
         if (!jobRes.ok) {
           toast('Could not save job.', 'error');
@@ -728,10 +779,12 @@ export function JobTailoredCVEditor() {
         if (od) {
           useOptimiseDraftStore.getState().setDraft({ ...od, savedJobId: jobId });
         }
-        useOptimiseEditDraftStore.getState().setCvEditDraft({
-          ...draftMeta,
-          savedJobId: jobId,
-        });
+        if (draftMeta) {
+          useOptimiseEditDraftStore.getState().setCvEditDraft({
+            ...draftMeta,
+            savedJobId: jobId,
+          });
+        }
       }
 
       const patchRes = await fetch(`/api/jobs/${jobId}/status`, {
@@ -743,6 +796,21 @@ export function JobTailoredCVEditor() {
         toast('Could not update status.', 'error');
         return;
       }
+
+      if (!isDraftMode && id && !effectiveJobId) {
+        const linkRes = await fetch(`/api/jobs/${jobId}/link`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'cv', assetId: id, action: 'link' }),
+        });
+        if (!linkRes.ok) {
+          toast('Status saved but could not link job to this CV.', 'error');
+        } else {
+          void queryClient.invalidateQueries({ queryKey: ['job-specific-cv', id] });
+        }
+      }
+
+      queryClient.setQueryData(['job-detail', jobId], { status: pendingTrackStatus });
       toast(
         `Status updated to ${JOB_STATUS_CONFIG[pendingTrackStatus as Exclude<JobStatus, 'none'>].label}`,
         'success'
@@ -758,9 +826,15 @@ export function JobTailoredCVEditor() {
     }
   }, [
     pendingTrackStatus,
+    isDraftMode,
     draftMeta,
     sessionSavedJobId,
     effectiveJobId,
+    keywords,
+    jobCV?.job_description,
+    jobTitle,
+    companyName,
+    id,
     toast,
     queryClient,
   ]);
@@ -871,6 +945,16 @@ export function JobTailoredCVEditor() {
 
   return (
     <div className="cv-editor-text-tune mx-auto max-w-[1800px] space-y-4 pb-24 md:pb-8">
+      <CvTitleModal
+        isOpen={titleModalOpen}
+        defaultTitle={titleModalDefault}
+        onClose={() => setTitleModalOpen(false)}
+        onConfirm={confirmSaveWithTitle}
+        isSubmitting={pageSaveState === 'saving'}
+        submitLabel={
+          pageSaveState === 'saving' ? 'Saving…' : isUnsavedDraft ? 'Save CV' : 'Update CV'
+        }
+      />
       <CVEditorTopBar
         backHref={isDraftMode ? '/cv/optimise' : '/cv/job-specific'}
         title="Job-tailored CV"
@@ -946,7 +1030,7 @@ export function JobTailoredCVEditor() {
                 : 'Save',
           loading: pageSaveState === 'saving',
           disabled: pageSaveState === 'saving',
-          onClick: () => void saveJobCv(),
+          onClick: () => openSaveTitleModal(),
         }}
         statusLine={saveLabel}
         focusMode={editingCvBody ? focusMode : 'default'}
@@ -1212,7 +1296,7 @@ export function JobTailoredCVEditor() {
         }
         primaryLabel={pageSaveState === 'saving' ? 'Saving…' : 'Save'}
         primaryLoading={pageSaveState === 'saving'}
-        onPrimaryClick={() => void saveJobCv()}
+        onPrimaryClick={() => openSaveTitleModal()}
       />
 
       <Modal
