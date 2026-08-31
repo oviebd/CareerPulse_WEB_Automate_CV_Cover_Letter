@@ -965,7 +965,11 @@
     } else if (shouldSkip(key, d, cfg)) {
       return '';
     }
-    if (key === 'skills') return renderSkillsBlock(d, cfg, 'skills');
+    if (key === 'skills') {
+      var block = renderSkillsBlock(d, cfg, 'skills');
+      if (cfg.id === 'creative') block += renderSkillsBlock(d, cfg, 'tools');
+      return block;
+    }
     if (key === 'tools') return renderSkillsBlock(d, cfg, 'tools');
     if (key === 'languages') {
       if (!d.languages || !d.languages.length) return '';
@@ -986,6 +990,25 @@
         '</div>';
     }
     return '';
+  }
+
+  function sectionLabel(cfg, key, fallback) {
+    var overrides = cfg.labelOverrides || {};
+    return overrides[key] || fallback;
+  }
+
+  function educationExtraHtml(e, cfg) {
+    if (cfg.educationDetail !== 'academic') return '';
+    var h = '';
+    if (e.thesis) h += '<div class="cv-muted">Thesis: ' + esc(e.thesis) + '</div>';
+    if (e.advisor) h += '<div class="cv-muted">Advisor: ' + esc(e.advisor) + '</div>';
+    if (e.coursework && e.coursework.length) {
+      h += '<div class="cv-muted">Coursework: ' + esc(e.coursework.join(', ')) + '</div>';
+    }
+    if (e.honors && e.honors.length) {
+      h += '<div class="cv-muted">Honors: ' + esc(e.honors.join(', ')) + '</div>';
+    }
+    return h;
   }
 
   function headerBlock(d, cfg) {
@@ -1028,6 +1051,12 @@
       parts.push('<a href="' + esc(lk.portfolio) + '">Portfolio</a>');
     if (lk.website)
       parts.push('<a href="' + esc(lk.website) + '">Website</a>');
+    if (lk.orcid)
+      parts.push('<a href="' + esc(lk.orcid) + '">ORCID</a>');
+    if (lk.googleScholar)
+      parts.push('<a href="' + esc(lk.googleScholar) + '">Scholar</a>');
+    if (lk.researchGate)
+      parts.push('<a href="' + esc(lk.researchGate) + '">ResearchGate</a>');
     html += parts.join(' · ');
     html += '</div></div></header>';
     return html;
@@ -1040,7 +1069,7 @@
 
   function sectionSummary(d, cfg, tpl) {
     if (shouldSkip('summary', d, cfg)) return '';
-    var title = tpl === 'high-school' ? 'Objective' : 'Summary';
+    var title = sectionLabel(cfg, 'summary', tpl === 'high-school' ? 'Objective' : 'Summary');
     return (
       '<section class="cv-section"><div class="cv-section-title">' + title + '</div><div class="cv-summary">' +
       esc(d.summary || '') +
@@ -1052,7 +1081,7 @@
     if (shouldSkip('experience', d, cfg)) return '';
     var html =
       '<section class="cv-section"><div class="cv-section-title">' +
-      (tpl === 'healthcare' ? 'Clinical experience' : 'Experience') +
+      sectionLabel(cfg, 'experience', tpl === 'healthcare' ? 'Clinical experience' : 'Experience') +
       '</div>';
     (d.experience || []).forEach(function (e) {
       html += '<div class="cv-card exp-block">';
@@ -1094,6 +1123,7 @@
         (e.field ? ' — ' + esc(e.field) : '') +
         '</div>';
       if (e.gpa) html += '<div class="cv-muted">GPA: ' + esc(e.gpa) + '</div>';
+      html += educationExtraHtml(e, cfg);
       html += '</div>';
     });
     html += '</section>';
@@ -1202,15 +1232,21 @@
     if (shouldSkip('certifications', d, cfg)) return '';
     var html =
       '<section class="cv-section"><div class="cv-section-title">' +
-      (tpl === 'healthcare' ? 'Licenses & certifications' : 'Certifications') +
+      sectionLabel(
+        cfg,
+        'certifications',
+        tpl === 'healthcare' ? 'Licenses & certifications' : 'Certifications'
+      ) +
       '</div>';
     (d.certifications || []).forEach(function (c) {
       html += '<div class="cv-card">';
       if (tpl === 'healthcare') {
         html += '<span class="lic-badge">' + esc(c.name) + '</span> ';
+        html += esc(c.issuer) + ' · ' + esc(c.date);
+      } else {
+        html += '<span class="cv-strong">' + esc(c.name) + '</span> — ' + esc(c.issuer);
+        html += ' · ' + esc(c.date);
       }
-      html += '<span class="cv-strong">' + esc(c.name) + '</span> — ' + esc(c.issuer);
-      html += ' · ' + esc(c.date);
       html += '</div>';
     });
     html += '</section>';

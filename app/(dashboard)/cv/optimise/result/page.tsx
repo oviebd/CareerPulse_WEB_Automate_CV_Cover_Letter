@@ -485,8 +485,6 @@ export default function OptimiseResultPage() {
         body: JSON.stringify({
           type: 'cv',
           job_cv_id: d.savedCvId,
-          template_id: 'classic',
-          accent_color: '#6C63FF',
           format: 'pdf',
         }),
       });
@@ -522,9 +520,7 @@ export default function OptimiseResultPage() {
         body: JSON.stringify({
           type: 'cover_letter',
           id: d.savedCoverLetterId,
-          templateId: 'cl-classic',
           content: d.coverLetter ?? '',
-          accent_color: '#2563EB',
           company_name: d.analysis?.company ?? d.companyName ?? null,
           job_title: d.analysis?.jobTitle ?? d.jobTitle ?? null,
         }),

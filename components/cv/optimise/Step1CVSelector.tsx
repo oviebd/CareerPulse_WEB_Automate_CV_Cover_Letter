@@ -30,6 +30,28 @@ export function Step1CVSelector({ options, loading, selectedCvId, onSelect }: St
         <p className="text-sm text-[var(--color-muted)]">Pick one core CV version as the source for optimization.</p>
       </header>
 
+      {!loading && options.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] p-6 text-center">
+          <p className="font-medium text-[var(--color-text-primary)]">You need a base CV first</p>
+          <p className="mt-1 text-sm text-[var(--color-muted)]">
+            Upload an existing CV or create one in the builder before tailoring to a job.
+          </p>
+          <div className="mt-4 flex flex-wrap justify-center gap-3">
+            <Link
+              href="/cv/upload"
+              className="inline-flex items-center rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-2)]"
+            >
+              Upload CV
+            </Link>
+            <Link
+              href="/cv/edit"
+              className="inline-flex items-center rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+            >
+              Create CV
+            </Link>
+          </div>
+        </div>
+      ) : (
       <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 sm:p-5">
         <Select
           label={loading ? 'Loading base CVs...' : 'Base CV'}
@@ -40,7 +62,7 @@ export function Step1CVSelector({ options, loading, selectedCvId, onSelect }: St
         />
         <div className="mt-3 flex items-center justify-end">
           <Link
-            href="/cv/builder"
+            href="/cv/edit"
             className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--color-primary)] hover:underline"
           >
             <Plus className="h-4 w-4" />
@@ -48,6 +70,7 @@ export function Step1CVSelector({ options, loading, selectedCvId, onSelect }: St
           </Link>
         </div>
       </div>
+      )}
     </section>
   );
 }

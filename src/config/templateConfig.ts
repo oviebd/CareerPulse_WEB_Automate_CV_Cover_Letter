@@ -19,6 +19,14 @@ export interface TemplateConfig {
   showPhoto: boolean;
   hideIfEmpty: string[];
   requiredSections: string[];
+  /** How much education detail to render (thesis, advisor, coursework, honors). */
+  educationDetail?: 'basic' | 'academic';
+  /** Publication citation style in renderer. */
+  publicationStyle?: 'plain' | 'numbered' | 'apa-ish';
+  /** Override default section heading labels keyed by section id. */
+  labelOverrides?: Partial<Record<string, string>>;
+  /** ATS compatibility risk — drives UI warnings. */
+  atsRisk?: 'low' | 'medium' | 'high';
 }
 
 /**
@@ -74,6 +82,9 @@ export const TEMPLATE_CONFIGS: Record<TemplateId, TemplateConfig> = {
     showPhoto: false,
     hideIfEmpty: ['publications', 'research', 'projects'],
     requiredSections: ['personal', 'summary', 'experience', 'education', 'skills'],
+    educationDetail: 'basic',
+    publicationStyle: 'plain',
+    atsRisk: 'low',
   },
   modern: {
     id: 'modern',
@@ -105,6 +116,9 @@ export const TEMPLATE_CONFIGS: Record<TemplateId, TemplateConfig> = {
     showPhoto: true,
     hideIfEmpty: ['publications', 'research'],
     requiredSections: ['personal', 'summary', 'experience', 'skills'],
+    educationDetail: 'basic',
+    publicationStyle: 'plain',
+    atsRisk: 'medium',
   },
   academic: {
     id: 'academic',
@@ -135,6 +149,9 @@ export const TEMPLATE_CONFIGS: Record<TemplateId, TemplateConfig> = {
     showPhoto: false,
     hideIfEmpty: ['projects', 'volunteer'],
     requiredSections: ['personal', 'education', 'publications', 'research'],
+    educationDetail: 'academic',
+    publicationStyle: 'plain',
+    atsRisk: 'low',
   },
   technical: {
     id: 'technical',
@@ -166,6 +183,9 @@ export const TEMPLATE_CONFIGS: Record<TemplateId, TemplateConfig> = {
     showPhoto: false,
     hideIfEmpty: ['publications', 'research', 'volunteer'],
     requiredSections: ['personal', 'skills', 'experience', 'projects'],
+    educationDetail: 'basic',
+    publicationStyle: 'plain',
+    atsRisk: 'medium',
   },
   minimal: {
     id: 'minimal',
@@ -202,6 +222,9 @@ export const TEMPLATE_CONFIGS: Record<TemplateId, TemplateConfig> = {
       'research',
     ],
     requiredSections: ['personal', 'summary', 'experience'],
+    educationDetail: 'basic',
+    publicationStyle: 'plain',
+    atsRisk: 'low',
   },
   creative: {
     id: 'creative',
@@ -209,7 +232,7 @@ export const TEMPLATE_CONFIGS: Record<TemplateId, TemplateConfig> = {
     description: 'Visual layout with photo support',
     targetUsers: 'Designers, Artists, Writers, UX',
     layout: 'two-column',
-    sidebarSections: ['skills', 'tools', 'languages', 'interests'],
+    sidebarSections: ['skills', 'languages', 'interests'],
     sectionOrder: [
       'personal',
       'summary',
@@ -233,6 +256,9 @@ export const TEMPLATE_CONFIGS: Record<TemplateId, TemplateConfig> = {
     showPhoto: true,
     hideIfEmpty: ['publications', 'research'],
     requiredSections: ['personal', 'projects', 'skills'],
+    educationDetail: 'basic',
+    publicationStyle: 'plain',
+    atsRisk: 'medium',
   },
   'entry-level': {
     id: 'entry-level',
@@ -263,6 +289,9 @@ export const TEMPLATE_CONFIGS: Record<TemplateId, TemplateConfig> = {
     showPhoto: false,
     hideIfEmpty: ['publications', 'research'],
     requiredSections: ['personal', 'education', 'skills'],
+    educationDetail: 'academic',
+    publicationStyle: 'plain',
+    atsRisk: 'low',
   },
   healthcare: {
     id: 'healthcare',
@@ -293,6 +322,13 @@ export const TEMPLATE_CONFIGS: Record<TemplateId, TemplateConfig> = {
     showPhoto: false,
     hideIfEmpty: ['projects', 'publications'],
     requiredSections: ['personal', 'certifications', 'experience', 'education'],
+    educationDetail: 'basic',
+    publicationStyle: 'plain',
+    labelOverrides: {
+      experience: 'Clinical experience',
+      certifications: 'Licenses & certifications',
+    },
+    atsRisk: 'low',
   },
   'amber-strike': {
     id: 'amber-strike',
@@ -325,6 +361,9 @@ export const TEMPLATE_CONFIGS: Record<TemplateId, TemplateConfig> = {
     showPhoto: true,
     hideIfEmpty: ['publications', 'research'],
     requiredSections: ['personal', 'summary', 'experience', 'skills'],
+    educationDetail: 'basic',
+    publicationStyle: 'plain',
+    atsRisk: 'medium',
   },
   'midnight-pro': {
     id: 'midnight-pro',
@@ -357,6 +396,9 @@ export const TEMPLATE_CONFIGS: Record<TemplateId, TemplateConfig> = {
     showPhoto: true,
     hideIfEmpty: ['publications', 'research', 'volunteer'],
     requiredSections: ['personal', 'summary', 'experience', 'skills'],
+    educationDetail: 'basic',
+    publicationStyle: 'plain',
+    atsRisk: 'medium',
   },
   'golden-hour': {
     id: 'golden-hour',
@@ -389,6 +431,9 @@ export const TEMPLATE_CONFIGS: Record<TemplateId, TemplateConfig> = {
     showPhoto: true,
     hideIfEmpty: ['publications', 'research'],
     requiredSections: ['personal', 'summary', 'experience', 'skills'],
+    educationDetail: 'basic',
+    publicationStyle: 'plain',
+    atsRisk: 'medium',
   },
   'ocean-slate': {
     id: 'ocean-slate',
@@ -421,6 +466,9 @@ export const TEMPLATE_CONFIGS: Record<TemplateId, TemplateConfig> = {
     showPhoto: true,
     hideIfEmpty: ['publications', 'research'],
     requiredSections: ['personal', 'summary', 'experience', 'skills'],
+    educationDetail: 'basic',
+    publicationStyle: 'plain',
+    atsRisk: 'medium',
   },
   'violet-edge': {
     id: 'violet-edge',
@@ -453,6 +501,9 @@ export const TEMPLATE_CONFIGS: Record<TemplateId, TemplateConfig> = {
     showPhoto: true,
     hideIfEmpty: ['publications', 'research'],
     requiredSections: ['personal', 'summary', 'experience', 'skills'],
+    educationDetail: 'basic',
+    publicationStyle: 'plain',
+    atsRisk: 'medium',
   },
   'ats-plain': {
     id: 'ats-plain',
@@ -483,6 +534,9 @@ export const TEMPLATE_CONFIGS: Record<TemplateId, TemplateConfig> = {
     showPhoto: false,
     hideIfEmpty: ['projects', 'publications', 'research', 'volunteer', 'interests', 'references'],
     requiredSections: ['personal', 'experience', 'education', 'skills'],
+    educationDetail: 'basic',
+    publicationStyle: 'plain',
+    atsRisk: 'low',
   },
   'high-school': {
     id: 'high-school',
@@ -513,6 +567,10 @@ export const TEMPLATE_CONFIGS: Record<TemplateId, TemplateConfig> = {
     showPhoto: false,
     hideIfEmpty: ['experience', 'projects', 'publications', 'research', 'certifications', 'references'],
     requiredSections: ['personal', 'education', 'skills'],
+    educationDetail: 'academic',
+    publicationStyle: 'plain',
+    labelOverrides: { summary: 'Objective' },
+    atsRisk: 'low',
   },
   executive: {
     id: 'executive',
@@ -543,6 +601,9 @@ export const TEMPLATE_CONFIGS: Record<TemplateId, TemplateConfig> = {
     showPhoto: false,
     hideIfEmpty: ['projects', 'publications', 'research', 'volunteer', 'interests'],
     requiredSections: ['personal', 'summary', 'experience'],
+    educationDetail: 'basic',
+    publicationStyle: 'plain',
+    atsRisk: 'low',
   },
   researcher: {
     id: 'researcher',
@@ -573,6 +634,9 @@ export const TEMPLATE_CONFIGS: Record<TemplateId, TemplateConfig> = {
     showPhoto: false,
     hideIfEmpty: ['volunteer', 'interests', 'certifications', 'projects'],
     requiredSections: ['personal', 'education', 'publications'],
+    educationDetail: 'academic',
+    publicationStyle: 'numbered',
+    atsRisk: 'low',
   },
   europass: {
     id: 'europass',
@@ -603,6 +667,9 @@ export const TEMPLATE_CONFIGS: Record<TemplateId, TemplateConfig> = {
     showPhoto: true,
     hideIfEmpty: ['projects', 'publications', 'research', 'awards', 'interests', 'references'],
     requiredSections: ['personal', 'experience', 'education', 'languages'],
+    educationDetail: 'academic',
+    publicationStyle: 'plain',
+    atsRisk: 'low',
   },
 };
 
@@ -645,11 +712,15 @@ export const VISIBLE_TEMPLATE_IDS: TemplateId[] = [
   'modern',
   'academic',
   'technical',
-  'entry-level',
-  'creative',
   'minimal',
+  'creative',
+  'entry-level',
   'healthcare',
+  'amber-strike',
   'midnight-pro',
+  'golden-hour',
+  'ocean-slate',
+  'violet-edge',
   'ats-plain',
   'high-school',
   'executive',

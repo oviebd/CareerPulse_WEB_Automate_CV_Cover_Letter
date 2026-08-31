@@ -97,11 +97,16 @@ src/templates/
 ├── creative/
 ├── entry-level/
 ├── healthcare/
-├── amber-strike/       ← Premium
-├── midnight-pro/       ← Premium
-├── golden-hour/        ← Premium
-├── ocean-slate/        ← Premium
-└── violet-edge/        ← Premium
+├── amber-strike/       ← Pro
+├── midnight-pro/       ← Pro
+├── golden-hour/        ← Pro
+├── ocean-slate/        ← Pro
+├── violet-edge/        ← Pro
+├── ats-plain/
+├── high-school/
+├── executive/
+├── researcher/
+└── europass/
 
 src/config/
 └── templateConfig.ts   ← Template registry (TemplateConfig interface + TEMPLATE_CONFIGS)
@@ -134,8 +139,14 @@ export interface TemplateConfig {
   showPhoto: boolean;             // Support profile photo
   hideIfEmpty: string[];          // Auto-hide these sections when they have no content
   requiredSections: string[];     // Minimum sections (informational, used by completion check)
+  educationDetail?: 'basic' | 'academic';  // Render thesis/advisor/coursework/honors when 'academic'
+  publicationStyle?: 'plain' | 'numbered' | 'apa-ish';
+  labelOverrides?: Partial<Record<string, string>>;  // e.g. summary → Objective
+  atsRisk?: 'low' | 'medium' | 'high';
 }
 ```
+
+> **Note:** Legacy Handlebars templates under `templates/cv/` were removed. All CV rendering uses `src/templates/` + `sections.js`.
 
 ### Field Effects on Rendering
 
@@ -162,21 +173,28 @@ Every template's `sectionOrder` must include all 15 keys exactly once.
 
 ### Template Catalog
 
+All 18 templates are visible in every picker (landing page, template gallery, and CV builder). Free users can preview Pro templates but need an upgrade to set them as default or export PDF.
+
 | ID | Label | Layout | Photo | Skill Bars | Tier |
 |---|---|---|---|---|---|
 | `classic` | Classic | single-column | No | No | Free |
 | `minimal` | Minimal | single-column | No | No | Free |
 | `entry-level` | Entry Level | single-column | No | Yes | Free |
 | `healthcare` | Healthcare | single-column | No | No | Free |
+| `ats-plain` | ATS Plain | single-column | No | No | Free |
+| `high-school` | High School | single-column | No | No | Free |
+| `executive` | Executive | single-column | No | No | Free |
+| `researcher` | PhD / Researcher | single-column | No | No | Free |
+| `europass` | Europass | single-column | Yes | No | Free |
 | `modern` | Modern | two-column | Yes | Yes | Pro |
 | `academic` | Academic | single-column | No | No | Pro |
 | `technical` | Technical | two-column | No | Yes | Pro |
 | `creative` | Creative | two-column | Yes | Yes | Pro |
-| `amber-strike` | Amber Strike | two-column | Yes | Yes | Premium |
-| `midnight-pro` | Midnight Pro | two-column | Yes | No | Premium |
-| `golden-hour` | Golden Hour | two-column | Yes | Yes | Premium |
-| `ocean-slate` | Ocean Slate | two-column | Yes | No | Premium |
-| `violet-edge` | Violet Edge | two-column | Yes | No | Premium |
+| `amber-strike` | Amber Strike | two-column | Yes | Yes | Pro |
+| `midnight-pro` | Midnight Pro | two-column | Yes | No | Pro |
+| `golden-hour` | Golden Hour | two-column | Yes | Yes | Pro |
+| `ocean-slate` | Ocean Slate | two-column | Yes | No | Pro |
+| `violet-edge` | Violet Edge | two-column | Yes | No | Pro |
 
 ### Adding a New ID
 
@@ -844,6 +862,26 @@ GET /api/cv/preview-html?template_id=my-template&sample=1
 This uses sample data so no user account is needed. The endpoint falls back to `TEMPLATE_CONFIGS` if the template isn't in the Supabase `cv_templates` table.
 
 To add it to the database, insert a row in the `cv_templates` table (or leave it out and the fallback will serve it from config).
+
+### Acceptance checklist (required before shipping)
+
+Run after every template change:
+
+```bash
+npm run validate-templates
+npm run test-roundtrip
+npm run test-templates
+```
+
+Each new template must pass:
+
+1. **Fixture render** — `getSampleCVData()` populates every section; PDF is non-empty for all 18 ids.
+2. **Empty-section hiding** — optional sections in `hideIfEmpty` do not render when data is absent.
+3. **Preview === PDF** — same `renderUnifiedHtml()` path for iframe preview and Puppeteer export.
+4. **Accent + font** — `meta.colorScheme` and `meta.fontFamily` apply via CSS variables (except locked premium palettes).
+5. **Round-trip** — `CVData → universalToProfilePayload → migrateLegacyCVData` preserves publications, thesis, native language, ORCID, and all references.
+
+Set `educationDetail: 'academic'` for student/researcher templates; use `labelOverrides` instead of hardcoding template ids in `sections.js`.
 
 ---
 

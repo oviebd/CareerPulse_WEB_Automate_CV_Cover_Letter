@@ -343,7 +343,7 @@ function CoverLettersTab() {
         </Link>
 
         <Link
-          href="/applications/new"
+          href="/cover-letters/new/jd"
           className="flex flex-col gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-left transition hover:border-[var(--color-primary-300)] hover:bg-[var(--color-surface-2)]"
         >
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400">

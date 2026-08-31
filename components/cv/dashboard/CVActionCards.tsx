@@ -90,7 +90,7 @@ export function CVActionCards() {
           </div>
         </div>
         <div className="mt-3">
-          <Link href="/cv/optimise" className={`${cvDashboardPrimary} w-full shadow-sm sm:w-auto`}>
+          <Link href="/applications/new" className={`${cvDashboardPrimary} w-full shadow-sm sm:w-auto`}>
             Tailor My CV
           </Link>
         </div>

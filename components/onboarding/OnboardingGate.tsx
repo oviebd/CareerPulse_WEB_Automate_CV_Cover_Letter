@@ -55,11 +55,11 @@ export function OnboardingGate({ children }: { children: React.ReactNode }) {
                   Paste a job posting to get a tailored CV and cover letter — or build your base CV first.
                 </p>
                 <div className="flex flex-col gap-2">
-                  <Button variant="primary" onClick={() => router.push('/applications/new')}>
-                    Paste a job posting
+                  <Button variant="secondary" onClick={() => router.push('/cv/upload')}>
+                    Upload or create my CV first
                   </Button>
-                  <Button variant="secondary" onClick={() => setStep(1)}>
-                    I don&apos;t have a job yet
+                  <Button variant="primary" onClick={() => router.push('/applications/new')}>
+                    I already have a CV — paste a job posting
                   </Button>
                 </div>
               </>

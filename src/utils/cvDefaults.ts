@@ -153,10 +153,10 @@ function mapLangProf(
   p: string | undefined
 ): import('../types/cv.types').Language['proficiency'] {
   const x = (p ?? 'professional').toLowerCase();
-  if (x === 'native' || x === 'fluent') return 'professional';
-  if (x === 'advanced' || x === 'intermediate' || x === 'basic')
-    return x as import('../types/cv.types').Language['proficiency'];
-  if (x === 'conversational' || x === 'professional') return x;
+  if (x === 'native') return 'native';
+  if (x === 'fluent' || x === 'advanced' || x === 'professional') return 'professional';
+  if (x === 'intermediate' || x === 'conversational') return 'conversational';
+  if (x === 'basic') return 'basic';
   return 'professional';
 }
 
@@ -224,6 +224,10 @@ export function migrateLegacyCVData(legacyData: unknown): CVData {
       label === 'site'
     )
       out.personal.links.website = url;
+    else if (label.includes('orcid')) out.personal.links.orcid = url;
+    else if (label.includes('scholar')) out.personal.links.googleScholar = url;
+    else if (label.includes('researchgate') || label === 'rg')
+      out.personal.links.researchGate = url;
   }
   const port = str(L.portfolio_url);
   const web = str(L.website_url);
@@ -292,6 +296,8 @@ export function migrateLegacyCVData(legacyData: unknown): CVData {
       };
     }
     const r = row;
+    const thesisFromDesc =
+      !r.thesis && r.description ? str(r.description) : undefined;
     return {
       id: str(r.id) || `edu-${i}`,
       institution: str(r.institution),
@@ -301,7 +307,7 @@ export function migrateLegacyCVData(legacyData: unknown): CVData {
       endDate: str(r.endDate ?? r.end_date ?? ''),
       current: Boolean(r.current),
       gpa: r.gpa ? str(r.gpa) : undefined,
-      thesis: r.thesis ? str(r.thesis) : undefined,
+      thesis: r.thesis ? str(r.thesis) : thesisFromDesc || undefined,
       advisor: r.advisor ? str(r.advisor) : undefined,
       coursework: Array.isArray(r.coursework)
         ? r.coursework.map((x) => str(x))
@@ -311,6 +317,29 @@ export function migrateLegacyCVData(legacyData: unknown): CVData {
         : undefined,
     };
   });
+
+  if (xtra && isRecord(xtra.educationExtra)) {
+    const eduExtra = xtra.educationExtra as Record<string, Record<string, unknown>>;
+    out.education = out.education.map((e) => {
+      const ext = eduExtra[e.id];
+      if (!ext || !isRecord(ext)) return e;
+      return {
+        ...e,
+        thesis: e.thesis ?? (ext.thesis ? str(ext.thesis) : undefined),
+        advisor: e.advisor ?? (ext.advisor ? str(ext.advisor) : undefined),
+        coursework:
+          e.coursework ??
+          (Array.isArray(ext.coursework)
+            ? ext.coursework.map((x) => str(x))
+            : undefined),
+        honors:
+          e.honors ??
+          (Array.isArray(ext.honors)
+            ? ext.honors.map((x) => str(x))
+            : undefined),
+      };
+    });
+  }
 
   out.skills = migrateSkillsToRated(L.skills);
 
@@ -509,11 +538,15 @@ export function migrateLegacyCVData(legacyData: unknown): CVData {
         : [];
   }
 
-  const refs = Array.isArray(L.references)
-    ? L.references
-    : Array.isArray(L.referrals)
-      ? L.referrals
-      : [];
+  const refsFromExtra =
+    xtra && Array.isArray(xtra.references) ? xtra.references : null;
+  const refs = refsFromExtra?.length
+    ? refsFromExtra
+    : Array.isArray(L.references)
+      ? L.references
+      : Array.isArray(L.referrals)
+        ? L.referrals
+        : [];
   out.references = refs.map((row) => {
     if (!isRecord(row)) {
       return {

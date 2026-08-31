@@ -103,7 +103,7 @@ export function TrackerBoard() {
           >
             + Add Job
           </Button>
-          <Link href="/cv/optimise">
+          <Link href="/applications/new">
             <Button size="sm" variant="secondary">
               Optimise a CV
             </Button>
@@ -255,7 +255,7 @@ function EmptyState({ hasAnyJobs }: { hasAnyJobs: boolean }) {
         Generate a tailored CV to start tracking jobs
       </p>
       <Link
-        href="/cv/optimise"
+        href="/applications/new"
         className="mt-6 inline-flex rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95"
       >
         Optimise a CV →

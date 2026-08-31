@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "test-templates": "tsx scripts/test-templates.ts",
+    "test-roundtrip": "tsx scripts/test-roundtrip.ts",
     "validate-templates": "tsx scripts/validate-templates.ts"
   },
   "dependencies": {

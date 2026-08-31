@@ -33,7 +33,7 @@ export function buildCoverLetterVariables(
     applicant_location: letter.applicant_location ?? cv?.location ?? '',
     applicant_linkedin: cv?.linkedin_url ?? '',
     company_name: letter.company_name ?? '',
-    job_title: letter.applicant_role ?? letter.job_title ?? '',
+    job_title: letter.job_title ?? letter.applicant_role ?? '',
     date: today,
     cover_letter_body: letter.content.replaceAll('\n', '<br/>'),
     primary_color: accent,
@@ -48,7 +48,7 @@ export function applyCoverLetterWatermark(
   if (tier !== 'free') return html;
   return html.replace(
     '</body>',
-    '<div style="position:fixed;bottom:10mm;right:10mm;font-size:9px;color:#64748b;">Created with CV&amp;CL — cvai.app</div></body>'
+    '<div style="position:fixed;bottom:10mm;right:10mm;font-size:9px;color:#64748b;">Created with CareerPulse</div></body>'
   );
 }
 

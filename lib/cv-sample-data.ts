@@ -1,7 +1,7 @@
 import type { CVData } from '@/types';
 import { migrateLegacyCVData } from '@/src/utils/cvDefaults';
 
-/** Static content for template gallery thumbnails (no user data). */
+/** Static content for template gallery thumbnails and test fixtures (no user data). */
 export function getSampleCVData(accentColor = '#2563EB'): CVData {
   const flat = {
     preferred_template_id: 'classic',
@@ -13,12 +13,33 @@ export function getSampleCVData(accentColor = '#2563EB'): CVData {
     phone: '+1 415 555 0192',
     location: 'San Francisco, CA',
     linkedin_url: 'linkedin.com/in/alexmorgan',
-    github_url: null,
-    links: [],
-    address: null,
+    github_url: 'github.com/alexmorgan',
+    links: [
+      { id: 'pf', label: 'Portfolio', url: 'https://alexmorgan.design' },
+      { id: 'orcid', label: 'ORCID', url: 'https://orcid.org/0000-0001-2345-6789' },
+      { id: 'scholar', label: 'Google Scholar', url: 'https://scholar.google.com/citations?user=abc123' },
+      { id: 'rg', label: 'ResearchGate', url: 'https://researchgate.net/profile/Alex-Morgan' },
+    ],
+    address: '123 Market Street, San Francisco, CA 94103',
     photo_url: null,
     summary:
       'Product designer with 8+ years shipping B2B SaaS. Focused on research-led UX, design systems, and cross-functional delivery.',
+    section_visibility: {
+      summary: true,
+      experience: true,
+      education: true,
+      skills: true,
+      projects: true,
+      publications: true,
+      research: true,
+      certifications: true,
+      awards: true,
+      volunteer: true,
+      languages: true,
+      interests: true,
+      references: true,
+      custom: true,
+    },
     experience: [
       {
         id: 's1',
@@ -54,11 +75,24 @@ export function getSampleCVData(accentColor = '#2563EB'): CVData {
       {
         id: 'e1',
         institution: 'State University',
-        degree: "Bachelor's",
+        degree: "Master's",
         field_of_study: 'Human–Computer Interaction',
+        start_date: '2015-09',
+        end_date: '2017-05',
+        gpa: '3.9',
+        thesis: 'Adaptive Interfaces for Accessibility in Enterprise Software',
+        advisor: 'Dr. Jane Chen',
+        coursework: ['UX Research Methods', 'Cognitive Psychology', 'Design Systems'],
+        honors: ['Dean\'s List', 'Graduate Research Fellowship'],
+      },
+      {
+        id: 'e2',
+        institution: 'State University',
+        degree: "Bachelor's",
+        field_of_study: 'Design',
         start_date: '2011-09',
         end_date: '2015-05',
-        gpa: null,
+        gpa: '3.7',
         description: null,
       },
     ],
@@ -80,18 +114,126 @@ export function getSampleCVData(accentColor = '#2563EB'): CVData {
         name: 'Design tokens toolkit',
         description: 'Open-source Figma plugin for syncing tokens with code repos.',
         tech_stack: ['TypeScript', 'Figma API'],
-        links: [],
+        links: [{ label: 'GitHub', url: 'https://github.com/example/tokens' }],
         start_date: '2023-01',
         end_date: null,
       },
     ],
-    certifications: [],
+    certifications: [
+      {
+        id: 'c1',
+        name: 'Certified UX Professional',
+        issuer: 'NN/g',
+        issue_date: '2020-06',
+        expiry_date: null,
+        url: 'https://example.com/credential',
+      },
+    ],
     languages: [
       { id: 'l1', language: 'English', proficiency: 'native' },
       { id: 'l2', language: 'Spanish', proficiency: 'intermediate' },
+      {
+        id: 'l3',
+        language: 'French',
+        proficiency: 'conversational',
+        cefr: { listening: 'B2', reading: 'B2', spoken: 'B1', writing: 'B1' },
+      },
     ],
-    awards: [],
-    referrals: [],
+    awards: [
+      {
+        id: 'a1',
+        title: 'Design Excellence Award',
+        issuer: 'UX Design Association',
+        date: '2022-11',
+        description: 'Recognized for design system contribution.',
+      },
+    ],
+    referrals: [
+      {
+        id: 'r1',
+        name: 'Jordan Lee',
+        title: 'VP Product',
+        company: 'Northwind Labs',
+        email: 'jordan@northwind.io',
+        phone: '+1 415 555 0100',
+        relationship: 'Direct manager',
+      },
+      {
+        id: 'r2',
+        name: 'Sam Patel',
+        title: 'Engineering Director',
+        company: 'Acme Studio',
+        email: 'sam@acme.studio',
+        relationship: 'Former colleague',
+      },
+      {
+        id: 'r3',
+        name: 'Dr. Jane Chen',
+        title: 'Professor',
+        company: 'State University',
+        email: 'jchen@state.edu',
+        relationship: 'Graduate advisor',
+      },
+    ],
+    cv_extra: {
+      publications: [
+        {
+          id: 'pub1',
+          title: 'Adaptive UI Patterns for Enterprise Dashboards',
+          authors: ['Morgan, A.', 'Chen, J.'],
+          journal: 'Journal of HCI',
+          year: '2019',
+          doi: '10.1234/jhci.2019.001',
+          url: 'https://example.com/paper',
+          volume: '42',
+          issue: '3',
+          pages: '112-128',
+          type: 'journal',
+          status: 'published',
+        },
+      ],
+      research: [
+        {
+          id: 'res1',
+          title: 'Accessibility in Design Systems',
+          institution: 'State University HCI Lab',
+          role: 'Research Assistant',
+          startDate: '2016-01',
+          endDate: '2017-05',
+          description: 'Studied WCAG compliance patterns in component libraries.',
+          funding: 'NSF Grant #12345',
+        },
+      ],
+      volunteer: [
+        {
+          id: 'v1',
+          organization: 'Code for SF',
+          role: 'Design Mentor',
+          startDate: '2019-03',
+          endDate: '2023-12',
+          description: 'Mentored civic tech volunteers on UX best practices.',
+        },
+      ],
+      interests: ['Typography', 'Trail running', 'Open source'],
+      custom: [
+        {
+          id: 'cust1',
+          title: 'Speaking',
+          items: [
+            {
+              heading: 'Design Systems Summit 2023',
+              subheading: 'Keynote speaker',
+              date: '2023-09',
+              description: 'Scaling design tokens across organizations.',
+            },
+          ],
+        },
+      ],
+      personalExtra: {
+        dateOfBirth: '1993-04-15',
+        nationality: 'United States',
+      },
+    },
     watermark: false,
   };
   return migrateLegacyCVData(flat);

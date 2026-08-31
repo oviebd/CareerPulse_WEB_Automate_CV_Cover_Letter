@@ -3,6 +3,8 @@
  */
 const STATIC_PROTECTED: readonly string[] = [
   '/dashboard',
+  '/documents',
+  '/applications',
   '/cover-letters',
   '/tracker',
   '/ai-tools',

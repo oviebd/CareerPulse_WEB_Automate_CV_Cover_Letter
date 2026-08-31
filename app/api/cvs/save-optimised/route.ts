@@ -4,6 +4,7 @@ import type { GenerationType } from '@/types';
 import type { Json } from '@/types/database';
 import { CLAUDE_MODEL } from '@/lib/claude';
 import { defaultJobCvDisplayName } from '@/lib/cv-display-name';
+import { optimisedCvContentToProfilePayload } from '@/lib/cv-universal-bridge';
 
 function err(
   msg: string,
@@ -93,6 +94,8 @@ export async function POST(request: Request) {
       cvData = {};
     }
 
+    const cvPayload = hasCv ? optimisedCvContentToProfilePayload(cvData) : null;
+
     let savedCvId: string | null = null;
     let savedCoverLetterId: string | null = null;
 
@@ -113,29 +116,10 @@ export async function POST(request: Request) {
             user_id: user.id,
             name: cvName,
             job_ids: [],
-            full_name: cvData.full_name ?? null,
-            professional_title: cvData.professional_title ?? null,
-            email: cvData.email ?? null,
-            phone: cvData.phone ?? null,
-            location: cvData.location ?? null,
-            linkedin_url: cvData.linkedin_url ?? null,
-            github_url: cvData.github_url ?? null,
-            links: cvData.links ?? [],
-            summary: cvData.summary ?? null,
-            experience: cvData.experience ?? [],
-            education: cvData.education ?? [],
-            skills: cvData.skills ?? [],
-            projects: cvData.projects ?? [],
-            certifications: cvData.certifications ?? [],
-            languages: cvData.languages ?? [],
-            awards: cvData.awards ?? [],
-            referrals: cvData.referrals ?? [],
+            ...cvPayload,
             ai_changes_summary: body.ai_changes_summary ?? null,
             keywords_added: keywordsAddedJson,
             bullets_improved: body.bullets_improved ?? 0,
-            preferred_template_id: 'classic',
-            accent_color: '#6C63FF',
-            font_family: (cvData as { font_family?: string }).font_family ?? 'Inter',
           })
           .select('id')
           .single();
@@ -169,29 +153,10 @@ export async function POST(request: Request) {
             user_id: user.id,
             name: cvName,
             job_ids: [jobId],
-            full_name: cvData.full_name ?? null,
-            professional_title: cvData.professional_title ?? null,
-            email: cvData.email ?? null,
-            phone: cvData.phone ?? null,
-            location: cvData.location ?? null,
-            linkedin_url: cvData.linkedin_url ?? null,
-            github_url: cvData.github_url ?? null,
-            links: cvData.links ?? [],
-            summary: cvData.summary ?? null,
-            experience: cvData.experience ?? [],
-            education: cvData.education ?? [],
-            skills: cvData.skills ?? [],
-            projects: cvData.projects ?? [],
-            certifications: cvData.certifications ?? [],
-            languages: cvData.languages ?? [],
-            awards: cvData.awards ?? [],
-            referrals: cvData.referrals ?? [],
+            ...cvPayload,
             ai_changes_summary: body.ai_changes_summary ?? null,
             keywords_added: keywordsAddedJson,
             bullets_improved: body.bullets_improved ?? 0,
-            preferred_template_id: 'classic',
-            accent_color: '#6C63FF',
-            font_family: (cvData as { font_family?: string }).font_family ?? 'Inter',
           })
           .select('id')
           .single();

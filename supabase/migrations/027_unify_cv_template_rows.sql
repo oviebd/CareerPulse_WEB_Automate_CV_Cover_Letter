@@ -1,5 +1,17 @@
--- Optional: run in Supabase SQL Editor if templates are missing.
--- Mirrors migration 027_unify_cv_template_rows.sql: the 18 unified CV layouts.
+-- Unify the cv_templates catalog with the 18 unified template ids.
+--
+-- 1) Remove legacy pre-unification rows (they duplicate unified layouts on the
+--    landing page; existing CVs keep rendering via LEGACY_TEMPLATE_ID_MAP).
+-- 2) Re-activate the four retired premium variants (amber-strike, golden-hour,
+--    ocean-slate, violet-edge) as Pro-gated templates.
+-- 3) Backfill rows for templates added in later migrations so every unified id
+--    has a row (the /cv/templates/[id]/preview page 404s without one).
+--
+-- Idempotent: safe to run on any database state, any number of times.
+
+DELETE FROM cv_templates
+WHERE type = 'cv'
+  AND id IN ('sidebar', 'bold-header', 'two-column', 'apex', 'nova');
 
 INSERT INTO cv_templates (id, type, name, description, category, is_premium, available_tiers, sort_order)
 VALUES
@@ -31,9 +43,3 @@ ON CONFLICT (id) DO UPDATE SET
   is_premium      = EXCLUDED.is_premium,
   available_tiers = EXCLUDED.available_tiers,
   sort_order      = EXCLUDED.sort_order;
-
--- Legacy pre-unification ids are duplicates of unified layouts; existing CVs
--- keep rendering via LEGACY_TEMPLATE_ID_MAP in src/utils/cvDefaults.ts.
-DELETE FROM cv_templates
-WHERE type = 'cv'
-  AND id IN ('sidebar', 'bold-header', 'two-column', 'apex', 'nova');

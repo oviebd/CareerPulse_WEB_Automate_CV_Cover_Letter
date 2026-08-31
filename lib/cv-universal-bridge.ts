@@ -9,7 +9,7 @@ import type {
   ReferralEntry,
 } from '@/types';
 import type { CVProfile } from '@/types';
-import type { CVData } from '@/src/types/cv.types';
+import type { CVData, Education } from '@/src/types/cv.types';
 import { migrateLegacyCVData } from '@/src/utils/cvDefaults';
 import { generateId } from '@/lib/utils';
 import { normalizeSkillsForSave } from '@/src/utils/migrateSkills';
@@ -63,6 +63,13 @@ function universalExperienceToEntries(
   }));
 }
 
+export type EducationExtraEntry = {
+  thesis?: string;
+  advisor?: string;
+  coursework?: string[];
+  honors?: string[];
+};
+
 function universalEducationToEntries(
   edu: CVData['education']
 ): EducationEntry[] {
@@ -74,8 +81,22 @@ function universalEducationToEntries(
     start_date: e.startDate,
     end_date: e.endDate || null,
     gpa: e.gpa ?? null,
-    description: e.thesis ?? null,
+    description: null,
   }));
+}
+
+function buildEducationExtra(edu: Education[]): Record<string, EducationExtraEntry> {
+  const out: Record<string, EducationExtraEntry> = {};
+  for (const e of edu ?? []) {
+    const id = e.id || generateId();
+    const entry: EducationExtraEntry = {};
+    if (e.thesis?.trim()) entry.thesis = e.thesis.trim();
+    if (e.advisor?.trim()) entry.advisor = e.advisor.trim();
+    if (e.coursework?.length) entry.coursework = [...e.coursework];
+    if (e.honors?.length) entry.honors = [...e.honors];
+    if (Object.keys(entry).length > 0) out[id] = entry;
+  }
+  return out;
 }
 
 function universalProjectsToEntries(
@@ -145,6 +166,8 @@ export type CVExtraPayload = {
   interests: CVData['interests'];
   custom: CVData['custom'];
   personalExtra?: { dateOfBirth?: string; nationality?: string };
+  educationExtra?: Record<string, EducationExtraEntry>;
+  references?: CVData['references'];
 };
 
 export function universalToProfilePayload(cv: CVData): Record<string, unknown> {
@@ -153,6 +176,7 @@ export function universalToProfilePayload(cv: CVData): Record<string, unknown> {
   if (personal.dateOfBirth) personalExtra.dateOfBirth = personal.dateOfBirth;
   if (personal.nationality) personalExtra.nationality = personal.nationality;
 
+  const educationExtra = buildEducationExtra(cv.education ?? []);
   const extra: CVExtraPayload = {
     publications: cv.publications ?? [],
     research: cv.research ?? [],
@@ -160,6 +184,8 @@ export function universalToProfilePayload(cv: CVData): Record<string, unknown> {
     interests: cv.interests ?? [],
     custom: cv.custom ?? [],
     ...(Object.keys(personalExtra).length > 0 ? { personalExtra } : {}),
+    ...(Object.keys(educationExtra).length > 0 ? { educationExtra } : {}),
+    ...(cv.references?.length ? { references: cv.references } : {}),
   };
 
   const links: ProfileLink[] = [];
@@ -171,6 +197,9 @@ export function universalToProfilePayload(cv: CVData): Record<string, unknown> {
   pushLink('li', 'LinkedIn', personal.links.linkedin);
   pushLink('gh', 'GitHub', personal.links.github);
   pushLink('pf', 'Portfolio', personal.links.portfolio);
+  pushLink('orcid', 'ORCID', personal.links.orcid);
+  pushLink('scholar', 'Google Scholar', personal.links.googleScholar);
+  pushLink('rg', 'ResearchGate', personal.links.researchGate);
   pushLink('bh', 'Behance', personal.links.behance);
   pushLink('dr', 'Dribbble', personal.links.dribbble);
   pushLink('web', 'Website', personal.links.website);
@@ -207,4 +236,11 @@ export function universalToProfilePayload(cv: CVData): Record<string, unknown> {
     accent_color: cv.meta.colorScheme,
     cv_extra: extra,
   };
+}
+
+/** Normalise optimise/save JSON (flat or universal) into a DB insert/update payload. */
+export function optimisedCvContentToProfilePayload(
+  raw: Record<string, unknown>
+): Record<string, unknown> {
+  return universalToProfilePayload(migrateLegacyCVData(raw));
 }

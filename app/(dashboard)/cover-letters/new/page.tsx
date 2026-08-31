@@ -87,13 +87,13 @@ export default function NewCoverLetterPage() {
               From Job Description
             </h2>
             <p className="mt-1 text-sm text-[var(--color-muted)]">
-              Paste a job description and AI will generate a tailored resume and cover letter together.
+              Paste a job description and AI will generate a tailored cover letter for that role.
             </p>
           </div>
           <Button
             variant="secondary"
             size="sm"
-            onClick={() => router.push('/applications/new')}
+            onClick={() => router.push('/cover-letters/new/jd')}
           >
             Get started
           </Button>
