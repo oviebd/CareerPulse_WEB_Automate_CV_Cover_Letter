@@ -224,3 +224,54 @@ export function normalizeSkillsForSave(
     };
   });
 }
+
+/** ATS-aligned caps for AI extract / optimise skill lists. */
+export const MAX_SKILL_CATEGORIES = 4;
+export const MAX_SKILL_ITEMS_TOTAL = 15;
+
+/**
+ * Dedupe skill names (case-insensitive, global), drop empty categories,
+ * keep at most MAX_SKILL_CATEGORIES groups and MAX_SKILL_ITEMS_TOTAL items.
+ * Preserves first-seen order.
+ */
+export function clampSkillCategories(raw: unknown): SkillCategory[] {
+  const migrated = migrateSkillsToRated(raw);
+  const seen = new Set<string>();
+  const result: SkillCategory[] = [];
+  let totalItems = 0;
+
+  for (const cat of migrated) {
+    if (result.length >= MAX_SKILL_CATEGORIES) break;
+    if (totalItems >= MAX_SKILL_ITEMS_TOTAL) break;
+
+    const items: SkillItem[] = [];
+    for (const it of cat.items ?? []) {
+      if (totalItems >= MAX_SKILL_ITEMS_TOTAL) break;
+      const name = it.name.trim();
+      if (!name) continue;
+      const key = name.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      items.push({
+        id: it.id || generateId(),
+        name,
+        rating: clampRating(
+          typeof it.rating === 'number' ? it.rating : 3
+        ),
+      });
+      totalItems += 1;
+    }
+
+    if (items.length === 0) continue;
+
+    result.push({
+      id: cat.id || generateId(),
+      category: cat.category.trim() || 'Skills',
+      displayOrder:
+        typeof cat.displayOrder === 'number' ? cat.displayOrder : result.length,
+      items,
+    });
+  }
+
+  return result;
+}

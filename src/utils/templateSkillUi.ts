@@ -3,12 +3,20 @@ import { normalizeTemplateId } from '@/src/utils/cvDefaults';
 import type { TemplateId } from '@/src/types/cv.types';
 
 /**
- * Whether the selected CV template renders skill levels prominently (bars, dots, etc.).
+ * Whether the selected CV template can render skill levels (bars, dots, inline labels).
  * When false, the skills editor hides 1–5 controls; new skills default to rating 3.
  */
-export function templateShowsSkillRatingEditor(
+export function templateCanShowSkillRatings(
   templateId: string | null | undefined
 ): boolean {
   const id = normalizeTemplateId(templateId ?? 'classic') as TemplateId;
-  return TEMPLATE_CONFIGS[id].showsSkillRatingInCv;
+  const cfg = TEMPLATE_CONFIGS[id];
+  return cfg.showSkillBars || cfg.showsSkillRatingInCv;
+}
+
+/** @deprecated Use templateCanShowSkillRatings */
+export function templateShowsSkillRatingEditor(
+  templateId: string | null | undefined
+): boolean {
+  return templateCanShowSkillRatings(templateId);
 }

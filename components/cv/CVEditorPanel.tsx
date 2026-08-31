@@ -169,6 +169,8 @@ export function CVEditorPanel({
         onEducationChange={(v) => applyPatch({ education: v })}
         skills={slices.skills}
         onSkillsChange={(v) => applyPatch({ skills: v })}
+        showSkillProficiency={slices.showSkillProficiency}
+        onShowSkillProficiencyChange={(v) => applyPatch({ showSkillProficiency: v })}
         projects={slices.projects}
         onProjectsChange={(v) => applyPatch({ projects: v })}
         languages={slices.languages}

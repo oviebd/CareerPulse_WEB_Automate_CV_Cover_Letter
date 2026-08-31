@@ -237,6 +237,8 @@ export interface CVData {
   interests: string[];
   references: Reference[];
   custom: CustomSection[];
+  /** When true, render 1–5 skill ratings in preview/PDF/DOCX (if template supports them). */
+  showSkillProficiency?: boolean;
   /** Free-tier watermark for PDF/preview */
   watermark?: boolean;
 }

@@ -20,6 +20,10 @@ import { cvProfileToExportSnapshot } from '@/lib/cv-export-snapshot';
 import { canUseTemplate, canAccessFeature } from '@/lib/subscription';
 import { downloadCvExport, type ExportFormat } from '@/lib/export-client';
 import { cn } from '@/lib/utils';
+import {
+  CV_DRAFT_UPDATED_EVENT,
+  hasCvDraft,
+} from '@/lib/cv-draft-storage';
 
 const SWATCHES = ['#2563EB', '#0d9488', '#7c3aed', '#dc2626', '#0f172a'];
 
@@ -84,12 +88,11 @@ function CVTemplatesPageContent() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const compute = () =>
-      setDraftActive(Boolean(sessionStorage.getItem('cv_draft')));
+    const compute = () => setDraftActive(hasCvDraft());
     compute();
     const onUpdate = () => compute();
-    window.addEventListener('cv_draft_updated', onUpdate);
-    return () => window.removeEventListener('cv_draft_updated', onUpdate);
+    window.addEventListener(CV_DRAFT_UPDATED_EVENT, onUpdate);
+    return () => window.removeEventListener(CV_DRAFT_UPDATED_EVENT, onUpdate);
   }, []);
 
   const { data: templates = [] } = useQuery({

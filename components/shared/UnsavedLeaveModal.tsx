@@ -22,7 +22,7 @@ export function UnsavedLeaveModal({
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Unsaved changes">
       <p className="text-sm text-[var(--color-text-secondary)]">
-        This {entityLabel} is not saved yet. Leave without saving, or save and go back.
+        You have unsaved changes. Leave without saving, or save and go back.
       </p>
       <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <Button variant="ghost" size="sm" onClick={onClose} disabled={saving}>

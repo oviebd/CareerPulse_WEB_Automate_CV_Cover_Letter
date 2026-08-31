@@ -6,6 +6,11 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import type { CVProfile } from '@/types';
 import { dbRowToCvProfile } from '@/lib/cv-mapper';
 import { useEffect, useState } from 'react';
+import {
+  CV_DRAFT_UPDATED_EVENT,
+  editorStateToProfileOverlay,
+  readCvEditorDraft,
+} from '@/lib/cv-draft-storage';
 
 export type CoreCVVersion = {
   id: string;
@@ -50,19 +55,14 @@ export function useCVProfile(coreCvId?: string | null) {
 
   const loadDraft = () => {
     if (typeof window === 'undefined') return;
-    const raw = sessionStorage.getItem('cv_draft');
-    if (!raw) {
+    const state = readCvEditorDraft();
+    if (!state) {
       setDraft(null);
       setDraftLoaded(true);
       return;
     }
     try {
-      const parsed = JSON.parse(raw) as CVProfile & { user_id?: string };
-      if (userId && parsed.user_id && parsed.user_id !== userId) {
-        setDraft(null);
-      } else {
-        setDraft(parsed as CVProfile);
-      }
+      setDraft(editorStateToProfileOverlay(state));
     } catch {
       setDraft(null);
     } finally {
@@ -79,8 +79,8 @@ export function useCVProfile(coreCvId?: string | null) {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const onUpdate = () => loadDraft();
-    window.addEventListener('cv_draft_updated', onUpdate);
-    return () => window.removeEventListener('cv_draft_updated', onUpdate);
+    window.addEventListener(CV_DRAFT_UPDATED_EVENT, onUpdate);
+    return () => window.removeEventListener(CV_DRAFT_UPDATED_EVENT, onUpdate);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 

@@ -98,7 +98,10 @@ export function renderUnifiedHtml(cvData: CVData): string {
   const baseCss = existsSync(sharedBase) ? readUtf8(sharedBase) : '';
   const sectionsJs = readUtf8(sharedJs);
 
-  const cfg = TEMPLATE_CONFIGS[tid];
+  const cfg = { ...TEMPLATE_CONFIGS[tid] };
+  cfg.showSkillBars =
+    Boolean(data.showSkillProficiency) &&
+    (cfg.showSkillBars || cfg.showsSkillRatingInCv);
   const fontFam = (data.meta.fontFamily || 'Inter').trim() || 'Inter';
   const fontParam = encodeURIComponent(fontFam).replace(/%20/g, '+');
   const fontHref = `https://fonts.googleapis.com/css2?family=${fontParam}:wght@300;400;500;600;700&display=swap`;

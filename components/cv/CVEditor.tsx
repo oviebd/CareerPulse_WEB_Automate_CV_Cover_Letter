@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { useCVEditor } from '@/hooks/useCVEditor';
-import { useCVEditorAutosave } from '@/hooks/useCVEditorAutosave';
 import { useCVEditorPreviewState } from '@/hooks/useCVEditorPreviewState';
 import { useAuthGate } from '@/hooks/useAuthGate';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -30,10 +29,10 @@ import { CvTitleModal } from '@/components/cv/CvTitleModal';
 import { UnsavedLeaveModal } from '@/components/shared/UnsavedLeaveModal';
 import { defaultCoreCvDisplayName } from '@/lib/cv-display-name';
 import { cloneCvData } from '@/lib/cv-clone';
-import { createEmptyCVData } from '@/src/utils/cvDefaults';
 import { cvCompletionPercent } from '@/lib/cv-sidebar-content';
 import { ALL_TEMPLATE_IDS, TEMPLATE_CONFIGS } from '@/src/config/templateConfig';
 import { normalizeTemplateId } from '@/src/utils/cvDefaults';
+import { CV_DRAFT_UPDATED_EVENT, clearCvDraft, hasCvDraft } from '@/lib/cv-draft-storage';
 import type { TemplateId } from '@/src/types/cv.types';
 
 function previewPayloadFromCVData(d: CVData): Record<string, unknown> {
@@ -44,16 +43,15 @@ function buildSaveStatusLine({
   isNew,
   isDirty,
   isSaving,
-  autosaveState,
+  saveError,
 }: {
   isNew: boolean;
   isDirty: boolean;
   isSaving: boolean;
-  autosaveState: 'idle' | 'saving' | 'saved' | 'error';
+  saveError: string | null;
 }) {
-  if (isSaving || autosaveState === 'saving') return 'Saving…';
-  if (autosaveState === 'error') return "Couldn't save";
-  if (isNew && isDirty) return 'Unsaved changes';
+  if (isSaving) return 'Saving…';
+  if (saveError) return "Couldn't save";
   if (isDirty) return 'Unsaved changes';
   if (!isNew) return 'Saved to account';
   return '';
@@ -87,18 +85,6 @@ export function CVEditor() {
     reloadFromServer,
   } = useCVEditor({ cvIdFromRoute: routeId });
 
-  const stateKey = useMemo(() => JSON.stringify(editorState), [editorState]);
-
-  const { autosaveState, retryAutosave } = useCVEditorAutosave({
-    stateKey,
-    cvId,
-    isNew,
-    isDirty,
-    isSaving,
-    handleSave,
-    enabled: !isNew && Boolean(cvId),
-  });
-
   const previewControl = useCVEditorPreviewState();
   const { requireAuth, authModal } = useAuthGate();
   const queryClient = useQueryClient();
@@ -111,26 +97,12 @@ export function CVEditor() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const compute = () => setDraftActive(Boolean(sessionStorage.getItem('cv_draft')));
+    const compute = () => setDraftActive(hasCvDraft());
     compute();
     const onUpdate = () => compute();
-    window.addEventListener('cv_draft_updated', onUpdate);
-    return () => window.removeEventListener('cv_draft_updated', onUpdate);
+    window.addEventListener(CV_DRAFT_UPDATED_EVENT, onUpdate);
+    return () => window.removeEventListener(CV_DRAFT_UPDATED_EVENT, onUpdate);
   }, []);
-
-  const isNewParam = searchParams.get('new') === '1';
-
-  useEffect(() => {
-    if (isNewParam && typeof window !== 'undefined') {
-      const emptyCv = createEmptyCVData('classic');
-      sessionStorage.setItem('cv_draft', JSON.stringify(emptyCv));
-      sessionStorage.setItem('cv_draft_force_overwrite', '0');
-      window.dispatchEvent(new Event('cv_draft_updated'));
-      const url = new URL(window.location.href);
-      url.searchParams.delete('new');
-      window.history.replaceState({}, '', url.toString());
-    }
-  }, [isNewParam]);
 
   const { toast } = useToast();
   const { tier } = useSubscription();
@@ -382,25 +354,15 @@ export function CVEditor() {
   }
 
   const handleBackClick = useCallback(() => {
-    if (isNew && isDirty) {
+    if (isDirty) {
       setLeaveModalOpen(true);
       return;
     }
-    if (!isNew && isDirty) {
-      void (async () => {
-        await handleSave();
-        router.push('/documents');
-      })();
-      return;
-    }
     router.push('/documents');
-  }, [isNew, isDirty, handleSave, router]);
+  }, [isDirty, router]);
 
   const handleDiscardLeave = useCallback(() => {
-    if (typeof window !== 'undefined') {
-      sessionStorage.removeItem('cv_draft');
-      window.dispatchEvent(new Event('cv_draft_updated'));
-    }
+    clearCvDraft();
     setLeaveModalOpen(false);
     router.push('/documents');
   }, [router]);
@@ -455,7 +417,7 @@ export function CVEditor() {
     : { score: 0, summary: '', suggestions: [], sections: {} };
 
   const subtitleName = cvData?.personal?.fullName?.trim();
-  const statusLine = buildSaveStatusLine({ isNew, isDirty, isSaving, autosaveState });
+  const statusLine = buildSaveStatusLine({ isNew, isDirty, isSaving, saveError });
 
   if (loadError) {
     return (
@@ -535,7 +497,7 @@ export function CVEditor() {
             {saveError ? <span className="text-[var(--color-danger)]"> · {saveError}</span> : null}
           </>
         }
-        onRetrySave={autosaveState === 'error' ? () => void retryAutosave() : undefined}
+        onRetrySave={saveError ? () => void handleSave() : undefined}
         focusMode={focusMode}
         onFocusModeChange={setFocusMode}
         trailingControls={

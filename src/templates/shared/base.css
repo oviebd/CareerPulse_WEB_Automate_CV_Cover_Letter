@@ -160,6 +160,43 @@ a {
   page-break-inside: avoid;
 }
 
+.skill-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4pt 6pt;
+  margin-bottom: 4pt;
+  font-size: 9pt;
+}
+
+.skill-name {
+  font-weight: 500;
+  color: #334155;
+}
+
+.skill-label {
+  font-size: 8pt;
+  font-weight: 500;
+  color: #64748b;
+}
+
+.skill-bar {
+  display: inline-block;
+  width: 72px;
+  height: 4px;
+  background: #e2e8f0;
+  border-radius: 2px;
+  vertical-align: middle;
+  overflow: hidden;
+}
+
+.skill-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--cv-accent, #6366f1);
+  border-radius: 2px;
+}
+
 .skill-level {
   font-size: 10px;
   color: #888;

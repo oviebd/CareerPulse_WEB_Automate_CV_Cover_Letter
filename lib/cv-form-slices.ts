@@ -55,6 +55,7 @@ export type FormSlices = {
   /** One interest per line in the form; mapped to `interests: string[]` on save. */
   interestsText: string;
   custom: CustomSection[];
+  showSkillProficiency: boolean;
 };
 
 function workToExp(w: WorkExperience): ExperienceEntry {
@@ -273,6 +274,7 @@ export function cvDataToFormSlices(cv: CVData): FormSlices {
     volunteer: cv.volunteer ?? [],
     interestsText: (cv.interests ?? []).join('\n'),
     custom: cv.custom ?? [],
+    showSkillProficiency: cv.showSkillProficiency ?? false,
   };
 }
 
@@ -354,6 +356,7 @@ export function formSlicesToCvData(
       .filter(Boolean),
     references: slices.referrals.map(referralToRef),
     custom: slices.custom,
+    showSkillProficiency: slices.showSkillProficiency,
     watermark: prev.watermark,
   };
 }

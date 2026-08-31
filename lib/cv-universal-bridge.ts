@@ -175,6 +175,7 @@ export type CVExtraPayload = {
   personalExtra?: { dateOfBirth?: string; nationality?: string };
   educationExtra?: Record<string, EducationExtraEntry>;
   references?: CVData['references'];
+  showSkillProficiency?: boolean;
 };
 
 export function universalToProfilePayload(cv: CVData): Record<string, unknown> {
@@ -193,6 +194,7 @@ export function universalToProfilePayload(cv: CVData): Record<string, unknown> {
     ...(Object.keys(personalExtra).length > 0 ? { personalExtra } : {}),
     ...(Object.keys(educationExtra).length > 0 ? { educationExtra } : {}),
     ...(cv.references?.length ? { references: cv.references } : {}),
+    ...(cv.showSkillProficiency ? { showSkillProficiency: true } : {}),
   };
 
   const links: ProfileLink[] = [];

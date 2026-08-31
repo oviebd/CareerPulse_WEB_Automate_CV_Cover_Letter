@@ -18,7 +18,7 @@ import {
 } from '../primitives';
 import { dateRange, sectionTitleFor } from '../utils';
 
-const RATING_LABELS = ['', 'Beginner', 'Basic', 'Intermediate', 'Advanced', 'Expert'];
+const RATING_LABELS = ['', 'Beginner', 'Basic', 'Intermediate', 'Advanced', 'Professional'];
 
 function skillRatingLabel(rating: number): string {
   return RATING_LABELS[Math.min(5, Math.max(1, rating))] ?? 'Intermediate';

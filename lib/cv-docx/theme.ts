@@ -35,8 +35,13 @@ function mapFont(name: string | undefined): string {
 
 function skillDisplayFor(
   id: TemplateId,
-  cfg: (typeof TEMPLATE_CONFIGS)[TemplateId]
+  cfg: (typeof TEMPLATE_CONFIGS)[TemplateId],
+  showSkillProficiency: boolean
 ): SkillDisplayMode {
+  if (!showSkillProficiency) {
+    if (id === 'technical') return 'chips';
+    return cfg.layout === 'two-column' ? 'sidebar-compact' : 'inline';
+  }
   if (id === 'technical') return 'chips';
   if (id === 'violet-edge') return 'dots';
   if (id === 'ocean-slate') return 'bars';
@@ -98,6 +103,10 @@ export function resolveDocxTheme(cvData: CVData): DocxTheme {
   const photoAllowed =
     !cvData.sectionVisibility || cvData.sectionVisibility.photo !== false;
 
+  const showRatings =
+    Boolean(cvData.showSkillProficiency) &&
+    (cfg.showSkillBars || cfg.showsSkillRatingInCv);
+
   return {
     templateId,
     accent,
@@ -112,8 +121,8 @@ export function resolveDocxTheme(cvData: CVData): DocxTheme {
     layout: cfg.layout,
     sidebarSections: cfg.sidebarSections ?? [],
     showPhoto: Boolean(cfg.showPhoto && cvData.meta?.showPhoto && photoAllowed),
-    showSkillBars: cfg.showSkillBars,
-    skillDisplay: skillDisplayFor(templateId, cfg),
+    showSkillBars: showRatings,
+    skillDisplay: skillDisplayFor(templateId, cfg, Boolean(cvData.showSkillProficiency)),
     experienceStyle: experienceStyleFor(templateId),
     educationDetail: cfg.educationDetail ?? 'basic',
     publicationStyle: cfg.publicationStyle ?? 'plain',

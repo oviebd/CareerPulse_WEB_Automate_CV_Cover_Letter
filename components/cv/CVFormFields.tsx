@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { LayoutDashboard } from 'lucide-react';
 import { DEFAULT_CV_ACCENT, cvAccentSwatchName } from '@/lib/cv-accent';
 import { SectionIntro } from '@/components/cv/SectionIntro';
@@ -39,7 +39,6 @@ import { CV_FORM_CARD as FORM_CARD, CV_FORM_STACK, CV_FORM_GRID_GAP } from '@/li
 import { RemoveEntryButton } from '@/components/cv/RemoveEntryButton';
 import { canUseTemplate } from '@/lib/subscription';
 import { TEMPLATE_CONFIGS, VISIBLE_TEMPLATE_IDS } from '@/src/config/templateConfig';
-import { useUIStore } from '@/stores/useUIStore';
 import {
   CustomSectionsForm,
   InterestsSection,
@@ -49,7 +48,7 @@ import {
 } from '@/components/cv/ExtendedCvSections';
 import { ListReorderArrows } from '@/components/cv/ListReorderArrows';
 import { SkillsEditor } from '@/components/cv/SkillsEditor';
-import { templateShowsSkillRatingEditor } from '@/src/utils/templateSkillUi';
+import { templateCanShowSkillRatings } from '@/src/utils/templateSkillUi';
 
 export type CVFormTab =
   | 'design'
@@ -135,6 +134,8 @@ type Props = {
   onEducationChange: (next: EducationEntry[]) => void;
   skills: SkillCategory[];
   onSkillsChange: (next: SkillCategory[]) => void;
+  showSkillProficiency?: boolean;
+  onShowSkillProficiencyChange?: (show: boolean) => void;
   projects: ProjectEntry[];
   onProjectsChange: (next: ProjectEntry[]) => void;
   languages: LanguageEntry[];
@@ -267,6 +268,8 @@ export function CVFormFields(props: Props) {
     onEducationChange,
     skills,
     onSkillsChange,
+    showSkillProficiency = false,
+    onShowSkillProficiencyChange,
     projects,
     onProjectsChange,
     languages,
@@ -354,43 +357,9 @@ export function CVFormFields(props: Props) {
     onApply: (value: string) => void;
   } | null>(null);
 
-  const [skillsLocal, setSkillsLocal] = useState<SkillCategory[] | null>(null);
-  const skillsShown = skillsLocal ?? skills;
-  const skillsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    setSkillsLocal(null);
-  }, [skills]);
-
-  useEffect(() => {
-    return () => {
-      if (skillsDebounceRef.current) clearTimeout(skillsDebounceRef.current);
-    };
-  }, []);
-
-  const handleSkillsChangeDebounced = useCallback(
-    (next: SkillCategory[]) => {
-      if (skillsDebounceRef.current) clearTimeout(skillsDebounceRef.current);
-      skillsDebounceRef.current = setTimeout(() => {
-        onSkillsChange(next);
-      }, 800);
-    },
-    [onSkillsChange]
-  );
-
-  const handleSkillsEditorChange = useCallback(
-    (next: SkillCategory[]) => {
-      setSkillsLocal(next);
-      handleSkillsChangeDebounced(next);
-    },
-    [handleSkillsChangeDebounced]
-  );
-
-  const showSkillProficiency = useUIStore((s) => s.showSkillProficiency);
-  const setShowSkillProficiency = useUIStore((s) => s.setShowSkillProficiency);
   const showSkillRatingUi = useMemo(
     () =>
-      showSkillProficiency && templateShowsSkillRatingEditor(selectedTemplateId),
+      showSkillProficiency && templateCanShowSkillRatings(selectedTemplateId),
     [selectedTemplateId, showSkillProficiency]
   );
 
@@ -1136,23 +1105,23 @@ export function CVFormFields(props: Props) {
               <input
                 type="checkbox"
                 checked={showSkillProficiency}
-                onChange={(e) => setShowSkillProficiency(e.target.checked)}
+                onChange={(e) => onShowSkillProficiencyChange?.(e.target.checked)}
                 className="rounded border-[var(--color-border)]"
               />
               Show skill proficiency (1–5 ratings)
             </label>
             <SkillsEditor
-              skills={skillsShown}
-              onChange={handleSkillsEditorChange}
+              skills={skills}
+              onChange={onSkillsChange}
               showRatingControls={showSkillRatingUi}
             />
             {kw.length > 0 &&
-              skillsShown.some((g) => g.items.length > 0) && (
+              skills.some((g) => g.items.length > 0) && (
                 <div className="flex flex-wrap gap-1.5 rounded-lg border border-[var(--color-accent-gold)]/25 bg-[var(--color-accent-gold)]/10 p-3">
                   <span className="mr-1 text-xs font-medium text-[var(--color-accent-gold)]">
                     Keyword match:
                   </span>
-                  {skillsShown.flatMap((g) => g.items).map((it) => {
+                  {skills.flatMap((g) => g.items).map((it) => {
                     const skill = it.name;
                     const isHighlighted = kw.some((k) =>
                       skill.toLowerCase().includes(k.toLowerCase())

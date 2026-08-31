@@ -101,9 +101,6 @@ export default function CoverLetterDetailPage() {
   const [exportingPdf, setExportingPdf] = useState(false);
   const [leaveModalOpen, setLeaveModalOpen] = useState(false);
   const [leaveSaving, setLeaveSaving] = useState(false);
-  const [autosaveState, setAutosaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>(
-    'idle'
-  );
   const initLetterIdRef = useRef<string | null>(null);
   const jobSyncedForLetterRef = useRef<string | null>(null);
   const previewUrlRef = useRef<string | null>(null);
@@ -384,35 +381,6 @@ export default function CoverLetterDetailPage() {
     ]
   );
 
-  useEffect(() => {
-    if (isDraftMode || !letter || !isDirty) {
-      if (!isDraftMode && letter && !isDirty) setAutosaveState('saved');
-      return;
-    }
-    setAutosaveState('saving');
-    const timer = window.setTimeout(() => {
-      void (async () => {
-        const ok = await persistSavedLetter({ silent: true });
-        setAutosaveState(ok ? 'saved' : 'error');
-      })();
-    }, 800);
-    return () => window.clearTimeout(timer);
-  }, [
-    isDraftMode,
-    letter,
-    isDirty,
-    draftContent,
-    draftTemplateId,
-    draftCompanyName,
-    draftJobTitle,
-    draftApplicantName,
-    draftApplicantRole,
-    draftApplicantEmail,
-    draftApplicantPhone,
-    draftApplicantLocation,
-    persistSavedLetter,
-  ]);
-
   async function handleSave(options?: { navigateAfterDraft?: boolean }): Promise<boolean> {
     if (isDraftMode) {
       if (!draftClMeta) return false;
@@ -478,26 +446,44 @@ export default function CoverLetterDetailPage() {
   }
 
   const handleBackClick = useCallback(() => {
-    if (isDraftMode && isDirty) {
+    if (isDirty) {
       setLeaveModalOpen(true);
       return;
     }
-    if (!isDraftMode && isDirty) {
-      void (async () => {
-        await persistSavedLetter({ silent: true });
-        router.push('/cover-letters');
-      })();
-      return;
-    }
     router.push('/cover-letters');
-  }, [isDraftMode, isDirty, persistSavedLetter, router]);
+  }, [isDirty, router]);
+
+  useEffect(() => {
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!isDirty) return;
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [isDirty]);
 
   const handleDiscardLeave = useCallback(() => {
-    useOptimiseEditDraftStore.getState().setClEditDraft(null);
     setLeaveModalOpen(false);
-    const optim = useOptimiseDraftStore.getState().draft;
-    router.push(optim ? '/cv/optimise/result' : '/cover-letters');
-  }, [router]);
+    if (isDraftMode) {
+      useOptimiseEditDraftStore.getState().setClEditDraft(null);
+      const optim = useOptimiseDraftStore.getState().draft;
+      router.push(optim ? '/cv/optimise/result' : '/cover-letters');
+      return;
+    }
+    if (letter) {
+      setDraftContent(letter.content ?? '');
+      setDraftTemplateId(letter.template_id?.trim() || preferredClTemplateId || 'cl-classic');
+      setDraftApplicantName(letter.applicant_name ?? '');
+      setDraftApplicantRole(letter.applicant_role ?? '');
+      setDraftApplicantEmail(letter.applicant_email ?? '');
+      setDraftApplicantPhone(letter.applicant_phone ?? '');
+      setDraftApplicantLocation(letter.applicant_location ?? '');
+      setDraftCompanyName(linkedJob?.company_name ?? '');
+      setDraftJobTitle(linkedJob?.job_title ?? '');
+    }
+    router.push('/cover-letters');
+  }, [isDraftMode, letter, linkedJob, preferredClTemplateId, router]);
 
   const handleSaveAndLeave = useCallback(async () => {
     setLeaveSaving(true);
@@ -594,15 +580,11 @@ export default function CoverLetterDetailPage() {
         </button>
         {!isDraftMode ? (
           <span className="text-xs text-[var(--color-muted)]">
-            {autosaveState === 'saving'
+            {updateLetter.isPending
               ? 'Saving…'
-              : autosaveState === 'error'
-                ? "Couldn't save"
-                : autosaveState === 'saved' && !isDirty
-                  ? 'Saved'
-                  : isDirty
-                    ? 'Unsaved changes'
-                    : ''}
+              : isDirty
+                ? 'Unsaved changes'
+                : 'Saved'}
           </span>
         ) : isDirty ? (
           <span className="text-xs text-[var(--color-muted)]">Unsaved changes</span>

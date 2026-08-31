@@ -190,6 +190,11 @@ export function migrateLegacyCVData(legacyData: unknown): CVData {
     if (!merged.meta.fontFamily && L.font_family) {
       merged.meta.fontFamily = str(L.font_family);
     }
+    if (xtra && typeof xtra.showSkillProficiency === 'boolean') {
+      merged.showSkillProficiency = xtra.showSkillProficiency;
+    } else if (typeof L.showSkillProficiency === 'boolean') {
+      merged.showSkillProficiency = L.showSkillProficiency;
+    }
     return merged;
   }
 
@@ -604,6 +609,11 @@ export function migrateLegacyCVData(legacyData: unknown): CVData {
   });
 
   out.meta.templateId = templateId;
+  if (xtra && typeof xtra.showSkillProficiency === 'boolean') {
+    out.showSkillProficiency = xtra.showSkillProficiency;
+  } else if (typeof L.showSkillProficiency === 'boolean') {
+    out.showSkillProficiency = L.showSkillProficiency;
+  }
   return out;
 }
 
@@ -705,5 +715,6 @@ function deepMergeCv(base: CVData, patch: Partial<CVData>): CVData {
     interests: patch.interests ?? base.interests,
     references: patch.references ?? base.references,
     custom: patch.custom ?? base.custom,
+    showSkillProficiency: patch.showSkillProficiency ?? base.showSkillProficiency,
   };
 }

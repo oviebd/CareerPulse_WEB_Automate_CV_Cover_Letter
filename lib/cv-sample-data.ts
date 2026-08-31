@@ -233,6 +233,7 @@ export function getSampleCVData(accentColor = '#2563EB'): CVData {
         dateOfBirth: '1993-04-15',
         nationality: 'United States',
       },
+      showSkillProficiency: true,
     },
     watermark: false,
   };

@@ -13,6 +13,7 @@ import type {
   GenerationType,
 } from '@/types';
 import { migrateLegacyCVData } from '@/src/utils/cvDefaults';
+import { clampSkillCategories } from '@/src/utils/migrateSkills';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
@@ -164,10 +165,11 @@ RULES — READ CAREFULLY:
 5. You MAY: rewrite bullet points to use stronger action verbs and quantification — but only based on what the original bullet already says. Do not add numbers or metrics that aren't implied by the original.
 6. You MAY: add relevant keywords from the job description into bullet points naturally — only if the underlying experience genuinely supports the keyword.
 7. You MAY: rewrite the professional summary to align with the target role — using only the candidate's actual experience.
-8. You MAY: reorder skill items within a category to put the most job-relevant skills first.
-9. You MAY: add skills to the skills list ONLY if they are clearly evidenced in the candidate's experience bullets or projects.
-10. Keep the tone professional and consistent throughout.
-11. Prefer ATS-friendly wording: clear role terms, standard job titles, and explicit tools/skills already evidenced in the CV.
+8. You MAY: reorder skill items within a category to put the most job-relevant skills first. Prefer reorder and light prune over growing the list.
+9. You MAY: add skills ONLY if they are clearly evidenced in the candidate's experience bullets or projects AND the total skill item count stays at most 15.
+10. Do NOT pad skills with vague soft skills. Prefer dropping low-relevance extras over exceeding 15 total items or 4 categories.
+11. Keep the tone professional and consistent throughout.
+12. Prefer ATS-friendly wording: clear role terms, standard job titles, and explicit tools/skills already evidenced in the CV.
 
 Return ONLY a valid JSON object matching the exact schema provided. No preamble, no explanation, no markdown fences.`;
 
@@ -217,6 +219,8 @@ Optimise the candidate's CV for this role. Return a JSON object with:
   }
 
   const { warnings } = validateOptimisedCV(cvData, parsed.optimised_cv);
+
+  parsed.optimised_cv.skills = clampSkillCategories(parsed.optimised_cv.skills);
 
   let extractedKeywords: string[] = [];
   try {

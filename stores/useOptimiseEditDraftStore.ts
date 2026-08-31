@@ -6,7 +6,9 @@ import type {
   JobAnalysisResult,
 } from '@/types';
 
-/** Passed from optimise result → job-specific CV editor when nothing is saved yet (Zustand, no URL/localStorage). */
+const STORAGE_KEY = 'optimise_edit_draft_v1';
+
+/** Passed from optimise result → job-specific CV editor when nothing is saved yet. */
 export interface CvOptimiseEditDraft {
   cvContent: string;
   originalCvId: string;
@@ -32,7 +34,6 @@ export interface CvOptimiseEditDraft {
 /** Passed from optimise result or enhance-existing page → cover letter editor when nothing is saved yet. */
 export interface CoverLetterOptimiseEditDraft {
   content: string;
-  /** CV row id used to pre-populate applicant contact fields. Null for non-CV flows (e.g. enhance-existing, scratch). */
   originalCvId: string | null;
   companyName?: string | null;
   jobTitle?: string | null;
@@ -51,9 +52,52 @@ interface OptimiseEditDraftState {
   setClEditDraft: (draft: CoverLetterOptimiseEditDraft | null) => void;
 }
 
-export const useOptimiseEditDraftStore = create<OptimiseEditDraftState>((set) => ({
-  cvEditDraft: null,
-  setCvEditDraft: (cvEditDraft) => set({ cvEditDraft }),
-  clEditDraft: null,
-  setClEditDraft: (clEditDraft) => set({ clEditDraft }),
+type StoredDrafts = {
+  cvEditDraft: CvOptimiseEditDraft | null;
+  clEditDraft: CoverLetterOptimiseEditDraft | null;
+};
+
+function readStored(): StoredDrafts {
+  if (typeof window === 'undefined') {
+    return { cvEditDraft: null, clEditDraft: null };
+  }
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    if (!raw) return { cvEditDraft: null, clEditDraft: null };
+    const parsed = JSON.parse(raw) as StoredDrafts;
+    return {
+      cvEditDraft: parsed?.cvEditDraft ?? null,
+      clEditDraft: parsed?.clEditDraft ?? null,
+    };
+  } catch {
+    return { cvEditDraft: null, clEditDraft: null };
+  }
+}
+
+function writeStored(next: StoredDrafts) {
+  if (typeof window === 'undefined') return;
+  try {
+    if (!next.cvEditDraft && !next.clEditDraft) {
+      sessionStorage.removeItem(STORAGE_KEY);
+      return;
+    }
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  } catch {
+    /* quota / private mode */
+  }
+}
+
+const initial = readStored();
+
+export const useOptimiseEditDraftStore = create<OptimiseEditDraftState>((set, get) => ({
+  cvEditDraft: initial.cvEditDraft,
+  setCvEditDraft: (cvEditDraft) => {
+    writeStored({ cvEditDraft, clEditDraft: get().clEditDraft });
+    set({ cvEditDraft });
+  },
+  clEditDraft: initial.clEditDraft,
+  setClEditDraft: (clEditDraft) => {
+    writeStored({ cvEditDraft: get().cvEditDraft, clEditDraft });
+    set({ clEditDraft });
+  },
 }));

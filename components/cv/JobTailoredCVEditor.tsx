@@ -20,7 +20,6 @@ import { CVEditorMobileBar } from '@/components/cv/premium/CVEditorMobileBar';
 import { ATSDrawer } from '@/components/cv/premium/ATSDrawer';
 import { KeywordPopover } from '@/components/cv/premium/KeywordPopover';
 import { useCVEditorPreviewState } from '@/hooks/useCVEditorPreviewState';
-import { useCVEditorAutosave } from '@/hooks/useCVEditorAutosave';
 import { DEFAULT_CV_ACCENT } from '@/lib/cv-accent';
 import { UnsavedLeaveModal } from '@/components/shared/UnsavedLeaveModal';
 import type { CVFormTab } from '@/components/cv/CVFormFields';
@@ -297,10 +296,11 @@ export function JobTailoredCVEditor() {
       router.replace('/cv/optimise/result');
       return;
     }
-    setDraft(optimisedCvJsonToCvData(parsed.object));
-    setSelectedTemplateId('classic');
-    setAccent(DEFAULT_CV_ACCENT);
-    setFontFamily('Inter');
+    const data = optimisedCvJsonToCvData(parsed.object);
+    setDraft(data);
+    setSelectedTemplateId(data.meta?.templateId || 'classic');
+    setAccent(data.meta?.colorScheme || DEFAULT_CV_ACCENT);
+    setFontFamily(data.meta?.fontFamily || 'Inter');
     setSavedSnapshot(null); // never persisted until explicit Save
     setUndoPast([]);
     setUndoFuture([]);
@@ -583,16 +583,15 @@ export function JobTailoredCVEditor() {
     serializeEditor,
   ]);
 
-  const isPersisted =
-    !isDraftMode || Boolean(sessionSavedCvId || draftMeta?.savedCvId);
-  const persistedCvId = !isDraftMode
-    ? id
-    : sessionSavedCvId ?? draftMeta?.savedCvId ?? null;
-
-  const stateKey = useMemo(() => {
-    if (!draft) return '';
-    return serializeEditor(draft, selectedTemplateId, accent, fontFamily, coverLetterText);
-  }, [draft, selectedTemplateId, accent, fontFamily, coverLetterText, serializeEditor]);
+  useEffect(() => {
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!isDirty) return;
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [isDirty]);
 
   const saveJobCv = useCallback(async (
     displayName?: string,
@@ -780,16 +779,6 @@ export function JobTailoredCVEditor() {
     serializeEditor,
   ]);
 
-  const { autosaveState, retryAutosave } = useCVEditorAutosave({
-    stateKey,
-    cvId: persistedCvId,
-    isNew: !isPersisted,
-    isDirty,
-    isSaving: pageSaveState === 'saving',
-    handleSave: () => saveJobCv(undefined, { silent: true }),
-    enabled: isPersisted && Boolean(persistedCvId),
-  });
-
   const backHref = isDraftMode ? '/cv/optimise' : '/cv/job-specific';
 
   const navigateBack = useCallback(() => {
@@ -797,19 +786,12 @@ export function JobTailoredCVEditor() {
   }, [router, backHref]);
 
   const handleBackClick = useCallback(() => {
-    if (!isPersisted && isDirty) {
+    if (isDirty) {
       setLeaveModalOpen(true);
       return;
     }
-    if (isPersisted && isDirty) {
-      void (async () => {
-        await saveJobCv(undefined, { silent: true });
-        navigateBack();
-      })();
-      return;
-    }
     navigateBack();
-  }, [isPersisted, isDirty, saveJobCv, navigateBack]);
+  }, [isDirty, navigateBack]);
 
   const handleDiscardLeave = useCallback(() => {
     useOptimiseEditDraftStore.getState().setCvEditDraft(null);
@@ -1087,17 +1069,15 @@ export function JobTailoredCVEditor() {
     isDraftMode && !sessionSavedCvId && !(draftMeta?.savedCvId ?? null);
 
   const saveLabel =
-    pageSaveState === 'saving' || (isPersisted && autosaveState === 'saving')
+    pageSaveState === 'saving'
       ? 'Saving…'
-      : pageSaveState === 'saved' || (isPersisted && autosaveState === 'saved' && !isDirty)
+      : pageSaveState === 'saved'
         ? 'Saved to account'
-        : saveError || (isPersisted && autosaveState === 'error')
+        : saveError
           ? "Couldn't save"
-          : !isPersisted && (isDirty || isUnsavedDraft)
+          : isDirty || isUnsavedDraft
             ? 'Unsaved changes'
-            : isPersisted && isDirty
-              ? 'Unsaved changes'
-              : '';
+            : '';
 
   const editingCvBody = !(genType === 'both' && documentTab === 'coverLetter');
 
@@ -1170,11 +1150,7 @@ export function JobTailoredCVEditor() {
           onClick: () => openSaveTitleModal(),
         }}
         statusLine={saveLabel || undefined}
-        onRetrySave={
-          saveError || autosaveState === 'error'
-            ? () => void (autosaveState === 'error' ? retryAutosave() : saveJobCv())
-            : undefined
-        }
+        onRetrySave={saveError ? () => void saveJobCv() : undefined}
         focusMode={editingCvBody ? focusMode : 'default'}
         onFocusModeChange={setFocusMode}
         trailingControls={

@@ -27,6 +27,12 @@ function defaultInputState(): { inputValue: string; rating: SkillRating } {
   return { inputValue: '', rating: 3 };
 }
 
+/** Capitalize only the first character (tools → Tools). Leaves the rest unchanged. */
+function capitalizeCategoryName(name: string): string {
+  if (!name) return name;
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
 export function SkillsEditor({
   skills,
   onChange,
@@ -35,6 +41,7 @@ export function SkillsEditor({
   const [inputs, setInputs] = useState<CategoryInputState>({});
   const [dupError, setDupError] = useState<Record<string, string | undefined>>({});
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [confirmClearId, setConfirmClearId] = useState<string | null>(null);
   const blockRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const skillInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const labelInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -95,6 +102,24 @@ export function SkillsEditor({
     );
   };
 
+  const updateSkillRating = (
+    catId: string,
+    itemId: string,
+    rating: SkillRating
+  ) => {
+    onChange(
+      skills.map((s) => {
+        if (s.id !== catId) return s;
+        return {
+          ...s,
+          items: s.items.map((it) =>
+            it.id === itemId ? { ...it, rating } : it
+          ),
+        };
+      })
+    );
+  };
+
   const removeCategory = (id: string) => {
     onChange(skills.filter((s) => s.id !== id));
     setConfirmDeleteId(null);
@@ -105,7 +130,19 @@ export function SkillsEditor({
       removeCategory(cat.id);
       return;
     }
+    setConfirmClearId(null);
     setConfirmDeleteId(cat.id);
+  };
+
+  const clearCategoryItems = (id: string) => {
+    updateCategory(id, { items: [] });
+    setConfirmClearId(null);
+  };
+
+  const tryClearCategory = (cat: SkillCategory) => {
+    if (cat.items.length === 0) return;
+    setConfirmDeleteId(null);
+    setConfirmClearId(cat.id);
   };
 
   const addSkill = (cat: SkillCategory) => {
@@ -154,8 +191,9 @@ export function SkillsEditor({
       {skills.map((cat) => {
         const st = ensureInput(cat.id);
         const dup = dupError[cat.id];
-        const catLabel = cat.category.trim() || 'Untitled Category';
-        const charCount = cat.category.length;
+        const displayCategory = capitalizeCategoryName(cat.category);
+        const catLabel = displayCategory.trim() || 'Untitled Category';
+        const charCount = displayCategory.length;
         const showCount = charCount > 45;
 
         return (
@@ -176,12 +214,16 @@ export function SkillsEditor({
                 aria-label="Skill category name"
                 placeholder="Category name (e.g. Tools, Languages, Frameworks)"
                 className={cn(
-                  'w-full border-0 border-b border-transparent bg-transparent font-semibold text-base text-[var(--color-text-primary)]',
+                  'w-full border-0 border-b border-transparent bg-transparent font-semibold text-base text-gray-900',
                   'focus:border-gray-400 focus:outline-none',
                   charCount >= 60 && 'border-red-400'
                 )}
-                value={cat.category}
-                onChange={(e) => updateCategory(cat.id, { category: e.target.value })}
+                value={displayCategory}
+                onChange={(e) =>
+                  updateCategory(cat.id, {
+                    category: capitalizeCategoryName(e.target.value),
+                  })
+                }
                 onKeyDown={(e) => {
                   if (e.key === 'Tab' && !e.shiftKey) {
                     e.preventDefault();
@@ -200,6 +242,16 @@ export function SkillsEditor({
                     {charCount}/60
                   </span>
                 )}
+                {cat.items.length > 0 ? (
+                  <button
+                    type="button"
+                    className="rounded px-1.5 py-1 text-xs font-medium text-gray-600 hover:bg-black/[0.04] hover:text-red-600"
+                    aria-label={`Clear all skills in ${catLabel}`}
+                    onClick={() => tryClearCategory(cat)}
+                  >
+                    Clear all
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className="rounded p-1 text-[var(--color-muted)] hover:bg-black/[0.04] hover:text-red-600"
@@ -210,6 +262,27 @@ export function SkillsEditor({
                 </button>
               </div>
             </div>
+
+            {confirmClearId === cat.id ? (
+              <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                Clear all {cat.items.length} skill
+                {cat.items.length === 1 ? '' : 's'} in &apos;{catLabel}&apos;?{' '}
+                <button
+                  type="button"
+                  className="font-medium underline"
+                  onClick={() => setConfirmClearId(null)}
+                >
+                  Cancel
+                </button>{' '}
+                <button
+                  type="button"
+                  className="font-semibold text-red-700 underline"
+                  onClick={() => clearCategoryItems(cat.id)}
+                >
+                  Clear
+                </button>
+              </div>
+            ) : null}
 
             {confirmDeleteId === cat.id ? (
               <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
@@ -235,13 +308,73 @@ export function SkillsEditor({
             <div className="mb-3 flex min-h-[24px] flex-wrap gap-x-1 gap-y-1 text-sm text-gray-700">
               {cat.items.length === 0 ? (
                 <span className="italic text-gray-400">No skills added yet</span>
+              ) : showRatingControls ? (
+                <ul className="w-full space-y-2">
+                  {cat.items.map((it) => (
+                    <li
+                      key={it.id}
+                      className="flex flex-wrap items-center gap-2 rounded-md border border-gray-100 bg-gray-50 px-2 py-1.5"
+                    >
+                      <span
+                        className="min-w-0 flex-1 truncate font-medium text-gray-900"
+                        title={it.name}
+                      >
+                        {it.name}
+                      </span>
+                      <span className="shrink-0 text-xs font-semibold text-gray-600">
+                        {it.rating} · {SKILL_RATING_LABEL[it.rating]}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={it.rating <= 1}
+                        aria-label={`Decrease rating for ${it.name}`}
+                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-gray-300 text-xs font-bold text-gray-900 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+                        onClick={() =>
+                          updateSkillRating(
+                            cat.id,
+                            it.id,
+                            Math.max(1, it.rating - 1) as SkillRating
+                          )
+                        }
+                      >
+                        −
+                      </button>
+                      <button
+                        type="button"
+                        disabled={it.rating >= 5}
+                        aria-label={`Increase rating for ${it.name}`}
+                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-gray-300 text-xs font-bold text-gray-900 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+                        onClick={() =>
+                          updateSkillRating(
+                            cat.id,
+                            it.id,
+                            Math.min(5, it.rating + 1) as SkillRating
+                          )
+                        }
+                      >
+                        +
+                      </button>
+                      <button
+                        type="button"
+                        className="shrink-0 cursor-pointer text-[14px] leading-none text-gray-400 hover:text-red-500"
+                        aria-label={`Remove ${it.name} from ${catLabel}`}
+                        onClick={() =>
+                          updateCategory(cat.id, {
+                            items: cat.items.filter((x) => x.id !== it.id),
+                          })
+                        }
+                      >
+                        ×
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               ) : (
                 cat.items.map((it, ii) => (
                   <span key={it.id} className="inline-flex max-w-full min-w-0 items-center gap-0.5">
                     {ii > 0 ? <span className="text-gray-500">,</span> : null}
                     <span className="max-w-[min(100%,280px)] truncate" title={it.name}>
                       {it.name}
-                      {showRatingControls ? ` (${it.rating})` : ''}
                     </span>
                     <button
                       type="button"
@@ -273,7 +406,7 @@ export function SkillsEditor({
                     type="button"
                     disabled={st.rating <= 1}
                     aria-label="Decrease rating"
-                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-gray-300 text-sm font-bold hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-gray-300 text-sm font-bold text-gray-900 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
                     onClick={() =>
                       setInputSlice(cat.id, {
                         rating: Math.max(1, st.rating - 1) as SkillRating,
@@ -297,7 +430,7 @@ export function SkillsEditor({
                 type="text"
                 maxLength={80}
                 placeholder="Add skill..."
-                className="min-w-[120px] flex-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-400)]"
+                className="min-w-[120px] flex-1 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-400)]"
                 value={st.inputValue}
                 onChange={(e) => {
                   setDupError((d) => ({ ...d, [cat.id]: undefined }));
@@ -315,7 +448,7 @@ export function SkillsEditor({
                   type="button"
                   disabled={st.rating >= 5}
                   aria-label="Increase rating"
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-gray-300 text-sm font-bold hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-gray-300 text-sm font-bold text-gray-900 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
                   onClick={() =>
                     setInputSlice(cat.id, {
                       rating: Math.min(5, st.rating + 1) as SkillRating,

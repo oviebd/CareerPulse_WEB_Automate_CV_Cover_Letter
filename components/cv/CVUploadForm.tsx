@@ -11,6 +11,7 @@ import { useCVProfile } from '@/hooks/useCV';
 import { useSubscription } from '@/hooks/useSubscription';
 import { uploadCvFileWithProgress } from '@/lib/cv-storage-upload';
 import { isAllowedCvFile } from '@/lib/cv-file';
+import { writeCvDraftFromUnknown } from '@/lib/cv-draft-storage';
 import type { CVProfile } from '@/types';
 
 const MAX = 10 * 1024 * 1024;
@@ -164,14 +165,10 @@ export function CVUploadForm() {
         }
 
         if (json.cvProfile) {
-          // Store extraction as a local draft.
-          // It will be persisted to DB only when the user presses Save.
-          sessionStorage.setItem('cv_draft', JSON.stringify(json.cvProfile));
-          sessionStorage.setItem(
-            'cv_draft_force_overwrite',
-            force ? '1' : '0'
-          );
-          window.dispatchEvent(new Event('cv_draft_updated'));
+          writeCvDraftFromUnknown(json.cvProfile, {
+            forceOverwrite: force,
+            emitEvent: true,
+          });
           queryClient.setQueryData(
             ['cv-profile', user.id, 'latest'],
             json.cvProfile

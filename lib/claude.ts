@@ -108,7 +108,13 @@ IMPORTANT — Link extraction rules:
 • Certification links: for EACH certification, collect ALL credential/badge/verification links into that cert's "links[]" array.
   - Common labels: "Credential", "Badge", "Verify", "Certificate"
 • Also scan the visible text for bare URLs (e.g. "github.com/user/repo") and classify them the same way.
-• Do NOT duplicate a link across both dedicated fields and links[].`,
+• Do NOT duplicate a link across both dedicated fields and links[].
+
+IMPORTANT — Skills extraction rules:
+• Only extract skills that are explicitly listed on the CV (skills section or clear skill/tool lists). Do NOT invent skills from every technology mention in experience bullets.
+• Prefer technical skills, tools, and spoken/programming languages. Omit vague soft skills (e.g. "team player", "hard working", "communication") unless the CV has a dedicated soft-skills list.
+• At most 15 skill items total across all categories. Prefer quality over volume; dedupe case-insensitively.
+• Use short category names (Technical, Tools, Languages, Soft). At most 4 categories.`,
       messages: [
         {
           role: 'user',
@@ -127,7 +133,7 @@ Schema:
   "summary": string,
   "experience": [{"id":"uuid","company":"","title":"","location":"","start_date":"YYYY-MM","end_date":"YYYY-MM or null","is_current":false,"bullets":[],"description":""}],
   "education": [{"id":"uuid","institution":"","degree":"","field_of_study":"","start_date":"YYYY-MM","end_date":"YYYY-MM or null","gpa":null,"description":""}],
-  "skills": [{"id":"uuid","category":"technical|soft|languages|tools","items":[]}],
+  "skills": [{"id":"uuid","category":"Technical|Tools|Languages|Soft","items":[{"id":"uuid","name":"","rating":3}]}],
   "projects": [{"id":"uuid","name":"","description":"","tech_stack":[],"links":[{"label":"GitHub|Live Demo|npm|...","url":""}],"start_date":null,"end_date":null}],
   "certifications": [{"id":"uuid","name":"","issuer":"","issue_date":"YYYY-MM","expiry_date":null,"links":[{"label":"Credential|Badge|Verify|...","url":""}]}],
   "languages": [{"id":"uuid","language":"","proficiency":"native|fluent|advanced|intermediate|basic"}],
@@ -137,6 +143,7 @@ Schema:
 CV TEXT:
 ${cvText}${hyperlinkSection}`,
         },
+
       ],
     })
   );

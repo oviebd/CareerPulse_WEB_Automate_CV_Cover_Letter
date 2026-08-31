@@ -458,23 +458,24 @@
           if (cat.indexOf('language') !== -1) return;
           g.items.forEach(function (it) {
             var name = typeof it === 'string' ? it : it.name;
-            var pct = skillFillPctFromItem(
-              typeof it === 'object' && it ? it : { name: String(name) }
-            );
-            var rr = skillRatingFromItem(
-              typeof it === 'object' && it ? it : { name: String(name) }
-            );
+            var obj = typeof it === 'object' && it ? it : { name: String(name) };
             h += '<div class="golden-skill skill-item">';
-            h +=
-              '<div class="golden-skill-name">' +
-              esc(name) +
-              '<span class="skill-label"> ' +
-              esc(RATING_LABEL[rr] || '') +
-              '</span></div>';
-            h +=
-              '<div class="golden-sbar"><span class="golden-sbar-fill" style="width:' +
-              pct +
-              '%"></span></div>';
+            if (cfg.showSkillBars) {
+              var pct = skillFillPctFromItem(obj);
+              var rr = skillRatingFromItem(obj);
+              h +=
+                '<div class="golden-skill-name">' +
+                esc(name) +
+                '<span class="skill-label"> ' +
+                esc(RATING_LABEL[rr] || '') +
+                '</span></div>';
+              h +=
+                '<div class="golden-sbar"><span class="golden-sbar-fill" style="width:' +
+                pct +
+                '%"></span></div>';
+            } else {
+              h += '<div class="golden-skill-name">' + esc(name) + '</div>';
+            }
             h += '</div>';
           });
         });
@@ -645,15 +646,19 @@
             g.items.forEach(function (it) {
               var name = typeof it === 'string' ? it : it.name;
               var obj = typeof it === 'object' && it ? it : { name: String(name) };
-              var pct = skillFillPctFromItem(obj);
-              var rr = skillRatingFromItem(obj);
               h += '<div class="ocean-skill-row skill-item">';
-              h += '<div class="ocean-skill-hd"><span>' + esc(name) + '</span>';
-              h += '<span class="skill-label">' + esc(RATING_LABEL[rr] || '') + '</span></div>';
-              h +=
-                '<div class="ocean-sbar"><span class="ocean-sbar-fill" style="width:' +
-                pct +
-                '%"></span></div>';
+              if (cfg.showSkillBars) {
+                var pct = skillFillPctFromItem(obj);
+                var rr = skillRatingFromItem(obj);
+                h += '<div class="ocean-skill-hd"><span>' + esc(name) + '</span>';
+                h += '<span class="skill-label">' + esc(RATING_LABEL[rr] || '') + '</span></div>';
+                h +=
+                  '<div class="ocean-sbar"><span class="ocean-sbar-fill" style="width:' +
+                  pct +
+                  '%"></span></div>';
+              } else {
+                h += '<div class="ocean-skill-hd"><span>' + esc(name) + '</span></div>';
+              }
               h += '</div>';
             });
             h += '</div>';
@@ -816,18 +821,17 @@
           g.items.forEach(function (it) {
             var name = typeof it === 'string' ? it : it.name;
             var obj = typeof it === 'object' && it ? it : { name: String(name) };
-            var n = skillRatingFromItem(obj);
-            h +=
-              '<div class="violet-skill-row skill-item"><span>' +
-              esc(name) +
-              '</span><span class="violet-dots" aria-label="' +
-              n +
-              ' of 5">';
-            var j;
-            for (j = 0; j < 5; j++) {
-              h += '<span class="' + (j < n ? 'violet-dot on' : 'violet-dot') + '">●</span>';
+            h += '<div class="violet-skill-row skill-item"><span>' + esc(name) + '</span>';
+            if (cfg.showSkillBars) {
+              var n = skillRatingFromItem(obj);
+              h += '<span class="violet-dots" aria-label="' + n + ' of 5">';
+              var j;
+              for (j = 0; j < 5; j++) {
+                h += '<span class="' + (j < n ? 'violet-dot on' : 'violet-dot') + '">●</span>';
+              }
+              h += '</span>';
             }
-            h += '</span></div>';
+            h += '</div>';
           });
         });
         h += '</div>';

@@ -50,6 +50,7 @@ function readCvExtra(d: CVProfile) {
     volunteer: (x.volunteer ?? []) as Volunteer[],
     interestsText: (x.interests ?? []).join('\n'),
     custom: (x.custom ?? []) as CustomSection[],
+    showSkillProficiency: x.showSkillProficiency ?? false,
   };
 }
 
@@ -59,6 +60,12 @@ function patchCvExtra(d: CVProfile, patch: Partial<CVExtraPayload>): CVProfile {
 }
 
 import { cvProfileToExportSnapshot } from '@/lib/cv-export-snapshot';
+import {
+  CV_DRAFT_FORCE_KEY,
+  CV_DRAFT_UPDATED_EVENT,
+  clearCvDraft,
+  hasCvDraft,
+} from '@/lib/cv-draft-storage';
 
 function draftFromJobSpecificCV(j: JobSpecificCV): CVProfile {
   return {
@@ -133,12 +140,11 @@ export default function CVTemplatePreviewPage() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const compute = () =>
-      setDraftActive(Boolean(sessionStorage.getItem('cv_draft')));
+    const compute = () => setDraftActive(hasCvDraft());
     compute();
     const onUpdate = () => compute();
-    window.addEventListener('cv_draft_updated', onUpdate);
-    return () => window.removeEventListener('cv_draft_updated', onUpdate);
+    window.addEventListener(CV_DRAFT_UPDATED_EVENT, onUpdate);
+    return () => window.removeEventListener(CV_DRAFT_UPDATED_EVENT, onUpdate);
   }, []);
 
   useEffect(() => {
@@ -272,7 +278,7 @@ export default function CVTemplatePreviewPage() {
     }
 
     const forceOverwrite =
-      sessionStorage.getItem('cv_draft_force_overwrite') === '1';
+      sessionStorage.getItem(CV_DRAFT_FORCE_KEY) === '1';
     const res = await fetch('/api/cv', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -310,9 +316,7 @@ export default function CVTemplatePreviewPage() {
       setSaveState('saved');
       if (draftActive) {
         try {
-          sessionStorage.removeItem('cv_draft');
-          sessionStorage.removeItem('cv_draft_force_overwrite');
-          window.dispatchEvent(new Event('cv_draft_updated'));
+          clearCvDraft();
         } catch {
           // ignore
         }
@@ -683,6 +687,12 @@ export default function CVTemplatePreviewPage() {
             onEducationChange={(education) => setDraft({ ...draft, education })}
             skills={(draft.skills?.length ? draft.skills : []) as SkillCategory[]}
             onSkillsChange={(skills) => setDraft({ ...draft, skills })}
+            showSkillProficiency={ex.showSkillProficiency}
+            onShowSkillProficiencyChange={(show) =>
+              setDraft(
+                patchCvExtra(draft, { showSkillProficiency: show || undefined })
+              )
+            }
             projects={(draft.projects?.length ? draft.projects : []) as ProjectEntry[]}
             onProjectsChange={(projects) => setDraft({ ...draft, projects })}
             languages={(draft.languages?.length ? draft.languages : []) as LanguageEntry[]}

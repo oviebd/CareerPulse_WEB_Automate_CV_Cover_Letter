@@ -7,9 +7,9 @@ import type {
   LanguageEntry,
   ProfileLink,
   ProjectEntry,
-  SkillCategory,
 } from '@/types';
 import { generateId } from '@/lib/utils';
+import { clampSkillCategories } from '@/src/utils/migrateSkills';
 
 function id<T extends { id?: string }>(row: T): T & { id: string } {
   return {
@@ -86,7 +86,7 @@ export function normalizeExtractedCV(
     })
   );
   const education = ((raw.education as EducationEntry[]) ?? []).map(id);
-  const skills = ((raw.skills as SkillCategory[]) ?? []).map(id);
+  const skills = clampSkillCategories(raw.skills);
 
   const projects = ((raw.projects as ProjectEntry[]) ?? []).map((p) =>
     id({
