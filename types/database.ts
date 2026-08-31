@@ -206,6 +206,8 @@ export interface CoverLetter {
   id: string;
   user_id: string;
   name: string;
+  company_name: string | null;
+  job_title: string | null;
   tone: string | null;
   length: string | null;
   specific_emphasis: string | null;

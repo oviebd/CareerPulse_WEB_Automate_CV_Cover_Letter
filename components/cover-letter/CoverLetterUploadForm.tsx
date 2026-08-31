@@ -192,6 +192,8 @@ export function CoverLetterUploadForm({ onExtracted }: Props) {
             content: json.letter.content,
             template_id: json.preferred_template_id ?? 'cl-classic',
             source_type: 'existing_cover_letter',
+            company_name: json.letter.company_name,
+            job_title: json.letter.job_title,
             applicant_name: json.letter.applicant_name,
             applicant_role: json.letter.applicant_role,
             applicant_email: json.letter.applicant_email,

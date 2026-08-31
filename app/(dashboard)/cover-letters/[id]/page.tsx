@@ -27,7 +27,7 @@ import { ExportMenu } from '@/components/shared/ExportMenu';
 import { UnsavedLeaveModal } from '@/components/shared/UnsavedLeaveModal';
 import { exportCoverLetter, type ExportFormat } from '@/lib/export-client';
 import { formatDate } from '@/lib/utils';
-import type { CVTemplate, SubscriptionTier } from '@/types';
+import type { CVTemplate, SubscriptionTier, CoverLetter } from '@/types';
 import type { Job } from '@/types/database';
 import { useOptimiseDraftStore } from '@/stores/useOptimiseDraftStore';
 import {
@@ -168,10 +168,10 @@ export default function CoverLetterDetailPage() {
       setDraftApplicantEmail(letter.applicant_email ?? '');
       setDraftApplicantPhone(letter.applicant_phone ?? '');
       setDraftApplicantLocation(letter.applicant_location ?? '');
-      setDraftCompanyName('');
-      setDraftJobTitle('');
+      setDraftCompanyName(letter.company_name ?? '');
+      setDraftJobTitle(letter.job_title ?? '');
     }
-  }, [letter, preferredClTemplateId]);
+  }, [letter, preferredClTemplateId, isDraftMode]);
 
   useEffect(() => {
     if (isDraftMode || !letter || !linkedJob) return;
@@ -189,6 +189,18 @@ export default function CoverLetterDetailPage() {
       }
     };
   }, []);
+
+  const syncDraftFromLetter = useCallback((saved: CoverLetter) => {
+    setDraftContent(saved.content ?? '');
+    setDraftTemplateId(saved.template_id?.trim() || preferredClTemplateId || 'cl-classic');
+    setDraftApplicantName(saved.applicant_name ?? '');
+    setDraftApplicantRole(saved.applicant_role ?? '');
+    setDraftApplicantEmail(saved.applicant_email ?? '');
+    setDraftApplicantPhone(saved.applicant_phone ?? '');
+    setDraftApplicantLocation(saved.applicant_location ?? '');
+    setDraftCompanyName(saved.company_name ?? '');
+    setDraftJobTitle(saved.job_title ?? '');
+  }, [preferredClTemplateId]);
 
   const refreshPreview = useCallback(async () => {
     if (isDraftMode) {
@@ -312,8 +324,8 @@ export default function CoverLetterDetailPage() {
         letter &&
         (draftContent !== (letter.content ?? '') ||
           draftTemplateId !== (letter.template_id?.trim() || 'cl-classic') ||
-          draftCompanyName !== (linkedJob?.company_name ?? '') ||
-          draftJobTitle !== (linkedJob?.job_title ?? '') ||
+          draftCompanyName !== (linkedJob?.company_name ?? letter.company_name ?? '') ||
+          draftJobTitle !== (linkedJob?.job_title ?? letter.job_title ?? '') ||
           draftApplicantName !== (letter.applicant_name ?? '') ||
           draftApplicantRole !== (letter.applicant_role ?? '') ||
           draftApplicantEmail !== (letter.applicant_email ?? '') ||
@@ -333,16 +345,19 @@ export default function CoverLetterDetailPage() {
         return false;
       }
       try {
-        await updateLetter.mutateAsync({
+        const saved = await updateLetter.mutateAsync({
           id: letter.id,
           content: draftContent,
           template_id: draftTemplateId,
+          company_name: draftCompanyName.trim() || null,
+          job_title: draftJobTitle.trim() || null,
           applicant_name: draftApplicantName.trim() || null,
           applicant_role: draftApplicantRole.trim() || null,
           applicant_email: draftApplicantEmail.trim() || null,
           applicant_phone: draftApplicantPhone.trim() || null,
           applicant_location: draftApplicantLocation.trim() || null,
         });
+        syncDraftFromLetter(saved);
         if (letter.job_ids?.[0]) {
           const supabase = createClient();
           const { error: jobErr } = await supabase
@@ -354,11 +369,17 @@ export default function CoverLetterDetailPage() {
             .eq('id', letter.job_ids[0])
             .eq('user_id', userId ?? '');
           if (jobErr) throw jobErr;
+          void qc.invalidateQueries({
+            queryKey: ['job', letter.job_ids[0], userId],
+          });
         }
         if (!options?.silent) toast('Cover letter saved.', 'success');
         return true;
-      } catch {
-        if (!options?.silent) toast('Could not save.', 'error');
+      } catch (e) {
+        console.error('[cover-letter save]', e);
+        if (!options?.silent) {
+          toast(e instanceof Error ? e.message : 'Could not save.', 'error');
+        }
         return false;
       }
     },
@@ -378,6 +399,8 @@ export default function CoverLetterDetailPage() {
       draftCompanyName,
       draftJobTitle,
       userId,
+      qc,
+      syncDraftFromLetter,
     ]
   );
 
@@ -403,6 +426,8 @@ export default function CoverLetterDetailPage() {
             length: draftClMeta.length ?? 'medium',
             template_id: draftTemplateId,
             specific_emphasis: draftClMeta.emphasis?.trim() || null,
+            company_name: draftCompanyName.trim() || null,
+            job_title: draftJobTitle.trim() || null,
             applicant_name: draftApplicantName.trim() || null,
             applicant_role: draftApplicantRole.trim() || null,
             applicant_email: draftApplicantEmail.trim() || null,
@@ -479,8 +504,8 @@ export default function CoverLetterDetailPage() {
       setDraftApplicantEmail(letter.applicant_email ?? '');
       setDraftApplicantPhone(letter.applicant_phone ?? '');
       setDraftApplicantLocation(letter.applicant_location ?? '');
-      setDraftCompanyName(linkedJob?.company_name ?? '');
-      setDraftJobTitle(linkedJob?.job_title ?? '');
+      setDraftCompanyName(linkedJob?.company_name ?? letter.company_name ?? '');
+      setDraftJobTitle(linkedJob?.job_title ?? letter.job_title ?? '');
     }
     router.push('/cover-letters');
   }, [isDraftMode, letter, linkedJob, preferredClTemplateId, router]);
@@ -615,15 +640,6 @@ export default function CoverLetterDetailPage() {
             canDocx={canAccessFeature(tier, 'docxExport')}
             onExport={(format) => void handleExport(format)}
           />
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={isDraftMode}
-            loading={exportingPdf}
-            onClick={() => void handleExport('pdf')}
-          >
-            Export PDF
-          </Button>
           <Button
             variant="primary"
             size="sm"

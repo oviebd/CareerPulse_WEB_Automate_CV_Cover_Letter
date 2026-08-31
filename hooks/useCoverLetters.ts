@@ -88,34 +88,44 @@ export function useToggleCoverLetterFavourite() {
 
 export function useUpdateCoverLetter() {
   const qc = useQueryClient();
+  const userId = useAuthStore((s) => s.user?.id);
   return useMutation({
     mutationFn: async (payload: {
       id: string;
       content: string;
       template_id: string;
+      company_name: string | null;
+      job_title: string | null;
       applicant_name: string | null;
       applicant_role: string | null;
       applicant_email: string | null;
       applicant_phone: string | null;
       applicant_location: string | null;
-    }) => {
-      const supabase = createClient();
-      const { error } = await supabase
-        .from('cover_letters')
-        .update({
+    }): Promise<CoverLetter> => {
+      const res = await fetch(`/api/cover-letters/${payload.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({
           content: payload.content,
           template_id: payload.template_id,
+          company_name: payload.company_name,
+          job_title: payload.job_title,
           applicant_name: payload.applicant_name,
           applicant_role: payload.applicant_role,
           applicant_email: payload.applicant_email,
           applicant_phone: payload.applicant_phone,
           applicant_location: payload.applicant_location,
-        })
-        .eq('id', payload.id);
-      if (error) throw error;
+        }),
+      });
+      if (!res.ok) {
+        const json = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(json.error ?? `Save failed (HTTP ${res.status})`);
+      }
+      return (await res.json()) as CoverLetter;
     },
-    onSuccess: (_, v) => {
-      void qc.invalidateQueries({ queryKey: ['cover-letter', v.id] });
+    onSuccess: (data, v) => {
+      qc.setQueryData(['cover-letter', v.id, userId], data);
       void qc.invalidateQueries({ queryKey: ['cover-letters'] });
     },
   });

@@ -47,6 +47,8 @@ export async function POST(request: Request) {
       length?: string | null;
       template_id?: string | null;
       specific_emphasis?: string | null;
+      company_name?: string | null;
+      job_title?: string | null;
       applicant_name?: string | null;
       applicant_role?: string | null;
       applicant_email?: string | null;
@@ -63,16 +65,28 @@ export async function POST(request: Request) {
       ? body.job_ids.filter((x): x is string => typeof x === 'string')
       : [];
 
+    const tone =
+      typeof body.tone === 'string' && body.tone.trim()
+        ? body.tone.trim()
+        : 'professional';
+    const length =
+      typeof body.length === 'string' && body.length.trim()
+        ? body.length.trim()
+        : 'medium';
+
     const { data, error } = await supabase
       .from('cover_letters')
       .insert({
         user_id: user.id,
         ...(body.name?.trim() ? { name: body.name.trim() } : {}),
         content: body.content,
-        tone: body.tone ?? null,
-        length: body.length ?? null,
+        job_description: '',
+        tone,
+        length,
         template_id: body.template_id?.trim() || 'cl-classic',
         specific_emphasis: body.specific_emphasis?.trim() || null,
+        company_name: body.company_name?.trim() || null,
+        job_title: body.job_title?.trim() || null,
         applicant_name: body.applicant_name?.trim() || null,
         applicant_role: body.applicant_role?.trim() || null,
         applicant_email: body.applicant_email?.trim() || null,
