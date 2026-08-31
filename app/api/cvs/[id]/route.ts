@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server';
 import { dbRowToCvProfile } from '@/lib/cv-mapper';
 import { mergeAndCompleteCv, normalizeCvPatchBody } from '@/lib/cv-api-merge';
 import { stripUndefined } from '@/lib/queries/strip-undefined';
+import { optimisedJsonToDbPayload } from '@/lib/optimise-result';
+import { CLAUDE_MODEL } from '@/lib/claude';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -55,8 +57,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     const fromCvJson: Record<string, unknown> = {};
     if (typeof cvContentRaw === 'string' && cvContentRaw.trim()) {
       try {
-        const parsed = JSON.parse(cvContentRaw) as Record<string, unknown>;
-        Object.assign(fromCvJson, parsed);
+        Object.assign(fromCvJson, optimisedJsonToDbPayload(cvContentRaw));
       } catch {
         return err('Invalid cvContent JSON', 'INVALID_JSON', 422);
       }
@@ -112,6 +113,8 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     if (hasCl) {
       const jids = (current.job_ids as string[] | undefined) ?? [];
       const firstJob = jids[0];
+      const clContent = (coverLetterContentRaw as string).trim();
+
       if (firstJob) {
         const { data: clRow } = await supabase
           .from('cover_letters')
@@ -119,17 +122,48 @@ export async function PATCH(request: Request, { params }: RouteContext) {
           .eq('user_id', user.id)
           .contains('job_ids', [firstJob])
           .maybeSingle();
+
         if (clRow?.id) {
           await supabase
             .from('cover_letters')
             .update({
-              content: (coverLetterContentRaw as string).trim(),
+              content: clContent,
               updated_at: now,
             })
             .eq('id', clRow.id)
             .eq('user_id', user.id);
+        } else {
+          const source = updatedRow ?? (current as Record<string, unknown>);
+          await supabase.from('cover_letters').insert({
+            user_id: user.id,
+            applicant_name: (source.full_name as string | null) ?? null,
+            applicant_role: (source.professional_title as string | null) ?? null,
+            applicant_email: (source.email as string | null) ?? null,
+            applicant_phone: (source.phone as string | null) ?? null,
+            applicant_location: (source.location as string | null) ?? null,
+            content: clContent,
+            template_id: 'cl-classic',
+            generation_model: CLAUDE_MODEL,
+            job_ids: [firstJob],
+          });
         }
+      } else {
+        // No linked job — still create/update a standalone letter if content provided
+        const source = updatedRow ?? (current as Record<string, unknown>);
+        await supabase.from('cover_letters').insert({
+          user_id: user.id,
+          applicant_name: (source.full_name as string | null) ?? null,
+          applicant_role: (source.professional_title as string | null) ?? null,
+          applicant_email: (source.email as string | null) ?? null,
+          applicant_phone: (source.phone as string | null) ?? null,
+          applicant_location: (source.location as string | null) ?? null,
+          content: clContent,
+          template_id: 'cl-classic',
+          generation_model: CLAUDE_MODEL,
+          job_ids: [],
+        });
       }
+
       if (!hasCvPatch) {
         const { data: touched, error: touchErr } = await supabase
           .from('cvs')

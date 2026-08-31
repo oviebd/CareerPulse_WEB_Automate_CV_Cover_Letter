@@ -24,6 +24,8 @@ export type CVEditorFocusMode = 'default' | 'editor' | 'preview';
 export interface CVEditorTopBarProps {
   backHref: string;
   backLabel?: string;
+  /** When set, Back is a button that calls this instead of navigating via Link. */
+  onBackClick?: () => void;
   title: string;
   subtitle?: string;
   caption?: string;
@@ -142,6 +144,7 @@ function FocusModeMenu({
 export function CVEditorTopBar({
   backHref,
   backLabel = 'Back to Documents',
+  onBackClick,
   title,
   subtitle,
   caption,
@@ -179,6 +182,9 @@ export function CVEditorTopBar({
     };
   }, [menuOpen]);
 
+  const backClassName =
+    'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-control-bg)] text-[var(--color-text-primary)] transition duration-200 hover:bg-[var(--color-control-bg-hover)]';
+
   return (
     <header className="sticky top-0 z-40 border-b border-[var(--color-border)]/80 bg-[var(--color-surface)]/92 backdrop-blur-xl">
       <div
@@ -191,13 +197,20 @@ export function CVEditorTopBar({
       >
         <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           <Tooltip content={backLabel}>
-            <Link
-              href={backHref}
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-control-bg)] text-[var(--color-text-primary)] transition duration-200 hover:bg-[var(--color-control-bg-hover)]"
-              aria-label={backLabel}
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
+            {onBackClick ? (
+              <button
+                type="button"
+                className={backClassName}
+                aria-label={backLabel}
+                onClick={onBackClick}
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </button>
+            ) : (
+              <Link href={backHref} className={backClassName} aria-label={backLabel}>
+                <ArrowLeft className="h-4 w-4" />
+              </Link>
+            )}
           </Tooltip>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">

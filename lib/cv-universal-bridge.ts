@@ -9,7 +9,7 @@ import type {
   ReferralEntry,
 } from '@/types';
 import type { CVProfile } from '@/types';
-import type { CVData, Education } from '@/src/types/cv.types';
+import type { CVData, Education, WorkExperience } from '@/src/types/cv.types';
 import { migrateLegacyCVData } from '@/src/utils/cvDefaults';
 import { generateId } from '@/lib/utils';
 import { normalizeSkillsForSave } from '@/src/utils/migrateSkills';
@@ -50,17 +50,24 @@ export function profileToUniversalCV(row: CVProfile): CVData {
 function universalExperienceToEntries(
   exp: CVData['experience']
 ): ExperienceEntry[] {
-  return (exp ?? []).map((e) => ({
-    id: e.id || generateId(),
-    company: e.company,
-    title: e.role,
-    location: e.location || '',
-    start_date: e.startDate,
-    end_date: e.current ? null : e.endDate || null,
-    is_current: e.current,
-    bullets: e.bullets ?? [],
-    description: e.highlights ?? e.bullets?.join('\n') ?? null,
-  }));
+  return (exp ?? []).map((e) => {
+    const anyE = e as WorkExperience & { title?: string; start_date?: string; end_date?: string; is_current?: boolean };
+    const role = (e.role || anyE.title || '').trim();
+    const startDate = e.startDate || anyE.start_date || '';
+    const endDate = e.endDate || anyE.end_date || '';
+    const current = Boolean(e.current ?? anyE.is_current);
+    return {
+      id: e.id || generateId(),
+      company: e.company,
+      title: role,
+      location: e.location || '',
+      start_date: startDate,
+      end_date: current ? null : endDate || null,
+      is_current: current,
+      bullets: e.bullets ?? [],
+      description: e.highlights ?? e.bullets?.join('\n') ?? null,
+    };
+  });
 }
 
 export type EducationExtraEntry = {

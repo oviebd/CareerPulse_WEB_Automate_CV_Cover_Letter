@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Briefcase, FileText, PenLine } from 'lucide-react';
+import { Briefcase, FileText, PenLine, Upload } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
@@ -76,7 +76,7 @@ export default function NewCoverLetterPage() {
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         {/* From Job Description */}
         <div className="flex flex-col gap-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 transition hover:border-[var(--color-primary)]/40 hover:bg-[var(--color-surface-2)]">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--color-primary)]/10">
@@ -99,6 +99,28 @@ export default function NewCoverLetterPage() {
           </Button>
         </div>
 
+        {/* Upload */}
+        <div className="flex flex-col gap-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 transition hover:border-[var(--color-primary)]/40 hover:bg-[var(--color-surface-2)]">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--color-primary)]/10">
+            <Upload className="h-5 w-5 text-[var(--color-primary)]" />
+          </div>
+          <div className="flex-1">
+            <h2 className="font-semibold text-[var(--color-text-primary)]">
+              Upload Cover Letter
+            </h2>
+            <p className="mt-1 text-sm text-[var(--color-muted)]">
+              Import a PDF or DOCX cover letter, then edit it with your preferred template.
+            </p>
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => router.push('/cover-letters/new/upload')}
+          >
+            Get started
+          </Button>
+        </div>
+
         {/* Enhance Existing */}
         <div className="flex flex-col gap-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 transition hover:border-[var(--color-primary)]/40 hover:bg-[var(--color-surface-2)]">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--color-accent-gold)]/10">
@@ -109,7 +131,7 @@ export default function NewCoverLetterPage() {
               Enhance Existing Letter
             </h2>
             <p className="mt-1 text-sm text-[var(--color-muted)]">
-              Paste an existing cover letter and AI will rewrite it to improve clarity, tone, and impact.
+              Paste or upload an existing cover letter and AI will rewrite it to improve clarity, tone, and impact.
             </p>
           </div>
           <Button

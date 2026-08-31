@@ -1,16 +1,18 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { CoverLetterTemplatePicker } from '@/components/cover-letter/CoverLetterTemplatePicker';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useToast } from '@/components/ui/toast';
+import { createClient } from '@/lib/supabase/client';
 import { canAccessFeature } from '@/lib/subscription';
-import type { CoverLetterLength, CoverLetterTone } from '@/types';
+import type { CoverLetterLength, CoverLetterTone, CVTemplate } from '@/types';
 
 const TONES: { id: CoverLetterTone; label: string }[] = [
   { id: 'professional', label: 'Professional' },
@@ -42,6 +44,20 @@ export function GenerateCoverLetterForm() {
   } | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
+
+  const { data: templates = [] } = useQuery({
+    queryKey: ['cover-letter-templates'],
+    queryFn: async (): Promise<CVTemplate[]> => {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from('cv_templates')
+        .select('*')
+        .eq('type', 'cover_letter')
+        .order('sort_order');
+      return (data ?? []) as CVTemplate[];
+    },
+    staleTime: 10 * 60 * 1000,
+  });
 
   useEffect(() => {
     return () => {
@@ -173,12 +189,21 @@ export function GenerateCoverLetterForm() {
           value={emphasis}
           onChange={(e) => setEmphasis(e.target.value)}
         />
-        <Input
-          label="Template ID"
-          helperText="e.g. cl-classic, cl-modern"
-          value={templateId}
-          onChange={(e) => setTemplateId(e.target.value)}
-        />
+        <div>
+          <p className="mb-1 text-sm font-medium text-[var(--color-text-primary)]">
+            Template
+          </p>
+          <p className="mb-3 text-xs text-[var(--color-muted)]">
+            Choose a layout for PDF/DOCX export.
+          </p>
+          <CoverLetterTemplatePicker
+            templates={templates}
+            selectedId={templateId}
+            onSelect={setTemplateId}
+            userTier={tier}
+            columns="compact"
+          />
+        </div>
         <Button
           variant="primary"
           loading={loading}
@@ -201,6 +226,7 @@ export function GenerateCoverLetterForm() {
                   length,
                   template_id: templateId,
                   specific_emphasis: emphasis.trim() || null,
+                  source_type: 'job_description',
                 }),
               });
               if (!res.ok) {

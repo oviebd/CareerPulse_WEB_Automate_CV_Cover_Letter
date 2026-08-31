@@ -9,12 +9,12 @@ import { LayoutTemplate } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
 import { CVRewriteWithAIModal } from '@/components/cv/CVRewriteWithAIModal';
 import { CvAtsPolishButton } from '@/components/cv/CvAtsPolishButton';
 import { CoverLetterPrintPreviewFrame } from '@/components/cover-letter/CoverLetterPrintPreviewFrame';
+import { CoverLetterTemplatePicker } from '@/components/cover-letter/CoverLetterTemplatePicker';
 import {
   useCoverLetter,
   useUpdateCoverLetter,
@@ -24,6 +24,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { canUseTemplate, canAccessFeature } from '@/lib/subscription';
 import { ExportMenu } from '@/components/shared/ExportMenu';
+import { UnsavedLeaveModal } from '@/components/shared/UnsavedLeaveModal';
 import { exportCoverLetter, type ExportFormat } from '@/lib/export-client';
 import { formatDate } from '@/lib/utils';
 import type { CVTemplate, SubscriptionTier } from '@/types';
@@ -98,6 +99,11 @@ export default function CoverLetterDetailPage() {
   );
   const [draftSaveBusy, setDraftSaveBusy] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [leaveModalOpen, setLeaveModalOpen] = useState(false);
+  const [leaveSaving, setLeaveSaving] = useState(false);
+  const [autosaveState, setAutosaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>(
+    'idle'
+  );
   const initLetterIdRef = useRef<string | null>(null);
   const jobSyncedForLetterRef = useRef<string | null>(null);
   const previewUrlRef = useRef<string | null>(null);
@@ -303,30 +309,120 @@ export default function CoverLetterDetailPage() {
     refreshPreview,
   ]);
 
-  const isDirty =
+  const isDirty = Boolean(
     (isDraftMode && draftClMeta && draftContent.trim().length > 0) ||
-    (!isDraftMode &&
-      letter &&
-      (draftContent !== (letter.content ?? '') ||
-        draftTemplateId !== (letter.template_id?.trim() || 'cl-classic') ||
-        draftCompanyName !== (linkedJob?.company_name ?? '') ||
-        draftJobTitle !== (linkedJob?.job_title ?? '') ||
-        draftApplicantName !== (letter.applicant_name ?? '') ||
-        draftApplicantRole !== (letter.applicant_role ?? '') ||
-        draftApplicantEmail !== (letter.applicant_email ?? '') ||
-        draftApplicantPhone !== (letter.applicant_phone ?? '') ||
-        draftApplicantLocation !== (letter.applicant_location ?? '')));
+      (!isDraftMode &&
+        letter &&
+        (draftContent !== (letter.content ?? '') ||
+          draftTemplateId !== (letter.template_id?.trim() || 'cl-classic') ||
+          draftCompanyName !== (linkedJob?.company_name ?? '') ||
+          draftJobTitle !== (linkedJob?.job_title ?? '') ||
+          draftApplicantName !== (letter.applicant_name ?? '') ||
+          draftApplicantRole !== (letter.applicant_role ?? '') ||
+          draftApplicantEmail !== (letter.applicant_email ?? '') ||
+          draftApplicantPhone !== (letter.applicant_phone ?? '') ||
+          draftApplicantLocation !== (letter.applicant_location ?? '')))
+  );
 
-  async function handleSave() {
+  const persistSavedLetter = useCallback(
+    async (options?: { silent?: boolean }): Promise<boolean> => {
+      if (!letter) return false;
+      const tmpl = templates.find((x) => x.id === draftTemplateId);
+      if (
+        tmpl &&
+        !canUseTemplate(tmpl.available_tiers as SubscriptionTier[], tier)
+      ) {
+        if (!options?.silent) toast('Upgrade your plan to use this template.', 'error');
+        return false;
+      }
+      try {
+        await updateLetter.mutateAsync({
+          id: letter.id,
+          content: draftContent,
+          template_id: draftTemplateId,
+          applicant_name: draftApplicantName.trim() || null,
+          applicant_role: draftApplicantRole.trim() || null,
+          applicant_email: draftApplicantEmail.trim() || null,
+          applicant_phone: draftApplicantPhone.trim() || null,
+          applicant_location: draftApplicantLocation.trim() || null,
+        });
+        if (letter.job_ids?.[0]) {
+          const supabase = createClient();
+          const { error: jobErr } = await supabase
+            .from('jobs')
+            .update({
+              company_name: draftCompanyName.trim() || 'Company',
+              job_title: draftJobTitle.trim() || 'Role',
+            })
+            .eq('id', letter.job_ids[0])
+            .eq('user_id', userId ?? '');
+          if (jobErr) throw jobErr;
+        }
+        if (!options?.silent) toast('Cover letter saved.', 'success');
+        return true;
+      } catch {
+        if (!options?.silent) toast('Could not save.', 'error');
+        return false;
+      }
+    },
+    [
+      letter,
+      templates,
+      draftTemplateId,
+      tier,
+      toast,
+      updateLetter,
+      draftContent,
+      draftApplicantName,
+      draftApplicantRole,
+      draftApplicantEmail,
+      draftApplicantPhone,
+      draftApplicantLocation,
+      draftCompanyName,
+      draftJobTitle,
+      userId,
+    ]
+  );
+
+  useEffect(() => {
+    if (isDraftMode || !letter || !isDirty) {
+      if (!isDraftMode && letter && !isDirty) setAutosaveState('saved');
+      return;
+    }
+    setAutosaveState('saving');
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        const ok = await persistSavedLetter({ silent: true });
+        setAutosaveState(ok ? 'saved' : 'error');
+      })();
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [
+    isDraftMode,
+    letter,
+    isDirty,
+    draftContent,
+    draftTemplateId,
+    draftCompanyName,
+    draftJobTitle,
+    draftApplicantName,
+    draftApplicantRole,
+    draftApplicantEmail,
+    draftApplicantPhone,
+    draftApplicantLocation,
+    persistSavedLetter,
+  ]);
+
+  async function handleSave(options?: { navigateAfterDraft?: boolean }): Promise<boolean> {
     if (isDraftMode) {
-      if (!draftClMeta) return;
+      if (!draftClMeta) return false;
       const tmpl = templates.find((x) => x.id === draftTemplateId);
       if (
         tmpl &&
         !canUseTemplate(tmpl.available_tiers as SubscriptionTier[], tier)
       ) {
         toast('Upgrade your plan to use this template.', 'error');
-        return;
+        return false;
       }
       setDraftSaveBusy(true);
       try {
@@ -352,7 +448,7 @@ export default function CoverLetterDetailPage() {
           const errText = await res.text();
           console.error('cover-letters POST', errText);
           toast('Could not save cover letter.', 'error');
-          return;
+          return false;
         }
         const created = (await res.json()) as { id: string };
         useOptimiseEditDraftStore.getState().setClEditDraft(null);
@@ -365,52 +461,72 @@ export default function CoverLetterDetailPage() {
         }
         void qc.invalidateQueries({ queryKey: ['cover-letters'] });
         toast('Cover letter saved.', 'success');
+        if (options?.navigateAfterDraft === false) {
+          return true;
+        }
         router.replace(`/cover-letters/${created.id}`);
+        return true;
       } catch (e) {
         console.error(e);
         toast('Could not save.', 'error');
+        return false;
       } finally {
         setDraftSaveBusy(false);
       }
-      return;
     }
-    if (!letter) return;
-    const tmpl = templates.find((x) => x.id === draftTemplateId);
-    if (
-      tmpl &&
-      !canUseTemplate(tmpl.available_tiers as SubscriptionTier[], tier)
-    ) {
-      toast('Upgrade your plan to use this template.', 'error');
-      return;
-    }
-    try {
-      await updateLetter.mutateAsync({
-        id: letter.id,
-        content: draftContent,
-        template_id: draftTemplateId,
-        applicant_name: draftApplicantName.trim() || null,
-        applicant_role: draftApplicantRole.trim() || null,
-        applicant_email: draftApplicantEmail.trim() || null,
-        applicant_phone: draftApplicantPhone.trim() || null,
-        applicant_location: draftApplicantLocation.trim() || null,
-      });
-      if (letter.job_ids?.[0]) {
-        const supabase = createClient();
-        const { error: jobErr } = await supabase
-          .from('jobs')
-          .update({
-            company_name: draftCompanyName.trim() || 'Company',
-            job_title: draftJobTitle.trim() || 'Role',
-          })
-          .eq('id', letter.job_ids[0])
-          .eq('user_id', userId ?? '');
-        if (jobErr) throw jobErr;
-      }
-      toast('Cover letter saved.', 'success');
-    } catch {
-      toast('Could not save.', 'error');
-    }
+    return persistSavedLetter();
   }
+
+  const handleBackClick = useCallback(() => {
+    if (isDraftMode && isDirty) {
+      setLeaveModalOpen(true);
+      return;
+    }
+    if (!isDraftMode && isDirty) {
+      void (async () => {
+        await persistSavedLetter({ silent: true });
+        router.push('/cover-letters');
+      })();
+      return;
+    }
+    router.push('/cover-letters');
+  }, [isDraftMode, isDirty, persistSavedLetter, router]);
+
+  const handleDiscardLeave = useCallback(() => {
+    useOptimiseEditDraftStore.getState().setClEditDraft(null);
+    setLeaveModalOpen(false);
+    const optim = useOptimiseDraftStore.getState().draft;
+    router.push(optim ? '/cv/optimise/result' : '/cover-letters');
+  }, [router]);
+
+  const handleSaveAndLeave = useCallback(async () => {
+    setLeaveSaving(true);
+    try {
+      const ok = await handleSave({ navigateAfterDraft: false });
+      if (ok) {
+        setLeaveModalOpen(false);
+        router.push('/cover-letters');
+      }
+    } finally {
+      setLeaveSaving(false);
+    }
+  }, [
+    isDraftMode,
+    draftClMeta,
+    templates,
+    draftTemplateId,
+    tier,
+    draftContent,
+    draftApplicantName,
+    draftApplicantRole,
+    draftApplicantEmail,
+    draftApplicantPhone,
+    draftApplicantLocation,
+    qc,
+    toast,
+    router,
+    persistSavedLetter,
+  ]);
 
   async function handleExport(format: ExportFormat = 'pdf') {
     if (isDraftMode) {
@@ -453,28 +569,45 @@ export default function CoverLetterDetailPage() {
     return <p className="text-sm">Not found.</p>;
   }
 
-  const templateOptions = templates.map((t) => {
-    const allowed = canUseTemplate(
-      t.available_tiers as SubscriptionTier[],
-      tier
-    );
-    return {
-      value: t.id,
-      label: `${t.name}${allowed ? '' : ' (plan)'}`,
-      disabled: !allowed,
-    };
-  });
-
   return (
     <div className="mx-auto max-w-6xl space-y-6">
+      <UnsavedLeaveModal
+        isOpen={leaveModalOpen}
+        onClose={() => setLeaveModalOpen(false)}
+        onDiscard={handleDiscardLeave}
+        onSaveAndLeave={() => void handleSaveAndLeave()}
+        saving={leaveSaving}
+        entityLabel="cover letter"
+      />
       {isDraftMode ? (
         <div className="rounded-xl border border-[var(--color-accent-gold)]/40 bg-[var(--color-accent-gold)]/10 px-4 py-3 text-sm text-[var(--color-text-primary)]">
           You are editing an unsaved draft from optimise. Save to store this letter and enable PDF export.
         </div>
       ) : null}
-      <Link href="/cover-letters" className="text-sm text-[var(--color-primary)]">
-        ← Back
-      </Link>
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={handleBackClick}
+          className="text-sm text-[var(--color-primary)] hover:underline"
+        >
+          ← Back
+        </button>
+        {!isDraftMode ? (
+          <span className="text-xs text-[var(--color-muted)]">
+            {autosaveState === 'saving'
+              ? 'Saving…'
+              : autosaveState === 'error'
+                ? "Couldn't save"
+                : autosaveState === 'saved' && !isDirty
+                  ? 'Saved'
+                  : isDirty
+                    ? 'Unsaved changes'
+                    : ''}
+          </span>
+        ) : isDirty ? (
+          <span className="text-xs text-[var(--color-muted)]">Unsaved changes</span>
+        ) : null}
+      </div>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="font-display text-2xl font-bold">
@@ -523,13 +656,22 @@ export default function CoverLetterDetailPage() {
 
       <div className="grid gap-8 lg:grid-cols-2 lg:items-start">
         <div className="space-y-4">
-          <Select
-            label="Template"
-            name="template_id"
-            value={draftTemplateId}
-            onChange={(e) => setDraftTemplateId(e.target.value)}
-            options={templateOptions}
-          />
+          <div>
+            <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-primary)]">
+              Choose a layout
+            </p>
+            <p className="mb-3 text-xs text-[var(--color-muted)]">
+              The live preview updates when you pick a template.
+            </p>
+            <CoverLetterTemplatePicker
+              templates={templates}
+              selectedId={draftTemplateId}
+              onSelect={setDraftTemplateId}
+              accent={accent}
+              userTier={tier}
+              columns="compact"
+            />
+          </div>
           <p className="flex items-center gap-1 text-xs text-[var(--color-muted)]">
             <LayoutTemplate className="h-3.5 w-3.5" />
             PDF export uses this layout.{' '}

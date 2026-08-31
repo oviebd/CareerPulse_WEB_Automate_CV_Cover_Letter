@@ -3,14 +3,15 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
+import { CoverLetterUploadForm } from '@/components/cover-letter/CoverLetterUploadForm';
 import { useOptimiseEditDraftStore } from '@/stores/useOptimiseEditDraftStore';
-import type { CoverLetterTone, CoverLetterLength } from '@/types';
+import type { CoverLetterTone, CoverLetterLength, ExtractedCoverLetter } from '@/types';
 
 const TONE_OPTIONS: { value: CoverLetterTone; label: string }[] = [
   { value: 'professional', label: 'Professional' },
@@ -41,9 +42,18 @@ export default function EnhanceExistingCoverLetterPage() {
   const [enhancedContent, setEnhancedContent] = useState('');
 
   const [savingBusy, setSavingBusy] = useState(false);
+  const [showUpload, setShowUpload] = useState(false);
 
   const canEnhance = existingContent.trim().length >= 100;
   const canUse = enhancedContent.trim().length > 0;
+
+  function handleFileExtracted(letter: ExtractedCoverLetter) {
+    setExistingContent(letter.content);
+    if (letter.job_title) setTargetRole(letter.job_title);
+    if (letter.company_name) setTargetCompany(letter.company_name);
+    setShowUpload(false);
+    toast('Text imported from file. Review and enhance when ready.', 'success');
+  }
 
   async function handleEnhance() {
     if (!canEnhance) return;
@@ -99,13 +109,31 @@ export default function EnhanceExistingCoverLetterPage() {
       <div>
         <h1 className="font-display text-2xl font-bold">Enhance Existing Cover Letter</h1>
         <p className="mt-1 text-sm text-[var(--color-muted)]">
-          Paste your existing letter and AI will rewrite it — improving clarity, tone, and impact while preserving your authentic voice.
+          Paste or upload your existing letter and AI will rewrite it — improving clarity, tone, and impact while preserving your authentic voice.
         </p>
       </div>
 
       <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm font-medium text-[var(--color-text-primary)]">
+            Your existing cover letter
+          </p>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => setShowUpload((v) => !v)}
+          >
+            <Upload className="h-3.5 w-3.5" />
+            {showUpload ? 'Hide upload' : 'Upload PDF/DOCX'}
+          </Button>
+        </div>
+        {showUpload ? (
+          <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+            <CoverLetterUploadForm onExtracted={handleFileExtracted} />
+          </div>
+        ) : null}
         <Textarea
-          label="Your existing cover letter"
           placeholder="Paste your cover letter here (minimum 100 characters)…"
           value={existingContent}
           onChange={(e) => setExistingContent(e.target.value)}

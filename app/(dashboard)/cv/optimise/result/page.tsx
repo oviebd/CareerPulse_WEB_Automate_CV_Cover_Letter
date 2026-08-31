@@ -232,33 +232,112 @@ export default function OptimiseResultPage() {
     draft?.jobTitle,
   ]);
 
-  const performSave = useCallback(async (): Promise<{
-    jobId: string | null;
-    cvId: string | null;
-  }> => {
-    const cur = useOptimiseDraftStore.getState().draft;
-    if (!cur) throw new Error('No draft data. Return to optimise and try again.');
-    if (cur.savedCvId || cur.savedCoverLetterId) {
-      return { jobId: cur.savedJobId, cvId: cur.savedCvId };
-    }
+  const performSave = useCallback(
+    async (
+      scope: GenerationType = 'both'
+    ): Promise<{
+      jobId: string | null;
+      cvId: string | null;
+      coverLetterId: string | null;
+    }> => {
+      const cur = useOptimiseDraftStore.getState().draft;
+      if (!cur) throw new Error('No draft data. Return to optimise and try again.');
 
-    const g: GenerationType = cur.generationType;
-    const hasJd = Boolean(cur.jobDescription.trim());
-    const cvContent = cur.cv;
-    const coverLetterContent = cur.coverLetter;
+      const wantsCv = scope === 'cv' || scope === 'both';
+      const wantsCl = scope === 'coverLetter' || scope === 'both';
 
-    if (!hasJd) {
+      // Already have what was requested — reuse without re-inserting
+      if (wantsCv && !wantsCl && cur.savedCvId) {
+        return {
+          jobId: cur.savedJobId,
+          cvId: cur.savedCvId,
+          coverLetterId: cur.savedCoverLetterId ?? null,
+        };
+      }
+      if (wantsCl && !wantsCv && cur.savedCoverLetterId) {
+        return {
+          jobId: cur.savedJobId,
+          cvId: cur.savedCvId,
+          coverLetterId: cur.savedCoverLetterId,
+        };
+      }
+      if (wantsCv && wantsCl && cur.savedCvId && cur.savedCoverLetterId) {
+        return {
+          jobId: cur.savedJobId,
+          cvId: cur.savedCvId,
+          coverLetterId: cur.savedCoverLetterId,
+        };
+      }
+
+      // Partial: only save what's still missing
+      const needCv = wantsCv && !cur.savedCvId;
+      const needCl = wantsCl && !cur.savedCoverLetterId;
+      if (!needCv && !needCl) {
+        return {
+          jobId: cur.savedJobId,
+          cvId: cur.savedCvId,
+          coverLetterId: cur.savedCoverLetterId ?? null,
+        };
+      }
+
+      const effectiveGen: GenerationType =
+        needCv && needCl ? 'both' : needCv ? 'cv' : 'coverLetter';
+
+      const hasJd = Boolean(cur.jobDescription.trim());
+      const cvContent = cur.cv;
+      const coverLetterContent = cur.coverLetter;
+
+      let jobId = cur.savedJobId;
+
+      if (hasJd && !jobId) {
+        let jobRes: Response;
+        try {
+          jobRes = await fetch('/api/jobs/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              url: cur.jobUrl || undefined,
+              keywords: cur.analysis?.keywords?.length
+                ? cur.analysis.keywords
+                : cur.extractedKeywords ?? [],
+              jobSummary: cur.analysis?.jobSummary ?? '',
+              title: cur.analysis?.jobTitle ?? cur.jobTitle ?? undefined,
+              company: cur.analysis?.company ?? cur.companyName ?? undefined,
+            }),
+          });
+        } catch (e) {
+          console.error('jobs/save network', e);
+          throw new Error('Network error while saving the job. Check your connection.');
+        }
+        if (!jobRes.ok) {
+          const t = await jobRes.text();
+          console.error('jobs/save', t);
+          throw new Error('Failed to save job.');
+        }
+        let job: { id: string };
+        try {
+          job = (await jobRes.json()) as { id: string };
+        } catch (e) {
+          console.error('jobs/save JSON parse', e);
+          throw new Error('Invalid response after saving job.');
+        }
+        if (!job?.id) {
+          throw new Error('Job was saved but no id was returned.');
+        }
+        jobId = job.id;
+      }
+
       let res: Response;
       try {
         res = await fetch('/api/cvs/save-optimised', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            cvContent: g !== 'coverLetter' ? cvContent : undefined,
-            coverLetterContent: g !== 'cv' ? coverLetterContent : undefined,
+            cvContent: needCv ? cvContent : undefined,
+            coverLetterContent: needCl ? coverLetterContent : undefined,
             originalCvId: cur.originalCvId,
-            jobId: null,
-            generationType: g,
+            jobId: jobId ?? null,
+            generationType: effectiveGen,
             ai_changes_summary: cur.aiChangesSummary ?? null,
             keywords_added: cur.extractedKeywords ?? [],
             bullets_improved: cur.bulletsImproved ?? 0,
@@ -268,16 +347,16 @@ export default function OptimiseResultPage() {
           }),
         });
       } catch (e) {
-        console.error('save-optimised (no job) network', e);
-        throw new Error('Network error while saving. Check your connection.');
+        console.error('save-optimised network', e);
+        throw new Error('Network error while saving your CV or cover letter.');
       }
       if (!res.ok) {
         const t = await res.text();
-        console.error('save-optimised (no job)', t);
+        console.error('save-optimised', t);
         const label =
-          g === 'cv'
+          effectiveGen === 'cv'
             ? 'Failed to save CV.'
-            : g === 'coverLetter'
+            : effectiveGen === 'coverLetter'
               ? 'Failed to save cover letter.'
               : 'Failed to save CV and cover letter.';
         throw new Error(label);
@@ -290,123 +369,72 @@ export default function OptimiseResultPage() {
         };
       } catch (e) {
         console.error('save-optimised JSON parse', e);
-        throw new Error('Invalid response from server after save.');
+        throw new Error('Invalid response after saving documents.');
       }
-      setStoreDraft({
+
+      const next = {
         ...cur,
-        savedJobId: null,
-        savedCvId: out.cvId,
-        savedCoverLetterId: out.coverLetterId,
-        isTracked: false,
-      });
-      return { jobId: null, cvId: out.cvId };
-    }
-
-    let jobRes: Response;
-    try {
-      jobRes = await fetch('/api/jobs/save', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          url: cur.jobUrl || undefined,
-          keywords: cur.analysis?.keywords?.length
-            ? cur.analysis.keywords
-            : cur.extractedKeywords ?? [],
-          jobSummary: cur.analysis?.jobSummary ?? '',
-          title: cur.analysis?.jobTitle ?? cur.jobTitle ?? undefined,
-          company: cur.analysis?.company ?? cur.companyName ?? undefined,
-        }),
-      });
-    } catch (e) {
-      console.error('jobs/save network', e);
-      throw new Error('Network error while saving the job. Check your connection.');
-    }
-    if (!jobRes.ok) {
-      const t = await jobRes.text();
-      console.error('jobs/save', t);
-      throw new Error('Failed to save job.');
-    }
-    let job: { id: string };
-    try {
-      job = (await jobRes.json()) as { id: string };
-    } catch (e) {
-      console.error('jobs/save JSON parse', e);
-      throw new Error('Invalid response after saving job.');
-    }
-    if (!job?.id) {
-      throw new Error('Job was saved but no id was returned.');
-    }
-
-    let res: Response;
-    try {
-      res = await fetch('/api/cvs/save-optimised', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          cvContent: g !== 'coverLetter' ? cvContent : undefined,
-          coverLetterContent: g !== 'cv' ? coverLetterContent : undefined,
-          originalCvId: cur.originalCvId,
-          jobId: job.id,
-          generationType: g,
-          ai_changes_summary: cur.aiChangesSummary ?? null,
-          keywords_added: cur.extractedKeywords ?? [],
-          bullets_improved: cur.bulletsImproved ?? 0,
-          coverLetterTone: cur.coverLetterTone,
-          coverLetterLength: cur.coverLetterLength,
-          coverLetterEmphasis: cur.coverLetterEmphasis,
-        }),
-      });
-    } catch (e) {
-      console.error('save-optimised network', e);
-      throw new Error('Network error while saving your CV or cover letter.');
-    }
-    if (!res.ok) {
-      const t = await res.text();
-      console.error('save-optimised (with job)', t);
-      const label =
-        g === 'cv'
-          ? 'Failed to save CV.'
-          : g === 'coverLetter'
-            ? 'Failed to save cover letter.'
-            : 'Failed to save CV and cover letter.';
-      throw new Error(label);
-    }
-    let out: { cvId: string | null; coverLetterId: string | null };
-    try {
-      out = (await res.json()) as {
-        cvId: string | null;
-        coverLetterId: string | null;
+        savedJobId: jobId ?? null,
+        savedCvId: out.cvId ?? cur.savedCvId,
+        savedCoverLetterId: out.coverLetterId ?? cur.savedCoverLetterId ?? null,
+        isTracked: cur.isTracked,
       };
-    } catch (e) {
-      console.error('save-optimised JSON parse', e);
-      throw new Error('Invalid response after saving documents.');
-    }
-    setStoreDraft({
-      ...cur,
-      savedJobId: job.id,
-      savedCvId: out.cvId,
-      savedCoverLetterId: out.coverLetterId,
-      isTracked: false,
-    });
-    return { jobId: job.id, cvId: out.cvId };
-  }, [setStoreDraft]);
+      setStoreDraft(next);
+      return {
+        jobId: next.savedJobId,
+        cvId: next.savedCvId,
+        coverLetterId: next.savedCoverLetterId ?? null,
+      };
+    },
+    [setStoreDraft]
+  );
 
-  const handleSaveClick = useCallback(async () => {
-    if (!draft || isSaved) return;
-    setIsSaving(true);
-    try {
-      await performSave();
-      setIsSaved(true);
-      toast('Saved successfully', 'success');
-      void qc.invalidateQueries({ queryKey: ['optimise-job-status'] });
-    } catch (e) {
-      const m =
-        e instanceof Error ? e.message : 'Could not save. Please try again.';
-      toast(m, 'error');
-    } finally {
-      setIsSaving(false);
-    }
-  }, [draft, isSaved, performSave, toast, qc]);
+  const invalidateAfterSave = useCallback(() => {
+    void qc.invalidateQueries({ queryKey: ['optimise-job-status'] });
+    void qc.invalidateQueries({ queryKey: ['all-cvs'] });
+    void qc.invalidateQueries({ queryKey: ['cover-letters'] });
+    void qc.invalidateQueries({ queryKey: ['job-specific-cvs'] });
+  }, [qc]);
+
+  const handleSaveClick = useCallback(
+    async (scope: GenerationType = 'both') => {
+      if (!draft) return;
+      const wantsCv = scope === 'cv' || scope === 'both';
+      const wantsCl = scope === 'coverLetter' || scope === 'both';
+      if (wantsCv && wantsCl && draft.savedCvId && draft.savedCoverLetterId) return;
+      if (wantsCv && !wantsCl && draft.savedCvId) return;
+      if (wantsCl && !wantsCv && draft.savedCoverLetterId) return;
+
+      setIsSaving(true);
+      try {
+        await performSave(scope);
+        const updated = useOptimiseDraftStore.getState().draft;
+        const fullySaved =
+          (gen === 'cv' && Boolean(updated?.savedCvId)) ||
+          (gen === 'coverLetter' && Boolean(updated?.savedCoverLetterId)) ||
+          (gen === 'both' &&
+            Boolean(updated?.savedCvId) &&
+            Boolean(updated?.savedCoverLetterId));
+        if (fullySaved) setIsSaved(true);
+        toast(
+          scope === 'cv'
+            ? 'CV saved'
+            : scope === 'coverLetter'
+              ? 'Cover letter saved'
+              : 'Saved successfully',
+          'success'
+        );
+        invalidateAfterSave();
+      } catch (e) {
+        const m =
+          e instanceof Error ? e.message : 'Could not save. Please try again.';
+        toast(m, 'error');
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    [draft, performSave, toast, invalidateAfterSave, gen]
+  );
 
   const trackMutation = useMutation({
     mutationFn: async () => {
@@ -414,9 +442,16 @@ export default function OptimiseResultPage() {
       if (!d) throw new Error('No draft data.');
       let jobId = d.savedJobId;
       if (!jobId) {
-        const r = await performSave();
+        const r = await performSave(gen === 'coverLetter' ? 'coverLetter' : gen === 'cv' ? 'cv' : 'both');
         jobId = r.jobId;
-        setIsSaved(true);
+        const updated = useOptimiseDraftStore.getState().draft;
+        if (
+          (gen === 'cv' && updated?.savedCvId) ||
+          (gen === 'coverLetter' && updated?.savedCoverLetterId) ||
+          (gen === 'both' && updated?.savedCvId && updated?.savedCoverLetterId)
+        ) {
+          setIsSaved(true);
+        }
       }
       if (!jobId) throw new Error('Save the job context first, then track.');
       const res = await fetch(`/api/jobs/${jobId}/status`, {
@@ -595,15 +630,42 @@ export default function OptimiseResultPage() {
                         companyName:
                           draft.analysis?.company ?? draft.companyName ?? null,
                         savedJobId: draft.savedJobId ?? null,
+                        savedCvId: draft.savedCvId ?? null,
+                        savedCoverLetterId: draft.savedCoverLetterId ?? null,
+                        coverLetter: draft.coverLetter,
+                        generationType: draft.generationType,
+                        jobDescription: draft.jobDescription,
+                        jobUrl: draft.jobUrl,
+                        analysis: draft.analysis,
+                        isTracked: draft.isTracked,
                         aiChangesSummary: draft.aiChangesSummary ?? null,
                         extractedKeywords: draft.extractedKeywords ?? [],
                         bulletsImproved: draft.bulletsImproved ?? 0,
+                        coverLetterTone: draft.coverLetterTone,
+                        coverLetterLength: draft.coverLetterLength,
+                        coverLetterEmphasis: draft.coverLetterEmphasis ?? null,
                       });
                     }}
                   >
                     <Pencil className="h-4 w-4" />
                     Edit CV
                   </Link>
+                )}
+                {!hasSavedCv ? (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    className="min-w-[88px]"
+                    disabled={isSaving}
+                    loading={isSaving}
+                    onClick={() => void handleSaveClick('cv')}
+                  >
+                    Save CV
+                  </Button>
+                ) : (
+                  <Button variant="secondary" size="sm" disabled className="min-w-[88px]">
+                    CV saved ✓
+                  </Button>
                 )}
                 {hasSavedCv ? (
                   <ExportMenu
@@ -655,6 +717,22 @@ export default function OptimiseResultPage() {
                     <Pencil className="h-4 w-4" />
                     Edit cover letter
                   </Link>
+                )}
+                {!hasSavedCl ? (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    className="min-w-[88px]"
+                    disabled={isSaving}
+                    loading={isSaving}
+                    onClick={() => void handleSaveClick('coverLetter')}
+                  >
+                    Save cover letter
+                  </Button>
+                ) : (
+                  <Button variant="secondary" size="sm" disabled className="min-w-[88px]">
+                    Letter saved ✓
+                  </Button>
                 )}
                 {hasSavedCl ? (
                   <ExportMenu
@@ -723,16 +801,44 @@ export default function OptimiseResultPage() {
         ) : null}
 
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-          <Button
-            variant="primary"
-            size="lg"
-            className="min-w-[140px]"
-            disabled={isSaved || isSaving}
-            loading={isSaving}
-            onClick={() => void handleSaveClick()}
-          >
-            {isSaved ? 'Saved ✓' : 'Save'}
-          </Button>
+          {gen === 'both' ? (
+            <Button
+              variant="primary"
+              size="lg"
+              className="min-w-[200px]"
+              disabled={
+                isSaving || Boolean(hasSavedCv && hasSavedCl)
+              }
+              loading={isSaving}
+              onClick={() => void handleSaveClick('both')}
+            >
+              {hasSavedCv && hasSavedCl
+                ? 'Saved ✓'
+                : 'Save CV and cover letter'}
+            </Button>
+          ) : gen === 'cv' ? (
+            <Button
+              variant="primary"
+              size="lg"
+              className="min-w-[140px]"
+              disabled={isSaving || hasSavedCv}
+              loading={isSaving}
+              onClick={() => void handleSaveClick('cv')}
+            >
+              {hasSavedCv ? 'Saved ✓' : 'Save CV'}
+            </Button>
+          ) : (
+            <Button
+              variant="primary"
+              size="lg"
+              className="min-w-[180px]"
+              disabled={isSaving || hasSavedCl}
+              loading={isSaving}
+              onClick={() => void handleSaveClick('coverLetter')}
+            >
+              {hasSavedCl ? 'Saved ✓' : 'Save cover letter'}
+            </Button>
+          )}
 
           {hasJobContext ? (
             <Button

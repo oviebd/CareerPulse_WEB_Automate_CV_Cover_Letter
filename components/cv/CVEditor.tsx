@@ -27,6 +27,7 @@ import { CV_EDITOR_CANVAS } from '@/lib/cv-editor-styles';
 import { ExportMenu } from '@/components/shared/ExportMenu';
 import { downloadCvExport, type ExportFormat } from '@/lib/export-client';
 import { CvTitleModal } from '@/components/cv/CvTitleModal';
+import { UnsavedLeaveModal } from '@/components/shared/UnsavedLeaveModal';
 import { defaultCoreCvDisplayName } from '@/lib/cv-display-name';
 import { cloneCvData } from '@/lib/cv-clone';
 import { createEmptyCVData } from '@/src/utils/cvDefaults';
@@ -105,6 +106,8 @@ export function CVEditor() {
   const [titleModalOpen, setTitleModalOpen] = useState(false);
   const [titleModalDefault, setTitleModalDefault] = useState('');
   const [draftActive, setDraftActive] = useState(false);
+  const [leaveModalOpen, setLeaveModalOpen] = useState(false);
+  const [leaveSaving, setLeaveSaving] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -378,6 +381,47 @@ export function CVEditor() {
     }
   }
 
+  const handleBackClick = useCallback(() => {
+    if (isNew && isDirty) {
+      setLeaveModalOpen(true);
+      return;
+    }
+    if (!isNew && isDirty) {
+      void (async () => {
+        await handleSave();
+        router.push('/documents');
+      })();
+      return;
+    }
+    router.push('/documents');
+  }, [isNew, isDirty, handleSave, router]);
+
+  const handleDiscardLeave = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('cv_draft');
+      window.dispatchEvent(new Event('cv_draft_updated'));
+    }
+    setLeaveModalOpen(false);
+    router.push('/documents');
+  }, [router]);
+
+  const handleSaveAndLeave = useCallback(async () => {
+    setLeaveSaving(true);
+    try {
+      const generated = defaultCoreCvDisplayName(editorState.cvData.personal.fullName);
+      const current = editorState.name?.trim();
+      const name = current && current !== 'Untitled CV' ? current : generated;
+      const ok = await handleSave(name);
+      if (ok) {
+        setLeaveModalOpen(false);
+        void queryClient.invalidateQueries({ queryKey: ['cv-versions'] });
+        router.push('/documents');
+      }
+    } finally {
+      setLeaveSaving(false);
+    }
+  }, [editorState, handleSave, queryClient, router]);
+
   async function runExport(format: ExportFormat = 'pdf') {
     if (!cvData || !selectedTemplateId) return;
     if (!allowed) {
@@ -431,6 +475,14 @@ export function CVEditor() {
   return (
     <div className="cv-editor-text-tune mx-auto max-w-[1800px] pb-24 md:pb-8">
       {authModal}
+      <UnsavedLeaveModal
+        isOpen={leaveModalOpen}
+        onClose={() => setLeaveModalOpen(false)}
+        onDiscard={handleDiscardLeave}
+        onSaveAndLeave={() => void handleSaveAndLeave()}
+        saving={leaveSaving}
+        entityLabel="CV"
+      />
       <CvTitleModal
         isOpen={titleModalOpen}
         defaultTitle={titleModalDefault}
@@ -441,6 +493,7 @@ export function CVEditor() {
       />
       <CVEditorTopBar
         backHref="/documents"
+        onBackClick={handleBackClick}
         title="Core CV"
         subtitle={subtitleName || 'Master CV — reused for every application'}
         caption={subtitleName ? 'Master CV — reused for every application' : undefined}

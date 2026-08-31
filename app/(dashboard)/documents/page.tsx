@@ -105,7 +105,14 @@ function CVCard({ cv, onDelete, deleting }: { cv: CVProfile; onDelete: (id: stri
       </div>
 
       <div className="flex items-center gap-2">
-        <Link href={`/cv/edit/${cv.id}`} className="flex-1">
+        <Link
+          href={
+            isJobSpecific
+              ? `/cv/edit/${cv.id}?tailored=true`
+              : `/cv/edit/${cv.id}`
+          }
+          className="flex-1"
+        >
           <Button variant="primary" size="sm" className="w-full gap-1.5">
             <Edit className="h-3.5 w-3.5" /> Edit
           </Button>
@@ -315,7 +322,7 @@ function CoverLettersTab() {
   return (
     <div className="space-y-6">
       {/* Creation CTAs */}
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Link
           href="/cover-letters/new?source=scratch"
           className="flex flex-col gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-left transition hover:border-[var(--color-primary-300)] hover:bg-[var(--color-surface-2)]"
@@ -326,6 +333,19 @@ function CoverLettersTab() {
           <div>
             <p className="font-semibold text-[var(--color-text-primary)]">From Scratch</p>
             <p className="mt-0.5 text-xs text-[var(--color-muted)]">Write a new letter using your resume profile.</p>
+          </div>
+        </Link>
+
+        <Link
+          href="/cover-letters/new/upload"
+          className="flex flex-col gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-left transition hover:border-[var(--color-primary-300)] hover:bg-[var(--color-surface-2)]"
+        >
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--color-primary-100)] text-[var(--color-primary)]">
+            <Upload className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="font-semibold text-[var(--color-text-primary)]">Upload</p>
+            <p className="mt-0.5 text-xs text-[var(--color-muted)]">Import a PDF or DOCX cover letter.</p>
           </div>
         </Link>
 
@@ -438,9 +458,16 @@ export default function DocumentsPage() {
         subtitle="Your resumes and cover letters."
         actions={
           <PrimaryActionBar>
-            <Link href="/cv/upload">
+            <Link
+              href={
+                activeTab === 'resumes'
+                  ? '/cv/upload'
+                  : '/cover-letters/new/upload'
+              }
+            >
               <Button variant="secondary" size="sm" className="gap-1.5">
-                <Upload className="h-4 w-4" /> Upload Resume
+                <Upload className="h-4 w-4" />
+                {activeTab === 'resumes' ? 'Upload Resume' : 'Upload Cover Letter'}
               </Button>
             </Link>
             <Link href={activeTab === 'resumes' ? '/cv/templates' : '/cover-letters/templates'}>

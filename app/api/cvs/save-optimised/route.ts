@@ -4,7 +4,7 @@ import type { GenerationType } from '@/types';
 import type { Json } from '@/types/database';
 import { CLAUDE_MODEL } from '@/lib/claude';
 import { defaultJobCvDisplayName } from '@/lib/cv-display-name';
-import { optimisedCvContentToProfilePayload } from '@/lib/cv-universal-bridge';
+import { optimisedJsonToDbPayload } from '@/lib/optimise-result';
 
 function err(
   msg: string,
@@ -83,18 +83,14 @@ export async function POST(request: Request) {
     const jobId =
       typeof body.jobId === 'string' && body.jobId.trim() ? body.jobId.trim() : null;
 
-    let cvData: Record<string, unknown>;
+    let cvPayload: Record<string, unknown> | null = null;
     if (hasCv) {
       try {
-        cvData = JSON.parse(body.cvContent!) as Record<string, unknown>;
+        cvPayload = optimisedJsonToDbPayload(body.cvContent!);
       } catch {
         return err('Invalid cvContent JSON', 422);
       }
-    } else {
-      cvData = {};
     }
-
-    const cvPayload = hasCv ? optimisedCvContentToProfilePayload(cvData) : null;
 
     let savedCvId: string | null = null;
     let savedCoverLetterId: string | null = null;
@@ -107,7 +103,7 @@ export async function POST(request: Request) {
     const clientCvName =
       typeof body.name === 'string' && body.name.trim() ? body.name.trim() : null;
 
-    if (hasCv) {
+    if (hasCv && cvPayload) {
       if (!jobId) {
         const cvName = clientCvName ?? 'Tailored CV';
         const { data, error } = await supabase

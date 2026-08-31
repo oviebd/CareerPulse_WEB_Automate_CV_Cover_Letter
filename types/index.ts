@@ -20,6 +20,18 @@ export type CoverLetterTone =
   | 'formal';
 export type CoverLetterLength = 'short' | 'medium' | 'long';
 
+/** Structured output from POST /api/cover-letter/extract */
+export type ExtractedCoverLetter = {
+  content: string;
+  applicant_name: string | null;
+  applicant_role: string | null;
+  applicant_email: string | null;
+  applicant_phone: string | null;
+  applicant_location: string | null;
+  company_name: string | null;
+  job_title: string | null;
+};
+
 export type {
   CV as CVRow,
   CoverLetter,

@@ -175,16 +175,22 @@ export function migrateLegacyCVData(legacyData: unknown): CVData {
     return [];
   }
 
-  if (
-    isRecord(L.personal) &&
-    typeof L.meta === 'object' &&
-    L.meta !== null &&
-    'templateId' in (L.meta as object)
-  ) {
+  if (isRecord(L.personal)) {
+    const metaObj = isRecord(L.meta) ? L.meta : {};
     const base = createEmptyCVData(
-      normalizeTemplateId(str((L.meta as { templateId?: string }).templateId))
+      normalizeTemplateId(str(metaObj.templateId ?? L.preferred_template_id ?? L.template_id))
     );
-    return deepMergeCv(base, L as unknown as Partial<CVData>);
+    const merged = deepMergeCv(base, L as unknown as Partial<CVData>);
+    // AI / mixed payloads may use title/start_date even on the universal branch
+    merged.experience = normalizeUniversalExperience(L.experience ?? merged.experience);
+    merged.education = normalizeUniversalEducation(L.education ?? merged.education);
+    if (!merged.meta.colorScheme && (L.accent_color || L.accent)) {
+      merged.meta.colorScheme = str(L.accent_color ?? L.accent);
+    }
+    if (!merged.meta.fontFamily && L.font_family) {
+      merged.meta.fontFamily = str(L.font_family);
+    }
+    return merged;
   }
 
   const templateId = normalizeTemplateId(str(L.preferred_template_id ?? L.template_id));
@@ -599,6 +605,79 @@ export function migrateLegacyCVData(legacyData: unknown): CVData {
 
   out.meta.templateId = templateId;
   return out;
+}
+
+function normalizeUniversalExperience(raw: unknown): WorkExperience[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((row, i) => {
+    if (!isRecord(row)) {
+      return {
+        id: `exp-${i}`,
+        company: '',
+        role: '',
+        type: 'full-time' as const,
+        location: '',
+        remote: false,
+        startDate: '',
+        endDate: '',
+        current: false,
+        bullets: [],
+      };
+    }
+    return {
+      id: str(row.id) || `exp-${i}`,
+      company: str(row.company),
+      role: str(row.role ?? row.title),
+      type: (row.type as WorkExperience['type'] | undefined) ?? 'full-time',
+      location: str(row.location),
+      remote: Boolean(row.remote),
+      startDate: str(row.startDate ?? row.start_date),
+      endDate: str(row.endDate ?? row.end_date ?? ''),
+      current: Boolean(row.current ?? row.is_current),
+      bullets: Array.isArray(row.bullets)
+        ? row.bullets.map((x) => str(x))
+        : row.description
+          ? [str(row.description)]
+          : [],
+      technologies: Array.isArray(row.technologies)
+        ? row.technologies.map((x) => str(x))
+        : undefined,
+      highlights: row.highlights ? str(row.highlights) : undefined,
+    };
+  });
+}
+
+function normalizeUniversalEducation(raw: unknown): CVData['education'] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((row, i) => {
+    if (!isRecord(row)) {
+      return {
+        id: `edu-${i}`,
+        institution: '',
+        degree: '',
+        field: '',
+        startDate: '',
+        endDate: '',
+        current: false,
+      };
+    }
+    return {
+      id: str(row.id) || `edu-${i}`,
+      institution: str(row.institution),
+      degree: str(row.degree),
+      field: str(row.field ?? row.field_of_study),
+      startDate: str(row.startDate ?? row.start_date),
+      endDate: str(row.endDate ?? row.end_date ?? ''),
+      current: Boolean(row.current),
+      gpa: row.gpa != null ? str(row.gpa) : undefined,
+      thesis: row.thesis ? str(row.thesis) : undefined,
+      advisor: row.advisor ? str(row.advisor) : undefined,
+      coursework: Array.isArray(row.coursework)
+        ? row.coursework.map((x) => str(x))
+        : undefined,
+      honors: Array.isArray(row.honors) ? row.honors.map((x) => str(x)) : undefined,
+    };
+  });
 }
 
 function deepMergeCv(base: CVData, patch: Partial<CVData>): CVData {

@@ -3,8 +3,11 @@ import type {
   CoverLetterLength,
   CoverLetterTone,
   CVProfile,
+  ExtractedCoverLetter,
 } from '@/types';
 import { parseClaudeJson } from '@/lib/parse-claude-json';
+
+export type { ExtractedCoverLetter };
 
 const claude = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 export const CLAUDE_MODEL =
@@ -233,6 +236,71 @@ export async function generateCoverLetterText(params: {
   );
   const block = message.content[0];
   return block.type === 'text' ? block.text.trim() : '';
+}
+
+/**
+ * Parse an uploaded cover letter document into body text + optional contact/role fields.
+ * Strips letterhead / salutation / sign-off so templates can render them.
+ */
+export async function extractCoverLetterFromText(
+  rawText: string
+): Promise<ExtractedCoverLetter> {
+  const letterText = truncateCvText(rawText);
+  const message = await withRetry(() =>
+    claude.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: 4096,
+      system: `You are a cover letter parsing expert. Extract structured fields from an uploaded cover letter and return ONLY valid JSON with no other text.
+
+Rules:
+• "content" must be the letter BODY only — strip letterhead (name/address/contact block at top), date, recipient address, salutation (e.g. "Dear …"), and sign-off/closing (e.g. "Sincerely," + name). Preserve paragraph breaks as newlines.
+• If a field is not present, use null.
+• Do not invent contact details or role/company names.`,
+      messages: [
+        {
+          role: 'user',
+          content: `Extract from this cover letter. Return ONLY JSON:
+
+{
+  "content": string,
+  "applicant_name": string | null,
+  "applicant_role": string | null,
+  "applicant_email": string | null,
+  "applicant_phone": string | null,
+  "applicant_location": string | null,
+  "company_name": string | null,
+  "job_title": string | null
+}
+
+COVER LETTER TEXT:
+${letterText}`,
+        },
+      ],
+    })
+  );
+  const block = message.content[0];
+  const text = block.type === 'text' ? block.text : '';
+  if (!text.trim()) {
+    throw new Error('empty_model_response');
+  }
+  const parsed = parseClaudeJson<Partial<ExtractedCoverLetter>>(text);
+  const content =
+    typeof parsed.content === 'string' ? parsed.content.trim() : '';
+  if (!content) {
+    throw new Error('empty_cover_letter_body');
+  }
+  const strOrNull = (v: unknown): string | null =>
+    typeof v === 'string' && v.trim() ? v.trim() : null;
+  return {
+    content,
+    applicant_name: strOrNull(parsed.applicant_name),
+    applicant_role: strOrNull(parsed.applicant_role),
+    applicant_email: strOrNull(parsed.applicant_email),
+    applicant_phone: strOrNull(parsed.applicant_phone),
+    applicant_location: strOrNull(parsed.applicant_location),
+    company_name: strOrNull(parsed.company_name),
+    job_title: strOrNull(parsed.job_title),
+  };
 }
 
 /** Rewrite/enhance an existing cover letter body, preserving the candidate's voice. */

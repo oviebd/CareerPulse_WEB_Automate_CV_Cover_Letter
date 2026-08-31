@@ -1,32 +1,17 @@
-import mammoth from 'mammoth';
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { createClient } from '@/lib/supabase/server';
 import { extractCVFromText, describeAnthropicError } from '@/lib/claude';
 import { computeCompletionPercentage } from '@/lib/cv-completion';
-import { assertFileSize, validatePdfOrDocx } from '@/lib/file-magic';
 import { normalizeExtractedCV } from '@/lib/cv-parse-payload';
 import { rateLimitHit } from '@/lib/rate-limit';
 import { resolveEffectiveTier } from '@/lib/dev-subscription';
 import { TIER_LIMITS } from '@/types';
 import {
-  extractPdfHyperlinks,
-  extractDocxHyperlinks,
-  formatHyperlinksForPrompt,
-} from '@/lib/cv-hyperlinks';
-import { extractPdfText } from '@/lib/pdfjs-server';
+  extractDocumentTextFromBuffer,
+  isAllowedStorageUrl,
+} from '@/lib/extract-document-text';
 import type { CVProfile } from '@/types';
-
-function isAllowedStorageUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    const supabaseHost = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!).host;
-    return parsed.protocol === 'https:' && parsed.host === supabaseHost;
-  } catch {
-    return false;
-  }
-}
-
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -36,44 +21,9 @@ function anthropicApiKeyConfigured(): boolean {
 }
 
 async function extractFromBuffer(buf: Buffer) {
-  assertFileSize(buf.length);
-  const kind = validatePdfOrDocx(buf);
-  if (!kind) {
-    return { error: 'invalid_file_type' as const };
-  }
-
-  let rawText = '';
-  let hyperlinkPromptSection = '';
-  const uint8 = new Uint8Array(buf);
-
-  if (kind === 'pdf') {
-    try {
-      const [text, hyperlinks] = await Promise.all([
-        extractPdfText(uint8),
-        extractPdfHyperlinks(uint8).catch(() => []),
-      ]);
-      rawText = text;
-      hyperlinkPromptSection = formatHyperlinksForPrompt(hyperlinks);
-    } catch (e) {
-      console.error('PDF text extraction failed', e);
-      return { error: 'pdf_parse_failed' as const };
-    }
-  } else {
-    try {
-      const [textResult, hyperlinks] = await Promise.all([
-        mammoth.extractRawText({ buffer: buf }),
-        extractDocxHyperlinks(buf).catch(() => []),
-      ]);
-      rawText = textResult.value;
-      hyperlinkPromptSection = formatHyperlinksForPrompt(hyperlinks);
-    } catch (e) {
-      console.error('DOCX text extraction failed', e);
-      return { error: 'pdf_parse_failed' as const };
-    }
-  }
-
-  if (!rawText.trim()) {
-    return { error: 'empty_document' as const };
+  const textEx = await extractDocumentTextFromBuffer(buf);
+  if ('error' in textEx) {
+    return { error: textEx.error };
   }
 
   if (!anthropicApiKeyConfigured()) {
@@ -82,7 +32,10 @@ async function extractFromBuffer(buf: Buffer) {
 
   let parsed: Record<string, unknown>;
   try {
-    const extracted = await extractCVFromText(rawText, hyperlinkPromptSection);
+    const extracted = await extractCVFromText(
+      textEx.rawText,
+      textEx.hyperlinkPromptSection
+    );
     parsed = normalizeExtractedCV(extracted as Record<string, unknown>);
   } catch (e) {
     console.error('Claude extract failed', e);

@@ -8,7 +8,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { CoverLetterPrintPreviewFrame } from '@/components/cover-letter/CoverLetterPrintPreviewFrame';
+import { CoverLetterTemplateThumb } from '@/components/cover-letter/CoverLetterTemplatePicker';
 import { TemplateGate } from '@/components/shared/FeatureGate';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -96,10 +96,10 @@ export default function CoverLetterTemplatesPage() {
           );
           return (
             <Card key={t.id} padding="none" className="flex flex-col overflow-hidden">
-              <CoverLetterPrintPreviewFrame
-                src={`/api/cover-letter/preview-html?template_id=${encodeURIComponent(t.id)}&sample=1&accent=${encodeURIComponent(color)}`}
-                title={`${t.name} sample preview`}
-                containerHeight={300}
+              <CoverLetterTemplateThumb
+                templateId={t.id}
+                accent={color}
+                name={t.name}
               />
               <div className="flex flex-1 flex-col p-5">
                 <div className="flex items-start justify-between gap-2">
