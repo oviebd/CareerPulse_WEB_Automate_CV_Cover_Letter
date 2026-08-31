@@ -5,27 +5,52 @@ import { useSearchParams } from 'next/navigation';
 import { CVEditor } from '@/components/cv/CVEditor';
 import { JobTailoredCVEditor } from '@/components/cv/JobTailoredCVEditor';
 
-function UnifiedCVEditorInner({ forceTailored }: { forceTailored?: boolean }) {
-  const searchParams = useSearchParams();
-  const tailored =
+export type CVEditorMode = 'core' | 'tailored' | 'template-focused';
+
+function resolveMode(
+  searchParams: URLSearchParams,
+  forceTailored?: boolean
+): CVEditorMode {
+  if (
     forceTailored ||
     searchParams.get('tailored') === 'true' ||
-    searchParams.has('job');
+    searchParams.has('job')
+  ) {
+    return 'tailored';
+  }
+  return 'core';
+}
 
-  if (tailored) {
+function UnifiedCVEditorInner({
+  forceTailored,
+  mode: modeOverride,
+}: {
+  forceTailored?: boolean;
+  mode?: CVEditorMode;
+}) {
+  const searchParams = useSearchParams();
+  const mode = modeOverride ?? resolveMode(searchParams, forceTailored);
+
+  if (mode === 'tailored') {
     return <JobTailoredCVEditor />;
   }
   return <CVEditor />;
 }
 
 /**
- * Single CV editor entry point. Base CV hides ATS job panel; tailored mode shows
- * ATS drawer, keywords, and job context (formerly /cv/job-specific/[id]/edit).
+ * Single CV editor entry point for core and tailored modes.
+ * Routes: /cv/edit, /cv/edit/[id], /cv/edit/[id]?tailored=true
  */
-export function UnifiedCVEditor({ forceTailored }: { forceTailored?: boolean }) {
+export function UnifiedCVEditor({
+  forceTailored,
+  mode,
+}: {
+  forceTailored?: boolean;
+  mode?: CVEditorMode;
+}) {
   return (
     <Suspense fallback={<p className="text-sm text-[var(--color-muted)]">Loading editor…</p>}>
-      <UnifiedCVEditorInner forceTailored={forceTailored} />
+      <UnifiedCVEditorInner forceTailored={forceTailored} mode={mode} />
     </Suspense>
   );
 }

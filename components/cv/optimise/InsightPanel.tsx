@@ -59,7 +59,7 @@ export function InsightPanel({ state, analysis, errorMessage, onRetry }: Insight
         <div className="mt-2 flex items-center gap-3">
           <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-slate-200/90 dark:bg-slate-600/50">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-fuchsia-500 transition-all"
+              className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 transition-all"
               style={{ width: `${analysis.matchPercentage}%` }}
             />
           </div>

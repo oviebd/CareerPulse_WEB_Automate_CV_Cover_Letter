@@ -1,7 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { LayoutDashboard, AlertCircle } from 'lucide-react';
+import { LayoutDashboard } from 'lucide-react';
+import { DEFAULT_CV_ACCENT, cvAccentSwatchName } from '@/lib/cv-accent';
+import { SectionIntro } from '@/components/cv/SectionIntro';
+import { Tooltip } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -85,7 +88,7 @@ const PROFICIENCY_OPTIONS = [
   { value: 'basic', label: 'Basic' },
 ];
 
-const SWATCHES = ['#6C63FF', '#00D4A8', '#2563EB', '#7c3aed', '#dc2626', '#0f172a', '#10b981', '#f59e0b'];
+const SWATCHES = [DEFAULT_CV_ACCENT, '#00D4A8', '#2563EB', '#7c3aed', '#dc2626', '#0f172a', '#10b981', '#f59e0b'];
 const FONTS = ['Inter', 'Manrope', 'DM Sans', 'Lora', 'Outfit', 'Roboto'];
 
 export type AiJobContext = {
@@ -193,7 +196,7 @@ function HighlightedText({ text, keywords }: { text: string; keywords: string[] 
         regex.test(part) ? (
           <mark
             key={i}
-            className="rounded-sm bg-[var(--color-accent-mint)]/15 px-0.5 text-inherit"
+            className="rounded-sm bg-[var(--color-accent-mint)] px-0.5 text-white"
           >
             {part}
           </mark>
@@ -206,7 +209,7 @@ function HighlightedText({ text, keywords }: { text: string; keywords: string[] 
 }
 
 const TAB_DEFS: { id: CVFormTab; label: string }[] = [
-  { id: 'design', label: 'Layout & Design' },
+  { id: 'design', label: 'Layout & style' },
   { id: 'photo', label: 'Photo' },
   { id: 'header', label: 'Header' },
   { id: 'address', label: 'Address' },
@@ -294,7 +297,7 @@ export function CVFormFields(props: Props) {
     templates = [],
     selectedTemplateId,
     onTemplateChange,
-    accent = '#6C63FF',
+    accent = DEFAULT_CV_ACCENT,
     onAccentChange,
     fontFamily = 'Inter',
     onFontFamilyChange,
@@ -425,6 +428,8 @@ export function CVFormFields(props: Props) {
           </div>
         ) : null}
 
+        <SectionIntro tab={tab} />
+
         {tab === 'design' ? (
           <div className="space-y-6">
             {/* Header */}
@@ -433,15 +438,20 @@ export function CVFormFields(props: Props) {
                 <LayoutDashboard className="h-5 w-5" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">Layout & Style</h2>
-                <p className="text-sm text-[var(--color-muted)]">Configure your CV's visual identity and structure.</p>
+                <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">Layout & style</h2>
+                <p className="text-sm text-[var(--color-muted)]">
+                  Changes show instantly in the live preview.
+                </p>
               </div>
             </div>
 
             {/* Template Selection — full catalog (8); DB row supplies tier locks & labels when present */}
             <div className={FORM_CARD}>
-              <p className="mb-4 text-sm font-semibold text-[var(--color-text-primary)] uppercase tracking-wider text-xs">
-                Select Template
+              <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-primary)]">
+                Choose a layout
+              </p>
+              <p className="mb-4 text-xs text-[var(--color-muted)]">
+                The live preview on the right updates as soon as you pick one.
               </p>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 {VISIBLE_TEMPLATE_IDS.map((tid) => {
@@ -452,18 +462,21 @@ export function CVFormFields(props: Props) {
                   const swatchColor = cfg.templateAccent ?? accent;
                   const tiers = row?.available_tiers ?? ['free', 'pro'];
                   const allowed = canUseTemplate(tiers, userTier);
+                  const selected = selectedTemplateId === tid;
                   return (
                     <button
                       key={tid}
                       type="button"
                       disabled={!allowed}
+                      aria-pressed={selected}
+                      aria-label={`${name} layout${selected ? ', in use' : ''}`}
                       onClick={() => {
                         if (allowed) onTemplateChange?.(tid);
                       }}
                       className={cn(
                         'group relative aspect-[3/4] overflow-hidden rounded-xl border-2 transition-all duration-300',
                         !allowed && 'cursor-not-allowed opacity-60',
-                        selectedTemplateId === tid
+                        selected
                           ? 'border-[var(--color-primary-400)] shadow-lg shadow-[var(--color-primary-400)]/20'
                           : 'border-[var(--color-border)] hover:border-[var(--color-border-hover)]'
                       )}
@@ -484,7 +497,7 @@ export function CVFormFields(props: Props) {
                         <p
                           className={cn(
                             'text-[10px] font-bold uppercase tracking-widest transition-colors',
-                            selectedTemplateId === tid
+                            selected
                               ? 'text-[var(--color-primary-400)]'
                               : 'text-white'
                           )}
@@ -498,11 +511,9 @@ export function CVFormFields(props: Props) {
                           Upgrade
                         </span>
                       ) : null}
-                      {selectedTemplateId === tid ? (
-                        <div className="absolute right-2 top-2 rounded-full bg-[var(--color-primary-400)] p-1">
-                          <svg className="h-2 w-2 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                          </svg>
+                      {selected ? (
+                        <div className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-[var(--color-primary-400)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
+                          In use
                         </div>
                       ) : null}
                     </button>
@@ -515,21 +526,30 @@ export function CVFormFields(props: Props) {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className={FORM_CARD}>
                 <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)]">
-                  Accent Color
+                  Accent color
+                </p>
+                <p className="mb-3 text-xs text-[var(--color-muted)]">
+                  Heading and highlight color on the CV.
                 </p>
                 <div className="flex flex-wrap gap-2.5">
-                  {SWATCHES.map((color) => (
-                    <button
-                      key={color}
-                      type="button"
-                      className={cn(
-                        'h-9 w-9 rounded-full ring-2 ring-offset-2 ring-offset-[var(--color-background)] transition-all duration-300 transform hover:scale-110',
-                        accent === color ? 'ring-[var(--color-primary-400)]' : 'ring-transparent'
-                      )}
-                      style={{ backgroundColor: color }}
-                      onClick={() => onAccentChange?.(color)}
-                    />
-                  ))}
+                  {SWATCHES.map((color) => {
+                    const name = cvAccentSwatchName(color);
+                    return (
+                      <Tooltip key={color} content={`${name} — heading and highlight color on the CV.`}>
+                        <button
+                          type="button"
+                          aria-label={`${name} accent`}
+                          aria-pressed={accent === color}
+                          className={cn(
+                            'h-9 w-9 rounded-full ring-2 ring-offset-2 ring-offset-[var(--color-background)] transition-all duration-300 transform hover:scale-110',
+                            accent === color ? 'ring-[var(--color-primary-400)]' : 'ring-transparent'
+                          )}
+                          style={{ backgroundColor: color }}
+                          onClick={() => onAccentChange?.(color)}
+                        />
+                      </Tooltip>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -539,20 +559,22 @@ export function CVFormFields(props: Props) {
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   {FONTS.map((font) => (
-                    <button
-                      key={font}
-                      type="button"
-                      onClick={() => onFontFamilyChange?.(font)}
-                      className={cn(
-                        'rounded-xl border px-3 py-2.5 text-sm transition-all duration-200',
-                        fontFamily === font
-                          ? 'border-[var(--color-primary-400)]/50 bg-[var(--color-primary-100)]/40 font-semibold text-[var(--color-text-primary)]'
-                          : 'border-[var(--color-border)] text-[var(--color-muted)] hover:border-[var(--color-border-hover)] hover:text-[var(--color-text-primary)]'
-                      )}
-                      style={{ fontFamily: font }}
-                    >
-                      {font}
-                    </button>
+                    <Tooltip key={font} content="Body and heading font on the CV." className="w-full">
+                      <button
+                        type="button"
+                        onClick={() => onFontFamilyChange?.(font)}
+                        aria-pressed={fontFamily === font}
+                        className={cn(
+                          'w-full rounded-xl border px-3 py-2.5 text-sm transition-all duration-200',
+                          fontFamily === font
+                            ? 'border-[var(--color-primary-400)]/50 bg-[var(--color-primary-100)]/40 font-semibold text-[var(--color-text-primary)]'
+                            : 'border-[var(--color-border)] text-[var(--color-muted)] hover:border-[var(--color-border-hover)] hover:text-[var(--color-text-primary)]'
+                        )}
+                        style={{ fontFamily: font }}
+                      >
+                        {font}
+                      </button>
+                    </Tooltip>
                   ))}
                 </div>
               </div>
@@ -585,7 +607,13 @@ export function CVFormFields(props: Props) {
               />
               <Input label="Email address" type="email" value={email} onChange={(e) => onEmail(e.target.value)} />
               <Input label="Phone number" placeholder="e.g. +44 7700 900000" value={phone} onChange={(e) => onPhone(e.target.value)} />
-              <Input label="City or region" placeholder="e.g. London, UK" value={location} onChange={(e) => onLocation(e.target.value)} />
+              <Input
+                label="City or region"
+                placeholder="e.g. London, UK"
+                value={location}
+                onChange={(e) => onLocation(e.target.value)}
+                helperText="Shown in the header. Use Address for a street address."
+              />
               <Input
                 label="LinkedIn URL"
                 value={linkedin_url}
@@ -674,6 +702,9 @@ export function CVFormFields(props: Props) {
               onChange={(e) => onAddress(e.target.value)}
               placeholder="Street, city, postal code, country"
             />
+            <p className="-mt-2 text-xs text-[var(--color-muted)]">
+              Full postal address. Turn this section off in the sidebar if you only want city in the header.
+            </p>
             <div className="flex flex-wrap justify-end gap-2">
               <CvAtsPolishButton onAuthRequired={onRequireAiAuth}
                 disabled={!address?.trim()}

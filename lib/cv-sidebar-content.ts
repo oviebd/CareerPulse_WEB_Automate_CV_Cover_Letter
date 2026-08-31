@@ -57,10 +57,17 @@ export const CV_COMPLETION_TABS: CVFormTab[] = [
   'projects',
 ];
 
-export function cvCompletionPercent(cv: CVData): number {
-  if (!cv) return 0;
+export function cvCompletionCounts(cv: CVData): { filled: number; total: number } {
+  const total = CV_COMPLETION_TABS.length;
+  if (!cv) return { filled: 0, total };
   const filled = CV_COMPLETION_TABS.filter((tab) => cvFormTabHasFilledContent(tab, cv)).length;
-  return Math.round((filled / CV_COMPLETION_TABS.length) * 100);
+  return { filled, total };
+}
+
+export function cvCompletionPercent(cv: CVData): number {
+  const { filled, total } = cvCompletionCounts(cv);
+  if (total === 0) return 0;
+  return Math.round((filled / total) * 100);
 }
 
 /** True when this section has enough content to meaningfully appear on a CV. */

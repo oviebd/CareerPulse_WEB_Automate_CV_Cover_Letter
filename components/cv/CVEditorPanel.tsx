@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useCallback } from 'react';
 import type { CVData, SubscriptionTier } from '@/types';
+import { DEFAULT_CV_ACCENT } from '@/lib/cv-accent';
 import { CVFormFields, type CVFormTab, type AiJobContext } from '@/components/cv/CVFormFields';
 import { Progress } from '@/components/ui/progress';
 import { buildATSReport } from '@/lib/cv-ats';
@@ -71,7 +72,7 @@ export function CVEditorPanel({
   const design = useMemo(
     () => ({
       preferred_template_id: selectedTemplateId ?? value.meta?.templateId ?? 'classic',
-      accent_color: accent ?? value.meta?.colorScheme ?? '#6C63FF',
+      accent_color: accent ?? value.meta?.colorScheme ?? DEFAULT_CV_ACCENT,
       font_family: fontFamily ?? value.meta?.fontFamily ?? 'Inter',
     }),
     [selectedTemplateId, accent, fontFamily, value.meta]

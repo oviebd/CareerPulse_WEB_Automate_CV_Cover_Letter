@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { DEFAULT_CV_ACCENT } from '@/lib/cv-accent';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { CVData, CVProfile } from '@/types';
 import { cvProfileToCvData } from '@/lib/cv-profile-cvdata';
@@ -101,14 +102,14 @@ export function useCVEditor({ cvIdFromRoute }: UseCVEditorOptions): UseCVEditorR
         cvData = applyDesignToCv(
           cvData,
           tid,
-          profile.accent_color ?? '#6C63FF',
+          profile.accent_color ?? DEFAULT_CV_ACCENT,
           profile.font_family ?? 'Inter'
         );
         const st: CVEditorState = {
           cvData,
           name: profile.name ?? 'Untitled CV',
           preferred_template_id: tid,
-          accent_color: profile.accent_color ?? '#6C63FF',
+          accent_color: profile.accent_color ?? DEFAULT_CV_ACCENT,
           font_family: profile.font_family ?? 'Inter',
         };
         setEditorState(st);
@@ -135,7 +136,7 @@ export function useCVEditor({ cvIdFromRoute }: UseCVEditorOptions): UseCVEditorR
           cvData: parsed,
           name: 'Untitled CV',
           preferred_template_id: parsed.meta.templateId ?? 'classic',
-          accent_color: parsed.meta.colorScheme ?? '#6C63FF',
+          accent_color: parsed.meta.colorScheme ?? DEFAULT_CV_ACCENT,
           font_family: parsed.meta.fontFamily ?? 'Inter',
         });
         setSavedSnapshot(null);
@@ -144,7 +145,7 @@ export function useCVEditor({ cvIdFromRoute }: UseCVEditorOptions): UseCVEditorR
           cvData: createEmptyCVData('classic'),
           name: 'Untitled CV',
           preferred_template_id: 'classic',
-          accent_color: '#6C63FF',
+          accent_color: DEFAULT_CV_ACCENT,
           font_family: 'Inter',
         });
         setSavedSnapshot(null);
@@ -172,7 +173,7 @@ export function useCVEditor({ cvIdFromRoute }: UseCVEditorOptions): UseCVEditorR
   const saveButtonLabel = useMemo(() => {
     if (isSaving) return 'Saving...';
     if (saveError) return 'Retry Save';
-    return isNew ? 'Save CV' : 'Update CV';
+    return isNew ? 'Save CV' : 'Save';
   }, [isSaving, saveError, isNew]);
 
   const updateField = useCallback(<K extends keyof CVData>(field: K, value: CVData[K]) => {
@@ -240,14 +241,14 @@ export function useCVEditor({ cvIdFromRoute }: UseCVEditorOptions): UseCVEditorR
         cvData = applyDesignToCv(
           cvData,
           updated.preferred_template_id ?? 'classic',
-          updated.accent_color ?? '#6C63FF',
+          updated.accent_color ?? DEFAULT_CV_ACCENT,
           updated.font_family ?? 'Inter'
         );
         const st: CVEditorState = {
           cvData,
           name: updated.name ?? 'Untitled CV',
           preferred_template_id: updated.preferred_template_id ?? 'classic',
-          accent_color: updated.accent_color ?? '#6C63FF',
+          accent_color: updated.accent_color ?? DEFAULT_CV_ACCENT,
           font_family: updated.font_family ?? 'Inter',
         };
         setEditorState(st);
@@ -277,14 +278,14 @@ export function useCVEditor({ cvIdFromRoute }: UseCVEditorOptions): UseCVEditorR
         cvData = applyDesignToCv(
           cvData,
           updated.preferred_template_id ?? 'classic',
-          updated.accent_color ?? '#6C63FF',
+          updated.accent_color ?? DEFAULT_CV_ACCENT,
           updated.font_family ?? 'Inter'
         );
         const st: CVEditorState = {
           cvData,
           name: updated.name ?? 'Untitled CV',
           preferred_template_id: updated.preferred_template_id ?? 'classic',
-          accent_color: updated.accent_color ?? '#6C63FF',
+          accent_color: updated.accent_color ?? DEFAULT_CV_ACCENT,
           font_family: updated.font_family ?? 'Inter',
         };
         setEditorState(st);

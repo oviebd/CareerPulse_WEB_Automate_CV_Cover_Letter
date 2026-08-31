@@ -1,21 +1,15 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { ChevronDown, ChevronUp, X } from 'lucide-react';
+import { Tooltip } from '@/components/ui/tooltip';
 import {
   DocumentPrintPreviewFrame,
   DOCUMENT_PREVIEW_A4_HEIGHT,
 } from '@/components/shared/DocumentPrintPreviewFrame';
 import { cn } from '@/lib/utils';
 
-/**
- * CV templates use `min-height: 100vh` on sidebars and grid wrappers so the
- * coloured sidebar fills the full page in browser view.  Inside a preview
- * iframe the measurement probe temporarily sets the iframe to 10 000 px tall,
- * making `100vh = 10 000px`, which inflates scrollHeight and produces a large
- * blank area.  This override resets all viewport-relative min-heights to 0
- * before measuring so the iframe sizes to actual content only.
- */
 function injectCVPreviewOverrides(iframe: HTMLIFrameElement): void {
   try {
     const doc = iframe.contentDocument;
@@ -24,10 +18,6 @@ function injectCVPreviewOverrides(iframe: HTMLIFrameElement): void {
     if (existing) return;
     const style = doc.createElement('style');
     style.id = '__cv-preview-overrides';
-    // Reset all viewport-relative min-heights so the measurement probe
-    // (which expands the iframe to 10 000 px) doesn't inflate content height.
-    // Also pin html/body to auto height so html.scrollHeight reflects content,
-    // not the inflated viewport.
     style.textContent =
       'html{height:auto!important;overflow:hidden!important;}' +
       'body{min-height:0!important;height:auto!important;}' +
@@ -36,12 +26,11 @@ function injectCVPreviewOverrides(iframe: HTMLIFrameElement): void {
       '.violet-wrap,.violet-side,.violet-side-main{min-height:0!important;}';
     doc.head.appendChild(style);
   } catch {
-    // cross-origin frames are silently ignored
+    /* cross-origin */
   }
 }
 
 interface PreviewPanelProps {
-  /** Blob URL for rendered HTML preview. */
   previewSrc: string;
   previewBusy: boolean;
   zoom: number;
@@ -51,22 +40,34 @@ interface PreviewPanelProps {
   collapsed?: boolean;
   onToggleCollapse?: () => void;
   stickyTopClass?: string;
+  mobileSheetOpen?: boolean;
+  onMobileSheetClose?: () => void;
+  footerSlot?: React.ReactNode;
+  /** When true, only render the mobile bottom sheet (no desktop aside). */
+  mobileOnly?: boolean;
+  /** When true, only render the desktop aside (no mobile sheet). */
+  desktopOnly?: boolean;
 }
 
-export function PreviewPanel(props: PreviewPanelProps) {
-  const {
-    previewSrc,
-    previewBusy,
-    zoom,
-    onZoomChange,
-    currentPage,
-    onPageChange,
-    collapsed = false,
-    onToggleCollapse,
-    stickyTopClass = 'xl:top-[72px]',
-  } = props;
-
-  const scrollRef = useRef<HTMLDivElement>(null);
+function PreviewContent({
+  previewSrc,
+  previewBusy,
+  zoom,
+  onZoomChange,
+  currentPage,
+  onPageChange,
+  scrollRef,
+  onPageCountChange,
+}: {
+  previewSrc: string;
+  previewBusy: boolean;
+  zoom: number;
+  onZoomChange: (zoom: number) => void;
+  currentPage: number;
+  onPageChange: (page: number) => void;
+  scrollRef: React.RefObject<HTMLDivElement>;
+  onPageCountChange: (count: number) => void;
+}) {
   const [pageCount, setPageCount] = useState(1);
 
   const scrollToPage = useCallback(
@@ -82,7 +83,7 @@ export function PreviewPanel(props: PreviewPanelProps) {
       }
       el.scrollTop = ((clamped - 1) / (pages - 1)) * maxScroll;
     },
-    [pageCount]
+    [pageCount, scrollRef]
   );
 
   useEffect(() => {
@@ -90,7 +91,143 @@ export function PreviewPanel(props: PreviewPanelProps) {
     scrollToPage(currentPage);
   }, [previewSrc, currentPage, scrollToPage, zoom, pageCount]);
 
-  if (collapsed) {
+  const showMultiPage = pageCount > 1;
+
+  return (
+    <>
+      <div className="mb-3 flex items-center justify-between border-b border-[var(--color-border)]/80 pb-2">
+        <div>
+          <p className="text-sm font-semibold text-[var(--color-text-primary)]">Live preview</p>
+          <p className="text-[11px] text-[var(--color-muted)]">This is how your PDF will look.</p>
+        </div>
+        <div className="flex items-center gap-2 font-mono text-xs text-[var(--color-muted)]">
+          <Tooltip content="Zoom out">
+            <button
+              type="button"
+              aria-label="Zoom out"
+              className="rounded-btn border border-[var(--color-border)] bg-[var(--color-control-bg)] px-2 py-1 transition duration-200 hover:bg-[var(--color-control-bg-hover)]"
+              onClick={() => onZoomChange(Math.max(70, zoom - 10))}
+            >
+              -
+            </button>
+          </Tooltip>
+          <span className="min-w-[3ch] text-center" aria-label={`Zoom ${zoom} percent`}>
+            {zoom}%
+          </span>
+          <Tooltip content="Zoom in">
+            <button
+              type="button"
+              aria-label="Zoom in"
+              className="rounded-btn border border-[var(--color-border)] bg-[var(--color-control-bg)] px-2 py-1 transition duration-200 hover:bg-[var(--color-control-bg-hover)]"
+              onClick={() => onZoomChange(Math.min(140, zoom + 10))}
+            >
+              +
+            </button>
+          </Tooltip>
+        </div>
+      </div>
+
+      <div
+        ref={scrollRef}
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden pr-1"
+      >
+        <div className="relative w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-preview-well)] p-3 shadow-inner">
+          {previewBusy ? (
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-[var(--color-preview-overlay)] text-sm text-[var(--color-muted)] backdrop-blur-sm">
+              <div className="flex flex-col items-center gap-2">
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--color-primary-400)] border-t-transparent" />
+                <span>Updating preview…</span>
+              </div>
+            </div>
+          ) : null}
+          {previewSrc ? (
+            <DocumentPrintPreviewFrame
+              src={previewSrc}
+              title="CV live preview"
+              isLoading={previewBusy}
+              zoom={zoom}
+              injectOverrides={injectCVPreviewOverrides}
+              onMetricsChange={({ contentHeight }) => {
+                const pages = Math.max(1, Math.ceil(contentHeight / DOCUMENT_PREVIEW_A4_HEIGHT));
+                setPageCount(pages);
+                onPageCountChange(pages);
+              }}
+            />
+          ) : (
+            <div className="flex min-h-[200px] items-center justify-center p-8 text-sm text-[var(--color-muted)]">
+              Preview unavailable
+            </div>
+          )}
+        </div>
+        {previewSrc && !previewBusy ? (
+          <p className="mt-2 px-1 text-center text-[11px] text-[var(--color-muted)]">
+            {showMultiPage
+              ? `Long CV — about ${pageCount} page${pageCount > 1 ? 's' : ''}. Scroll the preview or use Previous / Next.`
+              : 'Scroll to see the full preview if content is long.'}
+          </p>
+        ) : null}
+      </div>
+
+      <div className="mt-2 flex shrink-0 items-center justify-center gap-4 border-t border-[var(--color-border)] pt-3 font-mono text-xs">
+        <button
+          type="button"
+          disabled={currentPage <= 1}
+          className="flex items-center gap-1 rounded-btn border border-[var(--color-border)] bg-[var(--color-control-bg)] px-3 py-1.5 transition duration-200 hover:bg-[var(--color-control-bg-hover)] disabled:cursor-not-allowed disabled:opacity-30"
+          onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+        >
+          Previous
+        </button>
+        <span className="font-medium text-[var(--color-text-primary)]">
+          {showMultiPage ? `Page ${currentPage} / ${pageCount}` : `Page ${currentPage}`}
+        </span>
+        <button
+          type="button"
+          disabled={currentPage >= pageCount}
+          className="flex items-center gap-1 rounded-btn border border-[var(--color-border)] bg-[var(--color-control-bg)] px-3 py-1.5 transition duration-200 hover:bg-[var(--color-control-bg-hover)] disabled:cursor-not-allowed disabled:opacity-30"
+          onClick={() => onPageChange(Math.min(pageCount, currentPage + 1))}
+        >
+          Next
+        </button>
+      </div>
+    </>
+  );
+}
+
+export function PreviewPanel(props: PreviewPanelProps) {
+  const {
+    previewSrc,
+    previewBusy,
+    zoom,
+    onZoomChange,
+    currentPage,
+    onPageChange,
+    collapsed = false,
+    onToggleCollapse,
+    stickyTopClass = 'md:top-[72px]',
+    mobileSheetOpen,
+    onMobileSheetClose,
+    footerSlot,
+    mobileOnly = false,
+    desktopOnly = false,
+  } = props;
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [, setPageCount] = useState(1);
+
+  const panelInner = (
+    <PreviewContent
+      previewSrc={previewSrc}
+      previewBusy={previewBusy}
+      zoom={zoom}
+      onZoomChange={onZoomChange}
+      currentPage={currentPage}
+      onPageChange={onPageChange}
+      scrollRef={scrollRef}
+      onPageCountChange={setPageCount}
+    />
+  );
+
+  if (!mobileOnly && collapsed) {
     return (
       <aside
         className={cn(
@@ -102,6 +239,7 @@ export function PreviewPanel(props: PreviewPanelProps) {
         <button
           type="button"
           onClick={onToggleCollapse}
+          aria-label="Show live preview"
           className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-control-bg)] px-2 py-1 text-xs font-medium text-[var(--color-muted)] transition duration-200 hover:bg-[var(--color-control-bg-hover)]"
         >
           <ChevronDown className="h-3.5 w-3.5" aria-hidden />
@@ -111,116 +249,73 @@ export function PreviewPanel(props: PreviewPanelProps) {
     );
   }
 
-  const showMultiPage = pageCount > 1;
-
   return (
-    <aside
-      className={cn(
-        'glass-panel sticky z-10 h-[calc(100vh-4.5rem)] w-full rounded-2xl border border-[var(--color-border)] border-l-[3px] border-l-[var(--color-primary-400)] p-4 shadow-[var(--shadow-card)]',
-        stickyTopClass
-      )}
-    >
-      <div className="flex h-full flex-col">
-        <div className="mb-4 flex items-center justify-between border-b border-[var(--color-border)]/80 pb-2 pt-1">
-          <p className="text-sm font-semibold text-[var(--color-text-primary)]">Live preview</p>
-          <div className="flex items-center gap-2">
-            {onToggleCollapse ? (
-              <button
-                type="button"
-                title="Collapse preview"
-                onClick={onToggleCollapse}
-                className="rounded-lg border border-[var(--color-border)] bg-[var(--color-control-bg)] p-1.5 text-[var(--color-muted)] transition duration-200 hover:bg-[var(--color-control-bg-hover)]"
-              >
-                <ChevronUp className="h-4 w-4" aria-hidden />
-              </button>
-            ) : null}
-            <div className="flex items-center gap-2 font-mono text-xs text-[var(--color-muted)]">
-              <button
-                type="button"
-                className="rounded-btn border border-[var(--color-border)] bg-[var(--color-control-bg)] px-2 py-1 transition duration-200 hover:bg-[var(--color-control-bg-hover)]"
-                onClick={() => onZoomChange(Math.max(70, zoom - 10))}
-              >
-                -
-              </button>
-              <span className="min-w-[3ch] text-center">{zoom}%</span>
-              <button
-                type="button"
-                className="rounded-btn border border-[var(--color-border)] bg-[var(--color-control-bg)] px-2 py-1 transition duration-200 hover:bg-[var(--color-control-bg-hover)]"
-                onClick={() => onZoomChange(Math.min(140, zoom + 10))}
-              >
-                +
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div
-          ref={scrollRef}
-          className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden pr-1"
+    <>
+      {!mobileOnly ? (
+        <aside
+          className={cn(
+            'glass-panel sticky z-10 flex h-[calc(100vh-4.5rem)] w-full flex-col rounded-2xl border border-[var(--color-border)] border-l-[3px] border-l-[var(--color-primary-400)] p-4 shadow-[var(--shadow-card)]',
+            stickyTopClass,
+            desktopOnly === false && 'hidden md:flex'
+          )}
         >
-          <div className="relative w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-preview-well)] p-3 shadow-inner">
-            {previewBusy ? (
-              <div className="absolute inset-0 z-10 flex items-center justify-center bg-[var(--color-preview-overlay)] text-sm text-[var(--color-muted)] backdrop-blur-sm">
-                <div className="flex flex-col items-center gap-2">
-                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--color-primary-400)] border-t-transparent" />
-                  <span>Updating preview…</span>
-                </div>
-              </div>
-            ) : null}
-            {previewSrc ? (
-              <DocumentPrintPreviewFrame
-                src={previewSrc}
-                title="CV live preview"
-                isLoading={previewBusy}
-                zoom={zoom}
-                injectOverrides={injectCVPreviewOverrides}
-                onMetricsChange={({ contentHeight }) => {
-                  const pages = Math.max(
-                    1,
-                    Math.ceil(contentHeight / DOCUMENT_PREVIEW_A4_HEIGHT)
-                  );
-                  setPageCount(pages);
-                }}
-              />
-            ) : (
-              <div className="flex min-h-[200px] items-center justify-center p-8 text-sm text-[var(--color-muted)]">
-                Preview unavailable
-              </div>
-            )}
-          </div>
-          {previewSrc && !previewBusy ? (
-            <p className="mt-2 px-1 text-center text-[11px] text-[var(--color-muted)]">
-              {showMultiPage
-                ? `Long CV — about ${pageCount} page${pageCount > 1 ? 's' : ''}. Scroll the preview or use Previous / Next.`
-                : 'Scroll to see the full preview if content is long.'}
-            </p>
+          {onToggleCollapse ? (
+            <div className="mb-2 flex justify-end">
+              <Tooltip content="Hide preview">
+                <button
+                  type="button"
+                  aria-label="Hide preview"
+                  onClick={onToggleCollapse}
+                  className="rounded-lg border border-[var(--color-border)] bg-[var(--color-control-bg)] p-1.5 text-[var(--color-muted)] transition duration-200 hover:bg-[var(--color-control-bg-hover)]"
+                >
+                  <ChevronUp className="h-4 w-4" aria-hidden />
+                </button>
+              </Tooltip>
+            </div>
           ) : null}
-        </div>
+          <div className="flex min-h-0 flex-1 flex-col">{panelInner}</div>
+          {footerSlot ? <div className="mt-3 shrink-0">{footerSlot}</div> : null}
+        </aside>
+      ) : null}
 
-        <div className="mt-2 flex shrink-0 items-center justify-center gap-4 border-t border-[var(--color-border)] pt-3 font-mono text-xs">
-          <button
-            type="button"
-            disabled={currentPage <= 1}
-            className="flex items-center gap-1 rounded-btn border border-[var(--color-border)] bg-[var(--color-control-bg)] px-3 py-1.5 transition duration-200 hover:bg-[var(--color-control-bg-hover)] disabled:cursor-not-allowed disabled:opacity-30"
-            onClick={() => onPageChange(Math.max(1, currentPage - 1))}
-          >
-            Previous
-          </button>
-          <span className="font-medium text-[var(--color-text-primary)]">
-            {showMultiPage
-              ? `Page ${currentPage} / ${pageCount}`
-              : `Page ${currentPage}`}
-          </span>
-          <button
-            type="button"
-            disabled={currentPage >= pageCount}
-            className="flex items-center gap-1 rounded-btn border border-[var(--color-border)] bg-[var(--color-control-bg)] px-3 py-1.5 transition duration-200 hover:bg-[var(--color-control-bg-hover)] disabled:cursor-not-allowed disabled:opacity-30"
-            onClick={() => onPageChange(Math.min(pageCount, currentPage + 1))}
-          >
-            Next
-          </button>
-        </div>
-      </div>
-    </aside>
+      {!desktopOnly ? (
+        <AnimatePresence>
+          {mobileSheetOpen ? (
+            <>
+              <motion.div
+                key="preview-backdrop"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-40 bg-black/50 md:hidden"
+                onClick={onMobileSheetClose}
+              />
+              <motion.aside
+                key="preview-sheet"
+                initial={{ y: '100%' }}
+                animate={{ y: 0 }}
+                exit={{ y: '100%' }}
+                transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+                className="fixed inset-x-0 bottom-0 z-50 flex max-h-[85vh] flex-col rounded-t-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-2xl md:hidden"
+              >
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-sm font-semibold text-[var(--color-text-primary)]">Preview</p>
+                  <button
+                    type="button"
+                    onClick={onMobileSheetClose}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-control-bg)]"
+                    aria-label="Close preview"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{panelInner}</div>
+                {footerSlot ? <div className="mt-3 shrink-0">{footerSlot}</div> : null}
+              </motion.aside>
+            </>
+          ) : null}
+        </AnimatePresence>
+      ) : null}
+    </>
   );
 }

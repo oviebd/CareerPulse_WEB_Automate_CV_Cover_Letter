@@ -1,5 +1,6 @@
 import type { CVData } from '@/types';
 import { createEmptyCVData } from '@/src/utils/cvDefaults';
+import { DEFAULT_CV_ACCENT } from '@/lib/cv-accent';
 
 /**
  * In-memory editor bundle for the core CV screen (useCVEditor).
@@ -17,6 +18,6 @@ export const DEFAULT_EDITOR_STATE: CVEditorState = {
   cvData: createEmptyCVData('classic'),
   name: 'Untitled CV',
   preferred_template_id: 'classic',
-  accent_color: '#6C63FF',
+  accent_color: DEFAULT_CV_ACCENT,
   font_family: 'Inter',
 };

@@ -1,43 +1,61 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { useCVEditor } from '@/hooks/useCVEditor';
+import { useCVEditorAutosave } from '@/hooks/useCVEditorAutosave';
+import { useCVEditorPreviewState } from '@/hooks/useCVEditorPreviewState';
 import { useAuthGate } from '@/hooks/useAuthGate';
 import { useSubscription } from '@/hooks/useSubscription';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { CVEditorPanel } from '@/components/cv/CVEditorPanel';
-import { Sidebar } from '@/components/cv/premium/Sidebar';
-import { PreviewPanel } from '@/components/cv/premium/PreviewPanel';
 import { CVEditorTopBar } from '@/components/cv/premium/CVEditorTopBar';
 import type { CVEditorFocusMode } from '@/components/cv/premium/CVEditorTopBar';
+import { CVEditorShell } from '@/components/cv/premium/CVEditorShell';
 import { ATSDrawer } from '@/components/cv/premium/ATSDrawer';
+import { EmptyCVGuide, ExportReadyNudge } from '@/components/cv/EmptyCVGuide';
 import type { CVFormTab } from '@/components/cv/CVFormFields';
 import type { CVSectionVisibility } from '@/types';
-import { FeatureGate } from '@/components/shared/FeatureGate';
 import { useToast } from '@/components/ui/toast';
 import type { CVData } from '@/types';
 import type { CVTemplate, SubscriptionTier } from '@/types';
 import { canUseTemplate, canAccessFeature } from '@/lib/subscription';
 import { buildATSReport } from '@/lib/cv-ats';
 import { CV_EDITOR_CANVAS } from '@/lib/cv-editor-styles';
-import { readPreviewCollapsedDefault, persistPreviewExpanded } from '@/lib/cv-preview-prefs';
-import { CVEditorMobileBar } from '@/components/cv/premium/CVEditorMobileBar';
 import { ExportMenu } from '@/components/shared/ExportMenu';
 import { downloadCvExport, type ExportFormat } from '@/lib/export-client';
 import { CvTitleModal } from '@/components/cv/CvTitleModal';
 import { defaultCoreCvDisplayName } from '@/lib/cv-display-name';
 import { cloneCvData } from '@/lib/cv-clone';
 import { createEmptyCVData } from '@/src/utils/cvDefaults';
-import { cn } from '@/lib/utils';
+import { cvCompletionPercent } from '@/lib/cv-sidebar-content';
 import { ALL_TEMPLATE_IDS, TEMPLATE_CONFIGS } from '@/src/config/templateConfig';
 import { normalizeTemplateId } from '@/src/utils/cvDefaults';
 import type { TemplateId } from '@/src/types/cv.types';
 
 function previewPayloadFromCVData(d: CVData): Record<string, unknown> {
   return JSON.parse(JSON.stringify(d)) as Record<string, unknown>;
+}
+
+function buildSaveStatusLine({
+  isNew,
+  isDirty,
+  isSaving,
+  autosaveState,
+}: {
+  isNew: boolean;
+  isDirty: boolean;
+  isSaving: boolean;
+  autosaveState: 'idle' | 'saving' | 'saved' | 'error';
+}) {
+  if (isSaving || autosaveState === 'saving') return 'Saving…';
+  if (autosaveState === 'error') return "Couldn't save";
+  if (isNew && isDirty) return 'Unsaved changes';
+  if (isDirty) return 'Unsaved changes';
+  if (!isNew) return 'Saved to account';
+  return '';
 }
 
 export function CVEditor() {
@@ -54,13 +72,13 @@ export function CVEditor() {
   }, [coreCvIdFromQuery, router]);
 
   const {
-    cv,
     cvId,
     isSaving,
     saveError,
     loadError,
     isLoading,
     isDirty,
+    isNew,
     saveButtonLabel,
     handleSave,
     editorState,
@@ -68,14 +86,26 @@ export function CVEditor() {
     reloadFromServer,
   } = useCVEditor({ cvIdFromRoute: routeId });
 
-  const { requireAuth, authModal } = useAuthGate();
+  const stateKey = useMemo(() => JSON.stringify(editorState), [editorState]);
 
+  const { autosaveState, retryAutosave } = useCVEditorAutosave({
+    stateKey,
+    cvId,
+    isNew,
+    isDirty,
+    isSaving,
+    handleSave,
+    enabled: !isNew && Boolean(cvId),
+  });
+
+  const previewControl = useCVEditorPreviewState();
+  const { requireAuth, authModal } = useAuthGate();
   const queryClient = useQueryClient();
 
   const [titleModalOpen, setTitleModalOpen] = useState(false);
   const [titleModalDefault, setTitleModalDefault] = useState('');
-
   const [draftActive, setDraftActive] = useState(false);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const compute = () => setDraftActive(Boolean(sessionStorage.getItem('cv_draft')));
@@ -85,10 +115,10 @@ export function CVEditor() {
     return () => window.removeEventListener('cv_draft_updated', onUpdate);
   }, []);
 
-  const isNew = searchParams.get('new') === '1';
+  const isNewParam = searchParams.get('new') === '1';
 
   useEffect(() => {
-    if (isNew && typeof window !== 'undefined') {
+    if (isNewParam && typeof window !== 'undefined') {
       const emptyCv = createEmptyCVData('classic');
       sessionStorage.setItem('cv_draft', JSON.stringify(emptyCv));
       sessionStorage.setItem('cv_draft_force_overwrite', '0');
@@ -97,7 +127,7 @@ export function CVEditor() {
       url.searchParams.delete('new');
       window.history.replaceState({}, '', url.toString());
     }
-  }, [isNew]);
+  }, [isNewParam]);
 
   const { toast } = useToast();
   const { tier } = useSubscription();
@@ -106,6 +136,7 @@ export function CVEditor() {
   const selectedTemplateId = editorState.preferred_template_id;
   const accent = editorState.accent_color;
   const fontFamily = editorState.font_family;
+  const completionPct = useMemo(() => cvCompletionPercent(cvData), [cvData]);
 
   const setSelectedTemplateId = useCallback(
     (id: string) => {
@@ -162,18 +193,12 @@ export function CVEditor() {
   const [previewSrc, setPreviewSrc] = useState<string>('');
   const [previewBusy, setPreviewBusy] = useState(false);
   const previewUrlRef = useRef<string | null>(null);
-  const [settingDefault, setSettingDefault] = useState(false);
-  const [exporting, setExporting] = useState(false);
   const [exportingFormat, setExportingFormat] = useState<ExportFormat | null>(null);
-  const [editorTab, setEditorTab] = useState<CVFormTab>('photo');
+  const [editorTab, setEditorTab] = useState<CVFormTab>('header');
   const [zoom, setZoom] = useState(100);
   const [page, setPage] = useState(1);
   const [focusMode, setFocusMode] = useState<CVEditorFocusMode>('default');
   const [atsDrawerOpen, setAtsDrawerOpen] = useState(false);
-  const [previewCollapsed, setPreviewCollapsed] = useState(() =>
-    typeof window !== 'undefined' ? readPreviewCollapsedDefault() : true
-  );
-  const [autosaveState, setAutosaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [undoPast, setUndoPast] = useState<CVData[]>([]);
   const [undoFuture, setUndoFuture] = useState<CVData[]>([]);
   const burstStartRef = useRef<CVData | null>(null);
@@ -207,7 +232,6 @@ export function CVEditor() {
 
   const catalogTid = normalizeTemplateId(selectedTemplateId) as TemplateId;
   const templateMeta = templates.find((t) => t.id === catalogTid) ?? null;
-  /** DB row may be missing for some unified ids; export still uses `src/templates/{id}` via `exportCV`. */
   const allowed =
     !ALL_TEMPLATE_IDS.includes(catalogTid)
       ? false
@@ -279,7 +303,6 @@ export function CVEditor() {
     return () => window.removeEventListener('keydown', onKey);
   }, [undo, redo]);
 
-  /** Keep selection when the unified id exists on disk (`src/templates/{id}`); DB may only list a subset of rows. */
   useEffect(() => {
     if (templatesLoading || !templates.length) return;
     const tid = normalizeTemplateId(selectedTemplateId) as TemplateId;
@@ -332,13 +355,6 @@ export function CVEditor() {
   }, [selectedTemplateId, cvData, templatesLoading, refreshPreview]);
 
   useEffect(() => {
-    if (!cvData) return;
-    setAutosaveState('saving');
-    const tm = window.setTimeout(() => setAutosaveState('saved'), 500);
-    return () => window.clearTimeout(tm);
-  }, [cvData]);
-
-  useEffect(() => {
     return () => {
       if (previewUrlRef.current) {
         URL.revokeObjectURL(previewUrlRef.current);
@@ -346,33 +362,6 @@ export function CVEditor() {
       }
     };
   }, []);
-
-  async function setPreferredTemplate() {
-    if (!cvId || !selectedTemplateId) {
-      toast('Save your CV first to set a default template.', 'error');
-      return;
-    }
-    if (draftActive) {
-      toast('Press Save first to persist your core CV.', 'error');
-      return;
-    }
-    setSettingDefault(true);
-    try {
-      const res = await fetch(`/api/cvs/${cvId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ preferred_template_id: selectedTemplateId }),
-      });
-      if (!res.ok) throw new Error('update_failed');
-      toast('Default template updated.', 'success');
-      void queryClient.invalidateQueries({ queryKey: ['cv-versions'] });
-      void reloadFromServer();
-    } catch {
-      toast('Could not update template.', 'error');
-    } finally {
-      setSettingDefault(false);
-    }
-  }
 
   function openSaveTitleModal() {
     const generated = defaultCoreCvDisplayName(editorState.cvData.personal.fullName);
@@ -395,7 +384,6 @@ export function CVEditor() {
       toast('Upgrade to export with this template.', 'error');
       return;
     }
-    setExporting(true);
     setExportingFormat(format);
     try {
       const result = await downloadCvExport(
@@ -414,13 +402,8 @@ export function CVEditor() {
         toast('Export failed.', 'error');
       }
     } finally {
-      setExporting(false);
       setExportingFormat(null);
     }
-  }
-
-  async function runExportPdf() {
-    await runExport('pdf');
   }
 
   const ats = cvData
@@ -428,12 +411,7 @@ export function CVEditor() {
     : { score: 0, summary: '', suggestions: [], sections: {} };
 
   const subtitleName = cvData?.personal?.fullName?.trim();
-  const statusBits: string[] = [];
-  if (isDirty) statusBits.push('Unsaved changes');
-  if (!isDirty && (autosaveState === 'saved' || autosaveState === 'saving')) {
-    if (autosaveState === 'saving') statusBits.push('Saving…');
-    else statusBits.push('Saved ✓');
-  }
+  const statusLine = buildSaveStatusLine({ isNew, isDirty, isSaving, autosaveState });
 
   if (loadError) {
     return (
@@ -462,13 +440,14 @@ export function CVEditor() {
         submitLabel={saveButtonLabel}
       />
       <CVEditorTopBar
-        backHref="/cv"
+        backHref="/documents"
         title="Core CV"
-        subtitle={subtitleName || 'Add your name in Header'}
+        subtitle={subtitleName || 'Master CV — reused for every application'}
+        caption={subtitleName ? 'Master CV — reused for every application' : undefined}
         badge={
           isDirty ? (
             <span className="rounded-full border border-amber-400/60 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900">
-              Draft
+              Unsaved
             </span>
           ) : null
         }
@@ -480,16 +459,35 @@ export function CVEditor() {
           onUndo: undo,
           onRedo: redo,
         }}
-        secondaryAction={{
-          label: 'Export PDF',
-          loading: exporting,
-          disabled: !allowed,
+        previewToggle={{
+          visible: previewControl.isPreviewActive,
+          onToggle: previewControl.togglePreview,
+        }}
+        primaryAction={{
+          label: saveButtonLabel,
+          loading: isSaving,
+          disabled: isSaving && !isDirty,
+          highlight: isDirty,
           onClick: requireAuth(() => {
-            void runExportPdf();
+            if (isNew || draftActive) {
+              openSaveTitleModal();
+            } else {
+              void handleSave();
+            }
           }),
         }}
+        statusLine={
+          <>
+            {statusLine}
+            {saveError ? <span className="text-[var(--color-danger)]"> · {saveError}</span> : null}
+          </>
+        }
+        onRetrySave={autosaveState === 'error' ? () => void retryAutosave() : undefined}
+        focusMode={focusMode}
+        onFocusModeChange={setFocusMode}
         trailingControls={
           <ExportMenu
+            label="Export"
             busyFormat={exportingFormat}
             disabled={!allowed || !cvData || !selectedTemplateId}
             canDocx={canAccessFeature(tier, 'docxExport')}
@@ -500,109 +498,75 @@ export function CVEditor() {
             }}
           />
         }
-        primaryAction={{
-          label: saveButtonLabel,
-          loading: isSaving,
-          disabled: isSaving,
-          onClick: requireAuth(() => {
-            openSaveTitleModal();
-          }),
-        }}
-        statusLine={
-          <>
-            {statusBits.join(' · ')}
-            {saveError ? <span className="text-red-600"> · {saveError}</span> : null}
-          </>
-        }
-        focusMode={focusMode}
-        onFocusModeChange={setFocusMode}
       />
 
       <ATSDrawer open={atsDrawerOpen} onOpenChange={setAtsDrawerOpen} report={ats} />
 
-      <div
-        className={cn(
-          'mt-4 grid gap-4 px-1 sm:px-0',
-          focusMode === 'default' &&
-            'xl:grid-cols-[minmax(220px,0.24fr)_minmax(0,1fr)_minmax(390px,0.45fr)]',
-          (focusMode === 'editor' || focusMode === 'preview') && 'xl:grid-cols-1'
-        )}
-      >
-        {focusMode !== 'preview' ? (
-          focusMode === 'default' ? (
-            <Sidebar
-              activeSection={editorTab}
-              onSelect={setEditorTab}
-              cvData={cvData}
-              sectionVisibility={cvData.sectionVisibility}
-              onSectionVisibilityChange={(next: CVSectionVisibility) =>
-                handleChange({ ...cvData, sectionVisibility: next })
-              }
+      <CVEditorShell
+        focusMode={focusMode}
+        editorTab={editorTab}
+        onEditorTabChange={setEditorTab}
+        cvData={cvData}
+        previewControl={previewControl}
+        onSectionVisibilityChange={(next: CVSectionVisibility) =>
+          handleChange({ ...cvData, sectionVisibility: next })
+        }
+        editorCanvas={
+          <div className={CV_EDITOR_CANVAS}>
+            <EmptyCVGuide cvData={cvData} activeTab={editorTab} onGoToSection={setEditorTab} placement="top" />
+            <CVEditorPanel
+              value={cvData}
+              onChange={handleChange}
+              activeTab={editorTab}
+              onActiveTabChange={setEditorTab}
+              hideAtsBanner
+              hideFormTabBar
+              hideVisibilityPanel
+              templates={templates}
+              selectedTemplateId={selectedTemplateId}
+              onTemplateChange={setSelectedTemplateId}
+              accent={accent}
+              onAccentChange={setAccent}
+              fontFamily={fontFamily}
+              onFontFamilyChange={setFontFamily}
+              userTier={tier}
             />
-          ) : null
-        ) : null}
-
-        {focusMode !== 'preview' ? (
-          <div
-            className={cn(
-              'min-w-0 space-y-3',
-              focusMode === 'default' && 'xl:border-r xl:border-[var(--color-border)] xl:pr-3'
-            )}
-          >
-            <div className={CV_EDITOR_CANVAS}>
-              <CVEditorPanel
-                value={cvData}
-                onChange={handleChange}
-                activeTab={editorTab}
-                onActiveTabChange={setEditorTab}
-                hideAtsBanner
-                hideFormTabBar
-                hideVisibilityPanel
-                templates={templates}
-                selectedTemplateId={selectedTemplateId}
-                onTemplateChange={setSelectedTemplateId}
-                accent={accent}
-                onAccentChange={setAccent}
-                fontFamily={fontFamily}
-                onFontFamilyChange={setFontFamily}
-                userTier={tier}
-              />
-            </div>
+            <EmptyCVGuide cvData={cvData} activeTab={editorTab} onGoToSection={setEditorTab} placement="bottom" />
           </div>
-        ) : null}
-
-        {focusMode !== 'editor' ? (
-          <div className="min-w-0 space-y-3">
-            <PreviewPanel
-              previewSrc={previewSrc}
-              previewBusy={previewBusy}
-              zoom={zoom}
-              onZoomChange={setZoom}
-              currentPage={page}
-              onPageChange={setPage}
-              collapsed={previewCollapsed}
-              onToggleCollapse={() =>
-                setPreviewCollapsed((c) => {
-                  const next = !c;
-                  persistPreviewExpanded(!next);
-                  return next;
-                })
-              }
+        }
+        preview={{
+          previewSrc,
+          previewBusy,
+          zoom,
+          onZoomChange: setZoom,
+          currentPage: page,
+          onPageChange: setPage,
+          footerSlot: (
+            <ExportReadyNudge
+              completion={completionPct}
+              busyFormat={exportingFormat}
+              canDocx={canAccessFeature(tier, 'docxExport')}
+              exportDisabled={!allowed}
+              onExport={(format) => {
+                requireAuth(() => {
+                  void runExport(format);
+                })();
+              }}
             />
-            <FeatureGate requiredTier={['pro']} userTier={tier}>
-              <p className="text-xs text-[var(--color-muted)]">Pro settings unlocked</p>
-            </FeatureGate>
-          </div>
-        ) : null}
-      </div>
-
-      <CVEditorMobileBar
-        primaryLabel={saveButtonLabel}
-        primaryLoading={isSaving}
-        primaryDisabled={isSaving}
-        onPrimaryClick={requireAuth(() => {
-          openSaveTitleModal();
-        })}
+          ),
+        }}
+        mobileBar={{
+          primaryLabel: saveButtonLabel,
+          primaryLoading: isSaving,
+          primaryDisabled: isSaving,
+          onPrimaryClick: requireAuth(() => {
+            if (isNew || draftActive) {
+              openSaveTitleModal();
+            } else {
+              void handleSave();
+            }
+          }),
+        }}
       />
     </div>
   );

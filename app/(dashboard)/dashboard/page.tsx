@@ -66,8 +66,8 @@ export default function HomePage() {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
           { label: 'Active', value: stats.active, icon: Briefcase, color: 'text-[var(--color-primary)]', bg: 'bg-[var(--color-primary-100)]' },
-          { label: 'Applied', value: stats.applied, icon: FileText, color: 'text-indigo-600 dark:text-indigo-400', bg: 'bg-indigo-50 dark:bg-indigo-950/40' },
-          { label: 'Interviews', value: stats.interviews, icon: MessageSquare, color: 'text-violet-600 dark:text-violet-400', bg: 'bg-violet-50 dark:bg-violet-950/40' },
+          { label: 'Applied', value: stats.applied, icon: FileText, color: 'text-cyan-600 dark:text-cyan-400', bg: 'bg-cyan-50 dark:bg-cyan-950/40' },
+          { label: 'Interviews', value: stats.interviews, icon: MessageSquare, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-950/40' },
           { label: 'Offers', value: stats.offers, icon: Trophy, color: 'text-green-600 dark:text-green-400', bg: 'bg-green-50 dark:bg-green-950/40' },
         ].map(({ label, value, icon: Icon, color, bg }) => (
           <div

@@ -36,7 +36,7 @@ export function StepperHeader({ currentStep, maxAccessibleStep, onStepClick }: S
                   'flex min-w-0 flex-1 items-center gap-2 rounded-xl border px-2.5 py-2 text-left transition sm:px-3 sm:py-2.5',
                   isActive && 'border-[var(--color-primary)] bg-[var(--color-primary)]/8',
                   isComplete &&
-                    'border-emerald-300 bg-emerald-50 dark:border-emerald-500/65 dark:bg-emerald-500/24',
+                    'border-[var(--color-success)]/45 bg-[var(--color-success)]/15',
                   !isActive && !isComplete && 'border-[var(--color-border)]',
                   !isAccessible && 'cursor-not-allowed opacity-55'
                 )}
@@ -44,7 +44,7 @@ export function StepperHeader({ currentStep, maxAccessibleStep, onStepClick }: S
                 <span
                   className={cn(
                     'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold',
-                    isComplete && 'bg-emerald-600 text-white dark:bg-emerald-500',
+                    isComplete && 'bg-[var(--color-success)] text-white',
                     isActive && 'bg-[var(--color-primary)] text-white',
                     !isActive && !isComplete && 'bg-[var(--color-input-bg)] text-[var(--color-muted)]'
                   )}
@@ -55,7 +55,7 @@ export function StepperHeader({ currentStep, maxAccessibleStep, onStepClick }: S
                   className={cn(
                     'truncate text-xs font-medium sm:text-sm',
                     isActive && 'text-[var(--color-text-primary)]',
-                    isComplete && 'text-emerald-900 dark:text-emerald-100',
+                    isComplete && 'text-[var(--color-success)]',
                     !isActive && !isComplete && 'text-[var(--color-muted)]'
                   )}
                 >

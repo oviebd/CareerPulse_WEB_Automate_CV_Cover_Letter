@@ -34,7 +34,7 @@ import {
 } from '@/hooks/useCoverLetters';
 import { useSubscription } from '@/hooks/useSubscription';
 import { formatDate } from '@/lib/utils';
-import { relativeTime } from '@/components/cv/dashboard/cv-dashboard-utils';
+import { relativeTime } from '@/lib/cv-dashboard-utils';
 import type { CVProfile } from '@/types';
 
 // ─── Resumes tab ─────────────────────────────────────────────────────────────
@@ -228,7 +228,7 @@ function ResumesTab() {
 
         <Link href="/applications/new" className="block">
           <div className="flex items-start gap-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-left transition hover:border-[var(--color-primary-300)] hover:bg-[var(--color-surface-2)]">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-400">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400">
               <Target className="h-5 w-5" />
             </div>
             <div>
@@ -298,7 +298,7 @@ const SOURCE_LABEL: Record<string, string> = {
 };
 
 const SOURCE_COLOR: Record<string, string> = {
-  scratch: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300',
+  scratch: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300',
   existing_cover_letter: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
   job_description: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
 };
@@ -320,7 +320,7 @@ function CoverLettersTab() {
           href="/cover-letters/new?source=scratch"
           className="flex flex-col gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-left transition hover:border-[var(--color-primary-300)] hover:bg-[var(--color-surface-2)]"
         >
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-400">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-cyan-100 text-cyan-600 dark:bg-cyan-900/40 dark:text-cyan-400">
             <PenLine className="h-5 w-5" />
           </div>
           <div>

@@ -8,9 +8,12 @@ import type { CVData, CVSectionVisibility, CVSectionVisibilityKey } from '@/type
 import { isCvSectionVisible, toggleCvSectionVisibility } from '@/lib/cv-section-visibility';
 import {
   cvCompletionPercent,
+  cvCompletionCounts,
   cvFormTabHasFilledContent,
   cvSectionHasFilledContent,
 } from '@/lib/cv-sidebar-content';
+import { sectionHint } from '@/lib/cv-editor-flow';
+import { Tooltip } from '@/components/ui/tooltip';
 import {
   Award,
   BookOpen,
@@ -29,6 +32,7 @@ import {
   Lightbulb,
   MapPin,
   Palette,
+  Search,
   Tag,
   UserRound,
   Users,
@@ -65,61 +69,52 @@ const ITEMS: Array<{
   { id: 'custom', label: 'Custom sections', icon: Layers, visibilityKey: 'custom' },
 ];
 
-const NAV_GROUPS: { title: string; hint: string; ids: CVFormTab[]; defaultOpen?: boolean }[] = [
-  {
-    title: 'Basics',
-    hint: 'Photo, contact, and intro',
-    ids: ['photo', 'header', 'address', 'summary'],
-    defaultOpen: true,
-  },
-  {
-    title: 'Experience',
-    hint: 'Jobs and education',
-    ids: ['experience', 'education'],
-    defaultOpen: true,
-  },
-  {
-    title: 'Showcase',
-    hint: 'Skills and projects',
-    ids: ['skills', 'projects'],
-    defaultOpen: true,
-  },
-  {
-    title: 'Extras',
-    hint: 'Optional sections — toggle on when ready',
-    ids: [
-      'publications',
-      'research',
-      'languages',
-      'certifications',
-      'references',
-      'awards',
-      'volunteer',
-      'interests',
-      'custom',
-    ],
-    defaultOpen: false,
-  },
+const CORE_SECTION_IDS: CVFormTab[] = [
+  'photo',
+  'header',
+  'address',
+  'summary',
+  'experience',
+  'education',
+  'skills',
+  'projects',
+];
+
+const OPTIONAL_SECTION_IDS: CVFormTab[] = [
+  'publications',
+  'research',
+  'languages',
+  'certifications',
+  'references',
+  'awards',
+  'volunteer',
+  'interests',
+  'custom',
 ];
 
 const ITEM_BY_ID = new Map(ITEMS.map((i) => [i.id, i]));
 
 function CompletionDot({ complete }: { complete: boolean }) {
+  const label = complete ? 'Has content' : 'Still empty';
   if (!complete) {
     return (
-      <span
-        className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-border)]"
-        aria-hidden
-      />
+      <Tooltip content={label}>
+        <span
+          className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-border)]"
+          aria-label={label}
+        />
+      </Tooltip>
     );
   }
   return (
-    <span
-      className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[var(--color-accent-mint)]/15 text-[var(--color-accent-mint)]"
-      aria-label="Section has content"
-    >
-      <Check className="h-2.5 w-2.5" strokeWidth={3} />
-    </span>
+    <Tooltip content={label}>
+      <span
+        className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[var(--color-accent-mint)]/15 text-[var(--color-accent-mint)]"
+        aria-label={label}
+      >
+        <Check className="h-2.5 w-2.5" strokeWidth={3} />
+      </span>
+    </Tooltip>
   );
 }
 
@@ -164,53 +159,15 @@ function VisibilitySwitch({
   );
 }
 
-function CollapsibleNavGroup({
-  title,
-  hint,
-  defaultOpen,
-  children,
-}: {
-  title: string;
-  hint?: string;
-  defaultOpen?: boolean;
-  children: ReactNode;
-}) {
-  const [open, setOpen] = useState(defaultOpen !== false);
-
-  return (
-    <div className="space-y-1">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left transition duration-200 hover:bg-[var(--color-hover-surface)]"
-      >
-        <span>
-          <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-text-secondary)]">
-            {title}
-          </span>
-          {hint ? (
-            <span className="mt-0.5 block text-[10px] font-medium normal-case tracking-normal text-[var(--color-muted)]">
-              {hint}
-            </span>
-          ) : null}
-        </span>
-        {open ? (
-          <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[var(--color-muted)]" />
-        ) : (
-          <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[var(--color-muted)]" />
-        )}
-      </button>
-      {open ? <div className="space-y-0.5">{children}</div> : null}
-    </div>
-  );
-}
-
 interface SidebarProps {
   activeSection: CVFormTab;
   onSelect: (section: CVFormTab) => void;
   cvData?: CVData | null;
   sectionVisibility?: CVSectionVisibility;
   onSectionVisibilityChange?: (next: CVSectionVisibility) => void;
+  /** Mobile drawer mode — used when opened from bottom bar. */
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
 export function Sidebar({
@@ -219,13 +176,44 @@ export function Sidebar({
   cvData,
   sectionVisibility,
   onSectionVisibilityChange,
+  mobileOpen,
+  onMobileClose,
 }: SidebarProps) {
+  const [search, setSearch] = useState('');
+  const [showOptional, setShowOptional] = useState(false);
   const showToggles = Boolean(onSectionVisibilityChange);
 
   const completionPct = useMemo(
     () => (cvData ? cvCompletionPercent(cvData) : 0),
     [cvData]
   );
+  const completionCounts = useMemo(
+    () => (cvData ? cvCompletionCounts(cvData) : { filled: 0, total: 0 }),
+    [cvData]
+  );
+
+  const query = search.trim().toLowerCase();
+  const isSearching = query.length > 0;
+
+  const filteredIds = useMemo(() => {
+    if (!isSearching) return null;
+    return ITEMS.filter((item) => item.label.toLowerCase().includes(query)).map((i) => i.id);
+  }, [isSearching, query]);
+
+  const visibleCoreIds = useMemo(() => {
+    if (filteredIds) return filteredIds.filter((id) => CORE_SECTION_IDS.includes(id));
+    return CORE_SECTION_IDS;
+  }, [filteredIds]);
+
+  const visibleOptionalIds = useMemo(() => {
+    if (filteredIds) return filteredIds.filter((id) => OPTIONAL_SECTION_IDS.includes(id));
+    return showOptional || isSearching ? OPTIONAL_SECTION_IDS : [];
+  }, [filteredIds, showOptional, isSearching]);
+
+  const handleSelect = (section: CVFormTab) => {
+    onSelect(section);
+    onMobileClose?.();
+  };
 
   const renderRow = (item: (typeof ITEMS)[number]) => {
     const Icon = item.icon;
@@ -253,7 +241,8 @@ export function Sidebar({
       >
         <button
           type="button"
-          onClick={() => onSelect(item.id)}
+          onClick={() => handleSelect(item.id)}
+          title={sectionHint(item.id).hint}
           className={cn(
             'flex min-w-0 flex-1 items-center gap-2 rounded-lg border-l-2 px-2 py-1.5 text-left text-sm font-semibold transition duration-200',
             active
@@ -285,15 +274,29 @@ export function Sidebar({
     );
   };
 
-  return (
-    <aside className="glass-panel w-full rounded-2xl border border-[var(--color-border)]/80 p-3 shadow-[var(--shadow-card)] xl:sticky xl:top-[72px] xl:max-h-[calc(100vh-5.5rem)] xl:w-full xl:overflow-y-auto xl:overscroll-contain">
+  const sidebarContent = (
+    <>
+      <div className="mb-3 px-1">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--color-muted)]" />
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search sections…"
+            className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-control-bg)] py-2 pl-8 pr-3 text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-muted)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-[var(--color-focus-ring)]"
+            aria-label="Search CV sections"
+          />
+        </div>
+      </div>
+
       {cvData ? (
         <div className="mb-3 px-2">
           <div className="flex items-start justify-between gap-2">
             <span className="text-[10px] font-medium text-[var(--color-muted)]">
               <span className="block">CV progress</span>
               <span className="mt-0.5 block text-[9px] font-normal text-[var(--color-muted)]/90">
-                Core sections only
+                {completionCounts.filled} of {completionCounts.total} core sections filled
               </span>
             </span>
             <span className="shrink-0 tabular-nums text-[10px] font-medium text-[var(--color-accent-mint)]">
@@ -309,39 +312,132 @@ export function Sidebar({
         </div>
       ) : null}
 
-      <CollapsibleNavGroup title="Design & layout" hint="Template, colours, typography" defaultOpen>
+      <div className="space-y-1">
+        <p className="px-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-text-secondary)]">
+          Design & layout
+        </p>
         <button
           type="button"
-          onClick={() => onSelect('design')}
+          onClick={() => handleSelect('design')}
+          title={sectionHint('design').hint}
           className={cn(
-            'flex w-full items-center gap-2 rounded-xl border-l-2 px-3 py-2 text-left text-sm font-semibold transition duration-200',
+            'flex w-full items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm font-semibold transition duration-200',
             activeSection === 'design'
-              ? 'border-[var(--color-primary-500)] bg-[var(--color-primary-100)]/90 text-[var(--color-primary-500)] shadow-sm'
-              : 'border-transparent text-[var(--color-text-secondary)] hover:bg-[var(--color-hover-surface)] hover:text-[var(--color-text-primary)]'
+              ? 'border-[var(--color-primary-400)] bg-[var(--color-primary-100)]/90 text-[var(--color-primary-500)] shadow-sm'
+              : 'border-[var(--color-border)] bg-[var(--color-control-bg)] text-[var(--color-text-secondary)] hover:border-[var(--color-border-hover)] hover:bg-[var(--color-hover-surface)] hover:text-[var(--color-text-primary)]'
           )}
         >
           <Palette className="h-4 w-4 shrink-0" />
-          <span>Design settings</span>
+          <span>Layout & style</span>
         </button>
-      </CollapsibleNavGroup>
+      </div>
 
-      {NAV_GROUPS.map((group) => (
-        <div key={group.title}>
-          <div className="my-3 border-t border-[var(--color-border)]/70" />
-          <CollapsibleNavGroup title={group.title} hint={group.hint} defaultOpen={group.defaultOpen}>
-            {group.ids.map((id) => {
-              const item = ITEM_BY_ID.get(id);
-              return item ? renderRow(item) : null;
-            })}
-          </CollapsibleNavGroup>
+      <div className="my-3 border-t border-[var(--color-border)]/70" />
+
+      <div className="space-y-1">
+        <div className="flex items-center justify-between gap-2 px-2">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-text-secondary)]">
+            Core sections
+          </p>
+          {showToggles ? (
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-muted)]">
+              On PDF
+            </span>
+          ) : null}
         </div>
-      ))}
+        {visibleCoreIds.map((id) => {
+          const item = ITEM_BY_ID.get(id);
+          return item ? renderRow(item) : null;
+        })}
+      </div>
+
+      {!isSearching && visibleOptionalIds.length === 0 ? (
+        <button
+          type="button"
+          onClick={() => setShowOptional(true)}
+          className="mt-2 flex w-full items-center justify-between gap-2 rounded-lg px-2 py-2 text-left text-xs font-semibold text-[var(--color-primary-500)] transition hover:bg-[var(--color-hover-surface)]"
+        >
+          <span>Show more sections</span>
+          <ChevronDown className="h-3.5 w-3.5" />
+        </button>
+      ) : null}
+
+      {visibleOptionalIds.length > 0 ? (
+        <div className="mt-2 space-y-1">
+          <div className="flex items-center justify-between gap-2 px-2">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-text-secondary)]">
+              {isSearching ? 'More sections' : 'Optional sections'}
+            </p>
+            {showToggles ? (
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-muted)]">
+                On PDF
+              </span>
+            ) : null}
+          </div>
+          {visibleOptionalIds.map((id) => {
+            const item = ITEM_BY_ID.get(id);
+            return item ? renderRow(item) : null;
+          })}
+          {!isSearching && showOptional ? (
+            <button
+              type="button"
+              onClick={() => setShowOptional(false)}
+              className="flex w-full items-center gap-1 px-2 py-1.5 text-xs font-medium text-[var(--color-muted)] hover:text-[var(--color-text-secondary)]"
+            >
+              <ChevronRight className="h-3 w-3 rotate-90" />
+              Show fewer
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {isSearching && visibleCoreIds.length === 0 && visibleOptionalIds.length === 0 ? (
+        <p className="px-2 py-4 text-center text-xs text-[var(--color-muted)]">No sections match</p>
+      ) : null}
 
       {showToggles ? (
         <p className="mt-4 px-2 text-[10px] leading-snug text-[var(--color-muted)]">
-          Toggle off to hide from PDF and preview. Your data stays in the editor.
+          Toggle off to hide from PDF and preview. Your answers stay here.
         </p>
       ) : null}
+    </>
+  );
+
+  if (mobileOpen !== undefined) {
+    return (
+      <>
+        {mobileOpen ? (
+          <div
+            className="fixed inset-0 z-40 bg-black/40 md:hidden"
+            onClick={onMobileClose}
+            aria-hidden
+          />
+        ) : null}
+        <aside
+          className={cn(
+            'fixed inset-y-0 left-0 z-50 flex w-[min(100vw-2rem,280px)] flex-col overflow-y-auto border-r border-[var(--color-border)] bg-[var(--color-surface)] p-3 shadow-xl transition-transform duration-300 md:hidden',
+            mobileOpen ? 'translate-x-0' : '-translate-x-full'
+          )}
+        >
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-sm font-semibold text-[var(--color-text-primary)]">Sections</p>
+            <button
+              type="button"
+              onClick={onMobileClose}
+              className="rounded-lg px-2 py-1 text-xs font-medium text-[var(--color-muted)] hover:bg-[var(--color-hover-surface)]"
+            >
+              Close
+            </button>
+          </div>
+          {sidebarContent}
+        </aside>
+      </>
+    );
+  }
+
+  return (
+    <aside className="glass-panel w-full rounded-2xl border border-[var(--color-border)]/80 p-3 shadow-[var(--shadow-card)] md:sticky md:top-[72px] md:max-h-[calc(100vh-5.5rem)] md:w-full md:overflow-y-auto md:overscroll-contain">
+      {sidebarContent}
     </aside>
   );
 }

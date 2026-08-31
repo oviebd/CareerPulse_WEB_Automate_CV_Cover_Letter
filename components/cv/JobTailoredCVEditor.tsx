@@ -2,8 +2,9 @@
 
 /**
  * Layout history: legacy job editor stacked a tall header, separate core-CV sync panel, expandable keyword/JD tray,
- * and an always-visible ATS stack beside a fixed-width preview — shrinking the form. Refactor keeps every control
- * but moves ATS into a drawer, keywords into a contextual popover, and uses a 3-column shell + focus modes.
+ * and an always-visible ATS stack beside a fixed-width preview — shrinking the form. Refactor keeps ATS in a drawer,
+ * keywords in a contextual popover, and a 3-column shell + focus modes. Master-CV copy controls were removed from
+ * the toolbar so this page stays job-CV-only.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -11,20 +12,21 @@ import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Select } from '@/components/ui/select';
 import { CVEditorPanel } from '@/components/cv/CVEditorPanel';
-import { Sidebar } from '@/components/cv/premium/Sidebar';
-import { PreviewPanel } from '@/components/cv/premium/PreviewPanel';
 import { CVEditorTopBar } from '@/components/cv/premium/CVEditorTopBar';
 import type { CVEditorFocusMode } from '@/components/cv/premium/CVEditorTopBar';
+import { CVEditorShell } from '@/components/cv/premium/CVEditorShell';
+import { CVEditorMobileBar } from '@/components/cv/premium/CVEditorMobileBar';
 import { ATSDrawer } from '@/components/cv/premium/ATSDrawer';
 import { KeywordPopover } from '@/components/cv/premium/KeywordPopover';
+import { useCVEditorPreviewState } from '@/hooks/useCVEditorPreviewState';
+import { DEFAULT_CV_ACCENT } from '@/lib/cv-accent';
 import type { CVFormTab } from '@/components/cv/CVFormFields';
 import type { CVSectionVisibility } from '@/types';
 import { useJobSpecificCV, useArchiveJobSpecificCV } from '@/hooks/useJobSpecificCVs';
 import { useCoreCVVersions } from '@/hooks/useCV';
 import { useSubscription } from '@/hooks/useSubscription';
-import { formatDate, cn } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import type { CVData } from '@/types';
 import type { CVTemplate, SubscriptionTier } from '@/types';
 import { canUseTemplate, canAccessFeature } from '@/lib/subscription';
@@ -32,8 +34,6 @@ import { buildATSReport } from '@/lib/cv-ats';
 import { cloneCvData } from '@/lib/cv-clone';
 import { useToast } from '@/components/ui/toast';
 import { CV_EDITOR_CANVAS } from '@/lib/cv-editor-styles';
-import { readPreviewCollapsedDefault, persistPreviewExpanded } from '@/lib/cv-preview-prefs';
-import { CVEditorMobileBar } from '@/components/cv/premium/CVEditorMobileBar';
 import { ExportMenu } from '@/components/shared/ExportMenu';
 import { downloadCvExport, type ExportFormat } from '@/lib/export-client';
 import {
@@ -62,6 +62,8 @@ import {
   Building2,
   AlertTriangle,
   ChevronDown,
+  Briefcase,
+  Trash2,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -122,27 +124,11 @@ function patchFromCvDataWithJobMeta(
   };
 }
 
-/** Payload for PATCH /api/cv (core profile), matching core editor save. */
-
 function cvProfileToCvData(profile: CVProfile): CVData {
   return profileToUniversalCV(profile);
 }
 
 const TRACK_STATUS_OPTIONS = TRACKABLE_JOB_STATUSES;
-
-function coreCvPatchFromDraft(
-  data: CVData,
-  preferredTemplateId: string,
-  fontFamily: string,
-  accent: string
-) {
-  return {
-    ...universalToProfilePayload(
-      withDesign(data, preferredTemplateId, accent, fontFamily)
-    ),
-    original_cv_file_url: null,
-  };
-}
 
 export function JobTailoredCVEditor() {
   const params = useParams<{ id: string }>();
@@ -154,13 +140,11 @@ export function JobTailoredCVEditor() {
     isDraftMode ? undefined : id
   );
   const archive = useArchiveJobSpecificCV();
-  const { data: coreVersions = [], isLoading: coreVersionsLoading } = useCoreCVVersions();
+  const { data: coreVersions = [] } = useCoreCVVersions();
   const [keywordsPopoverOpen, setKeywordsPopoverOpen] = useState(false);
   const [atsDrawerOpen, setAtsDrawerOpen] = useState(false);
   const [focusMode, setFocusMode] = useState<CVEditorFocusMode>('default');
-  const [previewCollapsed, setPreviewCollapsed] = useState(() =>
-    typeof window !== 'undefined' ? readPreviewCollapsedDefault() : true
-  );
+  const previewControl = useCVEditorPreviewState();
 
   const { tier } = useSubscription();
   const { toast } = useToast();
@@ -170,19 +154,16 @@ export function JobTailoredCVEditor() {
   draftRef.current = draft;
 
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('classic');
-  const [accent, setAccent] = useState<string>('#6C63FF');
+  const [accent, setAccent] = useState<string>(DEFAULT_CV_ACCENT);
   const [previewSrc, setPreviewSrc] = useState<string>('');
   const [previewBusy, setPreviewBusy] = useState(false);
   const previewUrlRef = useRef<string | null>(null);
-  const [exporting, setExporting] = useState(false);
   const [exportingFormat, setExportingFormat] = useState<ExportFormat | null>(null);
   const [editorTab, setEditorTab] = useState<CVFormTab>('photo');
   const [zoom, setZoom] = useState(100);
   const [page, setPage] = useState(1);
   const [fontFamily, setFontFamily] = useState('Inter');
-  const [autosaveState, setAutosaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
-  const [targetCoreCvId, setTargetCoreCvId] = useState<string | null>(null);
-  const [savingCore, setSavingCore] = useState(false);
+  const [autosaveError, setAutosaveError] = useState(false);
 
   const [draftMeta, setDraftMeta] = useState<CvOptimiseEditDraft | null>(null);
   const [sessionSavedJobId, setSessionSavedJobId] = useState<string | null>(null);
@@ -303,7 +284,7 @@ export function JobTailoredCVEditor() {
     }
     setDraft(optimisedCvJsonToCvData(parsed.object));
     setSelectedTemplateId('classic');
-    setAccent('#6C63FF');
+    setAccent(DEFAULT_CV_ACCENT);
     setFontFamily('Inter');
     setUndoPast([]);
     setUndoFuture([]);
@@ -316,12 +297,12 @@ export function JobTailoredCVEditor() {
       withDesign(
         profileToUniversalCV(jobCV as CVProfile),
         jobCV.preferred_template_id ?? 'classic',
-        jobCV.accent_color ?? '#6C63FF',
+        jobCV.accent_color ?? DEFAULT_CV_ACCENT,
         jobCV.font_family ?? 'Inter'
       )
     );
     setSelectedTemplateId(jobCV.preferred_template_id ?? 'classic');
-    setAccent(jobCV.accent_color ?? '#6C63FF');
+    setAccent(jobCV.accent_color ?? DEFAULT_CV_ACCENT);
     setFontFamily(jobCV.font_family ?? 'Inter');
     setUndoPast([]);
     setUndoFuture([]);
@@ -448,20 +429,12 @@ export function JobTailoredCVEditor() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!draft) return;
-    setAutosaveState('saving');
-    const t = window.setTimeout(() => setAutosaveState('saved'), 500);
-    return () => window.clearTimeout(t);
-  }, [draft]);
-
   const exportPdf = useCallback(async (format: ExportFormat = 'pdf') => {
     if (!draft || !selectedTemplateId) return;
     if (!allowed) {
       toast('Upgrade to export with this template.', 'error');
       return;
     }
-    setExporting(true);
     setExportingFormat(format);
     try {
       const result = await downloadCvExport(
@@ -487,14 +460,9 @@ export function JobTailoredCVEditor() {
         toast('Export failed.', 'error');
       }
     } finally {
-      setExporting(false);
       setExportingFormat(null);
     }
   }, [accent, allowed, draft, id, selectedTemplateId, toast, fontFamily, isDraftMode]);
-
-  const runExportPdf = useCallback(async () => {
-    await exportPdf('pdf');
-  }, [exportPdf]);
 
   useEffect(() => {
     if (templatesLoading || !templates.length) return;
@@ -503,17 +471,10 @@ export function JobTailoredCVEditor() {
     setSelectedTemplateId(templates[0].id);
   }, [templatesLoading, templates, selectedTemplateId]);
 
-  useEffect(() => {
-    if (!coreVersions.length) {
-      setTargetCoreCvId(null);
-      return;
-    }
-    setTargetCoreCvId((prev) =>
-      prev && coreVersions.some((v) => v.id === prev) ? prev : coreVersions[0].id
-    );
-  }, [coreVersions]);
-
-  const saveJobCv = useCallback(async (displayName?: string): Promise<boolean> => {
+  const saveJobCv = useCallback(async (
+    displayName?: string,
+    options?: { silent?: boolean }
+  ): Promise<boolean> => {
     if (!draft) return false;
     if (isDraftMode && !draftMeta) return false;
 
@@ -627,7 +588,7 @@ export function JobTailoredCVEditor() {
             setPageSaveState('idle');
             return false;
           }
-          toast('Changes saved', 'success');
+          if (!options?.silent) toast('Changes saved', 'success');
           void queryClient.invalidateQueries({ queryKey: ['job-detail'] });
         }
       } else if (!isDraftMode) {
@@ -641,11 +602,11 @@ export function JobTailoredCVEditor() {
           }),
         });
         if (!patchRes.ok) {
-          toast('Could not save changes.', 'error');
+          if (!options?.silent) toast('Could not save changes.', 'error');
           setPageSaveState('idle');
           return false;
         }
-        toast('Changes saved', 'success');
+        if (!options?.silent) toast('Changes saved', 'success');
         void queryClient.invalidateQueries({ queryKey: ['job-specific-cv', id] });
       }
 
@@ -703,10 +664,31 @@ export function JobTailoredCVEditor() {
     [saveJobCv]
   );
 
+  const saveJobCvRef = useRef(saveJobCv);
+  saveJobCvRef.current = saveJobCv;
+
+  useEffect(() => {
+    if (isDraftMode || !draft || !id) return;
+    setPageSaveState('saving');
+    setAutosaveError(false);
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        const ok = await saveJobCvRef.current(undefined, { silent: true });
+        if (!ok) {
+          setAutosaveError(true);
+          setPageSaveState('idle');
+        } else {
+          setPageSaveState('saved');
+          window.setTimeout(() => setPageSaveState('idle'), 1800);
+        }
+      })();
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [draft, coverLetterText, id, isDraftMode]);
+
   const openDiffViewer = useCallback(async () => {
     if (!draft) return;
-    const oid =
-      draftMeta?.originalCvId ?? targetCoreCvId ?? coreVersions[0]?.id ?? null;
+    const oid = draftMeta?.originalCvId ?? coreVersions[0]?.id ?? null;
     if (!oid) {
       setDiffError('Could not load original CV for comparison. Please try again.');
       setDiffSections([]);
@@ -735,7 +717,7 @@ export function JobTailoredCVEditor() {
     } finally {
       setDiffLoading(false);
     }
-  }, [draft, draftMeta?.originalCvId, targetCoreCvId, coreVersions]);
+  }, [draft, draftMeta?.originalCvId, coreVersions]);
 
   const handleTrackPopupSave = useCallback(async () => {
     if (!pendingTrackStatus) return;
@@ -837,33 +819,6 @@ export function JobTailoredCVEditor() {
     queryClient,
   ]);
 
-  const updateCoreCvFromJob = useCallback(async () => {
-    if (!draft || !targetCoreCvId) {
-      toast('Select a core CV.', 'error');
-      return;
-    }
-    setSavingCore(true);
-    try {
-      const res = await fetch('/api/cv', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          core_cv_id: targetCoreCvId,
-          ...coreCvPatchFromDraft(draft, selectedTemplateId, fontFamily, accent),
-        }),
-      });
-      if (!res.ok) {
-        toast('Could not update core CV.', 'error');
-        return;
-      }
-      toast('Core CV updated. This job CV was not changed.', 'success');
-      void queryClient.invalidateQueries({ queryKey: ['cv-versions'] });
-      void queryClient.invalidateQueries({ queryKey: ['cv-profile'] });
-    } finally {
-      setSavingCore(false);
-    }
-  }, [draft, targetCoreCvId, selectedTemplateId, toast, queryClient, fontFamily, accent]);
-
   const deleteJobCv = useCallback(async () => {
     if (!id || isDraftMode) return;
     if (!window.confirm('Delete this job-specific CV?')) return;
@@ -890,6 +845,13 @@ export function JobTailoredCVEditor() {
   const ats = draft
     ? buildATSReport(draft, keywords)
     : { score: 0, summary: '', suggestions: [], sections: {} };
+
+  const openTrackPopup = useCallback(() => {
+    setPendingTrackStatus(
+      trackStatus && trackStatus !== 'none' ? trackStatus : 'apply_later'
+    );
+    setTrackPopupOpen(true);
+  }, [trackStatus]);
 
   const pageLoading =
     (isDraftMode && (!draft || !draftMeta)) ||
@@ -936,8 +898,10 @@ export function JobTailoredCVEditor() {
     pageSaveState === 'saving'
       ? 'Saving…'
       : pageSaveState === 'saved'
-        ? 'Saved ✓'
-        : '';
+        ? 'Saved to account'
+        : autosaveError
+          ? "Couldn't save"
+          : '';
 
   const editingCvBody = !(genType === 'both' && documentTab === 'coverLetter');
 
@@ -950,50 +914,21 @@ export function JobTailoredCVEditor() {
         onConfirm={confirmSaveWithTitle}
         isSubmitting={pageSaveState === 'saving'}
         submitLabel={
-          pageSaveState === 'saving' ? 'Saving…' : isUnsavedDraft ? 'Save CV' : 'Update CV'
+          pageSaveState === 'saving' ? 'Saving…' : isUnsavedDraft ? 'Save CV' : 'Save'
         }
       />
       <CVEditorTopBar
         backHref={isDraftMode ? '/cv/optimise' : '/cv/job-specific'}
+        backLabel={isDraftMode ? 'Back to tailor' : 'Back to job CVs'}
         title="Job-tailored CV"
         subtitle={`${displayCompany} · ${displayJobTitle}`}
+        caption="Tailored for this job — not your master CV"
         badge={
           isUnsavedDraft ? (
             <span className="rounded-full border border-amber-400/80 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900">
               Unsaved draft
             </span>
           ) : null
-        }
-        centerSlot={
-          <div className="flex w-full max-w-lg flex-col items-stretch gap-2 sm:flex-row sm:items-end sm:justify-center">
-            <div className="min-w-0 flex-1">
-              <Select
-                value={targetCoreCvId ?? ''}
-                disabled={coreVersionsLoading || coreVersions.length === 0}
-                options={
-                  coreVersions.length
-                    ? coreVersions.map((v) => ({
-                        value: v.id,
-                        label: `${v.full_name ?? 'Core CV'} · ${formatDate(v.created_at)}`,
-                      }))
-                    : [{ value: '', label: coreVersionsLoading ? 'Loading…' : 'No core CV yet' }]
-                }
-                onChange={(e) => setTargetCoreCvId(e.target.value || null)}
-                className="py-2 text-xs"
-              />
-            </div>
-            <Button
-              variant="secondary"
-              size="sm"
-              className="h-9 shrink-0"
-              loading={savingCore}
-              disabled={!draft || !targetCoreCvId || !coreVersions.length}
-              onClick={() => void updateCoreCvFromJob()}
-              title="Apply this editor content to the selected core CV. Does not modify this job CV."
-            >
-              Update core CV
-            </Button>
-          </div>
         }
         atsScore={editingCvBody ? ats.score : null}
         onOpenAts={() => setAtsDrawerOpen(true)}
@@ -1013,11 +948,9 @@ export function JobTailoredCVEditor() {
           onUndo: undo,
           onRedo: redo,
         }}
-        secondaryAction={{
-          label: 'Export PDF',
-          loading: exporting,
-          disabled: !allowed,
-          onClick: () => void runExportPdf(),
+        previewToggle={{
+          visible: previewControl.isPreviewActive,
+          onToggle: previewControl.togglePreview,
         }}
         primaryAction={{
           label:
@@ -1030,57 +963,65 @@ export function JobTailoredCVEditor() {
           disabled: pageSaveState === 'saving',
           onClick: () => openSaveTitleModal(),
         }}
-        statusLine={saveLabel}
+        statusLine={saveLabel || undefined}
+        onRetrySave={autosaveError ? () => void saveJobCv(undefined, { silent: true }) : undefined}
         focusMode={editingCvBody ? focusMode : 'default'}
         onFocusModeChange={setFocusMode}
         trailingControls={
+          <ExportMenu
+            label="Export"
+            busyFormat={exportingFormat}
+            disabled={!allowed || !draft || !selectedTemplateId}
+            canDocx={canAccessFeature(tier, 'docxExport')}
+            onExport={(format) => {
+              void exportPdf(format);
+            }}
+          />
+        }
+        moreMenuItems={(close) => (
           <>
-            <ExportMenu
-              busyFormat={exportingFormat}
-              disabled={!allowed || !draft || !selectedTemplateId}
-              canDocx={canAccessFeature(tier, 'docxExport')}
-              onExport={(format) => {
-                void exportPdf(format);
-              }}
-            />
             <button
               type="button"
+              role="menuitem"
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--color-text-primary)] transition hover:bg-[var(--color-hover-surface)]"
               onClick={() => {
-                setPendingTrackStatus(
-                  trackStatus && trackStatus !== 'none' ? trackStatus : 'apply_later'
-                );
-                setTrackPopupOpen(true);
+                openTrackPopup();
+                close();
               }}
-              className={cn(
-                'inline-flex h-9 shrink-0 items-center rounded-full border-2 px-3 text-xs font-semibold transition',
-                trackRingClass
-              )}
             >
+              <Briefcase className="h-4 w-4 shrink-0" />
               {trackButtonLabel}
             </button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="hidden h-9 md:inline-flex"
+            <button
+              type="button"
+              role="menuitem"
               disabled={diffLoading}
-              onClick={() => void openDiffViewer()}
-              icon={<GitCompareArrows className="h-4 w-4" />}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--color-text-primary)] transition hover:bg-[var(--color-hover-surface)] disabled:cursor-not-allowed disabled:opacity-40"
+              onClick={() => {
+                void openDiffViewer();
+                close();
+              }}
             >
-              Diff
-            </Button>
+              <GitCompareArrows className="h-4 w-4 shrink-0" />
+              Compare with master
+            </button>
             {!isDraftMode ? (
-              <Button
-                variant="secondary"
-                size="sm"
-                className="hidden h-9 border-[var(--color-accent-coral)]/40 text-[var(--color-accent-coral)] lg:inline-flex"
-                loading={archive.isPending}
-                onClick={() => void deleteJobCv()}
+              <button
+                type="button"
+                role="menuitem"
+                disabled={archive.isPending}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--color-accent-coral)] transition hover:bg-[var(--color-hover-surface)] disabled:cursor-not-allowed disabled:opacity-40"
+                onClick={() => {
+                  void deleteJobCv();
+                  close();
+                }}
               >
+                <Trash2 className="h-4 w-4 shrink-0" />
                 Delete
-              </Button>
+              </button>
             ) : null}
           </>
-        }
+        )}
         bottomRow={
           genType === 'both' ? (
             <Tabs
@@ -1196,114 +1137,88 @@ export function JobTailoredCVEditor() {
             <p className="text-sm text-[var(--color-muted)]">
               Export cover letter to PDF from the cover letter page after you save.
             </p>
+            <CVEditorMobileBar
+              primaryLabel={pageSaveState === 'saving' ? 'Saving…' : 'Save'}
+              primaryLoading={pageSaveState === 'saving'}
+              onPrimaryClick={() => openSaveTitleModal()}
+            />
           </div>
         ) : (
-          <div
-            className={cn(
-              'mt-2 grid gap-4',
-              focusMode === 'default' &&
-                'xl:grid-cols-[minmax(220px,0.24fr)_minmax(0,1fr)_minmax(390px,0.45fr)]',
-              (focusMode === 'editor' || focusMode === 'preview') && 'xl:grid-cols-1'
-            )}
-          >
-            {focusMode !== 'preview' ? (
-              focusMode === 'default' ? (
-                <Sidebar
-                  activeSection={editorTab}
-                  onSelect={setEditorTab}
-                  cvData={draft}
-                  sectionVisibility={draft.sectionVisibility}
-                  onSectionVisibilityChange={(next: CVSectionVisibility) =>
-                    handleChange({ ...draft, sectionVisibility: next })
-                  }
+          <CVEditorShell
+            focusMode={focusMode}
+            editorTab={editorTab}
+            onEditorTabChange={setEditorTab}
+            cvData={draft}
+            previewControl={previewControl}
+            onSectionVisibilityChange={(next: CVSectionVisibility) =>
+              handleChange({ ...draft, sectionVisibility: next })
+            }
+            editorCanvas={
+              <div className={CV_EDITOR_CANVAS}>
+                <CVEditorPanel
+                  value={draft}
+                  onChange={handleChange}
+                  activeTab={editorTab}
+                  onActiveTabChange={setEditorTab}
+                  highlightedKeywords={keywords}
+                  aiJobContext={aiJobContext}
+                  hideAtsBanner
+                  hideFormTabBar
+                  hideVisibilityPanel
+                  hideKeywordsBanner
+                  templates={templates}
+                  selectedTemplateId={selectedTemplateId}
+                  onTemplateChange={(nextId: string) => {
+                    setSelectedTemplateId(nextId);
+                  }}
+                  accent={accent}
+                  onAccentChange={(c: string) => {
+                    setAccent(c);
+                  }}
+                  fontFamily={fontFamily}
+                  onFontFamilyChange={(next) => {
+                    setFontFamily(next);
+                  }}
+                  userTier={tier}
                 />
-              ) : null
-            ) : null}
-
-            {focusMode !== 'preview' ? (
-              <div className="min-w-0 space-y-3">
-                <div className={CV_EDITOR_CANVAS}>
-                  <CVEditorPanel
-                    value={draft}
-                    onChange={handleChange}
-                    activeTab={editorTab}
-                    onActiveTabChange={setEditorTab}
-                    highlightedKeywords={keywords}
-                    aiJobContext={aiJobContext}
-                    hideAtsBanner
-                    hideFormTabBar
-                    hideVisibilityPanel
-                    hideKeywordsBanner
-                    templates={templates}
-                    selectedTemplateId={selectedTemplateId}
-                    onTemplateChange={(nextId: string) => {
-                      setSelectedTemplateId(nextId);
-                    }}
-                    accent={accent}
-                    onAccentChange={(c: string) => {
-                      setAccent(c);
-                    }}
-                    fontFamily={fontFamily}
-                    onFontFamilyChange={(next) => {
-                      setFontFamily(next);
-                    }}
-                    userTier={tier}
-                  />
-                </div>
               </div>
-            ) : null}
-
-            {focusMode !== 'editor' ? (
-              <div className="min-w-0 space-y-3">
-                <PreviewPanel
-                  previewSrc={previewSrc}
-                  previewBusy={previewBusy}
-                  zoom={zoom}
-                  onZoomChange={setZoom}
-                  currentPage={page}
-                  onPageChange={setPage}
-                  collapsed={previewCollapsed}
-                  onToggleCollapse={() =>
-                    setPreviewCollapsed((c) => {
-                      const next = !c;
-                      persistPreviewExpanded(!next);
-                      return next;
-                    })
-                  }
-                />
-                {!templatesLoading && !allowed && templateMeta ? (
+            }
+            preview={{
+              previewSrc,
+              previewBusy,
+              zoom,
+              onZoomChange: setZoom,
+              currentPage: page,
+              onPageChange: setPage,
+              footerSlot:
+                !templatesLoading && !allowed && templateMeta ? (
                   <p className="rounded-xl border border-[var(--color-accent-gold)]/35 bg-[var(--color-accent-gold)]/10 px-3 py-2 text-sm text-[var(--color-accent-gold)]">
-                    You can preview this layout with your data here. Upgrade to export with this template.
+                    You can preview this layout with your data here. Upgrade to export with this
+                    template.
                   </p>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
+                ) : undefined,
+            }}
+            mobileBar={{
+              primaryLabel: pageSaveState === 'saving' ? 'Saving…' : 'Save',
+              primaryLoading: pageSaveState === 'saving',
+              onPrimaryClick: () => openSaveTitleModal(),
+              leftSlot: (
+                <button
+                  type="button"
+                  onClick={openTrackPopup}
+                  className={cn(
+                    'rounded-full border-2 px-3 py-2 text-xs font-semibold',
+                    trackRingClass
+                  )}
+                >
+                  {trackButtonLabel}
+                </button>
+              ),
+            }}
+            className="mt-2"
+          />
         )}
       </div>
-
-      <CVEditorMobileBar
-        leftSlot={
-          <button
-            type="button"
-            onClick={() => {
-              setPendingTrackStatus(
-                trackStatus && trackStatus !== 'none' ? trackStatus : 'apply_later'
-              );
-              setTrackPopupOpen(true);
-            }}
-            className={cn(
-              'rounded-full border-2 px-3 py-2 text-xs font-semibold',
-              trackRingClass
-            )}
-          >
-            {trackButtonLabel}
-          </button>
-        }
-        primaryLabel={pageSaveState === 'saving' ? 'Saving…' : 'Save'}
-        primaryLoading={pageSaveState === 'saving'}
-        onPrimaryClick={() => openSaveTitleModal()}
-      />
 
       <Modal
         isOpen={trackPopupOpen}

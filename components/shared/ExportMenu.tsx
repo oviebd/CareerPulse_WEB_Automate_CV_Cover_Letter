@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { FileDown, FileText, Loader2 } from 'lucide-react';
+import { ChevronDown, FileDown, FileText, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ExportFormat } from '@/lib/export-client';
 
@@ -14,6 +14,8 @@ export interface ExportMenuProps {
   onExport: (format: ExportFormat) => void;
   label?: string;
   size?: 'sm' | 'md';
+  /** Stretch trigger to container width (e.g. preview footer). */
+  fullWidth?: boolean;
 }
 
 /**
@@ -27,6 +29,7 @@ export function ExportMenu({
   onExport,
   label = 'Export',
   size = 'sm',
+  fullWidth = false,
 }: ExportMenuProps) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -50,23 +53,25 @@ export function ExportMenu({
 
   const items: { format: ExportFormat; label: string; icon: typeof FileDown }[] = [
     { format: 'pdf', label: 'PDF', icon: FileDown },
-    { format: 'docx', label: 'DOCX (Word / Google Docs)', icon: FileText },
+    { format: 'docx', label: 'Google Docs (Word)', icon: FileText },
   ];
 
   return (
-    <div ref={menuRef} className="relative inline-flex">
+    <div ref={menuRef} className={cn('relative inline-flex', fullWidth && 'w-full')}>
       <button
         type="button"
         disabled={disabled || busy}
         aria-expanded={open}
         aria-haspopup="menu"
-        aria-label={`${label} options`}
+        aria-label={`${label} — PDF or Google Docs`}
+        title={`${label} — PDF or Google Docs`}
         onClick={() => setOpen((v) => !v)}
         className={cn(
           'inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-control-bg)] font-semibold text-[var(--color-text-primary)] transition',
           'hover:bg-[var(--color-control-bg-hover)] hover:border-[var(--color-border-hover)]',
           'disabled:cursor-not-allowed disabled:opacity-50',
-          size === 'sm' ? 'h-9 px-3 text-sm' : 'h-10 px-4 text-sm'
+          size === 'sm' ? 'h-9 px-3 text-sm' : 'h-10 px-4 text-sm',
+          fullWidth && 'w-full'
         )}
       >
         {busy ? (
@@ -74,11 +79,8 @@ export function ExportMenu({
         ) : (
           <FileDown className="h-4 w-4" />
         )}
-        {busy
-          ? busyFormat === 'docx'
-            ? 'Exporting DOCX…'
-            : 'Exporting PDF…'
-          : label}
+        {busy ? 'Exporting…' : label}
+        {!busy ? <ChevronDown className="h-3.5 w-3.5 opacity-70" aria-hidden /> : null}
       </button>
       {open ? (
         <div
