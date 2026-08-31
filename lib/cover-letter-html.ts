@@ -1,5 +1,6 @@
 import { injectTemplateData } from '@/lib/pdf';
 import { resolveEffectiveTier } from '@/lib/dev-subscription';
+import type { CoverLetterDocxVars } from '@/lib/cover-letter-docx/types';
 
 export function buildCoverLetterVariables(
   cv: {
@@ -20,7 +21,7 @@ export function buildCoverLetterVariables(
     applicant_location?: string | null;
   },
   accent: string
-): Record<string, string> {
+): CoverLetterDocxVars {
   const today = new Date().toLocaleDateString(undefined, {
     year: 'numeric',
     month: 'long',

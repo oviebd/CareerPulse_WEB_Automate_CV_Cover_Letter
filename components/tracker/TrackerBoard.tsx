@@ -25,6 +25,12 @@ import { Modal } from '@/components/ui/modal';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { useJobApplications, useUpsertJobApplication } from '@/hooks/useTracker';
+import { ExportMenu } from '@/components/shared/ExportMenu';
+import {
+  downloadCvExport,
+  exportCoverLetter,
+  type ExportFormat,
+} from '@/lib/export-client';
 import { cn } from '@/lib/utils';
 
 type FilterKey = 'all' | JobStatus;
@@ -631,44 +637,21 @@ function TrackerPreviewModal({
       ? `/cv/job-specific/${preview.id}/edit`
       : `/cover-letters/${preview.id}`;
 
-  const download = async () => {
+  const download = async (format: ExportFormat = 'pdf') => {
     setDownloading(true);
     try {
-      if (preview.type === 'cv') {
-        const res = await fetch('/api/export', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: 'cv',
-            job_cv_id: preview.id,
-            format: 'pdf',
-          }),
-        });
-        if (!res.ok) throw new Error('export');
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'cv.pdf';
-        a.click();
-        URL.revokeObjectURL(url);
-      } else {
-        const res = await fetch('/api/export', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: 'cover_letter',
-            id: preview.id,
-            template_id: 'cl-classic',
-            format: 'pdf',
-          }),
-        });
-        const json = (await res.json()) as { pdfUrl?: string; error?: string };
-        if (!res.ok || !json.pdfUrl) throw new Error('export');
-        window.open(json.pdfUrl, '_blank', 'noopener,noreferrer');
+      const result =
+        preview.type === 'cv'
+          ? await downloadCvExport({ job_cv_id: preview.id }, format)
+          : await exportCoverLetter(
+              { id: preview.id, template_id: 'cl-classic' },
+              format
+            );
+      if (result === 'upgrade_required') {
+        toast('DOCX export is a Pro feature. Upgrade to unlock.', 'error');
+      } else if (result === 'error') {
+        toast('Download failed', 'error');
       }
-    } catch {
-      toast('Download failed', 'error');
     } finally {
       setDownloading(false);
     }
@@ -687,14 +670,12 @@ function TrackerPreviewModal({
             Edit
           </Button>
         </Link>
-        <Button
-          size="sm"
-          variant="primary"
-          loading={downloading}
-          onClick={() => void download()}
-        >
-          Download
-        </Button>
+        <ExportMenu
+          busyFormat={downloading ? 'pdf' : null}
+          canDocx
+          label="Download"
+          onExport={(format) => void download(format)}
+        />
         <button
           type="button"
           className="rounded-md p-2 text-[var(--color-muted)] transition hover:bg-[var(--color-hover-surface)] hover:text-[var(--color-text-primary)]"

@@ -26,6 +26,12 @@ import { useOptimiseDraftStore } from '@/stores/useOptimiseDraftStore';
 import { useOptimiseEditDraftStore } from '@/stores/useOptimiseEditDraftStore';
 import { CoverLetterPrintPreviewFrame } from '@/components/cover-letter/CoverLetterPrintPreviewFrame';
 import { DocumentPrintPreviewFrame } from '@/components/shared/DocumentPrintPreviewFrame';
+import { ExportMenu } from '@/components/shared/ExportMenu';
+import {
+  downloadCvExport,
+  exportCoverLetter,
+  type ExportFormat,
+} from '@/lib/export-client';
 import {
   optimisedCvJsonToCvData,
   parseOptimisedCvText,
@@ -471,78 +477,57 @@ export default function OptimiseResultPage() {
     },
   });
 
-  const handleDownloadCv = useCallback(async () => {
-    const d = useOptimiseDraftStore.getState().draft;
-    if (!d?.savedCvId) {
-      toast('Save first to download.', 'error');
-      return;
-    }
-    setDownloadBusy(true);
-    try {
-      const res = await fetch('/api/export', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'cv',
-          job_cv_id: d.savedCvId,
-          format: 'pdf',
-        }),
-      });
-      if (!res.ok) {
-        const text = await res.text();
-        console.error('export cv', text);
-        toast('Could not download PDF.', 'error');
+  const handleDownloadCv = useCallback(
+    async (format: ExportFormat = 'pdf') => {
+      const d = useOptimiseDraftStore.getState().draft;
+      if (!d?.savedCvId) {
+        toast('Save first to download.', 'error');
         return;
       }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank');
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    } catch (e) {
-      console.error(e);
-      toast('Could not download PDF.', 'error');
-    } finally {
-      setDownloadBusy(false);
-    }
-  }, [toast]);
+      setDownloadBusy(true);
+      try {
+        const result = await downloadCvExport({ job_cv_id: d.savedCvId }, format);
+        if (result === 'upgrade_required') {
+          toast('DOCX export is a Pro feature. Upgrade to unlock.', 'error');
+        } else if (result === 'error') {
+          toast('Could not download.', 'error');
+        }
+      } finally {
+        setDownloadBusy(false);
+      }
+    },
+    [toast]
+  );
 
-  const handleDownloadCoverLetter = useCallback(async () => {
-    const d = useOptimiseDraftStore.getState().draft;
-    if (!d?.savedCoverLetterId) {
-      toast('Save first to download.', 'error');
-      return;
-    }
-    setDownloadBusy(true);
-    try {
-      const res = await fetch('/api/export', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'cover_letter',
-          id: d.savedCoverLetterId,
-          content: d.coverLetter ?? '',
-          company_name: d.analysis?.company ?? d.companyName ?? null,
-          job_title: d.analysis?.jobTitle ?? d.jobTitle ?? null,
-        }),
-      });
-      const j = (await res.json()) as { pdfUrl?: string; error?: string };
-      if (j.pdfUrl) {
-        window.open(j.pdfUrl, '_blank');
+  const handleDownloadCoverLetter = useCallback(
+    async (format: ExportFormat = 'pdf') => {
+      const d = useOptimiseDraftStore.getState().draft;
+      if (!d?.savedCoverLetterId) {
+        toast('Save first to download.', 'error');
         return;
       }
-      toast(
-        j.error === 'invalid_template'
-          ? 'This template is not available.'
-          : 'Export failed.',
-        'error'
-      );
-    } catch (e) {
-      console.error(e);
-      toast('Export failed.', 'error');
-    } finally {
-      setDownloadBusy(false);
-    }
-  }, [toast]);
+      setDownloadBusy(true);
+      try {
+        const result = await exportCoverLetter(
+          {
+            id: d.savedCoverLetterId,
+            content: d.coverLetter ?? '',
+            company_name: d.analysis?.company ?? d.companyName ?? null,
+            job_title: d.analysis?.jobTitle ?? d.jobTitle ?? null,
+          },
+          format
+        );
+        if (result === 'upgrade_required') {
+          toast('DOCX export is a Pro feature. Upgrade to unlock.', 'error');
+        } else if (result === 'error') {
+          toast('Export failed.', 'error');
+        }
+      } finally {
+        setDownloadBusy(false);
+      }
+    },
+    [toast]
+  );
 
   const trackBusy =
     trackCheckLoading || trackMutation.isPending || untrackMutation.isPending || isSaving;
@@ -621,18 +606,12 @@ export default function OptimiseResultPage() {
                   </Link>
                 )}
                 {hasSavedCv ? (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    disabled={downloadBusy}
-                    onClick={() => void handleDownloadCv()}
-                  >
-                    {downloadBusy ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Download className="h-4 w-4" />
-                    )}
-                  </Button>
+                  <ExportMenu
+                    busyFormat={downloadBusy ? 'pdf' : null}
+                    canDocx
+                    label="Download"
+                    onExport={(format) => void handleDownloadCv(format)}
+                  />
                 ) : (
                   <Tooltip content="Save first to download">
                     <span className="inline-flex">
@@ -678,18 +657,12 @@ export default function OptimiseResultPage() {
                   </Link>
                 )}
                 {hasSavedCl ? (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    disabled={downloadBusy}
-                    onClick={() => void handleDownloadCoverLetter()}
-                  >
-                    {downloadBusy ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Download className="h-4 w-4" />
-                    )}
-                  </Button>
+                  <ExportMenu
+                    busyFormat={downloadBusy ? 'pdf' : null}
+                    canDocx
+                    label="Download"
+                    onExport={(format) => void handleDownloadCoverLetter(format)}
+                  />
                 ) : (
                   <Tooltip content="Save first to download">
                     <span className="inline-flex">

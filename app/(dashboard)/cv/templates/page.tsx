@@ -10,13 +10,15 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { FeatureGate, TemplateGate } from '@/components/shared/FeatureGate';
+import { ExportMenu } from '@/components/shared/ExportMenu';
 import { useCVProfile } from '@/hooks/useCV';
 import { useJobSpecificCV } from '@/hooks/useJobSpecificCVs';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useToast } from '@/components/ui/toast';
 import type { CVTemplate, SubscriptionTier } from '@/types';
 import { cvProfileToExportSnapshot } from '@/lib/cv-export-snapshot';
-import { canUseTemplate } from '@/lib/subscription';
+import { canUseTemplate, canAccessFeature } from '@/lib/subscription';
+import { downloadCvExport, type ExportFormat } from '@/lib/export-client';
 import { cn } from '@/lib/utils';
 
 const SWATCHES = ['#2563EB', '#0d9488', '#7c3aed', '#dc2626', '#0f172a'];
@@ -121,52 +123,46 @@ function CVTemplatesPageContent() {
     toast('Default template updated.', 'success');
   }
 
-  async function exportPdf(templateId: string) {
+  const canDocx = canAccessFeature(tier, 'docxExport');
+
+  async function exportCv(templateId: string, format: ExportFormat = 'pdf') {
     if (jobCvId) {
       if (!jobCv || jobCvLoading) return;
       setExporting(templateId);
-      const res = await fetch('/api/export', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'cv',
+      const result = await downloadCvExport(
+        {
           job_cv_id: jobCvId,
           template_id: templateId,
           accent_color: color,
-        }),
-      });
+        },
+        format
+      );
       setExporting(null);
-      if (!res.ok) {
+      if (result === 'upgrade_required') {
+        toast('DOCX export is a Pro feature. Upgrade to unlock.', 'error');
+      } else if (result === 'error') {
         toast('Export failed.', 'error');
-        return;
       }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank');
       return;
     }
 
     if (!cv) return;
     setExporting(templateId);
-    const res = await fetch('/api/export', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'cv',
-          id: cv.id,
-          template_id: templateId,
-          accent_color: color,
-          cv_snapshot: cvProfileToExportSnapshot(cv),
-        }),
-    });
+    const result = await downloadCvExport(
+      {
+        id: cv.id,
+        template_id: templateId,
+        accent_color: color,
+        cv_snapshot: cvProfileToExportSnapshot(cv),
+      },
+      format
+    );
     setExporting(null);
-    if (!res.ok) {
+    if (result === 'upgrade_required') {
+      toast('DOCX export is a Pro feature. Upgrade to unlock.', 'error');
+    } else if (result === 'error') {
       toast('Export failed.', 'error');
-      return;
     }
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    window.open(url, '_blank');
   }
 
   const hasEditableCv = jobCvId
@@ -264,10 +260,17 @@ function CVTemplatesPageContent() {
                         size="sm"
                         loading={exporting === tid}
                         disabled={!hasEditableCv || !allowed || (!jobCvId && draftActive)}
-                        onClick={() => void exportPdf(tid)}
+                        onClick={() => void exportCv(tid, 'pdf')}
                       >
                         Export PDF
                       </Button>
+                      <ExportMenu
+                        busyFormat={exporting === tid ? 'pdf' : null}
+                        disabled={!hasEditableCv || !allowed || (!jobCvId && draftActive)}
+                        canDocx={canDocx}
+                        label="Export DOCX"
+                        onExport={(format) => void exportCv(tid, format)}
+                      />
                     </div>
                   </TemplateGate>
                 </div>

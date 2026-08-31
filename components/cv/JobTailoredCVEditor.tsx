@@ -27,13 +27,15 @@ import { useSubscription } from '@/hooks/useSubscription';
 import { formatDate, cn } from '@/lib/utils';
 import type { CVData } from '@/types';
 import type { CVTemplate, SubscriptionTier } from '@/types';
-import { canUseTemplate } from '@/lib/subscription';
+import { canUseTemplate, canAccessFeature } from '@/lib/subscription';
 import { buildATSReport } from '@/lib/cv-ats';
 import { cloneCvData } from '@/lib/cv-clone';
 import { useToast } from '@/components/ui/toast';
 import { CV_EDITOR_CANVAS } from '@/lib/cv-editor-styles';
 import { readPreviewCollapsedDefault, persistPreviewExpanded } from '@/lib/cv-preview-prefs';
 import { CVEditorMobileBar } from '@/components/cv/premium/CVEditorMobileBar';
+import { ExportMenu } from '@/components/shared/ExportMenu';
+import { downloadCvExport, type ExportFormat } from '@/lib/export-client';
 import {
   parseOptimisedCvText,
   optimisedCvJsonToCvData,
@@ -173,6 +175,7 @@ export function JobTailoredCVEditor() {
   const [previewBusy, setPreviewBusy] = useState(false);
   const previewUrlRef = useRef<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [exportingFormat, setExportingFormat] = useState<ExportFormat | null>(null);
   const [editorTab, setEditorTab] = useState<CVFormTab>('photo');
   const [zoom, setZoom] = useState(100);
   const [page, setPage] = useState(1);
@@ -452,51 +455,46 @@ export function JobTailoredCVEditor() {
     return () => window.clearTimeout(t);
   }, [draft]);
 
-  const exportPdf = useCallback(async () => {
+  const exportPdf = useCallback(async (format: ExportFormat = 'pdf') => {
     if (!draft || !selectedTemplateId) return;
     if (!allowed) {
       toast('Upgrade to export with this template.', 'error');
       return;
     }
     setExporting(true);
+    setExportingFormat(format);
     try {
-      const res = await fetch('/api/export', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(
-          isDraftMode
-            ? {
-                type: 'cv',
-                template_id: selectedTemplateId,
-                accent_color: accent,
-                font_family: fontFamily,
-                cv_snapshot: previewPayloadFromCVData(draft),
-              }
-            : {
-                type: 'cv',
-                job_cv_id: id,
-                template_id: selectedTemplateId,
-                accent_color: accent,
-                font_family: fontFamily,
-                cv_snapshot: previewPayloadFromCVData(draft),
-              }
-        ),
-      });
-      if (!res.ok) {
-        if (res.status === 422) {
-          toast('Add your name and at least one role to export.', 'error');
-        } else {
-          toast('Export failed.', 'error');
-        }
-        return;
+      const result = await downloadCvExport(
+        isDraftMode
+          ? {
+              template_id: selectedTemplateId,
+              accent_color: accent,
+              font_family: fontFamily,
+              cv_snapshot: previewPayloadFromCVData(draft),
+            }
+          : {
+              job_cv_id: id,
+              template_id: selectedTemplateId,
+              accent_color: accent,
+              font_family: fontFamily,
+              cv_snapshot: previewPayloadFromCVData(draft),
+            },
+        format
+      );
+      if (result === 'upgrade_required') {
+        toast('DOCX export is a Pro feature. Upgrade to unlock.', 'error');
+      } else if (result === 'error') {
+        toast('Export failed.', 'error');
       }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank');
     } finally {
       setExporting(false);
+      setExportingFormat(null);
     }
   }, [accent, allowed, draft, id, selectedTemplateId, toast, fontFamily, isDraftMode]);
+
+  const runExportPdf = useCallback(async () => {
+    await exportPdf('pdf');
+  }, [exportPdf]);
 
   useEffect(() => {
     if (templatesLoading || !templates.length) return;
@@ -1019,7 +1017,7 @@ export function JobTailoredCVEditor() {
           label: 'Export PDF',
           loading: exporting,
           disabled: !allowed,
-          onClick: () => void exportPdf(),
+          onClick: () => void runExportPdf(),
         }}
         primaryAction={{
           label:
@@ -1037,6 +1035,14 @@ export function JobTailoredCVEditor() {
         onFocusModeChange={setFocusMode}
         trailingControls={
           <>
+            <ExportMenu
+              busyFormat={exportingFormat}
+              disabled={!allowed || !draft || !selectedTemplateId}
+              canDocx={canAccessFeature(tier, 'docxExport')}
+              onExport={(format) => {
+                void exportPdf(format);
+              }}
+            />
             <button
               type="button"
               onClick={() => {

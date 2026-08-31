@@ -37,7 +37,9 @@ import type {
   SubscriptionTier,
   Volunteer,
 } from '@/types';
-import { canUseTemplate } from '@/lib/subscription';
+import { canUseTemplate, canAccessFeature } from '@/lib/subscription';
+import { ExportMenu } from '@/components/shared/ExportMenu';
+import { downloadCvExport, type ExportFormat } from '@/lib/export-client';
 import type { CVExtraPayload } from '@/lib/cv-universal-bridge';
 
 function readCvExtra(d: CVProfile) {
@@ -122,6 +124,7 @@ export default function CVTemplatePreviewPage() {
   const [previewBusy, setPreviewBusy] = useState(false);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [exporting, setExporting] = useState(false);
+  const [exportingFormat, setExportingFormat] = useState<ExportFormat | null>(null);
   const [settingDefault, setSettingDefault] = useState(false);
   const [showUpdateCoreModal, setShowUpdateCoreModal] = useState(false);
   const [draftActive, setDraftActive] = useState(false);
@@ -415,46 +418,40 @@ export default function CVTemplatePreviewPage() {
     toast('Default template updated.', 'success');
   }
 
-  async function exportPdf() {
+  async function exportPdf(format: ExportFormat = 'pdf') {
     if (!draft || !templateId) return;
     if (!allowed) {
       toast('Upgrade to export with this template.', 'error');
       return;
     }
     setExporting(true);
-    const res = await fetch('/api/export', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(
+    setExportingFormat(format);
+    try {
+      const result = await downloadCvExport(
         isJobMode
           ? {
-              type: 'cv',
-              job_cv_id: jobCvId,
+              job_cv_id: jobCvId ?? undefined,
               template_id: templateId,
               accent_color: accent,
               cv_snapshot: cvProfileToExportSnapshot(draft),
             }
           : {
-              type: 'cv',
               id: cv?.id,
               template_id: templateId,
               accent_color: accent,
               cv_snapshot: cvProfileToExportSnapshot(draft),
-            }
-      ),
-    });
-    setExporting(false);
-    if (!res.ok) {
-      if (res.status === 422) {
-        toast('Add your name and at least one role to export.', 'error');
-      } else {
+            },
+        format
+      );
+      if (result === 'upgrade_required') {
+        toast('DOCX export is a Pro feature. Upgrade to unlock.', 'error');
+      } else if (result === 'error') {
         toast('Export failed.', 'error');
       }
-      return;
+    } finally {
+      setExporting(false);
+      setExportingFormat(null);
     }
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    window.open(url, '_blank');
   }
 
   const isLoading = isJobMode ? jobCvLoading : cvLoading;
@@ -596,12 +593,18 @@ export default function CVTemplatePreviewPage() {
           <span className="text-xs text-[var(--color-muted)]">
             {saveState === 'saved' ? '✓ Saved' : ''}
           </span>
+          <ExportMenu
+            busyFormat={exportingFormat}
+            disabled={!allowed || !draft || !templateId}
+            canDocx={canAccessFeature(tier, 'docxExport')}
+            onExport={(format) => void exportPdf(format)}
+          />
           <Button
             variant="primary"
             size="sm"
             loading={exporting}
             disabled={!allowed}
-            onClick={() => void exportPdf()}
+            onClick={() => void exportPdf('pdf')}
           >
             Export PDF
           </Button>

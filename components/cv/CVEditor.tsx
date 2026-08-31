@@ -20,11 +20,13 @@ import { FeatureGate } from '@/components/shared/FeatureGate';
 import { useToast } from '@/components/ui/toast';
 import type { CVData } from '@/types';
 import type { CVTemplate, SubscriptionTier } from '@/types';
-import { canUseTemplate } from '@/lib/subscription';
+import { canUseTemplate, canAccessFeature } from '@/lib/subscription';
 import { buildATSReport } from '@/lib/cv-ats';
 import { CV_EDITOR_CANVAS } from '@/lib/cv-editor-styles';
 import { readPreviewCollapsedDefault, persistPreviewExpanded } from '@/lib/cv-preview-prefs';
 import { CVEditorMobileBar } from '@/components/cv/premium/CVEditorMobileBar';
+import { ExportMenu } from '@/components/shared/ExportMenu';
+import { downloadCvExport, type ExportFormat } from '@/lib/export-client';
 import { CvTitleModal } from '@/components/cv/CvTitleModal';
 import { defaultCoreCvDisplayName } from '@/lib/cv-display-name';
 import { cloneCvData } from '@/lib/cv-clone';
@@ -162,6 +164,7 @@ export function CVEditor() {
   const previewUrlRef = useRef<string | null>(null);
   const [settingDefault, setSettingDefault] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [exportingFormat, setExportingFormat] = useState<ExportFormat | null>(null);
   const [editorTab, setEditorTab] = useState<CVFormTab>('photo');
   const [zoom, setZoom] = useState(100);
   const [page, setPage] = useState(1);
@@ -386,40 +389,38 @@ export function CVEditor() {
     }
   }
 
-  async function runExportPdf() {
+  async function runExport(format: ExportFormat = 'pdf') {
     if (!cvData || !selectedTemplateId) return;
     if (!allowed) {
       toast('Upgrade to export with this template.', 'error');
       return;
     }
     setExporting(true);
+    setExportingFormat(format);
     try {
-      const res = await fetch('/api/export', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'cv',
+      const result = await downloadCvExport(
+        {
           id: cvId ?? undefined,
           template_id: selectedTemplateId,
           accent_color: accent,
           font_family: fontFamily,
           cv_snapshot: previewPayloadFromCVData(cvData),
-        }),
-      });
-      if (!res.ok) {
-        if (res.status === 422) {
-          toast('Add your name and at least one role to export.', 'error');
-        } else {
-          toast('Export failed.', 'error');
-        }
-        return;
+        },
+        format
+      );
+      if (result === 'upgrade_required') {
+        toast('DOCX export is a Pro feature. Upgrade to unlock.', 'error');
+      } else if (result === 'error') {
+        toast('Export failed.', 'error');
       }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank');
     } finally {
       setExporting(false);
+      setExportingFormat(null);
     }
+  }
+
+  async function runExportPdf() {
+    await runExport('pdf');
   }
 
   const ats = cvData
@@ -487,6 +488,18 @@ export function CVEditor() {
             void runExportPdf();
           }),
         }}
+        trailingControls={
+          <ExportMenu
+            busyFormat={exportingFormat}
+            disabled={!allowed || !cvData || !selectedTemplateId}
+            canDocx={canAccessFeature(tier, 'docxExport')}
+            onExport={(format) => {
+              requireAuth(() => {
+                void runExport(format);
+              })();
+            }}
+          />
+        }
         primaryAction={{
           label: saveButtonLabel,
           loading: isSaving,

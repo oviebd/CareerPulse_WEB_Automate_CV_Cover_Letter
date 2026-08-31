@@ -1,13 +1,15 @@
 import { readFile } from 'fs/promises';
 import path from 'path';
 import { NextResponse } from 'next/server';
-import { Document, Packer, Paragraph, TextRun } from 'docx';
 import { createClient } from '@/lib/supabase/server';
 import {
   buildCoverLetterVariables,
   renderCoverLetterPageHtml,
 } from '@/lib/cover-letter-html';
+import { generateCoverLetterDocx } from '@/lib/cover-letter-docx';
 import { exportCV, generatePDF } from '@/lib/pdf';
+import { canAccessFeature } from '@/lib/subscription';
+import { resolveEffectiveTier } from '@/lib/dev-subscription';
 import { rateLimitHit } from '@/lib/rate-limit';
 import { CL_TEMPLATE_IDS } from '@/src/config/templateConfig';
 import type { CoverLetter } from '@/types';
@@ -127,7 +129,8 @@ export async function POST(request: Request) {
             jobCvAccent,
             snapshot,
             null,
-            body.font_family ?? jobCv.font_family
+            body.font_family ?? jobCv.font_family,
+            format
           );
           const companySlug = resolvedCompany
             .toLowerCase()
@@ -137,11 +140,15 @@ export async function POST(request: Request) {
             .toLowerCase()
             .replace(/[^a-z0-9]+/g, '-')
             .replace(/^-|-$/g, '');
-          const filename = `cv-${companySlug ? `${companySlug}-` : ''}${titleSlug}.pdf`;
+          const ext = format === 'docx' ? 'docx' : 'pdf';
+          const filename = `cv-${companySlug ? `${companySlug}-` : ''}${titleSlug}.${ext}`;
           return new NextResponse(new Uint8Array(pdf), {
             status: 200,
             headers: {
-              'Content-Type': 'application/pdf',
+              'Content-Type':
+                format === 'docx'
+                  ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                  : 'application/pdf',
               'Content-Disposition': `attachment; filename="${filename}"`,
             },
           });
@@ -152,6 +159,9 @@ export async function POST(request: Request) {
           }
           if (msg === 'TEMPLATE_FORBIDDEN') {
             return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+          }
+          if (msg === 'DOCX_FORBIDDEN') {
+            return NextResponse.json({ error: 'docx_upgrade_required' }, { status: 403 });
           }
           if (msg === 'CV_NOT_FOUND') {
             return NextResponse.json({ error: 'cv_not_found' }, { status: 404 });
@@ -192,12 +202,16 @@ export async function POST(request: Request) {
           accent,
           snapshot,
           resolvedCoreCvId,
-          body.font_family
+          body.font_family,
+          format
         );
         return new NextResponse(new Uint8Array(pdf), {
           status: 200,
           headers: {
-            'Content-Type': 'application/pdf',
+            'Content-Type':
+              format === 'docx'
+                ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                : 'application/pdf',
             'Content-Disposition': `attachment; filename="${filename}"`,
           },
         });
@@ -208,6 +222,9 @@ export async function POST(request: Request) {
         }
         if (msg === 'TEMPLATE_FORBIDDEN') {
           return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+        }
+        if (msg === 'DOCX_FORBIDDEN') {
+          return NextResponse.json({ error: 'docx_upgrade_required' }, { status: 403 });
         }
         if (msg === 'CV_NOT_FOUND') {
           return NextResponse.json({ error: 'cv_not_found' }, { status: 404 });
@@ -304,19 +321,21 @@ export async function POST(request: Request) {
       ) ?? cvRows?.[0];
 
     if (format === 'docx') {
-      const doc = new Document({
-        sections: [
-          {
-            children: contentForExport.split('\n').map(
-              (line) =>
-                new Paragraph({
-                  children: [new TextRun(line || ' ')],
-                })
-            ),
-          },
-        ],
-      });
-      const buf = await Packer.toBuffer(doc);
+      const tier = resolveEffectiveTier(profile?.subscription_tier ?? 'free');
+      if (!canAccessFeature(tier, 'docxExport')) {
+        return NextResponse.json({ error: 'docx_upgrade_required' }, { status: 403 });
+      }
+      const vars = buildCoverLetterVariables(cvForLetter, {
+        content: contentForExport,
+        company_name: companyName,
+        job_title: jobTitle,
+        applicant_name: applicantName,
+        applicant_role: applicantRole,
+        applicant_email: applicantEmail,
+        applicant_phone: applicantPhone,
+        applicant_location: applicantLocation,
+      }, body.primaryColor ?? body.accent_color ?? '#2563EB');
+      const buf = await generateCoverLetterDocx(templateId, vars);
       const filePath = `${user.id}/cl-${body.id}-${Date.now()}.docx`;
       const { error: upErr } = await supabase.storage
         .from('pdf-exports')

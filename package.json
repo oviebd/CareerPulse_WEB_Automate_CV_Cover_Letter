@@ -10,6 +10,8 @@
     "lint": "next lint",
     "test-templates": "tsx scripts/test-templates.ts",
     "test-roundtrip": "tsx scripts/test-roundtrip.ts",
+    "test-cv-docx": "tsx scripts/test-cv-docx.ts",
+    "test-cover-letter-docx": "tsx scripts/test-cover-letter-docx.ts",
     "validate-templates": "tsx scripts/validate-templates.ts"
   },
   "dependencies": {

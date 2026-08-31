@@ -1,9 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { applyCvSectionVisibility } from '@/lib/cv-section-visibility';
+import { generateCVDocx } from '@/lib/cv-docx';
 import { profileToUniversalCV } from '@/lib/cv-universal-bridge';
 import type { CVProfile, SubscriptionTier } from '@/types';
 import type { CVData } from '@/types';
-import { canUseTemplate } from '@/lib/subscription';
+import { canAccessFeature, canUseTemplate } from '@/lib/subscription';
 import { resolveEffectiveTier } from '@/lib/dev-subscription';
 import { ALL_TEMPLATE_IDS } from '@/src/config/templateConfig';
 import { migrateLegacyCVData } from '@/src/utils/cvDefaults';
@@ -146,7 +147,8 @@ export async function exportCV(
   accentColor?: string,
   snapshot?: Partial<CVProfile> | null,
   coreCvId?: string | null,
-  fontFamily?: string
+  fontFamily?: string,
+  format: 'pdf' | 'docx' = 'pdf'
 ): Promise<{ pdf: Buffer; filename: string }> {
   const { data: profile } = await supabase
     .from('profiles')
@@ -210,10 +212,18 @@ export async function exportCV(
     templateId: normalizedId,
   });
 
-  const pdf = await generateCVPdf(cvData);
   const nameSlug = slugifyName(
     cvData.personal.fullName ?? cvRow?.full_name ?? 'untitled'
   );
-  const filename = `cv-${nameSlug}-${normalizedId}.pdf`;
+  const filename = `cv-${nameSlug}-${normalizedId}.${format === 'docx' ? 'docx' : 'pdf'}`;
+  if (format === 'docx') {
+    if (!canAccessFeature(tier, 'docxExport')) {
+      throw new Error('DOCX_FORBIDDEN');
+    }
+    const docx = await generateCVDocx(cvData);
+    return { pdf: docx, filename };
+  }
+
+  const pdf = await generateCVPdf(cvData);
   return { pdf, filename };
 }

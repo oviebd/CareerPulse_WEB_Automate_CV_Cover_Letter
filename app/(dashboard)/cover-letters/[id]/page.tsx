@@ -22,7 +22,9 @@ import {
 import { useSubscription } from '@/hooks/useSubscription';
 import { createClient } from '@/lib/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
-import { canUseTemplate } from '@/lib/subscription';
+import { canUseTemplate, canAccessFeature } from '@/lib/subscription';
+import { ExportMenu } from '@/components/shared/ExportMenu';
+import { exportCoverLetter, type ExportFormat } from '@/lib/export-client';
 import { formatDate } from '@/lib/utils';
 import type { CVTemplate, SubscriptionTier } from '@/types';
 import type { Job } from '@/types/database';
@@ -410,19 +412,16 @@ export default function CoverLetterDetailPage() {
     }
   }
 
-  async function handleExportPdf() {
+  async function handleExport(format: ExportFormat = 'pdf') {
     if (isDraftMode) {
-      toast('Save your cover letter first to export PDF.', 'error');
+      toast('Save your cover letter first to export.', 'error');
       return;
     }
     if (!letter) return;
     setExportingPdf(true);
     try {
-      const res = await fetch('/api/export', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'cover_letter',
+      const result = await exportCoverLetter(
+        {
           id: letter.id,
           templateId: draftTemplateId,
           content: draftContent,
@@ -434,14 +433,14 @@ export default function CoverLetterDetailPage() {
           applicant_email: draftApplicantEmail,
           applicant_phone: draftApplicantPhone,
           applicant_location: draftApplicantLocation,
-        }),
-      });
-      const j = (await res.json()) as { pdfUrl?: string; error?: string };
-      if (j.pdfUrl) {
-        window.open(j.pdfUrl, '_blank');
-        return;
+        },
+        format
+      );
+      if (result === 'upgrade_required') {
+        toast('DOCX export is a Pro feature. Upgrade to unlock.', 'error');
+      } else if (result === 'error') {
+        toast('Export failed.', 'error');
       }
-      toast(j.error === 'invalid_template' ? 'This template is not available.' : 'Export failed.', 'error');
     } finally {
       setExportingPdf(false);
     }
@@ -495,12 +494,18 @@ export default function CoverLetterDetailPage() {
           {!isDraftMode && letter?.ats_score != null ? (
             <Badge variant="success">ATS {letter.ats_score}</Badge>
           ) : null}
+          <ExportMenu
+            busyFormat={exportingPdf ? 'pdf' : null}
+            disabled={isDraftMode || !letter}
+            canDocx={canAccessFeature(tier, 'docxExport')}
+            onExport={(format) => void handleExport(format)}
+          />
           <Button
             variant="secondary"
             size="sm"
             disabled={isDraftMode}
             loading={exportingPdf}
-            onClick={() => void handleExportPdf()}
+            onClick={() => void handleExport('pdf')}
           >
             Export PDF
           </Button>
