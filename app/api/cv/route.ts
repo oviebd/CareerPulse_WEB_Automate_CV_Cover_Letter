@@ -1,36 +1,28 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getSessionUser } from '@/lib/auth/session';
 import { computeCompletionPercentage } from '@/lib/cv-completion';
 import { resolveEffectiveTier } from '@/lib/dev-subscription';
 import { TIER_LIMITS } from '@/types';
+import { getCvsRepo } from '@/lib/db/repositories/cvs';
+import { getProfilesRepo } from '@/lib/db/repositories/profiles';
+
+function pickLatest(rows: Record<string, unknown>[]) {
+  return rows[0] ?? null;
+}
 
 export async function GET(request: Request) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getSessionUser();
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
     const url = new URL(request.url);
     const coreCvId = url.searchParams.get('core_cv_id');
 
-    const baseQuery = supabase
-      .from('cvs')
-      .select('*')
-      .eq('user_id', user.id);
+    const data = coreCvId
+      ? await getCvsRepo().getById(user.id, coreCvId)
+      : pickLatest(await getCvsRepo().listByUser(user.id, { includeArchived: true }));
 
-    const { data, error } = coreCvId
-      ? await baseQuery.eq('id', coreCvId).maybeSingle()
-      : await baseQuery
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-    if (error) {
-      console.error('cv GET', error);
-      return NextResponse.json({ error: 'fetch_failed' }, { status: 500 });
-    }
     return NextResponse.json({ cvProfile: data });
   } catch (e) {
     console.error('cv GET', e);
@@ -40,10 +32,7 @@ export async function GET(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getSessionUser();
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
@@ -52,9 +41,7 @@ export async function PATCH(request: Request) {
     const coreCvId =
       typeof patchBody.core_cv_id === 'string' ? patchBody.core_cv_id : null;
     const createNew = Boolean(patchBody.create_new);
-    const forceOverwriteExisting = Boolean(
-      patchBody.force_overwrite_existing
-    );
+    const forceOverwriteExisting = Boolean(patchBody.force_overwrite_existing);
 
     delete patchBody.core_cv_id;
     delete patchBody.create_new;
@@ -73,38 +60,16 @@ export async function PATCH(request: Request) {
     if (Array.isArray(patch.referrals)) {
       patch.referrals = patch.referrals.slice(0, 2);
     }
-    if (
-      patch.section_visibility != null &&
-      typeof patch.section_visibility !== 'object'
-    ) {
+    if (patch.section_visibility != null && typeof patch.section_visibility !== 'object') {
       delete patch.section_visibility;
     }
-
-    const getLatest = async () => {
-      const { data: row, error: rowErr } = await supabase
-        .from('cvs')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (rowErr) throw rowErr;
-      return row as Record<string, unknown> | null;
-    };
 
     let current: Record<string, unknown> | null = null;
     if (!createNew) {
       if (coreCvId) {
-        const { data: row, error: rowErr } = await supabase
-          .from('cvs')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('id', coreCvId)
-          .maybeSingle();
-        if (rowErr) throw rowErr;
-        current = row ?? null;
+        current = (await getCvsRepo().getById(user.id, coreCvId)) ?? null;
       } else {
-        current = (await getLatest()) ?? null;
+        current = pickLatest(await getCvsRepo().listByUser(user.id, { includeArchived: true }));
       }
     }
 
@@ -126,122 +91,85 @@ export async function PATCH(request: Request) {
         p.name = fn || 'Untitled CV';
       }
       if (forceOverwriteExisting) {
-        const { data: prof, error: profErr } = await supabase
-          .from('profiles')
-          .select('subscription_tier')
-          .eq('id', user.id)
-          .maybeSingle();
-        if (profErr) throw profErr;
-
+        const prof = await getProfilesRepo().getById(user.id);
         const tier = resolveEffectiveTier(prof?.subscription_tier);
         const uploadLimit = TIER_LIMITS[tier].cvUploads;
         if (uploadLimit !== Number.POSITIVE_INFINITY) {
-          const { data: rows } = await supabase
-            .from('cvs')
-            .select('id')
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: false });
-
-          // We are about to insert 1 new row, so keep at most
-          // (uploadLimit - 1) existing versions to honor the post-insert limit.
+          const rows = await getCvsRepo().listByUser(user.id, { includeArchived: true });
           const keepCount = Math.max(0, uploadLimit - 1);
-          const keepIds = (rows ?? []).slice(0, keepCount).map((r) => r.id);
-          if (keepIds.length > 0) {
-            await supabase
-              .from('cvs')
-              .delete()
-              .eq('user_id', user.id)
-              .not('id', 'in', keepIds);
-          } else {
-            await supabase
-              .from('cvs')
-              .delete()
-              .eq('user_id', user.id);
+          const keepIds = new Set(rows.slice(0, keepCount).map((r) => r.id as string));
+          for (const row of rows) {
+            const rid = row.id as string;
+            if (!keepIds.has(rid)) {
+              await getCvsRepo().remove(user.id, rid, true);
+            }
           }
         }
       }
 
-      const { data, error } = await supabase
-        .from('cvs')
-        .insert({ user_id: user.id, ...payload })
-        .select()
-        .single();
-      if (error) {
-        // Fallback for missing columns (e.g. github_url not yet in DB)
-        if (error.code === 'PGRST204' || error.message?.includes('column')) {
+      try {
+        const data = await getCvsRepo().insert(user.id, payload);
+        return NextResponse.json({ cvProfile: data });
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : '';
+        if (msg.includes('column')) {
           const fallbackPayload = { ...payload };
-          // List of columns that might be missing in older schemas
           const possiblyMissing = ['github_url', 'linkedin_url', 'links'];
           for (const col of possiblyMissing) {
-            if (error.message?.includes(`'${col}'`) || error.details?.includes(`'${col}'`)) {
-              delete (fallbackPayload as any)[col];
+            if (msg.includes(`'${col}'`)) {
+              delete (fallbackPayload as Record<string, unknown>)[col];
             }
           }
-          // If we deleted something, retry
           if (Object.keys(fallbackPayload).length < Object.keys(payload).length) {
-             const { data: retryData, error: retryErr } = await supabase
-              .from('cvs')
-              .insert({ user_id: user.id, ...fallbackPayload })
-              .select()
-              .single();
-             if (!retryErr) return NextResponse.json({ cvProfile: retryData });
+            try {
+              const retryData = await getCvsRepo().insert(user.id, fallbackPayload);
+              return NextResponse.json({ cvProfile: retryData });
+            } catch {
+              /* fall through */
+            }
           }
         }
         console.error('cv PATCH insert', error);
         return NextResponse.json({ error: 'update_failed' }, { status: 500 });
       }
-      return NextResponse.json({ cvProfile: data });
     }
 
-    const targetId =
-      (coreCvId ?? (current?.id as string | undefined)) || undefined;
+    const targetId = (coreCvId ?? (current?.id as string | undefined)) || undefined;
     if (!targetId) {
-      // Shouldn't happen, but fallback to insert.
-      const { data, error } = await supabase
-        .from('cvs')
-        .insert({ user_id: user.id, ...payload })
-        .select()
-        .single();
-      if (error) {
+      try {
+        const data = await getCvsRepo().insert(user.id, payload);
+        return NextResponse.json({ cvProfile: data });
+      } catch (error) {
         console.error('cv PATCH insert fallback', error);
         return NextResponse.json({ error: 'update_failed' }, { status: 500 });
       }
-      return NextResponse.json({ cvProfile: data });
     }
 
-    const { data, error } = await supabase
-      .from('cvs')
-      .update(payload)
-      .eq('user_id', user.id)
-      .eq('id', targetId)
-      .select()
-      .single();
-
-    if (error) {
-      // Fallback for missing columns on update
-      if (error.code === 'PGRST204' || error.message?.includes('column')) {
+    try {
+      const data = await getCvsRepo().update(user.id, targetId, payload);
+      return NextResponse.json({ cvProfile: data });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : '';
+      if (msg.includes('column')) {
         const fallbackPayload = { ...payload };
         const possiblyMissing = ['github_url', 'linkedin_url', 'links'];
         for (const col of possiblyMissing) {
-          if (error.message?.includes(`'${col}'`) || error.details?.includes(`'${col}'`)) {
-            delete (fallbackPayload as any)[col];
+          if (msg.includes(`'${col}'`)) {
+            delete (fallbackPayload as Record<string, unknown>)[col];
           }
         }
         if (Object.keys(fallbackPayload).length < Object.keys(payload).length) {
-           const { data: retryData, error: retryErr } = await supabase
-            .from('cvs')
-            .update(fallbackPayload)
-            .eq('user_id', user.id)
-            .eq('id', targetId)
-            .select()
-            .single();
-           if (!retryErr) return NextResponse.json({ cvProfile: retryData });
+          try {
+            const retryData = await getCvsRepo().update(user.id, targetId, fallbackPayload);
+            return NextResponse.json({ cvProfile: retryData });
+          } catch {
+            /* fall through */
+          }
         }
       }
       console.error('cv PATCH', error);
       return NextResponse.json({ error: 'update_failed' }, { status: 500 });
     }
-    return NextResponse.json({ cvProfile: data });
   } catch (e) {
     console.error('cv PATCH', e);
     return NextResponse.json({ error: 'update_failed' }, { status: 500 });

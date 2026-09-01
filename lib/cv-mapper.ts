@@ -3,7 +3,7 @@ import type { SkillCategory } from '@/src/types/cv.types';
 import { migrateSkillsToRated } from '@/src/utils/migrateSkills';
 
 /**
- * Normalizes a `cvs` table row (Supabase JSONB) into the editor-facing CVProfile shape.
+ * Normalizes a `cvs` table row (JSONB) into the editor-facing CVProfile shape.
  */
 export function dbRowToCvProfile(row: Record<string, unknown>): CVProfile {
   const links = Array.isArray(row.links) ? row.links : [];

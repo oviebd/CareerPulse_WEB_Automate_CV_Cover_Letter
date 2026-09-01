@@ -1,4 +1,4 @@
-/** Map Supabase Auth error messages to user-facing copy (no internal details). */
+/** Map auth error messages to user-facing copy (no internal details). */
 export function authErrorMessage(message: string | undefined): string {
   if (!message) return 'Something went wrong. Please try again.';
   const m = message.toLowerCase();

@@ -1,8 +1,8 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { apiFetch } from '@/lib/api-fetch';
 import type { CoverLetter } from '@/types';
 
 export function useCoverLettersList() {
@@ -11,14 +11,7 @@ export function useCoverLettersList() {
     queryKey: ['cover-letters', userId],
     queryFn: async (): Promise<CoverLetter[]> => {
       if (!userId) return [];
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from('cover_letters')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      return (data ?? []) as CoverLetter[];
+      return apiFetch<CoverLetter[]>('/api/cover-letters');
     },
     enabled: !!userId,
     staleTime: 5 * 60 * 1000,
@@ -31,15 +24,7 @@ export function useCoverLetter(id: string | undefined) {
     queryKey: ['cover-letter', id, userId],
     queryFn: async (): Promise<CoverLetter | null> => {
       if (!id || !userId) return null;
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from('cover_letters')
-        .select('*')
-        .eq('id', id)
-        .eq('user_id', userId)
-        .maybeSingle();
-      if (error) throw error;
-      return data as CoverLetter | null;
+      return apiFetch<CoverLetter>(`/api/cover-letters/${id}`);
     },
     enabled: Boolean(id) && !!userId,
     staleTime: 5 * 60 * 1000,
@@ -50,12 +35,7 @@ export function useDeleteCoverLetter() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const supabase = createClient();
-      const { error } = await supabase
-        .from('cover_letters')
-        .delete()
-        .eq('id', id);
-      if (error) throw error;
+      await apiFetch(`/api/cover-letters/${id}`, { method: 'DELETE' });
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['cover-letters'] });
@@ -73,12 +53,10 @@ export function useToggleCoverLetterFavourite() {
       id: string;
       is_favourited: boolean;
     }) => {
-      const supabase = createClient();
-      const { error } = await supabase
-        .from('cover_letters')
-        .update({ is_favourited })
-        .eq('id', id);
-      if (error) throw error;
+      await apiFetch(`/api/cover-letters/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ is_favourited }),
+      });
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['cover-letters'] });
@@ -102,10 +80,8 @@ export function useUpdateCoverLetter() {
       applicant_phone: string | null;
       applicant_location: string | null;
     }): Promise<CoverLetter> => {
-      const res = await fetch(`/api/cover-letters/${payload.id}`, {
+      return apiFetch<CoverLetter>(`/api/cover-letters/${payload.id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
         body: JSON.stringify({
           content: payload.content,
           template_id: payload.template_id,
@@ -118,11 +94,6 @@ export function useUpdateCoverLetter() {
           applicant_location: payload.applicant_location,
         }),
       });
-      if (!res.ok) {
-        const json = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(json.error ?? `Save failed (HTTP ${res.status})`);
-      }
-      return (await res.json()) as CoverLetter;
     },
     onSuccess: (data, v) => {
       qc.setQueryData(['cover-letter', v.id, userId], data);

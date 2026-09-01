@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getSessionUser } from '@/lib/auth/session';
 import { getSampleCVData } from '@/lib/cv-sample-data';
 import { looseProfileToCVData, renderTemplate } from '@/lib/pdf';
 import { renderUnifiedHtml } from '@/src/services/pdfRenderer';
@@ -57,10 +57,7 @@ type PostBody = {
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getSessionUser();
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -80,18 +77,6 @@ export async function POST(request: Request) {
     if (!ALL_TEMPLATE_IDS.includes(tid)) {
       return NextResponse.json({ error: 'invalid_template' }, { status: 400 });
     }
-
-    const { data: tmpl, error: tErr } = await supabase
-      .from('cv_templates')
-      .select('id, type')
-      .eq('id', tid)
-      .eq('type', 'cv')
-      .maybeSingle();
-    if (tErr) {
-      return NextResponse.json({ error: 'template_lookup_failed' }, { status: 500 });
-    }
-    // DB row optional — unified templates exist on disk under src/templates/{id}
-    void tmpl;
 
     const cvData = looseProfileToCVData(body.cv, {
       accent_color: accent,

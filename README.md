@@ -1,38 +1,174 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CareerPulse
 
-## Getting Started
+CV and cover-letter generator with job tracking, templates, PDF export, and billing. The self-hosted stack is **Next.js + Postgres**, packaged as Docker images.
 
-First, run the development server:
+For VPS / Nginx / SSL deployment, see [Setup.md](Setup.md).
+
+---
+
+## Prerequisites
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (macOS / Windows) or Docker Engine + [Compose plugin](https://docs.docker.com/compose/install/) (Linux)
+- About **4 GB RAM** free — the image build compiles Next.js and the runner includes Chromium for PDF generation
+- An [Anthropic API key](https://console.anthropic.com/) for CV / cover-letter generation
+
+Ports **3000** (app) and **5432** (Postgres, local compose only) must be free.
+
+---
+
+## Run the dockerized app locally
+
+This starts **Postgres + the production Next.js image** together. Use this when you want the same stack that ships to the VPS.
+
+### 1. Create `.env.prod`
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.prod.example .env.prod
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Edit `.env.prod` and set at least:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Variable | Notes |
+|---|---|
+| `NEXT_PUBLIC_APP_URL` | `http://localhost:3000` for local Docker |
+| `POSTGRES_PASSWORD` | Any password; compose injects it into `DATABASE_URL` |
+| `AUTH_SECRET` | Required for login. Generate with `openssl rand -base64 32` |
+| `JWT_SECRET` | Can be the same value as `AUTH_SECRET` |
+| `ANTHROPIC_API_KEY` | Required for AI generation |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Google OAuth, Resend, and SSLCommerz can stay empty until you need those features.
 
-## Learn More
+`DATABASE_URL` and `DATA_BACKEND=postgres` are set by Compose for the app container — you do not need to add them to `.env.prod`.
 
-To learn more about Next.js, take a look at the following resources:
+### 2. Build and start
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+docker compose -f docker-compose.dev.yml --env-file .env.prod up --build
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+First build takes several minutes. When it finishes:
 
-## Deploy on Vercel
+- App: [http://localhost:3000](http://localhost:3000)
+- Postgres: `localhost:5432` (user/password/db from `.env.prod`)
+- Schema and CV/cover-letter templates are applied automatically on the **first** database start
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### 3. Check that it is healthy
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+curl -s http://localhost:3000/api/health | python3 -m json.tool
+```
 
+You want `"status": "ok"` and `database.detail` of `postgres_connected`. If Anthropic is misconfigured, the response is `503` with details in `checks`.
 
+Register a new account at `/register`, then sign in at `/login`.
+
+### Everyday commands
+
+```bash
+# Follow logs
+docker compose -f docker-compose.dev.yml logs -f
+
+# Stop (keeps database data)
+docker compose -f docker-compose.dev.yml down
+
+# Rebuild after changing NEXT_PUBLIC_* vars (they are baked into the client bundle)
+docker compose -f docker-compose.dev.yml --env-file .env.prod up --build
+
+# Wipe Postgres + uploads and start clean (re-runs schema.sql + seed.sql)
+docker compose -f docker-compose.dev.yml down -v
+docker compose -f docker-compose.dev.yml --env-file .env.prod up --build
+```
+
+---
+
+## Hybrid development (hot reload)
+
+Use this when you are editing the Next.js app and want fast refresh. Postgres still runs in Docker; the app runs on the host.
+
+**Terminal 1 — database only:**
+
+```bash
+docker compose -f docker-compose.dev.yml --env-file .env.prod up db
+```
+
+**`.env.local`** (create next to `package.json`):
+
+```
+DATA_BACKEND=postgres
+NEXT_PUBLIC_DATA_BACKEND=postgres
+DATABASE_URL=postgresql://careerpulse:careerpulse_dev@localhost:5432/careerpulse
+AUTH_SECRET=change-me-to-a-long-random-string
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+ANTHROPIC_API_KEY=your-key
+```
+
+Match `DATABASE_URL` to `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` in `.env.prod`.
+
+**Terminal 2 — Next.js:**
+
+```bash
+npm install
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000). Do not run the Docker `app` service at the same time — both bind port 3000.
+
+---
+
+## How the Docker files fit together
+
+| File | Role |
+|---|---|
+| `Dockerfile` | Multi-stage build: Next.js standalone server + Chromium for PDF export |
+| `docker-compose.dev.yml` | **Local:** builds the image and runs `app` + `db` |
+| `docker-compose.yml` | **Production:** runs a pre-built `careerpulse:latest` image + Postgres (no build step) |
+| `.env.prod` | Runtime secrets. Gitignored. Loaded by Compose |
+| `db/schema.sql` / `db/seed.sql` | Applied once when the Postgres volume is empty |
+
+`NEXT_PUBLIC_*` values are compiled into the client during `docker build`. Changing them requires `--build`. API keys stay out of the image and are injected at container start.
+
+---
+
+## Troubleshooting
+
+**`Bind for 0.0.0.0:3000 failed` or port 5432 in use**  
+Stop whatever is already on that port (`npm run dev`, another Postgres, or a leftover container):
+
+```bash
+docker compose -f docker-compose.dev.yml down
+```
+
+**Container exits immediately**
+
+```bash
+docker compose -f docker-compose.dev.yml logs app
+```
+
+**Login fails / health reports `auth_secret` not set**  
+Set `AUTH_SECRET` in `.env.prod` and recreate the app container (`up --build` again).
+
+**Empty database after you expected seed data**  
+Init scripts only run on a new volume. Reset with `down -v`, then `up --build`.
+
+**PDF export fails**  
+Confirm Chromium is in the image:
+
+```bash
+docker exec -it careerpulse chromium --version
+```
+
+**Out of memory during build**  
+Close other apps or give Docker more RAM (Settings → Resources). The VPS path in [Setup.md](Setup.md) also covers building locally and loading the image on the server.
+
+---
+
+## Production
+
+CI builds `careerpulse:latest` and streams it to the VPS. On the server:
+
+```bash
+cd /opt/careerpulse
+docker compose --env-file .env.prod up -d --pull never
+```
+
+Full VPS, Nginx, SSL, backup, and update steps: **[Setup.md](Setup.md)**.

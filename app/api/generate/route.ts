@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getSessionUser } from '@/lib/auth/session';
 import { generateCoverLetterStream, scoreATS } from '@/lib/claude';
 import { rateLimitHit } from '@/lib/rate-limit';
 import { resolveEffectiveTier } from '@/lib/dev-subscription';
-import {
-  assertGenerationAllowed,
-  canAccessFeature,
-} from '@/lib/subscription';
+import { canAccessFeature } from '@/lib/subscription';
+import { assertGenerationAllowed } from '@/lib/subscription-server';
 import type { CoverLetterLength, CoverLetterTone } from '@/types';
+import { getCvsRepo } from '@/lib/db/repositories/cvs';
+import { getProfilesRepo } from '@/lib/db/repositories/profiles';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
@@ -23,10 +23,7 @@ const LENGTHS: CoverLetterLength[] = ['short', 'medium', 'long'];
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getSessionUser();
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
@@ -49,15 +46,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'job_description_required' }, { status: 400 });
     }
 
-    const { data: prof } = await supabase
-      .from('profiles')
-      .select('subscription_tier')
-      .eq('id', user.id)
-      .single();
+    const prof = await getProfilesRepo().getById(user.id);
     const tier = resolveEffectiveTier(prof?.subscription_tier);
 
     try {
-      await assertGenerationAllowed(user.id, tier, supabase);
+      await assertGenerationAllowed(user.id, tier);
     } catch (e) {
       const msg = e instanceof Error ? e.message : '';
       if (msg.startsWith('GENERATION_LIMIT_REACHED')) {
@@ -74,20 +67,15 @@ export async function POST(request: Request) {
       throw e;
     }
 
-    const { data: cvRows, error: cvErr } = await supabase
-      .from('cvs')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(40);
+    const cvRows = await getCvsRepo().listByUser(user.id, { includeArchived: true });
     const cvRow =
-      (cvRows ?? []).find(
+      cvRows.find(
         (r) => !Array.isArray(r.job_ids) || (r.job_ids as string[]).length === 0
-      ) ?? cvRows?.[0];
-    if (cvErr || !cvRow) {
+      ) ?? cvRows[0];
+    if (!cvRow) {
       return NextResponse.json({ error: 'cv_profile_required' }, { status: 400 });
     }
-    if (!cvRow.is_complete && (cvRow.completion_percentage ?? 0) < 40) {
+    if (!cvRow.is_complete && Number(cvRow.completion_percentage ?? 0) < 40) {
       return NextResponse.json(
         { error: 'cv_profile_incomplete' },
         { status: 400 }

@@ -4,7 +4,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams, notFound, useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { createClient } from '@/lib/supabase/client';
+import { useCvTemplates } from '@/hooks/useTemplates';
+import { apiFetch } from '@/lib/api-fetch';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { cn, formatDate } from '@/lib/utils';
@@ -166,19 +167,7 @@ export default function CVTemplatePreviewPage() {
     return () => ro.disconnect();
   }, []);
 
-  const { data: templates = [], isLoading: templatesLoading } = useQuery({
-    queryKey: ['cv-templates'],
-    queryFn: async (): Promise<CVTemplate[]> => {
-      const supabase = createClient();
-      const { data } = await supabase
-        .from('cv_templates')
-        .select('*')
-        .eq('type', 'cv')
-        .order('sort_order');
-      return (data ?? []) as CVTemplate[];
-    },
-    staleTime: 10 * 60 * 1000,
-  });
+  const { data: templates = [], isLoading: templatesLoading } = useCvTemplates();
 
   const templateMeta = templates.find((t) => t.id === templateId);
   const allowed = templateMeta
@@ -413,11 +402,10 @@ export default function CVTemplatePreviewPage() {
       return;
     }
     setSettingDefault(true);
-    const supabase = createClient();
-    await supabase
-      .from('cvs')
-      .update({ preferred_template_id: templateId })
-      .eq('id', cv.id);
+    await apiFetch(`/api/cvs/${cv.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ preferred_template_id: templateId }),
+    });
     setSettingDefault(false);
     toast('Default template updated.', 'success');
   }

@@ -1,29 +1,22 @@
 import { NextResponse } from 'next/server';
-import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { getSessionUser } from '@/lib/auth/session';
+import { getProfilesRepo } from '@/lib/db/repositories/profiles';
 
 export async function POST() {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getSessionUser();
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const admin = createAdminClient();
-
-    const { error } = await admin
-      .from('profiles')
-      .update({
+    try {
+      await getProfilesRepo().update(user.id, {
         subscription_tier: 'free',
         subscription_status: 'inactive',
         subscription_expires_at: null,
-      })
-      .eq('id', user.id);
-
-    if (error) {
+      });
+    } catch (error) {
       console.error('subscription cancel', error);
       return NextResponse.json({ error: 'Failed to cancel subscription.' }, { status: 500 });
     }

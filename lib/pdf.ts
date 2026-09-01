@@ -1,5 +1,7 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
 import { applyCvSectionVisibility } from '@/lib/cv-section-visibility';
+import { getCvsRepo } from '@/lib/db/repositories/cvs';
+import { getProfilesRepo } from '@/lib/db/repositories/profiles';
+import { getTemplatesRepo } from '@/lib/db/repositories/templates';
 import { generateCVDocx } from '@/lib/cv-docx';
 import { profileToUniversalCV } from '@/lib/cv-universal-bridge';
 import type { CVProfile, SubscriptionTier } from '@/types';
@@ -141,7 +143,6 @@ export function mergedRowAndSnapshotToCVData(
 }
 
 export async function exportCV(
-  supabase: SupabaseClient,
   userId: string,
   templateId: string,
   accentColor?: string,
@@ -150,31 +151,22 @@ export async function exportCV(
   fontFamily?: string,
   format: 'pdf' | 'docx' = 'pdf'
 ): Promise<{ pdf: Buffer; filename: string }> {
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('subscription_tier')
-    .eq('id', userId)
-    .maybeSingle();
+  const profile = await getProfilesRepo().getById(userId);
   const tier = resolveEffectiveTier(profile?.subscription_tier ?? 'free');
 
   const normalizedId = normalizeTemplateId(templateId) as TemplateId;
 
-  const { data: tmpl, error: tErr } = await supabase
-    .from('cv_templates')
-    .select('id, type, available_tiers')
-    .eq('id', normalizedId)
-    .eq('type', 'cv')
-    .maybeSingle();
+  const tmpl = await getTemplatesRepo().getById(normalizedId);
 
   /** Tier gates from DB when present; unified `src/templates/{id}` works without a row (partial migrations). */
   let tiers: SubscriptionTier[];
-  if (tErr || !tmpl) {
+  if (!tmpl || tmpl.type !== 'cv') {
     if (!ALL_TEMPLATE_IDS.includes(normalizedId)) {
       throw new Error('TEMPLATE_NOT_FOUND');
     }
     tiers = ['free', 'pro'];
   } else {
-    tiers = tmpl.available_tiers as SubscriptionTier[];
+    tiers = (tmpl.available_tiers ?? ['free', 'pro']) as SubscriptionTier[];
   }
   if (!canUseTemplate(tiers, tier)) {
     throw new Error('TEMPLATE_FORBIDDEN');
@@ -182,22 +174,11 @@ export async function exportCV(
 
   let cvRow: CVProfile | null = null;
   if (coreCvId) {
-    const { data, error } = await supabase
-      .from('cvs')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('id', coreCvId)
-      .maybeSingle();
-    if (!error && data) cvRow = data as CVProfile;
+    const data = await getCvsRepo().getById(userId, coreCvId);
+    if (data) cvRow = data as unknown as CVProfile;
   } else {
-    const { data, error } = await supabase
-      .from('cvs')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (!error && data) cvRow = data as CVProfile;
+    const list = await getCvsRepo().listByUser(userId);
+    if (list[0]) cvRow = list[0] as unknown as CVProfile;
   }
 
   if (!cvRow && !(snapshot && typeof snapshot === 'object')) {

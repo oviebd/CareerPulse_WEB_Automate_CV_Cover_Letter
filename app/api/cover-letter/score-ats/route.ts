@@ -1,15 +1,13 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getSessionUser } from '@/lib/auth/session';
 import { scoreATS } from '@/lib/claude';
 import { resolveEffectiveTier } from '@/lib/dev-subscription';
 import { canAccessFeature } from '@/lib/subscription';
+import { getProfilesRepo } from '@/lib/db/repositories/profiles';
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getSessionUser();
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -24,11 +22,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'jobDescription and coverLetter required' }, { status: 400 });
     }
 
-    const { data: prof } = await supabase
-      .from('profiles')
-      .select('subscription_tier')
-      .eq('id', user.id)
-      .single();
+    const prof = await getProfilesRepo().getById(user.id);
     const tier = resolveEffectiveTier(prof?.subscription_tier);
     if (!canAccessFeature(tier, 'atsAccess')) {
       return NextResponse.json({ error: 'ATS not available on your plan' }, { status: 403 });

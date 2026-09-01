@@ -1,18 +1,48 @@
-# Production compose for VPS — uses a pre-built image loaded via `docker load`.
+# Production compose — app + Postgres on the same VPS
 # Runtime secrets: /opt/careerpulse/.env.prod
-# Local builds: use docker-compose.dev.yml
 
 services:
+  db:
+    image: postgres:16-alpine
+    container_name: careerpulse-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-careerpulse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.prod}
+      POSTGRES_DB: ${POSTGRES_DB:-careerpulse}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./db/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-careerpulse} -d ${POSTGRES_DB:-careerpulse}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   app:
     image: careerpulse:latest
     container_name: careerpulse
     pull_policy: never
     restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
     ports:
-      - "3000:3000"
+      - '3000:3000'
     env_file:
       - .env.prod
     environment:
       NODE_ENV: production
+      DATA_BACKEND: postgres
+      NEXT_PUBLIC_DATA_BACKEND: postgres
+      DATABASE_URL: postgresql://${POSTGRES_USER:-careerpulse}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-careerpulse}
+      UPLOAD_DIR: /data/uploads
       PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium
-      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: "true"
+      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: 'true'
+    volumes:
+      - uploads:/data/uploads
+
+volumes:
+  pgdata:
+  uploads:

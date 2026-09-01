@@ -9,7 +9,7 @@ import {
 /**
  * When NODE_ENV is development and NEXT_PUBLIC_DEV_SUBSCRIPTION_PLAN is set to a
  * valid PRICING key (e.g. premium_yearly), APIs and the client profile behave as
- * that plan without changing Supabase. Remove the env var to test real tiers.
+ * that plan without writing to the database. Remove the env var to test real tiers.
  */
 export function getDevSubscriptionOverride():
   | {

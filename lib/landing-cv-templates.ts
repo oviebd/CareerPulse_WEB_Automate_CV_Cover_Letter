@@ -1,8 +1,8 @@
-import { createClient } from '@/lib/supabase/server';
 import { ALL_TEMPLATE_IDS, TEMPLATE_CONFIGS } from '@/src/config/templateConfig';
 import { normalizeTemplateId } from '@/src/utils/cvDefaults';
 import type { CVTemplate } from '@/types';
 import type { TemplateId } from '@/src/types/cv.types';
+import { getTemplatesRepo } from '@/lib/db/repositories';
 
 function fallbackFromConfig(): CVTemplate[] {
   return ALL_TEMPLATE_IDS.map((id, i) => {
@@ -24,17 +24,12 @@ function fallbackFromConfig(): CVTemplate[] {
 /** CV rows from `cv_templates` (same source as the app), filtered to known unified template ids. */
 export async function getCvTemplatesForLanding(): Promise<CVTemplate[]> {
   try {
-    const supabase = await createClient();
-    const { data, error } = await supabase
-      .from('cv_templates')
-      .select('*')
-      .eq('type', 'cv')
-      .order('sort_order');
-    if (error || !data?.length) {
+    const rows = await getTemplatesRepo().listByType('cv');
+    if (!rows?.length) {
       return fallbackFromConfig();
     }
     const allowed = new Set<string>(ALL_TEMPLATE_IDS as unknown as string[]);
-    const filtered = (data as CVTemplate[]).filter((row) =>
+    const filtered = rows.filter((row) =>
       allowed.has(normalizeTemplateId(row.id))
     );
     return filtered.length ? filtered : fallbackFromConfig();

@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getSessionUser } from '@/lib/auth/session';
 import type { GenerationType } from '@/types';
 import type { Json } from '@/types/database';
 import { CLAUDE_MODEL } from '@/lib/claude';
 import { defaultJobCvDisplayName } from '@/lib/cv-display-name';
 import { optimisedJsonToDbPayload } from '@/lib/optimise-result';
+import { getCoverLettersRepo } from '@/lib/db/repositories/cover-letters';
+import { getCvsRepo } from '@/lib/db/repositories/cvs';
+import { getJobsRepo } from '@/lib/db/repositories/jobs';
+import { getProfilesRepo } from '@/lib/db/repositories/profiles';
 
 function err(
   msg: string,
@@ -19,10 +23,7 @@ function err(
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getSessionUser();
     if (!user) return err('Unauthorized', 401);
 
     const body = (await request.json()) as {
@@ -45,23 +46,9 @@ export async function POST(request: Request) {
       typeof body.originalCvId === 'string' ? body.originalCvId.trim() : '';
     if (!originalCvId) return err('originalCvId is required', 400);
 
-    const { data: profileRow, error: profileErr } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('id', user.id)
-      .maybeSingle();
-    if (profileErr) {
-      console.error('save-optimised profile lookup', profileErr);
-      return err('Could not verify your profile.', 500, {
-        code: profileErr.code,
-        details: profileErr.message,
-      });
-    }
+    const profileRow = await getProfilesRepo().getById(user.id);
     if (!profileRow) {
-      return err(
-        'Your profile could not be found. Try signing out and back in.',
-        400
-      );
+      return err('Your profile could not be found. Try signing out and back in.', 400);
     }
 
     const gen = body.generationType;
@@ -104,87 +91,46 @@ export async function POST(request: Request) {
       typeof body.name === 'string' && body.name.trim() ? body.name.trim() : null;
 
     if (hasCv && cvPayload) {
-      if (!jobId) {
-        const cvName = clientCvName ?? 'Tailored CV';
-        const { data, error } = await supabase
-          .from('cvs')
-          .insert({
-            user_id: user.id,
-            name: cvName,
-            job_ids: [],
-            ...cvPayload,
-            ai_changes_summary: body.ai_changes_summary ?? null,
-            keywords_added: keywordsAddedJson,
-            bullets_improved: body.bullets_improved ?? 0,
-          })
-          .select('id')
-          .single();
-        if (error) {
-          console.error('save-optimised cv no job', error);
-          return err(error.message || 'Failed to save CV', 500, {
-            code: error.code,
-            details: error.details,
-            hint: error.hint,
-          });
-        }
-        savedCvId = data.id;
-      } else {
-        const { data: jobRow, error: jobLookupErr } = await supabase
-          .from('jobs')
-          .select('id, job_title, company_name')
-          .eq('id', jobId)
-          .eq('user_id', user.id)
-          .maybeSingle();
-        if (jobLookupErr || !jobRow) {
+      let cvName = clientCvName ?? 'Tailored CV';
+      let jobIds: string[] = [];
+      if (jobId) {
+        const jobRow = await getJobsRepo().getById(user.id, jobId);
+        if (!jobRow) {
           return err('Job not found', 404);
         }
         const resolvedJobTitle = String(jobRow.job_title ?? '').trim() || 'Untitled role';
         const resolvedCompanyName = String(jobRow.company_name ?? '').trim() || 'Company';
-        const cvName =
-          clientCvName ?? defaultJobCvDisplayName(resolvedJobTitle, resolvedCompanyName);
+        cvName = clientCvName ?? defaultJobCvDisplayName(resolvedJobTitle, resolvedCompanyName);
+        jobIds = [jobId];
+      }
 
-        const { data, error } = await supabase
-          .from('cvs')
-          .insert({
-            user_id: user.id,
-            name: cvName,
-            job_ids: [jobId],
-            ...cvPayload,
-            ai_changes_summary: body.ai_changes_summary ?? null,
-            keywords_added: keywordsAddedJson,
-            bullets_improved: body.bullets_improved ?? 0,
-          })
-          .select('id')
-          .single();
-        if (error) {
-          console.error('save-optimised cv', error);
-          return err(error.message || 'Failed to save CV', 500, {
-            code: error.code,
-            details: error.details,
-            hint: error.hint,
-          });
-        }
-        savedCvId = data.id;
+      try {
+        const data = await getCvsRepo().insert(user.id, {
+          name: cvName,
+          job_ids: jobIds,
+          ...cvPayload,
+          ai_changes_summary: body.ai_changes_summary ?? null,
+          keywords_added: keywordsAddedJson,
+          bullets_improved: body.bullets_improved ?? 0,
+        });
+        savedCvId = data.id as string;
+      } catch (e) {
+        console.error('save-optimised cv', e);
+        const msg = e instanceof Error ? e.message : 'Failed to save CV';
+        return err(msg || 'Failed to save CV', 500);
       }
     }
 
     if (hasCl) {
-      const { data: baseCv } = await supabase
-        .from('cvs')
-        .select('full_name, professional_title, email, phone, location')
-        .eq('id', originalCvId)
-        .eq('user_id', user.id)
-        .maybeSingle();
+      const baseCv = await getCvsRepo().getById(user.id, originalCvId);
 
-      const { data: clRow, error: clErr } = await supabase
-        .from('cover_letters')
-        .insert({
-          user_id: user.id,
-          applicant_name: baseCv?.full_name ?? null,
-          applicant_role: baseCv?.professional_title ?? null,
-          applicant_email: baseCv?.email ?? null,
-          applicant_phone: baseCv?.phone ?? null,
-          applicant_location: baseCv?.location ?? null,
+      try {
+        const clRow = await getCoverLettersRepo().insert(user.id, {
+          applicant_name: (baseCv?.full_name as string | null) ?? null,
+          applicant_role: (baseCv?.professional_title as string | null) ?? null,
+          applicant_email: (baseCv?.email as string | null) ?? null,
+          applicant_phone: (baseCv?.phone as string | null) ?? null,
+          applicant_location: (baseCv?.location as string | null) ?? null,
           tone: body.coverLetterTone ?? 'professional',
           length: body.coverLetterLength ?? 'medium',
           specific_emphasis: body.coverLetterEmphasis?.trim() || null,
@@ -192,19 +138,13 @@ export async function POST(request: Request) {
           template_id: body.coverLetterTemplateId?.trim() || 'cl-classic',
           generation_model: CLAUDE_MODEL,
           job_ids: jobId ? [jobId] : [],
-        })
-        .select('id')
-        .single();
-
-      if (clErr) {
-        console.error('save-optimised cover letter', clErr);
-        return err(clErr.message || 'Failed to save cover letter', 500, {
-          code: clErr.code,
-          details: clErr.details,
-          hint: clErr.hint,
         });
+        savedCoverLetterId = clRow.id as string;
+      } catch (e) {
+        console.error('save-optimised cover letter', e);
+        const msg = e instanceof Error ? e.message : 'Failed to save cover letter';
+        return err(msg || 'Failed to save cover letter', 500);
       }
-      savedCoverLetterId = clRow.id;
     }
 
     return NextResponse.json({

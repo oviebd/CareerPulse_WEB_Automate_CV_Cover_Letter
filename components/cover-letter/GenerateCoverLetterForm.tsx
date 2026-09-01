@@ -10,7 +10,7 @@ import { Progress } from '@/components/ui/progress';
 import { CoverLetterTemplatePicker } from '@/components/cover-letter/CoverLetterTemplatePicker';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useToast } from '@/components/ui/toast';
-import { createClient } from '@/lib/supabase/client';
+import { useCoverLetterTemplates } from '@/hooks/useTemplates';
 import { canAccessFeature } from '@/lib/subscription';
 import type { CoverLetterLength, CoverLetterTone, CVTemplate } from '@/types';
 
@@ -45,19 +45,7 @@ export function GenerateCoverLetterForm() {
 
   const abortRef = useRef<AbortController | null>(null);
 
-  const { data: templates = [] } = useQuery({
-    queryKey: ['cover-letter-templates'],
-    queryFn: async (): Promise<CVTemplate[]> => {
-      const supabase = createClient();
-      const { data } = await supabase
-        .from('cv_templates')
-        .select('*')
-        .eq('type', 'cover_letter')
-        .order('sort_order');
-      return (data ?? []) as CVTemplate[];
-    },
-    staleTime: 10 * 60 * 1000,
-  });
+  const { data: templates = [] } = useCoverLetterTemplates();
 
   useEffect(() => {
     return () => {

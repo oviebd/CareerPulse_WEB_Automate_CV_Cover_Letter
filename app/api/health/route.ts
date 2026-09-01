@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { CLAUDE_MODEL, checkAnthropicConnectivity } from '@/lib/claude';
-import { getSupabasePublicAnonKey } from '@/lib/supabase/public-env';
+import { getDataBackend } from '@/lib/db/backend';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -15,22 +15,15 @@ function envConfigured(name: string): CheckResult {
   return value ? { ok: true } : { ok: false, detail: 'not_set' };
 }
 
-function checkSupabasePublicConfig(): {
-  url: CheckResult;
-  anon_key: CheckResult;
-} {
-  const url = envConfigured('NEXT_PUBLIC_SUPABASE_URL');
-  const anonKey = getSupabasePublicAnonKey();
-  return {
-    url,
-    anon_key: anonKey
-      ? { ok: true }
-      : {
-          ok: false,
-          detail:
-            'not_set — add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to .env.prod on the VPS',
-        },
-  };
+async function checkDatabase(): Promise<CheckResult> {
+  try {
+    const { checkDbConnection } = await import('@/lib/db');
+    await checkDbConnection();
+    return { ok: true, detail: 'postgres_connected' };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'connection_failed';
+    return { ok: false, detail: message.slice(0, 120) };
+  }
 }
 
 async function checkPdfParser(): Promise<CheckResult> {
@@ -46,27 +39,28 @@ async function checkPdfParser(): Promise<CheckResult> {
 }
 
 export async function GET() {
-  const supabase = checkSupabasePublicConfig();
+  const backend = getDataBackend();
   const anthropicApi = await checkAnthropicConnectivity();
+  const database = await checkDatabase();
 
   const checks = {
+    data_backend: { ok: true, backend },
+    database,
     anthropic_api_key: envConfigured('ANTHROPIC_API_KEY'),
     anthropic_api: anthropicApi,
     anthropic_model: {
       ok: Boolean(CLAUDE_MODEL),
       model: CLAUDE_MODEL,
     },
-    supabase_url: supabase.url,
-    supabase_anon_key: supabase.anon_key,
-    supabase_service_role_key: envConfigured('SUPABASE_SERVICE_ROLE_KEY'),
+    auth_secret: envConfigured('AUTH_SECRET'),
     pdf_parser: await checkPdfParser(),
   };
 
   const criticalOk =
     checks.anthropic_api_key.ok &&
     checks.anthropic_api.ok &&
-    checks.supabase_url.ok &&
-    checks.supabase_anon_key.ok;
+    checks.database.ok &&
+    checks.auth_secret.ok;
 
   const status = criticalOk && checks.pdf_parser.ok ? 'ok' : 'degraded';
   const httpStatus = criticalOk ? 200 : 503;
@@ -75,7 +69,7 @@ export async function GET() {
     {
       status,
       timestamp: new Date().toISOString(),
-      revision: 'export-auth-client-v2',
+      revision: 'postgres-only-v1',
       checks,
     },
     { status: httpStatus }

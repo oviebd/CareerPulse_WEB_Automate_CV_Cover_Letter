@@ -7,7 +7,7 @@ import { useCVEditor } from '@/hooks/useCVEditor';
 import { useCVEditorPreviewState } from '@/hooks/useCVEditorPreviewState';
 import { useAuthGate } from '@/hooks/useAuthGate';
 import { useSubscription } from '@/hooks/useSubscription';
-import { createClient } from '@/lib/supabase/client';
+import { useCvTemplates } from '@/hooks/useTemplates';
 import { Button } from '@/components/ui/button';
 import { CVEditorPanel } from '@/components/cv/CVEditorPanel';
 import { CVEditorTopBar } from '@/components/cv/premium/CVEditorTopBar';
@@ -191,19 +191,7 @@ export function CVEditor() {
     return () => window.clearTimeout(t);
   }, [routeId, cvId]);
 
-  const { data: templates = [], isLoading: templatesLoading } = useQuery({
-    queryKey: ['cv-templates'],
-    queryFn: async (): Promise<CVTemplate[]> => {
-      const supabase = createClient();
-      const { data } = await supabase
-        .from('cv_templates')
-        .select('*')
-        .eq('type', 'cv')
-        .order('sort_order');
-      return (data ?? []) as CVTemplate[];
-    },
-    staleTime: 10 * 60 * 1000,
-  });
+  const { data: templates = [], isLoading: templatesLoading } = useCvTemplates();
 
   const catalogTid = normalizeTemplateId(selectedTemplateId) as TemplateId;
   const templateMeta = templates.find((t) => t.id === catalogTid) ?? null;

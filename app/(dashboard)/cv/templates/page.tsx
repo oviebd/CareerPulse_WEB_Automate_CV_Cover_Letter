@@ -5,7 +5,8 @@ import { VISIBLE_TEMPLATE_IDS, TEMPLATE_CONFIGS } from '@/src/config/templateCon
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
+import { apiFetch } from '@/lib/api-fetch';
+import { useCvTemplates } from '@/hooks/useTemplates';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -95,19 +96,7 @@ function CVTemplatesPageContent() {
     return () => window.removeEventListener(CV_DRAFT_UPDATED_EVENT, onUpdate);
   }, []);
 
-  const { data: templates = [] } = useQuery({
-    queryKey: ['cv-templates'],
-    queryFn: async (): Promise<CVTemplate[]> => {
-      const supabase = createClient();
-      const { data } = await supabase
-        .from('cv_templates')
-        .select('*')
-        .eq('type', 'cv')
-        .order('sort_order');
-      return (data ?? []) as CVTemplate[];
-    },
-    staleTime: 10 * 60 * 1000,
-  });
+  const { data: templates = [] } = useCvTemplates();
 
   async function setPreferredTemplate(id: string) {
     if (!cv) {
@@ -118,11 +107,10 @@ function CVTemplatesPageContent() {
       toast('Press Save first to persist your core CV.', 'error');
       return;
     }
-    const supabase = createClient();
-    await supabase
-      .from('cvs')
-      .update({ preferred_template_id: id })
-      .eq('id', cv.id);
+    await apiFetch(`/api/cvs/${cv.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ preferred_template_id: id }),
+    });
     toast('Default template updated.', 'success');
   }
 

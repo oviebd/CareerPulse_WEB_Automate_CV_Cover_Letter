@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getSessionUser } from '@/lib/auth/session';
 import { rateLimitHit } from '@/lib/rate-limit';
 import { generateCVPreview } from '@/lib/pdf';
 import { migrateLegacyCVData } from '@/src/utils/cvDefaults';
@@ -18,10 +18,7 @@ type Body = {
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getSessionUser();
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

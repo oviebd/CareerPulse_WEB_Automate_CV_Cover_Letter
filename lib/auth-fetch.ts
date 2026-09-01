@@ -32,12 +32,11 @@ export async function authFetch(
 
 /**
  * Detect whether a react-query error originated from a 401 response.
- * Works for both plain fetch errors and Supabase PostgREST errors.
  */
 export function isUnauthorizedError(error: unknown): boolean {
   if (!error) return false;
 
-  // Supabase PostgREST errors carry a numeric `code` or `status`
+  // API errors may carry a numeric `code` or `status`
   if (typeof error === 'object') {
     const e = error as Record<string, unknown>;
     if (e.status === 401 || e.code === 401) return true;

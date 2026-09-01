@@ -8,7 +8,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
 import { useAuthStore } from '@/stores/useAuthStore';
-import { createClient } from '@/lib/supabase/client';
+import { apiFetch } from '@/lib/api-fetch';
 
 export default function NewCoverLetterPage() {
   const router = useRouter();
@@ -21,20 +21,13 @@ export default function NewCoverLetterPage() {
     if (!userId) return;
     setScratchBusy(true);
     try {
-      // Auto-populate applicant fields from the user's primary (non-job-specific) CV.
-      const supabase = createClient();
-      const { data: cvRows } = await supabase
-        .from('cvs')
-        .select('full_name, professional_title, email, phone, location')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(20);
-
-      const primaryCv =
-        (cvRows ?? []).find(
-          (r: { full_name: string | null; professional_title: string | null; email: string | null; phone: string | null; location: string | null; job_ids?: unknown }) =>
-            !Array.isArray(r.job_ids) || (r.job_ids as string[]).length === 0
-        ) ?? cvRows?.[0];
+      const primaryCv = await apiFetch<{
+        full_name: string | null;
+        professional_title: string | null;
+        email: string | null;
+        phone: string | null;
+        location: string | null;
+      } | null>('/api/cvs/profile');
 
       const res = await fetch('/api/cover-letters', {
         method: 'POST',

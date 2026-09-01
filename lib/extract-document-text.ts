@@ -20,12 +20,18 @@ export type DocumentTextExtractResult =
     }
   | { error: DocumentTextExtractError };
 
-/** Whether a signed storage URL is on our Supabase host (HTTPS). */
+/** Whether a signed storage URL is on this app. */
 export function isAllowedStorageUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
-    const supabaseHost = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!).host;
-    return parsed.protocol === 'https:' && parsed.host === supabaseHost;
+    const appHost = process.env.NEXT_PUBLIC_APP_URL
+      ? new URL(process.env.NEXT_PUBLIC_APP_URL).host
+      : null;
+    const allowedHosts = [appHost, 'localhost:3000'].filter(Boolean);
+    return (
+      (parsed.protocol === 'https:' || parsed.protocol === 'http:') &&
+      allowedHosts.includes(parsed.host)
+    );
   } catch {
     return false;
   }

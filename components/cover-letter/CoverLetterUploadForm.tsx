@@ -2,11 +2,11 @@
 
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
+import { useAuthStore } from '@/stores/useAuthStore';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
-import { uploadCvFileWithProgress } from '@/lib/cv-storage-upload';
+import { uploadFileWithProgress, createSignedUploadUrl, removeUploadedFile } from '@/lib/file-upload-client';
 import { isAllowedCvFile } from '@/lib/cv-file';
 import type { ExtractedCoverLetter } from '@/types';
 
@@ -15,7 +15,7 @@ const MAX = 10 * 1024 * 1024;
 const EXTRACT_ERROR_HINT: Record<string, string> = {
   Unauthorized: 'Session expired — sign in again.',
   fileUrl_required: 'Missing file URL — try uploading again.',
-  file_fetch_failed: 'Could not read the file from storage. Check Storage bucket and policies.',
+  file_fetch_failed: 'Could not read the uploaded file. Try uploading again.',
   invalid_file_type: 'File was not recognized as PDF or DOCX.',
   invalid_file_url: 'Invalid file URL.',
   pdf_parse_failed: 'Could not read text from this file. Try exporting as a text-based PDF or DOCX.',
@@ -36,6 +36,7 @@ type Props = {
 export function CoverLetterUploadForm({ onExtracted }: Props) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const userId = useAuthStore((s) => s.user?.id);
   const { toast } = useToast();
   const [phase, setPhase] = useState<
     'idle' | 'uploading' | 'analysing' | 'complete'
@@ -55,11 +56,7 @@ export function CoverLetterUploadForm({ onExtracted }: Props) {
     setUploadProgress(0);
     setPhase('uploading');
     try {
-      const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
+      if (!userId) {
         reportError('Session expired — sign in again.');
         setPhase('idle');
         setUploadProgress(0);
@@ -68,11 +65,11 @@ export function CoverLetterUploadForm({ onExtracted }: Props) {
       }
 
       const ext = file.name.split('.').pop()?.toLowerCase();
-      const path = `${user.id}/cl-${Date.now()}.${ext === 'docx' ? 'docx' : 'pdf'}`;
+      const path = `${userId}/cl-${Date.now()}.${ext === 'docx' ? 'docx' : 'pdf'}`;
       let canDeleteFromStorage = false;
 
-      const { error: upErr } = await uploadCvFileWithProgress(
-        supabase,
+      const { error: upErr } = await uploadFileWithProgress(
+        'cv-uploads',
         path,
         file,
         { cacheControl: '3600', upsert: true },
@@ -80,8 +77,8 @@ export function CoverLetterUploadForm({ onExtracted }: Props) {
       );
       if (upErr) {
         const hint = upErr.message.includes('Bucket not found')
-          ? `${upErr.message} Apply supabase/migrations/002_storage.sql and ensure the bucket exists.`
-          : `${upErr.message} If storage fails, check the cv-uploads bucket and RLS policies.`;
+          ? `${upErr.message} Ensure the cv-uploads bucket exists.`
+          : `${upErr.message} If storage fails, check the cv-uploads bucket.`;
         reportError(hint);
         setPhase('idle');
         setUploadProgress(0);
@@ -90,19 +87,15 @@ export function CoverLetterUploadForm({ onExtracted }: Props) {
 
       canDeleteFromStorage = true;
 
-      const { data: signed, error: signErr } = await supabase.storage
-        .from('cv-uploads')
-        .createSignedUrl(path, 3600);
-      if (signErr || !signed?.signedUrl) {
+      const { signedUrl, error: signErr } = await createSignedUploadUrl('cv-uploads', path, 3600);
+      if (signErr || !signedUrl) {
         console.error('createSignedUrl', signErr);
-        reportError(
-          signErr?.message ?? 'Could not create a signed URL for the file.'
-        );
+        reportError(signErr?.message ?? 'Could not create a signed URL for the file.');
         setPhase('idle');
         setUploadProgress(0);
         if (canDeleteFromStorage) {
           try {
-            await supabase.storage.from('cv-uploads').remove([path]);
+            await removeUploadedFile('cv-uploads', path);
           } catch (delErr) {
             console.warn('cv-uploads remove failed', delErr);
           }
@@ -119,7 +112,7 @@ export function CoverLetterUploadForm({ onExtracted }: Props) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'same-origin',
-            body: JSON.stringify({ fileUrl: signed.signedUrl }),
+            body: JSON.stringify({ fileUrl: signedUrl }),
           });
         } catch (e) {
           const msg =
@@ -216,7 +209,7 @@ export function CoverLetterUploadForm({ onExtracted }: Props) {
       } finally {
         if (canDeleteFromStorage) {
           try {
-            await supabase.storage.from('cv-uploads').remove([path]);
+            await removeUploadedFile('cv-uploads', path);
           } catch (delErr) {
             console.warn('cv-uploads remove failed', delErr);
           }

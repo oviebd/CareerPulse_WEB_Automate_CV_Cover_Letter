@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getSessionUser } from '@/lib/auth/session';
 import { dbRowToCvProfile } from '@/lib/cv-mapper';
 import { mergeAndCompleteCv, normalizeCvPatchBody } from '@/lib/cv-api-merge';
 import { stripUndefined } from '@/lib/queries/strip-undefined';
 import { optimisedJsonToDbPayload } from '@/lib/optimise-result';
 import { CLAUDE_MODEL } from '@/lib/claude';
+import { getCvsRepo } from '@/lib/db/repositories/cvs';
+import { getCoverLettersRepo } from '@/lib/db/repositories/cover-letters';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -15,22 +17,10 @@ function err(msg: string, code: string | undefined, status: number) {
 export async function GET(_request: Request, { params }: RouteContext) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getSessionUser();
     if (!user) return err('Unauthorized', 'UNAUTHORIZED', 401);
 
-    const { data, error } = await supabase
-      .from('cvs')
-      .select('*')
-      .eq('id', id)
-      .eq('user_id', user.id)
-      .maybeSingle();
-    if (error) {
-      console.error('cvs GET [id]', error);
-      return err('Failed to fetch CV', 'FETCH_FAILED', 500);
-    }
+    const data = await getCvsRepo().getById(user.id, id);
     if (!data) return err('Not found', 'NOT_FOUND', 404);
     return NextResponse.json(dbRowToCvProfile(data as Record<string, unknown>));
   } catch (e) {
@@ -42,10 +32,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
 export async function PATCH(request: Request, { params }: RouteContext) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getSessionUser();
     if (!user) return err('Unauthorized', 'UNAUTHORIZED', 401);
 
     const raw = (await request.json()) as Record<string, unknown>;
@@ -66,16 +53,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     const mergedBody = { ...fromCvJson, ...raw };
     const patch = normalizeCvPatchBody(mergedBody);
 
-    const { data: current, error: curErr } = await supabase
-      .from('cvs')
-      .select('*')
-      .eq('id', id)
-      .eq('user_id', user.id)
-      .maybeSingle();
-    if (curErr) {
-      console.error('cvs PATCH load', curErr);
-      return err('Failed to update CV', 'UPDATE_FAILED', 500);
-    }
+    const current = await getCvsRepo().getById(user.id, id);
     if (!current) return err('Not found', 'NOT_FOUND', 404);
 
     const hasCvPatch = Object.keys(patch).length > 0;
@@ -94,19 +72,12 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     if (hasCvPatch) {
       const withCompletion = mergeAndCompleteCv(current as Record<string, unknown>, patch);
       const payload = stripUndefined(withCompletion);
-
-      const { data: updated, error } = await supabase
-        .from('cvs')
-        .update(payload)
-        .eq('id', id)
-        .eq('user_id', user.id)
-        .select()
-        .single();
-      if (error) {
-        console.error('cvs PATCH', error);
+      try {
+        updatedRow = await getCvsRepo().update(user.id, id, payload);
+      } catch (e) {
+        console.error('cvs PATCH', e);
         return err('Failed to update CV', 'UPDATE_FAILED', 500);
       }
-      updatedRow = updated as Record<string, unknown>;
     }
 
     const now = new Date().toISOString();
@@ -114,66 +85,44 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       const jids = (current.job_ids as string[] | undefined) ?? [];
       const firstJob = jids[0];
       const clContent = (coverLetterContentRaw as string).trim();
+      const source = updatedRow ?? (current as Record<string, unknown>);
+      const clFields = {
+        applicant_name: (source.full_name as string | null) ?? null,
+        applicant_role: (source.professional_title as string | null) ?? null,
+        applicant_email: (source.email as string | null) ?? null,
+        applicant_phone: (source.phone as string | null) ?? null,
+        applicant_location: (source.location as string | null) ?? null,
+        content: clContent,
+        template_id: 'cl-classic',
+        generation_model: CLAUDE_MODEL,
+      };
 
       if (firstJob) {
-        const { data: clRow } = await supabase
-          .from('cover_letters')
-          .select('id')
-          .eq('user_id', user.id)
-          .contains('job_ids', [firstJob])
-          .maybeSingle();
-
+        const existing = await getCoverLettersRepo().listByUser(user.id, firstJob);
+        const clRow = existing[0];
         if (clRow?.id) {
-          await supabase
-            .from('cover_letters')
-            .update({
-              content: clContent,
-              updated_at: now,
-            })
-            .eq('id', clRow.id)
-            .eq('user_id', user.id);
-        } else {
-          const source = updatedRow ?? (current as Record<string, unknown>);
-          await supabase.from('cover_letters').insert({
-            user_id: user.id,
-            applicant_name: (source.full_name as string | null) ?? null,
-            applicant_role: (source.professional_title as string | null) ?? null,
-            applicant_email: (source.email as string | null) ?? null,
-            applicant_phone: (source.phone as string | null) ?? null,
-            applicant_location: (source.location as string | null) ?? null,
+          await getCoverLettersRepo().update(user.id, clRow.id as string, {
             content: clContent,
-            template_id: 'cl-classic',
-            generation_model: CLAUDE_MODEL,
+            updated_at: now,
+          });
+        } else {
+          await getCoverLettersRepo().insert(user.id, {
+            ...clFields,
             job_ids: [firstJob],
           });
         }
       } else {
-        // No linked job — still create/update a standalone letter if content provided
-        const source = updatedRow ?? (current as Record<string, unknown>);
-        await supabase.from('cover_letters').insert({
-          user_id: user.id,
-          applicant_name: (source.full_name as string | null) ?? null,
-          applicant_role: (source.professional_title as string | null) ?? null,
-          applicant_email: (source.email as string | null) ?? null,
-          applicant_phone: (source.phone as string | null) ?? null,
-          applicant_location: (source.location as string | null) ?? null,
-          content: clContent,
-          template_id: 'cl-classic',
-          generation_model: CLAUDE_MODEL,
+        await getCoverLettersRepo().insert(user.id, {
+          ...clFields,
           job_ids: [],
         });
       }
 
       if (!hasCvPatch) {
-        const { data: touched, error: touchErr } = await supabase
-          .from('cvs')
-          .update({ updated_at: now })
-          .eq('id', id)
-          .eq('user_id', user.id)
-          .select()
-          .single();
-        if (!touchErr && touched) {
-          updatedRow = touched as Record<string, unknown>;
+        try {
+          updatedRow = await getCvsRepo().update(user.id, id, { updated_at: now });
+        } catch {
+          /* keep previous */
         }
       }
     }
@@ -182,12 +131,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       return err('Failed to update CV', 'UPDATE_FAILED', 500);
     }
     if (!updatedRow) {
-      const { data: refetch } = await supabase
-        .from('cvs')
-        .select('*')
-        .eq('id', id)
-        .eq('user_id', user.id)
-        .maybeSingle();
+      const refetch = await getCvsRepo().getById(user.id, id);
       if (!refetch) return err('Not found', 'NOT_FOUND', 404);
       updatedRow = refetch as Record<string, unknown>;
     }
@@ -208,33 +152,13 @@ export async function PATCH(request: Request, { params }: RouteContext) {
 export async function DELETE(request: Request, { params }: RouteContext) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getSessionUser();
     if (!user) return err('Unauthorized', 'UNAUTHORIZED', 401);
 
     const url = new URL(request.url);
     const hard = url.searchParams.get('hard') === 'true';
 
-    if (hard) {
-      const { error } = await supabase.from('cvs').delete().eq('id', id).eq('user_id', user.id);
-      if (error) {
-        console.error('cvs DELETE hard', error);
-        return err('Failed to delete CV', 'DELETE_FAILED', 500);
-      }
-      return NextResponse.json({ ok: true });
-    }
-
-    const { error } = await supabase
-      .from('cvs')
-      .update({ is_archived: true })
-      .eq('id', id)
-      .eq('user_id', user.id);
-    if (error) {
-      console.error('cvs DELETE archive', error);
-      return err('Failed to archive CV', 'ARCHIVE_FAILED', 500);
-    }
+    await getCvsRepo().remove(user.id, id, hard);
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error('cvs DELETE', e);

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getSessionUser } from '@/lib/auth/session';
+import { getJobsRepo } from '@/lib/db/repositories/jobs';
 import type { JobStatus } from '@/types/database';
 import { isJobStatus } from '@/lib/job-status';
 
@@ -12,10 +13,7 @@ function err(msg: string, code: string | undefined, status: number) {
 export async function PATCH(request: Request, { params }: RouteContext) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getSessionUser();
     if (!user) return err('Unauthorized', 'UNAUTHORIZED', 401);
 
     const jid = id?.trim();
@@ -29,19 +27,15 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     const status = raw.trim() as JobStatus;
     const now = new Date().toISOString();
 
-    const { data, error } = await supabase
-      .from('jobs')
-      .update({ status, updated_at: now })
-      .eq('id', jid)
-      .eq('user_id', user.id)
-      .select('id, status, updated_at')
-      .maybeSingle();
-
-    if (error) {
-      console.error('jobs status PATCH', error);
-      return err('Failed to update status', 'UPDATE_FAILED', 500);
+    let data: Record<string, unknown>;
+    try {
+      data = await getJobsRepo().update(user.id, jid, { status, updated_at: now });
+    } catch (e) {
+      if (e instanceof Error && e.message === 'Job not found') {
+        return err('Not found', 'NOT_FOUND', 404);
+      }
+      throw e;
     }
-    if (!data) return err('Not found', 'NOT_FOUND', 404);
 
     return NextResponse.json({
       id: data.id as string,

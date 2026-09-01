@@ -1,5 +1,5 @@
 /**
- * Supabase table types — authoritative shapes for `cvs`, `jobs`, `cover_letters`.
+ * Table types for `cvs`, `jobs`, `cover_letters`.
  * JSONB columns may still contain legacy shapes at runtime; normalize at boundaries.
  */
 

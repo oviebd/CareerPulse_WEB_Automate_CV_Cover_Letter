@@ -27,10 +27,9 @@ These are **baked into the client bundle** during `npm run build`. If they chang
 
 | Variable | Description |
 |---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase public anon key |
 | `NEXT_PUBLIC_APP_URL` | Your production domain (e.g. `https://yourdomain.com`) |
 | `NEXT_PUBLIC_DEV_SUBSCRIPTION_PLAN` | Dev-only plan override (leave empty in production) |
+| `NEXT_PUBLIC_DATA_BACKEND` | Set to `postgres` for self-hosted DB (baked at build time) |
 
 ### Runtime (secrets — never baked into the image)
 
@@ -38,7 +37,12 @@ Loaded at container start from `.env.prod`. Keep this file out of version contro
 
 | Variable | Description |
 |---|---|
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role secret key |
+| `DATA_BACKEND` | `postgres` for self-hosted stack |
+| `DATABASE_URL` | Postgres connection string (auto-set in docker-compose for `app`) |
+| `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | Postgres container credentials |
+| `AUTH_SECRET` | Auth.js session secret (or reuse `JWT_SECRET`) |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth (redirect: `{APP_URL}/api/auth/callback/google`) |
+| `UPLOAD_DIR` | Local file storage root (default `/data/uploads` in Docker) |
 | `ANTHROPIC_API_KEY` | Claude API key |
 | `ANTHROPIC_MODEL` | Claude model ID (e.g. `claude-haiku-4-5-20251001`) |
 | `CV_ANALYZER_API_MODEL` | Model used for job fit analysis |
@@ -48,6 +52,17 @@ Loaded at container start from `.env.prod`. Keep this file out of version contro
 | `SSLCOMMERZ_STORE_ID` | SSLCommerz store ID |
 | `SSLCOMMERZ_STORE_PASSWORD` | SSLCommerz store password |
 | `SSLCOMMERZ_IS_LIVE` | `true` for production, `false` for sandbox |
+
+### Backups (Postgres)
+
+Nightly backup script: [`db/backup.sh`](db/backup.sh)
+
+```bash
+chmod +x db/backup.sh
+./db/backup.sh
+```
+
+Requires the `careerpulse-db` container to be running.
 
 ---
 
@@ -240,8 +255,6 @@ docker logs careerpulse-app-1
 # Local
 docker build \
   --build-arg NEXT_PUBLIC_APP_URL=https://yourdomain.com \
-  --build-arg NEXT_PUBLIC_SUPABASE_URL=... \
-  --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=... \
   -t youruser/careerpulse:latest .
 docker push youruser/careerpulse:latest
 

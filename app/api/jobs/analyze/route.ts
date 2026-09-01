@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
-import { createClient } from '@/lib/supabase/server';
+import { getSessionUser } from '@/lib/auth/session';
 import { rateLimitHit } from '@/lib/rate-limit';
 import { resolveEffectiveTier } from '@/lib/dev-subscription';
 import { canAccessFeature } from '@/lib/subscription';
 import type { JobAnalysisResult } from '@/types';
 import { migrateLegacyCVData } from '@/src/utils/cvDefaults';
+import { getCvsRepo } from '@/lib/db/repositories/cvs';
+import { getProfilesRepo } from '@/lib/db/repositories/profiles';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
@@ -77,10 +79,7 @@ function normalizeAnalysis(raw: Record<string, unknown>): JobAnalysisResult {
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getSessionUser();
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -107,11 +106,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'cvId is required' }, { status: 422 });
     }
 
-    const { data: prof } = await supabase
-      .from('profiles')
-      .select('subscription_tier')
-      .eq('id', user.id)
-      .single();
+    const prof = await getProfilesRepo().getById(user.id);
     const tier = resolveEffectiveTier(prof?.subscription_tier);
 
     if (!canAccessFeature(tier, 'aiExtrasAccess')) {
@@ -125,14 +120,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data: cvRow, error: cvErr } = await supabase
-      .from('cvs')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('id', cvId)
-      .maybeSingle();
+    const cvRow = await getCvsRepo().getById(user.id, cvId);
 
-    if (cvErr || !cvRow) {
+    if (!cvRow) {
       return NextResponse.json({ error: 'CV not found' }, { status: 404 });
     }
 

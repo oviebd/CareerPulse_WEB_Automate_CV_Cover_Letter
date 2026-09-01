@@ -1,39 +1,28 @@
 import { NextResponse } from 'next/server';
+import { getSessionUser } from '@/lib/auth/session';
 import { getDevSubscriptionOverride, resolveEffectiveTier } from '@/lib/dev-subscription';
-import { createClient } from '@/lib/supabase/server';
-import { countTailoredApplicationsThisMonth } from '@/lib/subscription';
+import { getProfilesRepo } from '@/lib/db/repositories/profiles';
+import { countTailoredApplicationsThisMonth } from '@/lib/subscription-server';
 import { TIER_LIMITS } from '@/types';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getSessionUser();
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
-    const { data: profile, error } = await supabase
-      .from('profiles')
-      .select(
-        'subscription_tier, subscription_status, subscription_expires_at, email'
-      )
-      .eq('id', user.id)
-      .single();
-
-    if (error || !profile) {
+    const profile = await getProfilesRepo().getById(user.id);
+    if (!profile) {
       return NextResponse.json({ error: 'profile_not_found' }, { status: 404 });
     }
     const dev = getDevSubscriptionOverride();
     const tier = resolveEffectiveTier(profile.subscription_tier);
-    const used = await countTailoredApplicationsThisMonth(user.id, supabase);
+    const used = await countTailoredApplicationsThisMonth(user.id);
     const limit = TIER_LIMITS[tier].generationsPerMonth;
     const remaining =
-      limit === Number.POSITIVE_INFINITY
-        ? null
-        : Math.max(0, limit - used);
+      limit === Number.POSITIVE_INFINITY ? null : Math.max(0, limit - used);
 
     return NextResponse.json({
       tier,

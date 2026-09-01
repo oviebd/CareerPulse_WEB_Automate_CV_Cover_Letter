@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getSessionUser } from '@/lib/auth/session';
+import { getCoverLettersRepo } from '@/lib/db/repositories/cover-letters';
 
 function err(msg: string, code: string | undefined, status: number) {
   return NextResponse.json({ error: msg, code }, { status });
@@ -7,24 +8,12 @@ function err(msg: string, code: string | undefined, status: number) {
 
 export async function GET(request: Request) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getSessionUser();
     if (!user) return err('Unauthorized', 'UNAUTHORIZED', 401);
 
     const url = new URL(request.url);
     const jobId = url.searchParams.get('jobId');
-
-    let q = supabase.from('cover_letters').select('*').eq('user_id', user.id);
-    if (jobId) {
-      q = q.contains('job_ids', [jobId]);
-    }
-    const { data, error } = await q.order('created_at', { ascending: false });
-    if (error) {
-      console.error('cover-letters GET', error);
-      return err('Failed to list cover letters', 'FETCH_FAILED', 500);
-    }
+    const data = await getCoverLettersRepo().listByUser(user.id, jobId ?? undefined);
     return NextResponse.json(data ?? []);
   } catch (e) {
     console.error('cover-letters GET', e);
@@ -34,10 +23,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getSessionUser();
     if (!user) return err('Unauthorized', 'UNAUTHORIZED', 401);
 
     const body = (await request.json().catch(() => ({}))) as {
@@ -66,41 +52,28 @@ export async function POST(request: Request) {
       : [];
 
     const tone =
-      typeof body.tone === 'string' && body.tone.trim()
-        ? body.tone.trim()
-        : 'professional';
+      typeof body.tone === 'string' && body.tone.trim() ? body.tone.trim() : 'professional';
     const length =
-      typeof body.length === 'string' && body.length.trim()
-        ? body.length.trim()
-        : 'medium';
+      typeof body.length === 'string' && body.length.trim() ? body.length.trim() : 'medium';
 
-    const { data, error } = await supabase
-      .from('cover_letters')
-      .insert({
-        user_id: user.id,
-        ...(body.name?.trim() ? { name: body.name.trim() } : {}),
-        content: body.content,
-        job_description: '',
-        tone,
-        length,
-        template_id: body.template_id?.trim() || 'cl-classic',
-        specific_emphasis: body.specific_emphasis?.trim() || null,
-        company_name: body.company_name?.trim() || null,
-        job_title: body.job_title?.trim() || null,
-        applicant_name: body.applicant_name?.trim() || null,
-        applicant_role: body.applicant_role?.trim() || null,
-        applicant_email: body.applicant_email?.trim() || null,
-        applicant_phone: body.applicant_phone?.trim() || null,
-        applicant_location: body.applicant_location?.trim() || null,
-        job_ids: jobIds,
-        source_type: body.source_type ?? null,
-      })
-      .select()
-      .single();
-    if (error) {
-      console.error('cover-letters POST', error);
-      return err('Failed to create cover letter', 'CREATE_FAILED', 500);
-    }
+    const data = await getCoverLettersRepo().insert(user.id, {
+      ...(body.name?.trim() ? { name: body.name.trim() } : {}),
+      content: body.content,
+      job_description: '',
+      tone,
+      length,
+      template_id: body.template_id?.trim() || 'cl-classic',
+      specific_emphasis: body.specific_emphasis?.trim() || null,
+      company_name: body.company_name?.trim() || null,
+      job_title: body.job_title?.trim() || null,
+      applicant_name: body.applicant_name?.trim() || null,
+      applicant_role: body.applicant_role?.trim() || null,
+      applicant_email: body.applicant_email?.trim() || null,
+      applicant_phone: body.applicant_phone?.trim() || null,
+      applicant_location: body.applicant_location?.trim() || null,
+      job_ids: jobIds,
+      source_type: body.source_type ?? null,
+    });
     return NextResponse.json(data);
   } catch (e) {
     console.error('cover-letters POST', e);

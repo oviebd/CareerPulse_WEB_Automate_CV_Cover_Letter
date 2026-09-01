@@ -1,33 +1,29 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getSessionUser } from '@/lib/auth/session';
+import { getCvsRepo } from '@/lib/db/repositories/cvs';
 
 export async function GET() {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getSessionUser();
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data, error } = await supabase
-      .from('cvs')
-      .select('id, name, full_name, completion_percentage, is_complete, created_at, preferred_template_id')
-      .eq('user_id', user.id)
-      .eq('is_archived', false)
-      .order('created_at', { ascending: false });
+    const rows = await getCvsRepo().listByUser(user.id);
+    const versions = rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      full_name: r.full_name,
+      completion_percentage: r.completion_percentage,
+      is_complete: r.is_complete,
+      created_at: r.created_at,
+      preferred_template_id: r.preferred_template_id,
+    }));
 
-    if (error) {
-      console.error('cv versions GET', error);
-      return NextResponse.json({ error: 'fetch_failed' }, { status: 500 });
-    }
-
-    return NextResponse.json({ versions: data ?? [] });
+    return NextResponse.json({ versions });
   } catch (e) {
     console.error('cv versions route', e);
     return NextResponse.json({ error: 'fetch_failed' }, { status: 500 });
   }
 }
-

@@ -20,7 +20,8 @@ import {
   useUpdateCoverLetter,
 } from '@/hooks/useCoverLetters';
 import { useSubscription } from '@/hooks/useSubscription';
-import { createClient } from '@/lib/supabase/client';
+import { apiFetch } from '@/lib/api-fetch';
+import { useCoverLetterTemplates } from '@/hooks/useTemplates';
 import { useQueryClient } from '@tanstack/react-query';
 import { canUseTemplate, canAccessFeature } from '@/lib/subscription';
 import { ExportMenu } from '@/components/shared/ExportMenu';
@@ -50,15 +51,7 @@ export default function CoverLetterDetailPage() {
     queryKey: ['job', jobId, userId],
     queryFn: async (): Promise<Job | null> => {
       if (!jobId || !userId) return null;
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from('jobs')
-        .select('*')
-        .eq('id', jobId)
-        .eq('user_id', userId)
-        .maybeSingle();
-      if (error) throw error;
-      return (data as Job) ?? null;
+      return apiFetch<Job>(`/api/jobs/${jobId}`);
     },
     enabled: Boolean(jobId) && Boolean(userId),
   });
@@ -69,13 +62,8 @@ export default function CoverLetterDetailPage() {
   const { data: preferredClTemplateId = 'cl-classic' } = useQuery({
     queryKey: ['profile-cl-template', userId],
     queryFn: async (): Promise<string> => {
-      const supabase = createClient();
-      const { data } = await supabase
-        .from('profiles')
-        .select('preferred_cl_template_id')
-        .eq('id', userId ?? '')
-        .maybeSingle();
-      return (data?.preferred_cl_template_id as string | null) ?? 'cl-classic';
+      const profile = await apiFetch<{ preferred_cl_template_id?: string | null }>('/api/account');
+      return profile.preferred_cl_template_id ?? 'cl-classic';
     },
     enabled: Boolean(userId),
     staleTime: 5 * 60 * 1000,
@@ -105,19 +93,7 @@ export default function CoverLetterDetailPage() {
   const jobSyncedForLetterRef = useRef<string | null>(null);
   const previewUrlRef = useRef<string | null>(null);
 
-  const { data: templates = [] } = useQuery({
-    queryKey: ['cover-letter-templates'],
-    queryFn: async (): Promise<CVTemplate[]> => {
-      const supabase = createClient();
-      const { data } = await supabase
-        .from('cv_templates')
-        .select('*')
-        .eq('type', 'cover_letter')
-        .order('sort_order');
-      return (data ?? []) as CVTemplate[];
-    },
-    staleTime: 10 * 60 * 1000,
-  });
+  const { data: templates = [] } = useCoverLetterTemplates();
 
   useEffect(() => {
     if (!isDraftMode) return;
@@ -135,15 +111,16 @@ export default function CoverLetterDetailPage() {
 
   useEffect(() => {
     if (!isDraftMode || !draftClMeta?.originalCvId) return;
-    const supabase = createClient();
     const cvId = draftClMeta.originalCvId as string;
     let cancelled = false;
     void (async () => {
-      const { data } = await supabase
-        .from('cvs')
-        .select('full_name, professional_title, email, phone, location')
-        .eq('id', cvId)
-        .maybeSingle();
+      const data = await apiFetch<{
+        full_name: string | null;
+        professional_title: string | null;
+        email: string | null;
+        phone: string | null;
+        location: string | null;
+      }>(`/api/cvs/${cvId}`);
       if (cancelled || !data) return;
       setDraftApplicantName((prev) => prev || (data.full_name ?? ''));
       setDraftApplicantRole((prev) => prev || (data.professional_title ?? ''));
@@ -359,16 +336,13 @@ export default function CoverLetterDetailPage() {
         });
         syncDraftFromLetter(saved);
         if (letter.job_ids?.[0]) {
-          const supabase = createClient();
-          const { error: jobErr } = await supabase
-            .from('jobs')
-            .update({
+          await apiFetch(`/api/jobs/${letter.job_ids[0]}`, {
+            method: 'PATCH',
+            body: JSON.stringify({
               company_name: draftCompanyName.trim() || 'Company',
               job_title: draftJobTitle.trim() || 'Role',
-            })
-            .eq('id', letter.job_ids[0])
-            .eq('user_id', userId ?? '');
-          if (jobErr) throw jobErr;
+            }),
+          });
           void qc.invalidateQueries({
             queryKey: ['job', letter.job_ids[0], userId],
           });

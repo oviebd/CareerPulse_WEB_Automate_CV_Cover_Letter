@@ -23,7 +23,7 @@ const nextConfig = {
       '@dnd-kit/utilities',
     ],
   },
-  serverExternalPackages: ['puppeteer', '@napi-rs/canvas', 'pdfjs-dist', 'pdf-parse'],
+  serverExternalPackages: ['puppeteer', '@napi-rs/canvas', 'pdfjs-dist', 'pdf-parse', 'postgres', 'drizzle-orm'],
   /** pdfjs worker + native canvas must ship with standalone/Docker output for CV upload. */
   outputFileTracingIncludes: {
     '/api/extract': [

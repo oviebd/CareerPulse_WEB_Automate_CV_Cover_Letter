@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getSessionUser } from '@/lib/auth/session';
 import type { Job } from '@/types/database';
 import { stripUndefined } from '@/lib/queries/strip-undefined';
 import { fetchLinkedDocumentsForJobs } from '@/lib/jobs-linked';
 import { isJobStatus } from '@/lib/job-status';
+import { getJobsRepo } from '@/lib/db/repositories/jobs';
 
 function err(msg: string, code: string | undefined, status: number) {
   return NextResponse.json({ error: msg, code }, { status });
@@ -11,10 +12,7 @@ function err(msg: string, code: string | undefined, status: number) {
 
 export async function GET(request: Request) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getSessionUser();
     if (!user) return err('Unauthorized', 'UNAUTHORIZED', 401);
 
     const url = new URL(request.url);
@@ -22,28 +20,19 @@ export async function GET(request: Request) {
     const starred = url.searchParams.get('starred');
     const listAll = url.searchParams.get('all') === '1';
 
-    let q = supabase.from('jobs').select('*').eq('user_id', user.id);
+    let rows = (await getJobsRepo().listByUser(user.id)) as unknown as Job[];
     if (!listAll) {
-      q = q.neq('status', 'none');
+      rows = rows.filter((j) => j.status !== 'none');
     }
     if (statusFilter) {
-      q = q.eq('status', statusFilter);
+      rows = rows.filter((j) => j.status === statusFilter);
     }
     if (starred === 'true') {
-      q = q.eq('is_starred', true);
+      rows = rows.filter((j) => j.is_starred);
     }
-    const { data, error } = await q.order('updated_at', { ascending: false });
-    if (error) {
-      console.error('jobs GET', error);
-      return err('Failed to list jobs', 'FETCH_FAILED', 500);
-    }
-    const rows = (data ?? []) as Job[];
+
     const ids = rows.map((j) => j.id);
-    const { cvsByJob, clByJob } = await fetchLinkedDocumentsForJobs(
-      supabase,
-      user.id,
-      ids
-    );
+    const { cvsByJob, clByJob } = await fetchLinkedDocumentsForJobs(user.id, ids);
     const withLinks: Job[] = rows.map((j) => ({
       ...j,
       cvs: cvsByJob.get(j.id) ?? [],
@@ -66,10 +55,7 @@ function normalizeKeywords(input: unknown): string[] {
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getSessionUser();
     if (!user) return err('Unauthorized', 'UNAUTHORIZED', 401);
 
     const body = (await request.json()) as Record<string, unknown>;
@@ -116,24 +102,15 @@ export async function POST(request: Request) {
     }
     delete payload.status;
 
-    const { data, error } = await supabase
-      .from('jobs')
-      .insert({
-        ...payload,
-        user_id: user.id,
-        company_name,
-        job_title,
-        job_url,
-        keywords,
-        job_summary,
-        ...(initialStatus ? { status: initialStatus } : {}),
-      })
-      .select()
-      .single();
-    if (error) {
-      console.error('jobs POST', error);
-      return err('Failed to create job', 'CREATE_FAILED', 500);
-    }
+    const data = await getJobsRepo().insert(user.id, {
+      ...payload,
+      company_name,
+      job_title,
+      job_url,
+      keywords,
+      job_summary,
+      ...(initialStatus ? { status: initialStatus } : {}),
+    });
     return NextResponse.json(data);
   } catch (e) {
     console.error('jobs POST', e);

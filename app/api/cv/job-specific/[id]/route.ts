@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getSessionUser } from '@/lib/auth/session';
 import { dbRowToCvProfile } from '@/lib/cv-mapper';
 import type { Job } from '@/types/database';
+import { getCvsRepo } from '@/lib/db/repositories/cvs';
+import { getJobsRepo } from '@/lib/db/repositories/jobs';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 async function enrichOne(
-  supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
   row: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
@@ -16,14 +17,9 @@ async function enrichOne(
   let companyName: string | null = null;
   let jobDescription = '';
   if (jobIds.length > 0) {
-    const { data: job } = await supabase
-      .from('jobs')
-      .select('*')
-      .eq('id', jobIds[0])
-      .eq('user_id', userId)
-      .maybeSingle();
+    const job = await getJobsRepo().getById(userId, jobIds[0]);
     if (job) {
-      const j = job as Job;
+      const j = job as unknown as Job;
       jobTitle = j.job_title;
       companyName = j.company_name;
       const kw = Array.isArray(j.keywords) ? j.keywords : [];
@@ -43,30 +39,17 @@ async function enrichOne(
 export async function GET(_request: Request, { params }: RouteContext) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getSessionUser();
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data, error } = await supabase
-      .from('cvs')
-      .select('*')
-      .eq('id', id)
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    if (error) {
-      console.error('job-specific GET [id]', error);
-      return NextResponse.json({ error: 'fetch_failed' }, { status: 500 });
-    }
+    const data = await getCvsRepo().getById(user.id, id);
     if (!data) {
       return NextResponse.json({ error: 'not_found' }, { status: 404 });
     }
 
-    const enriched = await enrichOne(supabase, user.id, data as Record<string, unknown>);
+    const enriched = await enrichOne(user.id, data as Record<string, unknown>);
     return NextResponse.json({ job_cv: enriched });
   } catch (e) {
     console.error('job-specific GET [id]', e);
@@ -77,10 +60,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
 export async function PATCH(request: Request, { params }: RouteContext) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getSessionUser();
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -91,49 +71,26 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     delete patch.job_description;
 
     if (patch.job_title != null || patch.company_name != null || patch.keywords != null) {
-      const { data: cvRow } = await supabase
-        .from('cvs')
-        .select('job_ids')
-        .eq('id', id)
-        .eq('user_id', user.id)
-        .maybeSingle();
+      const cvRow = await getCvsRepo().getById(user.id, id);
       const jids = (cvRow?.job_ids as string[] | undefined) ?? [];
       if (jids.length > 0) {
         const kwPatch =
           Array.isArray(patch.keywords) && patch.keywords.every((x) => typeof x === 'string')
             ? (patch.keywords as string[])
             : undefined;
-        await supabase
-          .from('jobs')
-          .update({
-            ...(typeof patch.company_name === 'string'
-              ? { company_name: patch.company_name }
-              : {}),
-            ...(typeof patch.job_title === 'string' ? { job_title: patch.job_title } : {}),
-            ...(kwPatch ? { keywords: kwPatch } : {}),
-          })
-          .eq('id', jids[0])
-          .eq('user_id', user.id);
+        await getJobsRepo().update(user.id, jids[0], {
+          ...(typeof patch.company_name === 'string' ? { company_name: patch.company_name } : {}),
+          ...(typeof patch.job_title === 'string' ? { job_title: patch.job_title } : {}),
+          ...(kwPatch ? { keywords: kwPatch } : {}),
+        });
       }
       delete patch.job_title;
       delete patch.company_name;
       delete patch.keywords;
     }
 
-    const { data, error } = await supabase
-      .from('cvs')
-      .update(patch)
-      .eq('id', id)
-      .eq('user_id', user.id)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('job-specific PATCH', error);
-      return NextResponse.json({ error: 'update_failed' }, { status: 500 });
-    }
-
-    const enriched = await enrichOne(supabase, user.id, data as Record<string, unknown>);
+    const data = await getCvsRepo().update(user.id, id, patch);
+    const enriched = await enrichOne(user.id, data as Record<string, unknown>);
     return NextResponse.json({ job_cv: enriched });
   } catch (e) {
     console.error('job-specific PATCH', e);
@@ -144,24 +101,12 @@ export async function PATCH(request: Request, { params }: RouteContext) {
 export async function DELETE(_request: Request, { params }: RouteContext) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getSessionUser();
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { error } = await supabase
-      .from('cvs')
-      .update({ is_archived: true })
-      .eq('id', id)
-      .eq('user_id', user.id);
-
-    if (error) {
-      console.error('job-specific DELETE', error);
-      return NextResponse.json({ error: 'archive_failed' }, { status: 500 });
-    }
+    await getCvsRepo().remove(user.id, id, false);
 
     return NextResponse.json({ ok: true });
   } catch (e) {

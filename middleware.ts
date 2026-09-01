@@ -1,70 +1,32 @@
-import { createServerClient } from '@supabase/ssr';
+import { auth } from '@/lib/auth';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { getSupabasePublicAnonKey } from '@/lib/supabase/public-env';
 import { isProtectedAppPath } from '@/lib/guest-cv-paths';
 
 const AUTH_ROUTES = ['/login', '/register'];
 
 export async function middleware(request: NextRequest) {
-  const response = NextResponse.next({ request });
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    getSupabasePublicAnonKey(),
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          );
-        },
-      },
-    }
-  );
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
   const { pathname } = request.nextUrl;
   const isProtected = isProtectedAppPath(pathname);
   const isAuthRoute = AUTH_ROUTES.some((p) => pathname.startsWith(p));
 
+  const session = await auth();
+  const user = session?.user;
+
   if (isProtected && !user) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
-    const returnPath = `${pathname}${request.nextUrl.search}`;
-    url.searchParams.set('returnTo', returnPath);
-    const redirectResponse = NextResponse.redirect(url);
-    // Supabase may refresh the session; copy full cookies (name + value + options) to the redirect
-    response.cookies.getAll().forEach((cookie) => {
-      redirectResponse.cookies.set(cookie);
-    });
-    return redirectResponse;
+    url.searchParams.set('returnTo', `${pathname}${request.nextUrl.search}`);
+    return NextResponse.redirect(url);
   }
-
   if (isAuthRoute && user) {
-    const redirectResponse = NextResponse.redirect(new URL('/dashboard', request.url));
-    response.cookies.getAll().forEach((cookie) => {
-      redirectResponse.cookies.set(cookie);
-    });
-    return redirectResponse;
+    return NextResponse.redirect(new URL('/dashboard', request.url));
   }
-
-  return response;
+  return NextResponse.next();
 }
 
 export const config = {
   matcher: [
-    /*
-     * Only match pages that need auth checks. Exclude:
-     * - _next/ (build assets, HMR)
-     * - api/ (route handlers authenticate themselves)
-     * - favicon.ico, static files
-     */
     '/((?!_next/|api/|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
   ],
 };

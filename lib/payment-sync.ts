@@ -1,19 +1,20 @@
-import { createAdminClient } from '@/lib/supabase/server';
 import { PRICING, type PricingPlanKey } from '@/types';
+import { getPaymentsRepo } from '@/lib/db/repositories/payments';
+import { getProfilesRepo } from '@/lib/db/repositories/profiles';
 
 export async function applySuccessfulPayment(params: {
   tran_id: string;
   val_id: string | null;
   gateway_response: Record<string, unknown>;
 }): Promise<{ ok: boolean; reason?: string }> {
-  const admin = createAdminClient();
-  const { data: payment, error: fetchErr } = await admin
-    .from('payments')
-    .select('*')
-    .eq('tran_id', params.tran_id)
-    .maybeSingle();
+  const payment = (await getPaymentsRepo().getByTranId(params.tran_id)) as {
+    status?: string;
+    plan?: string;
+    amount?: string | number;
+    user_id?: string;
+  } | null;
 
-  if (fetchErr || !payment) {
+  if (!payment) {
     return { ok: false, reason: 'payment_not_found' };
   }
   if (payment.status === 'success') {
@@ -36,35 +37,26 @@ export async function applySuccessfulPayment(params: {
   const end = new Date(now);
   end.setDate(end.getDate() + pricing.days);
 
-  const { error: payUp } = await admin
-    .from('payments')
-    .update({
-      status: 'success',
-      val_id: params.val_id,
-      gateway_response: params.gateway_response,
-      billing_period_start: now.toISOString(),
-      billing_period_end: end.toISOString(),
-    })
-    .eq('tran_id', params.tran_id);
-
-  if (payUp) {
-    console.error('payment update', payUp);
+  const updated = await getPaymentsRepo().updateByTranId(params.tran_id, {
+    status: 'success',
+    val_id: params.val_id,
+    gateway_response: params.gateway_response,
+    billing_period_start: now,
+    billing_period_end: end,
+  });
+  if (!updated) {
     return { ok: false, reason: 'update_failed' };
   }
 
-  const { error: profUp } = await admin
-    .from('profiles')
-    .update({
-      subscription_tier: pricing.tier,
-      subscription_status: 'active',
-      subscription_expires_at: end.toISOString(),
-    })
-    .eq('id', payment.user_id);
-
-  if (profUp) {
-    console.error('profile update', profUp);
+  if (!payment.user_id) {
     return { ok: false, reason: 'profile_update_failed' };
   }
+
+  await getProfilesRepo().update(payment.user_id, {
+    subscription_tier: pricing.tier,
+    subscription_status: 'active',
+    subscription_expires_at: end.toISOString(),
+  });
 
   return { ok: true };
 }

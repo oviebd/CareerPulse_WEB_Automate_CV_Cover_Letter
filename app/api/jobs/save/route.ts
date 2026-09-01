@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getSessionUser } from '@/lib/auth/session';
 import type { Json } from '@/types/database';
+import { getJobsRepo } from '@/lib/db/repositories/jobs';
+import { getProfilesRepo } from '@/lib/db/repositories/profiles';
 
 function err(
   msg: string,
@@ -27,10 +29,7 @@ function normalizeKeywords(input: unknown): string[] {
  */
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getSessionUser();
     if (!user) return err('Unauthorized', 401);
 
     const body = (await request.json()) as {
@@ -55,54 +54,20 @@ export async function POST(request: Request) {
         ? body.company.trim()
         : 'Company';
 
-    // jobs.user_id FK → profiles(id); avoid opaque 23503 from missing profile row
-    const { data: profileRow, error: profileErr } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('id', user.id)
-      .maybeSingle();
-    if (profileErr) {
-      console.error('jobs/save profile lookup', profileErr);
-      return err('Could not verify your profile.', 500, {
-        code: profileErr.code,
-        details: profileErr.message,
-      });
-    }
+    const profileRow = await getProfilesRepo().getById(user.id);
     if (!profileRow) {
-      return err(
-        'Your profile could not be found. Try signing out and back in.',
-        400
-      );
+      return err('Your profile could not be found. Try signing out and back in.', 400);
     }
 
-    // DB column `keywords` is JSONB (migration 012) — store as JSON-serialisable array
     const keywordsJson: Json = keywords;
 
-    const { data, error } = await supabase
-      .from('jobs')
-      .insert({
-        user_id: user.id,
-        job_title,
-        company_name,
-        job_url,
-        keywords: keywordsJson,
-        job_summary,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.error('jobs/save', error);
-      return err(
-        error.message || 'Failed to save job',
-        500,
-        {
-          code: error.code,
-          details: error.details,
-          hint: error.hint,
-        }
-      );
-    }
+    const data = await getJobsRepo().insert(user.id, {
+      job_title,
+      company_name,
+      job_url,
+      keywords: keywordsJson,
+      job_summary,
+    });
 
     if (!data?.id) {
       return err('Save succeeded but no job id was returned.', 500);

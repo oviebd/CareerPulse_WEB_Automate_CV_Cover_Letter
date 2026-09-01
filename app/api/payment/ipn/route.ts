@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { applySuccessfulPayment } from '@/lib/payment-sync';
 import { validatePayment, verifyCallbackSignature } from '@/lib/sslcommerz';
-import { createAdminClient } from '@/lib/supabase/server';
 import { sendPaymentReceiptEmail } from '@/lib/resend-mail';
+import { getPaymentsRepo } from '@/lib/db/repositories/payments';
+import { getProfilesRepo } from '@/lib/db/repositories/profiles';
 
 /**
  * SSLCommerz IPN — verify callback signature, then validate val_id server-side.
@@ -29,11 +30,10 @@ export async function POST(request: Request) {
     }
 
     if (status && status !== 'VALID' && status !== 'VALIDATED') {
-      const admin = createAdminClient();
-      await admin
-        .from('payments')
-        .update({ status: 'failed', gateway_response: data })
-        .eq('tran_id', tran_id);
+      await getPaymentsRepo().updateByTranId(tran_id, {
+        status: 'failed',
+        gateway_response: data,
+      });
       return NextResponse.json({ ok: true });
     }
 
@@ -43,12 +43,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'invalid' }, { status: 400 });
     }
 
-    const admin = createAdminClient();
-    const { data: payment } = await admin
-      .from('payments')
-      .select('user_id, amount, plan')
-      .eq('tran_id', tran_id)
-      .maybeSingle();
+    const payment = await getPaymentsRepo().getByTranId(tran_id);
 
     const result = await applySuccessfulPayment({
       tran_id,
@@ -56,17 +51,14 @@ export async function POST(request: Request) {
       gateway_response: data,
     });
 
-    if (result.ok && payment?.user_id) {
-      const { data: prof } = await admin
-        .from('profiles')
-        .select('email')
-        .eq('id', payment.user_id)
-        .single();
+    const userId = payment?.user_id as string | undefined;
+    if (result.ok && userId) {
+      const prof = await getProfilesRepo().getById(userId);
       if (prof?.email) {
         await sendPaymentReceiptEmail({
           to: prof.email,
-          plan: String(payment.plan),
-          amount: String(payment.amount),
+          plan: String(payment?.plan),
+          amount: String(payment?.amount),
         });
       }
     }

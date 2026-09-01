@@ -4,8 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect } from 'react';
 
 /**
- * For Supabase redirects configured to `/callback` instead of `/api/auth/callback`:
- * forwards `code` (and `next`) to the API route for PKCE exchange.
+ * For OAuth redirects that land on `/callback` instead of `/api/auth/callback/google`.
  */
 export default function CallbackClient() {
   const router = useRouter();

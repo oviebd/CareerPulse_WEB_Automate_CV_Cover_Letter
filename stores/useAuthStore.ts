@@ -1,16 +1,20 @@
-import type { User } from '@supabase/supabase-js';
-import { create } from 'zustand';
-import type { Profile } from '@/types';
+export type AppUser = {
+  id: string;
+  email: string;
+};
 
 export interface AuthState {
-  user: User | null;
-  profile: Profile | null;
+  user: AppUser | null;
+  profile: import('@/types').Profile | null;
   initialized: boolean;
-  setUser: (user: User | null) => void;
-  setProfile: (profile: Profile | null) => void;
+  setUser: (user: AppUser | null) => void;
+  setProfile: (profile: import('@/types').Profile | null) => void;
   setInitialized: (value: boolean) => void;
   reset: () => void;
 }
+
+import { create } from 'zustand';
+import type { Profile } from '@/types';
 
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
@@ -21,3 +25,5 @@ export const useAuthStore = create<AuthState>((set) => ({
   setInitialized: (initialized) => set({ initialized }),
   reset: () => set({ user: null, profile: null, initialized: true }),
 }));
+
+export type { Profile };

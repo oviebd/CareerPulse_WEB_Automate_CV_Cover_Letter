@@ -1,29 +1,18 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getSessionUser } from '@/lib/auth/session';
+import { getCvsRepo } from '@/lib/db/repositories/cvs';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function DELETE(_request: Request, { params }: RouteContext) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getSessionUser();
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { error } = await supabase
-      .from('cvs')
-      .delete()
-      .eq('id', id)
-      .eq('user_id', user.id);
-
-    if (error) {
-      console.error('core cv DELETE', error);
-      return NextResponse.json({ error: 'delete_failed' }, { status: 500 });
-    }
+    await getCvsRepo().remove(user.id, id, true);
 
     return NextResponse.json({ ok: true });
   } catch (e) {
@@ -31,4 +20,3 @@ export async function DELETE(_request: Request, { params }: RouteContext) {
     return NextResponse.json({ error: 'delete_failed' }, { status: 500 });
   }
 }
-

@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { LayoutTemplate, Mail } from 'lucide-react';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/client';
+import { apiFetch } from '@/lib/api-fetch';
+import { useCoverLetterTemplates } from '@/hooks/useTemplates';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -24,30 +25,17 @@ export default function CoverLetterTemplatesPage() {
   const { tier } = useSubscription();
   const [color, setColor] = useState('#2563EB');
 
-  const { data: templates = [] } = useQuery({
-    queryKey: ['cover-letter-templates'],
-    queryFn: async (): Promise<CVTemplate[]> => {
-      const supabase = createClient();
-      const { data } = await supabase
-        .from('cv_templates')
-        .select('*')
-        .eq('type', 'cover_letter')
-        .order('sort_order');
-      return (data ?? []) as CVTemplate[];
-    },
-    staleTime: 10 * 60 * 1000,
-  });
+  const { data: templates = [] } = useCoverLetterTemplates();
 
   async function setPreferredTemplate(id: string) {
     if (!userId) {
       toast('Sign in to save a default template.', 'error');
       return;
     }
-    const supabase = createClient();
-    const { error } = await supabase
-      .from('profiles')
-      .update({ preferred_cl_template_id: id })
-      .eq('id', userId);
+    const { error } = await apiFetch('/api/account', {
+      method: 'PATCH',
+      body: JSON.stringify({ preferred_cl_template_id: id }),
+    }).then(() => ({ error: null as null })).catch((e: Error) => ({ error: e }));
     if (error) {
       toast('Could not save default (add preferred_cl_template_id to profiles if missing).', 'error');
       return;

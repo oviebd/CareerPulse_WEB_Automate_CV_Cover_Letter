@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { apiFetch } from '@/lib/api-fetch';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
@@ -15,15 +15,16 @@ export default function AccountSettingsPage() {
   const [deletePhrase, setDeletePhrase] = useState('');
   const [savingName, setSavingName] = useState(false);
   const [exportingData, setExportingData] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   async function saveName() {
     setSavingName(true);
     try {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      await supabase.from('profiles').update({ full_name: name }).eq('id', user.id);
-      if (profile) setProfile({ ...profile, full_name: name });
+      const updated = await apiFetch<{ full_name?: string | null }>('/api/account', {
+        method: 'PATCH',
+        body: JSON.stringify({ full_name: name }),
+      });
+      if (profile) setProfile({ ...profile, full_name: updated.full_name ?? name });
       toast('Profile updated.', 'success');
     } finally {
       setSavingName(false);
@@ -33,24 +34,29 @@ export default function AccountSettingsPage() {
   async function exportData() {
     setExportingData(true);
     try {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const [cv, letters, apps] = await Promise.all([
-        supabase.from('cvs').select('*').eq('user_id', user.id),
-        supabase.from('cover_letters').select('*').eq('user_id', user.id),
-        supabase.from('jobs').select('*').eq('user_id', user.id),
-      ]);
-      const blob = new Blob(
-        [JSON.stringify({ cv: cv.data, cover_letters: letters.data, applications: apps.data }, null, 2)],
-        { type: 'application/json' }
-      );
+      const data = await apiFetch<{
+        cv: unknown[];
+        cover_letters: unknown[];
+        applications: unknown[];
+      }>('/api/account/export');
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = 'cv-app-export.json';
       a.click();
     } finally {
       setExportingData(false);
+    }
+  }
+
+  async function deleteAccount() {
+    setDeletingAccount(true);
+    try {
+      await apiFetch('/api/account', { method: 'DELETE' });
+      window.location.href = '/';
+    } catch {
+      toast('Could not delete account. Please try again.', 'error');
+      setDeletingAccount(false);
     }
   }
 
@@ -63,7 +69,7 @@ export default function AccountSettingsPage() {
           Save name
         </Button>
         <p className="text-xs text-[var(--color-muted)]">
-          Email and password changes use Supabase Auth in the hosted UI or your project settings.
+          To change your email or password, contact support or create a new account.
         </p>
       </div>
       <div>
@@ -75,7 +81,7 @@ export default function AccountSettingsPage() {
       <div className="rounded-xl border border-red-200 bg-red-50/50 p-4">
         <h2 className="font-semibold text-red-900">Delete account</h2>
         <p className="mt-1 text-sm text-red-800">
-          Type DELETE to confirm. This app does not remove the auth user automatically; disable or delete the user in Supabase Dashboard after clearing data.
+          Type DELETE to confirm. This permanently removes your profile, CVs, cover letters, and job data.
         </p>
         <Input
           className="mt-2"
@@ -86,8 +92,9 @@ export default function AccountSettingsPage() {
           variant="danger"
           size="sm"
           className="mt-2"
-          disabled={deletePhrase !== 'DELETE'}
-          onClick={() => toast('Remove data in Supabase and delete auth user from Dashboard.', 'info')}
+          disabled={deletePhrase !== 'DELETE' || deletingAccount}
+          loading={deletingAccount}
+          onClick={() => void deleteAccount()}
         >
           I understand
         </Button>

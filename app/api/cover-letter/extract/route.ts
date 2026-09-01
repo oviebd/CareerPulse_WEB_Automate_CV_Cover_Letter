@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import {
   extractCoverLetterFromText,
   describeAnthropicError,
@@ -9,6 +8,10 @@ import {
   extractDocumentTextFromBuffer,
   isAllowedStorageUrl,
 } from '@/lib/extract-document-text';
+import { getSessionUser } from '@/lib/auth/session';
+import { getCvsRepo } from '@/lib/db/repositories/cvs';
+import { getProfilesRepo } from '@/lib/db/repositories/profiles';
+import { fetchStorageFileBuffer } from '@/lib/storage/fetch-file';
 import type { ExtractedCoverLetter } from '@/types';
 
 export const runtime = 'nodejs';
@@ -61,12 +64,8 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as { fileUrl?: string };
 
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-    if (authError || !user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
@@ -81,15 +80,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'invalid_file_url' }, { status: 400 });
     }
 
-    const fileRes = await fetch(body.fileUrl);
-    if (!fileRes.ok) {
-      return NextResponse.json({ error: 'file_fetch_failed' }, { status: 400 });
+    const fileResult = await fetchStorageFileBuffer(body.fileUrl, user.id);
+    if (!fileResult.ok) {
+      return NextResponse.json({ error: fileResult.error }, { status: 400 });
     }
-    const buf = Buffer.from(await fileRes.arrayBuffer());
 
     let textEx: Awaited<ReturnType<typeof extractDocumentTextFromBuffer>>;
     try {
-      textEx = await extractDocumentTextFromBuffer(buf);
+      textEx = await extractDocumentTextFromBuffer(fileResult.buffer);
     } catch (e) {
       const msg = e instanceof Error ? e.message : '';
       if (msg === 'FILE_TOO_LARGE') {
@@ -102,25 +100,22 @@ export async function POST(request: Request) {
       return extractErrorResponse({ error: textEx.error });
     }
 
-    const { data: cvRows } = await supabase
-      .from('cvs')
-      .select('full_name, professional_title, email, phone, location, job_ids')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(20);
-
+    const cvRows = await getCvsRepo().listByUser(user.id);
     const primaryCv =
-      (cvRows ?? []).find(
-        (r) => !Array.isArray(r.job_ids) || (r.job_ids as string[]).length === 0
-      ) ?? cvRows?.[0] ?? null;
+      cvRows.find(
+        (r) =>
+          !Array.isArray((r as { job_ids?: string[] }).job_ids) ||
+          !((r as { job_ids?: string[] }).job_ids?.length)
+      ) ?? cvRows[0] ?? null;
 
     const cvContact: PrimaryCvContact | null = primaryCv
       ? {
-          full_name: primaryCv.full_name,
-          professional_title: primaryCv.professional_title,
-          email: primaryCv.email,
-          phone: primaryCv.phone,
-          location: primaryCv.location,
+          full_name: (primaryCv as { full_name?: string | null }).full_name ?? null,
+          professional_title:
+            (primaryCv as { professional_title?: string | null }).professional_title ?? null,
+          email: (primaryCv as { email?: string | null }).email ?? null,
+          phone: (primaryCv as { phone?: string | null }).phone ?? null,
+          location: (primaryCv as { location?: string | null }).location ?? null,
         }
       : null;
 
@@ -130,7 +125,6 @@ export async function POST(request: Request) {
         extracted = await extractCoverLetterFromText(textEx.rawText);
       } catch (e) {
         console.error('cover-letter Claude extract failed', e);
-        // Fall through to raw text — still usable in the editor.
         extracted = null;
         void describeAnthropicError(e);
       }
@@ -141,15 +135,8 @@ export async function POST(request: Request) {
       return extractErrorResponse({ error: 'empty_document' });
     }
 
-    const { data: profileRow } = await supabase
-      .from('profiles')
-      .select('preferred_cl_template_id')
-      .eq('id', user.id)
-      .maybeSingle();
-
-    const templateId =
-      (profileRow as { preferred_cl_template_id?: string } | null)
-        ?.preferred_cl_template_id ?? 'cl-classic';
+    const profileRow = await getProfilesRepo().getById(user.id);
+    const templateId = profileRow?.preferred_cl_template_id ?? 'cl-classic';
 
     return NextResponse.json({
       success: true,

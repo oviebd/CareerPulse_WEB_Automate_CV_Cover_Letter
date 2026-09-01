@@ -17,10 +17,9 @@ jobs:
       - name: Build Docker image
         run: |
           docker build \
-            --build-arg NEXT_PUBLIC_SUPABASE_URL="${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" \
-            --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY="${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" \
             --build-arg NEXT_PUBLIC_APP_URL="${{ secrets.NEXT_PUBLIC_APP_URL }}" \
             --build-arg NEXT_PUBLIC_DEV_SUBSCRIPTION_PLAN="${{ secrets.NEXT_PUBLIC_DEV_SUBSCRIPTION_PLAN }}" \
+            --build-arg NEXT_PUBLIC_DATA_BACKEND=postgres \
             -t careerpulse:latest .
 
       - name: Report image size
@@ -59,7 +58,7 @@ jobs:
 
             # Stop the running app so the old image is no longer "in use"
             docker compose down --remove-orphans || true
-            docker rm -f careerpulse 2>/dev/null || true
+            docker rm -f careerpulse careerpulse-db 2>/dev/null || true
 
             # Remove the current image so docker load has room for the new one
             docker rmi -f careerpulse:latest 2>/dev/null || true

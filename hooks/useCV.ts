@@ -1,10 +1,9 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { apiFetch } from '@/lib/api-fetch';
 import type { CVProfile } from '@/types';
-import { dbRowToCvProfile } from '@/lib/cv-mapper';
 import { useEffect, useState } from 'react';
 import {
   CV_DRAFT_UPDATED_EVENT,
@@ -88,30 +87,8 @@ export function useCVProfile(coreCvId?: string | null) {
     queryKey: ['cv-profile', userId, coreCvId ?? 'latest'],
     queryFn: async (): Promise<CVProfile | null> => {
       if (!userId) return null;
-      const supabase = createClient();
-      if (coreCvId) {
-        const { data, error } = await supabase
-          .from('cvs')
-          .select('*')
-          .eq('user_id', userId)
-          .eq('id', coreCvId)
-          .maybeSingle();
-        if (error) throw error;
-        return data ? dbRowToCvProfile(data as Record<string, unknown>) : null;
-      }
-      const { data: rows, error } = await supabase
-        .from('cvs')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('is_archived', false)
-        .order('created_at', { ascending: false })
-        .limit(40);
-      if (error) throw error;
-      const list = (rows ?? []) as Record<string, unknown>[];
-      const general = list.find(
-        (r) => !Array.isArray(r.job_ids) || (r.job_ids as string[]).length === 0
-      );
-      return general ? dbRowToCvProfile(general) : null;
+      const qs = coreCvId ? `?coreCvId=${encodeURIComponent(coreCvId)}` : '';
+      return apiFetch<CVProfile | null>(`/api/cvs/profile${qs}`);
     },
     enabled: !!userId && draftLoaded,
     staleTime: 5 * 60 * 1000,

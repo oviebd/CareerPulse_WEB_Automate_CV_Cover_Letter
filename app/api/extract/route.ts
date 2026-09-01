@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
-import { createClient } from '@/lib/supabase/server';
 import { extractCVFromText, describeAnthropicError } from '@/lib/claude';
 import { computeCompletionPercentage } from '@/lib/cv-completion';
 import { normalizeExtractedCV } from '@/lib/cv-parse-payload';
@@ -11,6 +10,10 @@ import {
   extractDocumentTextFromBuffer,
   isAllowedStorageUrl,
 } from '@/lib/extract-document-text';
+import { getSessionUser } from '@/lib/auth/session';
+import { getCvsRepo } from '@/lib/db/repositories/cvs';
+import { getProfilesRepo } from '@/lib/db/repositories/profiles';
+import { fetchStorageFileBuffer } from '@/lib/storage/fetch-file';
 import type { CVProfile } from '@/types';
 
 export const runtime = 'nodejs';
@@ -72,12 +75,8 @@ export async function POST(request: Request) {
       force?: boolean;
     };
 
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-    if (authError || !user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
@@ -92,22 +91,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'invalid_file_url' }, { status: 400 });
     }
 
-    // Enforce tier limit on the number of saved core CV versions.
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('subscription_tier')
-      .eq('id', user.id)
-      .single();
+    const profile = await getProfilesRepo().getById(user.id);
     const tier = resolveEffectiveTier(profile?.subscription_tier);
     const uploadLimit = TIER_LIMITS[tier].cvUploads;
 
     if (uploadLimit !== Number.POSITIVE_INFINITY && !body.force) {
-      const { count } = await supabase
-        .from('cvs')
-        .select('id', { count: 'exact' })
-        .eq('user_id', user.id);
-      const existingCount = typeof count === 'number' ? count : 0;
-      if (existingCount >= uploadLimit) {
+      const existingCvs = await getCvsRepo().listByUser(user.id);
+      if (existingCvs.length >= uploadLimit) {
         return NextResponse.json(
           { error: 'CV_UPLOAD_LIMIT', code: 'overwrite_requires_force' },
           { status: 403 }
@@ -115,32 +105,26 @@ export async function POST(request: Request) {
       }
     }
 
-    const fileRes = await fetch(body.fileUrl);
-    if (!fileRes.ok) {
-      return NextResponse.json({ error: 'file_fetch_failed' }, { status: 400 });
+    const fileResult = await fetchStorageFileBuffer(body.fileUrl, user.id);
+    if (!fileResult.ok) {
+      return NextResponse.json({ error: fileResult.error }, { status: 400 });
     }
-    const buf = Buffer.from(await fileRes.arrayBuffer());
-    const ex = await extractFromBuffer(buf);
+
+    const ex = await extractFromBuffer(fileResult.buffer);
     if ('error' in ex && ex.error) {
       return extractErrorResponse(ex);
     }
     const { parsed, percentage, isComplete } = ex;
 
-    // IMPORTANT: extract-only endpoint.
-    // It must not persist anything to `cvs`.
-    const { data: existing } = await supabase
-      .from('cvs')
-      .select('id, preferred_template_id, created_at, updated_at')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    const { data: profileRow } = await supabase
-      .from('profiles')
-      .select('preferred_cl_template_id')
-      .eq('id', user.id)
-      .maybeSingle();
+    const existingRows = await getCvsRepo().listByUser(user.id);
+    const existing = existingRows[0] as
+      | {
+          id: string;
+          preferred_template_id?: string;
+          created_at?: string;
+          updated_at?: string;
+        }
+      | undefined;
 
     const cvProfile: CVProfile = {
       id: existing?.id ?? randomUUID(),
@@ -159,11 +143,8 @@ export async function POST(request: Request) {
       completion_percentage: percentage,
       is_complete: isComplete,
       original_cv_file_url: null,
-      preferred_template_id:
-        (existing as { preferred_template_id?: string } | null)?.preferred_template_id ?? 'classic',
-      preferred_cl_template_id:
-        (profileRow as { preferred_cl_template_id?: string } | null)?.preferred_cl_template_id ??
-        'cl-classic',
+      preferred_template_id: existing?.preferred_template_id ?? 'classic',
+      preferred_cl_template_id: profile?.preferred_cl_template_id ?? 'cl-classic',
       created_at: existing?.created_at ?? new Date().toISOString(),
       updated_at: existing?.updated_at ?? new Date().toISOString(),
     } as CVProfile;

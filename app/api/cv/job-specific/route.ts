@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getSessionUser } from '@/lib/auth/session';
 import { dbRowToCvProfile } from '@/lib/cv-mapper';
 import type { Job } from '@/types/database';
+import { getCvsRepo } from '@/lib/db/repositories/cvs';
+import { getJobsRepo } from '@/lib/db/repositories/jobs';
 
 function normalizeKeywordsInput(input: unknown): string[] {
   if (!Array.isArray(input)) return [];
@@ -12,7 +14,6 @@ function normalizeKeywordsInput(input: unknown): string[] {
 }
 
 async function enrichJobCv(
-  supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
   row: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
@@ -22,14 +23,9 @@ async function enrichJobCv(
   let companyName: string | null = null;
   let jobDescription = '';
   if (jobIds.length > 0) {
-    const { data: job } = await supabase
-      .from('jobs')
-      .select('*')
-      .eq('id', jobIds[0])
-      .eq('user_id', userId)
-      .maybeSingle();
+    const job = await getJobsRepo().getById(userId, jobIds[0]);
     if (job) {
-      const j = job as Job;
+      const j = job as unknown as Job;
       jobTitle = j.job_title;
       companyName = j.company_name;
       const kw = Array.isArray(j.keywords) ? j.keywords : [];
@@ -46,34 +42,57 @@ async function enrichJobCv(
   };
 }
 
+function cvInsertPayload(
+  userFields: {
+    name: string;
+    job_ids: string[];
+    cv_data: Record<string, unknown>;
+    body: Record<string, unknown>;
+  }
+) {
+  const { name, job_ids, cv_data, body } = userFields;
+  return {
+    name,
+    job_ids,
+    full_name: cv_data.full_name ?? null,
+    professional_title: cv_data.professional_title ?? null,
+    email: cv_data.email ?? null,
+    phone: cv_data.phone ?? null,
+    location: cv_data.location ?? null,
+    linkedin_url: cv_data.linkedin_url ?? null,
+    github_url: cv_data.github_url ?? null,
+    links: cv_data.links ?? [],
+    summary: cv_data.summary ?? null,
+    experience: cv_data.experience ?? [],
+    education: cv_data.education ?? [],
+    skills: cv_data.skills ?? [],
+    projects: cv_data.projects ?? [],
+    certifications: cv_data.certifications ?? [],
+    languages: cv_data.languages ?? [],
+    awards: cv_data.awards ?? [],
+    referrals: cv_data.referrals ?? [],
+    ai_changes_summary: body.ai_changes_summary ?? null,
+    keywords_added: body.keywords_added ?? [],
+    bullets_improved: body.bullets_improved ?? 0,
+    preferred_template_id: body.preferred_template_id ?? 'classic',
+    accent_color: body.accent_color ?? '#6C63FF',
+    font_family: (cv_data as { font_family?: string }).font_family ?? 'Inter',
+  };
+}
+
 export async function GET() {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getSessionUser();
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data, error } = await supabase
-      .from('cvs')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('is_archived', false)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('job-specific GET', error);
-      return NextResponse.json({ error: 'fetch_failed' }, { status: 500 });
-    }
-
-    const rows = (data ?? []) as Record<string, unknown>[];
+    const rows = await getCvsRepo().listByUser(user.id);
     const tailored = rows.filter(
       (r) => Array.isArray(r.job_ids) && (r.job_ids as string[]).length > 0
     );
     const enriched = await Promise.all(
-      tailored.map((r) => enrichJobCv(supabase, user.id, r))
+      tailored.map((r) => enrichJobCv(user.id, r as Record<string, unknown>))
     );
 
     return NextResponse.json({ job_cvs: enriched });
@@ -85,10 +104,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getSessionUser();
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -97,57 +113,16 @@ export async function POST(request: Request) {
 
     const cv_data = body.cv_data as Record<string, unknown> | undefined;
     if (!cv_data) {
-      return NextResponse.json(
-        { error: 'cv_data is required' },
-        { status: 422 }
-      );
+      return NextResponse.json({ error: 'cv_data is required' }, { status: 422 });
     }
 
-    /** Save optimised CV as a new core CV (no job link) */
     if (body.save_without_job === true) {
       const cvName =
-        typeof body.name === 'string' && body.name.trim()
-          ? body.name.trim()
-          : 'Tailored CV';
-
-      const { data, error } = await supabase
-        .from('cvs')
-        .insert({
-          user_id: user.id,
-          name: cvName,
-          job_ids: [],
-          full_name: cv_data.full_name ?? null,
-          professional_title: cv_data.professional_title ?? null,
-          email: cv_data.email ?? null,
-          phone: cv_data.phone ?? null,
-          location: cv_data.location ?? null,
-          linkedin_url: cv_data.linkedin_url ?? null,
-          github_url: cv_data.github_url ?? null,
-          links: cv_data.links ?? [],
-          summary: cv_data.summary ?? null,
-          experience: cv_data.experience ?? [],
-          education: cv_data.education ?? [],
-          skills: cv_data.skills ?? [],
-          projects: cv_data.projects ?? [],
-          certifications: cv_data.certifications ?? [],
-          languages: cv_data.languages ?? [],
-          awards: cv_data.awards ?? [],
-          referrals: cv_data.referrals ?? [],
-          ai_changes_summary: body.ai_changes_summary ?? null,
-          keywords_added: body.keywords_added ?? [],
-          bullets_improved: body.bullets_improved ?? 0,
-          preferred_template_id: body.preferred_template_id ?? 'classic',
-          accent_color: body.accent_color ?? '#6C63FF',
-          font_family: (cv_data as { font_family?: string }).font_family ?? 'Inter',
-        })
-        .select('id')
-        .single();
-
-      if (error) {
-        console.error('job-specific POST cv (no job)', error);
-        return NextResponse.json({ error: 'save_failed' }, { status: 500 });
-      }
-
+        typeof body.name === 'string' && body.name.trim() ? body.name.trim() : 'Tailored CV';
+      const data = await getCvsRepo().insert(
+        user.id,
+        cvInsertPayload({ name: cvName, job_ids: [], cv_data, body })
+      );
       return NextResponse.json({ id: data.id }, { status: 201 });
     }
 
@@ -155,13 +130,8 @@ export async function POST(request: Request) {
       typeof body.existing_job_id === 'string' ? body.existing_job_id.trim() : '';
 
     if (existingJobId) {
-      const { data: jobRow, error: jobLookupErr } = await supabase
-        .from('jobs')
-        .select('id, job_title, company_name')
-        .eq('id', existingJobId)
-        .eq('user_id', user.id)
-        .maybeSingle();
-      if (jobLookupErr || !jobRow) {
+      const jobRow = await getJobsRepo().getById(user.id, existingJobId);
+      if (!jobRow) {
         return NextResponse.json({ error: 'job_not_found' }, { status: 404 });
       }
 
@@ -169,44 +139,10 @@ export async function POST(request: Request) {
       const resolvedCompanyName = String(jobRow.company_name ?? '').trim() || 'Company';
       const cvName = `${resolvedJobTitle} — ${resolvedCompanyName}`;
 
-      const { data, error } = await supabase
-        .from('cvs')
-        .insert({
-          user_id: user.id,
-          name: cvName,
-          job_ids: [existingJobId],
-          full_name: cv_data.full_name ?? null,
-          professional_title: cv_data.professional_title ?? null,
-          email: cv_data.email ?? null,
-          phone: cv_data.phone ?? null,
-          location: cv_data.location ?? null,
-          linkedin_url: cv_data.linkedin_url ?? null,
-          github_url: cv_data.github_url ?? null,
-          links: cv_data.links ?? [],
-          summary: cv_data.summary ?? null,
-          experience: cv_data.experience ?? [],
-          education: cv_data.education ?? [],
-          skills: cv_data.skills ?? [],
-          projects: cv_data.projects ?? [],
-          certifications: cv_data.certifications ?? [],
-          languages: cv_data.languages ?? [],
-          awards: cv_data.awards ?? [],
-          referrals: cv_data.referrals ?? [],
-          ai_changes_summary: body.ai_changes_summary ?? null,
-          keywords_added: body.keywords_added ?? [],
-          bullets_improved: body.bullets_improved ?? 0,
-          preferred_template_id: body.preferred_template_id ?? 'classic',
-          accent_color: body.accent_color ?? '#6C63FF',
-          font_family: (cv_data as { font_family?: string }).font_family ?? 'Inter',
-        })
-        .select('id')
-        .single();
-
-      if (error) {
-        console.error('job-specific POST cv', error);
-        return NextResponse.json({ error: 'save_failed' }, { status: 500 });
-      }
-
+      const data = await getCvsRepo().insert(
+        user.id,
+        cvInsertPayload({ name: cvName, job_ids: [existingJobId], cv_data, body })
+      );
       return NextResponse.json({ id: data.id }, { status: 201 });
     }
 
@@ -226,98 +162,43 @@ export async function POST(request: Request) {
     let jobId: string;
 
     if (legacyJobId) {
-      const { data: existing } = await supabase
-        .from('jobs')
-        .select('id')
-        .eq('id', legacyJobId)
-        .eq('user_id', user.id)
-        .maybeSingle();
+      const existing = await getJobsRepo().getById(user.id, legacyJobId);
       if (existing) {
-        await supabase
-          .from('jobs')
-          .update({
-            company_name: resolvedCompanyName,
-            job_title: resolvedJobTitle,
-            keywords,
-          })
-          .eq('id', legacyJobId)
-          .eq('user_id', user.id);
+        await getJobsRepo().update(user.id, legacyJobId, {
+          company_name: resolvedCompanyName,
+          job_title: resolvedJobTitle,
+          keywords,
+        });
         jobId = legacyJobId;
       } else {
-        const { data: created, error: cErr } = await supabase
-          .from('jobs')
-          .insert({
-            id: legacyJobId,
-            user_id: user.id,
-            company_name: resolvedCompanyName,
-            job_title: resolvedJobTitle,
-            keywords,
-          })
-          .select('id')
-          .single();
-        if (cErr || !created) {
-          console.error('job insert', cErr);
+        const created = await getJobsRepo().insert(user.id, {
+          id: legacyJobId,
+          company_name: resolvedCompanyName,
+          job_title: resolvedJobTitle,
+          keywords,
+        });
+        if (!created) {
           return NextResponse.json({ error: 'save_failed' }, { status: 500 });
         }
         jobId = created.id as string;
       }
     } else {
-      const { data: jobRow, error: jobErr } = await supabase
-        .from('jobs')
-        .insert({
-          user_id: user.id,
-          company_name: resolvedCompanyName,
-          job_title: resolvedJobTitle,
-          keywords,
-        })
-        .select('id')
-        .single();
-      if (jobErr || !jobRow) {
-        console.error('job-specific job insert', jobErr);
+      const jobRow = await getJobsRepo().insert(user.id, {
+        company_name: resolvedCompanyName,
+        job_title: resolvedJobTitle,
+        keywords,
+      });
+      if (!jobRow) {
         return NextResponse.json({ error: 'save_failed' }, { status: 500 });
       }
       jobId = jobRow.id as string;
     }
 
     const cvName = `${resolvedJobTitle} — ${resolvedCompanyName}`;
-
-    const { data, error } = await supabase
-      .from('cvs')
-      .insert({
-        user_id: user.id,
-        name: cvName,
-        job_ids: [jobId],
-        full_name: cv_data.full_name ?? null,
-        professional_title: cv_data.professional_title ?? null,
-        email: cv_data.email ?? null,
-        phone: cv_data.phone ?? null,
-        location: cv_data.location ?? null,
-        linkedin_url: cv_data.linkedin_url ?? null,
-        github_url: cv_data.github_url ?? null,
-        links: cv_data.links ?? [],
-        summary: cv_data.summary ?? null,
-        experience: cv_data.experience ?? [],
-        education: cv_data.education ?? [],
-        skills: cv_data.skills ?? [],
-        projects: cv_data.projects ?? [],
-        certifications: cv_data.certifications ?? [],
-        languages: cv_data.languages ?? [],
-        awards: cv_data.awards ?? [],
-        referrals: cv_data.referrals ?? [],
-        ai_changes_summary: body.ai_changes_summary ?? null,
-        keywords_added: body.keywords_added ?? [],
-        bullets_improved: body.bullets_improved ?? 0,
-        preferred_template_id: body.preferred_template_id ?? 'classic',
-        accent_color: body.accent_color ?? '#6C63FF',
-        font_family: (cv_data as { font_family?: string }).font_family ?? 'Inter',
-      })
-      .select('id')
-      .single();
-
-    if (error) {
-      console.error('job-specific POST cv', error);
-      return NextResponse.json({ error: 'save_failed' }, { status: 500 });
-    }
+    const data = await getCvsRepo().insert(
+      user.id,
+      cvInsertPayload({ name: cvName, job_ids: [jobId], cv_data, body })
+    );
 
     return NextResponse.json({ id: data.id }, { status: 201 });
   } catch (e) {

@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { applySuccessfulPayment } from '@/lib/payment-sync';
 import { validatePayment, verifyCallbackSignature } from '@/lib/sslcommerz';
 import { sendPaymentReceiptEmail } from '@/lib/resend-mail';
-import { createAdminClient } from '@/lib/supabase/server';
+import { getPaymentsRepo } from '@/lib/db/repositories/payments';
+import { getProfilesRepo } from '@/lib/db/repositories/profiles';
 
 const appUrl =
   process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') ?? 'http://localhost:3000';
@@ -46,16 +47,8 @@ async function handlePaymentReturn(request: Request) {
       callbackData = Object.fromEntries(
         Array.from(form.entries()).map(([k, v]) => [k, String(v)])
       );
-      tran_id =
-        pick(
-          callbackData,
-          ['tran_id']
-        ) ?? undefined;
-      val_id =
-        pick(
-          callbackData,
-          ['val_id']
-        ) ?? undefined;
+      tran_id = pick(callbackData, ['tran_id']) ?? undefined;
+      val_id = pick(callbackData, ['val_id']) ?? undefined;
     } else {
       const url = new URL(request.url);
       callbackData = Object.fromEntries(url.searchParams.entries());
@@ -77,12 +70,7 @@ async function handlePaymentReturn(request: Request) {
       return NextResponse.redirect(new URL('/settings/billing?payment=invalid', appUrl));
     }
 
-    const admin = createAdminClient();
-    const { data: payment } = await admin
-      .from('payments')
-      .select('user_id, amount, plan')
-      .eq('tran_id', tran_id)
-      .maybeSingle();
+    const payment = await getPaymentsRepo().getByTranId(tran_id);
 
     const result = await applySuccessfulPayment({
       tran_id,
@@ -90,17 +78,14 @@ async function handlePaymentReturn(request: Request) {
       gateway_response: { val_id, source: 'success_redirect' },
     });
 
-    if (result.ok && payment?.user_id) {
-      const { data: prof } = await admin
-        .from('profiles')
-        .select('email')
-        .eq('id', payment.user_id)
-        .single();
+    const userId = payment?.user_id as string | undefined;
+    if (result.ok && userId) {
+      const prof = await getProfilesRepo().getById(userId);
       if (prof?.email) {
         await sendPaymentReceiptEmail({
           to: prof.email,
-          plan: String(payment.plan),
-          amount: String(payment.amount),
+          plan: String(payment?.plan),
+          amount: String(payment?.amount),
         });
       }
     }

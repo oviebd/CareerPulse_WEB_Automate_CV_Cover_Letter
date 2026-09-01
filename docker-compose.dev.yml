@@ -1,23 +1,55 @@
-# Local development — build image with NEXT_PUBLIC_* from .env.prod
+# Local development — build image + Postgres
 # Usage: docker compose -f docker-compose.dev.yml --env-file .env.prod up --build
 
 services:
+  db:
+    image: postgres:16-alpine
+    container_name: careerpulse-db-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-careerpulse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-careerpulse_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-careerpulse}
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata_dev:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./db/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-careerpulse} -d ${POSTGRES_DB:-careerpulse}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   app:
     build:
       context: .
       args:
-        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
         NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
         NEXT_PUBLIC_DEV_SUBSCRIPTION_PLAN: ${NEXT_PUBLIC_DEV_SUBSCRIPTION_PLAN}
+        NEXT_PUBLIC_DATA_BACKEND: postgres
     image: careerpulse:latest
     container_name: careerpulse
     restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
     ports:
-      - "3000:3000"
+      - '3000:3000'
     env_file:
       - .env.prod
     environment:
       NODE_ENV: production
+      DATA_BACKEND: postgres
+      NEXT_PUBLIC_DATA_BACKEND: postgres
+      DATABASE_URL: postgresql://${POSTGRES_USER:-careerpulse}:${POSTGRES_PASSWORD:-careerpulse_dev}@db:5432/${POSTGRES_DB:-careerpulse}
+      UPLOAD_DIR: /data/uploads
       PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium
-      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: "true"
+      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: 'true'
+    volumes:
+      - uploads_dev:/data/uploads
+
+volumes:
+  pgdata_dev:
+  uploads_dev:

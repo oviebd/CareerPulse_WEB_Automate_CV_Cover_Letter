@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getSessionUser } from '@/lib/auth/session';
 import { CLAUDE_MODEL, generateCoverLetterText } from '@/lib/claude';
 import { rateLimitHit } from '@/lib/rate-limit';
 import { resolveEffectiveTier } from '@/lib/dev-subscription';
-import { assertGenerationAllowed } from '@/lib/subscription';
+import { assertGenerationAllowed } from '@/lib/subscription-server';
 import Anthropic from '@anthropic-ai/sdk';
 import type {
   CVData,
@@ -14,6 +14,8 @@ import type {
 } from '@/types';
 import { migrateLegacyCVData } from '@/src/utils/cvDefaults';
 import { clampSkillCategories } from '@/src/utils/migrateSkills';
+import { getCvsRepo } from '@/lib/db/repositories/cvs';
+import { getProfilesRepo } from '@/lib/db/repositories/profiles';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
@@ -257,10 +259,7 @@ Optimise the candidate's CV for this role. Return a JSON object with:
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getSessionUser();
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -315,15 +314,11 @@ export async function POST(request: Request) {
     const emphasis =
       body.specific_emphasis?.trim() ?? body.specificEmphasis?.trim() ?? '';
 
-    const { data: prof } = await supabase
-      .from('profiles')
-      .select('subscription_tier')
-      .eq('id', user.id)
-      .single();
+    const prof = await getProfilesRepo().getById(user.id);
     const tier = resolveEffectiveTier(prof?.subscription_tier);
 
     try {
-      await assertGenerationAllowed(user.id, tier, supabase);
+      await assertGenerationAllowed(user.id, tier);
     } catch (e) {
       const msg = e instanceof Error ? e.message : '';
       if (msg.startsWith('GENERATION_LIMIT_REACHED')) {
@@ -340,31 +335,18 @@ export async function POST(request: Request) {
     }
 
     let cvRow: CvRow | null = null;
-    let cvErr = null as { message: string } | null;
     if (body.core_cv_id) {
-      const r = await supabase
-        .from('cvs')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('id', body.core_cv_id)
-        .maybeSingle();
-      cvErr = r.error;
-      cvRow = r.data as CvRow | null;
+      cvRow = (await getCvsRepo().getById(user.id, body.core_cv_id)) as CvRow | null;
     } else {
-      const r = await supabase
-        .from('cvs')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(40);
-      cvErr = r.error;
-      const rows = (r.data ?? []) as CvRow[];
+      const rows = (await getCvsRepo().listByUser(user.id, {
+        includeArchived: true,
+      })) as CvRow[];
       cvRow =
         rows.find((row) => !Array.isArray(row.job_ids) || row.job_ids.length === 0) ??
         rows[0] ??
         null;
     }
-    if (cvErr || !cvRow) {
+    if (!cvRow) {
       return NextResponse.json(
         { error: 'Please complete your CV profile before generating a job-specific version.' },
         { status: 422 }

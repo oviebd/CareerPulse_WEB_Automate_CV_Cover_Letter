@@ -6,8 +6,9 @@ import {
 } from '@/lib/jd-monthly-limit';
 import { resolveEffectiveTier } from '@/lib/dev-subscription';
 import { canAccessFeature } from '@/lib/subscription';
-import { createClient } from '@/lib/supabase/server';
+import { getSessionUser } from '@/lib/auth/session';
 import { rateLimitHit } from '@/lib/rate-limit';
+import { getProfilesRepo } from '@/lib/db/repositories/profiles';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -60,10 +61,7 @@ function enforceCoverLetterParagraphs(text: string): string {
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getSessionUser();
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
@@ -72,11 +70,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'RATE_LIMIT' }, { status: 429 });
     }
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('subscription_tier')
-      .eq('id', user.id)
-      .single();
+    const profile = await getProfilesRepo().getById(user.id);
     const tier = resolveEffectiveTier(profile?.subscription_tier);
 
     const body = (await request.json()) as {

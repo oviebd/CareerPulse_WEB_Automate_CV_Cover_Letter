@@ -11,7 +11,7 @@ import { useSubscription } from '@/hooks/useSubscription';
 import { useToast } from '@/components/ui/toast';
 import { cn, formatDate } from '@/lib/utils';
 import { useAuthStore } from '@/stores/useAuthStore';
-import { createClient } from '@/lib/supabase/client';
+import { apiFetch } from '@/lib/api-fetch';
 import type { Profile } from '@/types';
 
 type Payment = { id: string; plan: string; amount: number; status: string; created_at: string };
@@ -54,14 +54,8 @@ export default function BillingPage() {
 
   const { data: payments = [], isLoading: paymentsLoading } = useQuery({
     queryKey: ['payments'],
-    queryFn: async (): Promise<Payment[]> => {
-      const supabase = createClient();
-      const { data } = await supabase
-        .from('payments')
-        .select('id, plan, amount, status, created_at')
-        .order('created_at', { ascending: false });
-      return (data ?? []) as Payment[];
-    },
+    queryFn: () =>
+      apiFetch<Payment[]>('/api/payments'),
     staleTime: 5 * 60 * 1000,
   });
 
@@ -414,7 +408,7 @@ export default function BillingPage() {
         <div className="space-y-4 text-center">
           <div className="text-5xl">🎉</div>
           <p className="text-[var(--color-text-primary)]">
-            Promo code applied successfully. Pro access activated for 30 days.
+            Promo code applied successfully. Pro access is now unlimited.
           </p>
           <p className="text-sm text-[var(--color-muted)]">
             You now have unlimited tailored applications, premium CV templates, AI

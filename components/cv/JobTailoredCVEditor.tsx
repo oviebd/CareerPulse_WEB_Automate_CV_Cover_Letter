@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { createClient } from '@/lib/supabase/client';
+import { useCvTemplates } from '@/hooks/useTemplates';
 import { Button } from '@/components/ui/button';
 import { CVEditorPanel } from '@/components/cv/CVEditorPanel';
 import { CVEditorTopBar } from '@/components/cv/premium/CVEditorTopBar';
@@ -199,19 +199,7 @@ export function JobTailoredCVEditor() {
   const skipHistoryRef = useRef(false);
   const allowUndoHistoryRef = useRef(false);
 
-  const { data: templates = [], isLoading: templatesLoading } = useQuery({
-    queryKey: ['cv-templates'],
-    queryFn: async (): Promise<CVTemplate[]> => {
-      const supabase = createClient();
-      const { data } = await supabase
-        .from('cv_templates')
-        .select('*')
-        .eq('type', 'cv')
-        .order('sort_order');
-      return (data ?? []) as CVTemplate[];
-    },
-    staleTime: 10 * 60 * 1000,
-  });
+  const { data: templates = [], isLoading: templatesLoading } = useCvTemplates();
 
   const catalogTid = normalizeTemplateId(selectedTemplateId) as TemplateId;
   const templateMeta = useMemo(

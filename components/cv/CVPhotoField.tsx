@@ -1,8 +1,9 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
+import { uploadFileWithProgress } from '@/lib/file-upload-client';
+import { useAuthStore } from '@/stores/useAuthStore';
 
 type Props = {
   photoUrl: string | null | undefined;
@@ -11,6 +12,7 @@ type Props = {
 
 export function CVPhotoField({ photoUrl, onPhotoUrl }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const userId = useAuthStore((s) => s.user?.id);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -26,42 +28,36 @@ export function CVPhotoField({ photoUrl, onPhotoUrl }: Props) {
       setErr('Image must be 2MB or smaller.');
       return;
     }
+    if (!userId) {
+      setErr('You need to be signed in.');
+      return;
+    }
     setErr(null);
     setBusy(true);
     try {
-      const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        setErr('You need to be signed in.');
-        setBusy(false);
-        return;
-      }
       const ext =
         file.type === 'image/png'
           ? 'png'
           : file.type === 'image/webp'
             ? 'webp'
             : 'jpg';
-      const path = `${user.id}/cv-photo-${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from('cv-photos').upload(path, file, {
-        cacheControl: '3600',
-        upsert: true,
-        contentType: file.type,
-      });
+      const path = `${userId}/cv-photo-${Date.now()}.${ext}`;
+      const { error: upErr, publicUrl } = await uploadFileWithProgress(
+        'cv-photos',
+        path,
+        file,
+        { cacheControl: '3600', upsert: true },
+        () => {}
+      );
       if (upErr) {
         setErr(upErr.message);
-        setBusy(false);
         return;
       }
-      const { data } = supabase.storage.from('cv-photos').getPublicUrl(path);
-      if (!data?.publicUrl) {
+      if (!publicUrl) {
         setErr('Could not get public URL for photo.');
-        setBusy(false);
         return;
       }
-      onPhotoUrl(data.publicUrl);
+      onPhotoUrl(publicUrl);
     } finally {
       setBusy(false);
     }
