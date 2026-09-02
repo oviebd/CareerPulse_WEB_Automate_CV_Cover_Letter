@@ -1465,6 +1465,14 @@
     order.forEach(function (key) {
       if (key === 'personal') return;
 
+      if (key === 'summary' && !shouldSkip('summary', d, cfg)) {
+        html += '<section class="eu-section">';
+        html += '<div class="eu-sec-title">Summary</div>';
+        html += '<div class="cv-summary">' + esc(d.summary || '') + '</div>';
+        html += '</section>';
+        return;
+      }
+
       if (key === 'experience' && !shouldSkip('experience', d, cfg)) {
         html += '<section class="eu-section">';
         html += '<div class="eu-sec-title">Work Experience</div>';
