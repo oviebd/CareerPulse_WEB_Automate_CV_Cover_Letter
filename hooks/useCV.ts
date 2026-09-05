@@ -22,6 +22,10 @@ export type CoreCVVersion = {
   preferred_template_id: string | null;
 };
 
+export type InterviewCVOption = CoreCVVersion & {
+  kind: 'general' | 'job-specific';
+};
+
 export function useCoreCVVersions() {
   const userId = useAuthStore((s) => s.user?.id);
   return useQuery({
@@ -40,6 +44,31 @@ export function useCoreCVVersions() {
         created_at: v.created_at,
         updated_at: v.updated_at,
         preferred_template_id: v.preferred_template_id ?? null,
+      }));
+    },
+    staleTime: 30_000,
+  });
+}
+
+export function useAllCVVersions() {
+  const userId = useAuthStore((s) => s.user?.id);
+  return useQuery({
+    queryKey: ['all-cvs', userId],
+    enabled: !!userId,
+    queryFn: async (): Promise<InterviewCVOption[]> => {
+      const res = await fetch('/api/cvs');
+      if (!res.ok) throw new Error('Failed to fetch CVs');
+      const json = (await res.json()) as CVProfile[];
+      return (json ?? []).map((v) => ({
+        id: v.id,
+        name: v.name ?? 'Untitled CV',
+        full_name: v.full_name,
+        completion_percentage: v.completion_percentage,
+        is_complete: v.is_complete,
+        created_at: v.created_at,
+        updated_at: v.updated_at,
+        preferred_template_id: v.preferred_template_id ?? null,
+        kind: (v.job_ids?.length ?? 0) > 0 ? 'job-specific' : 'general',
       }));
     },
     staleTime: 30_000,

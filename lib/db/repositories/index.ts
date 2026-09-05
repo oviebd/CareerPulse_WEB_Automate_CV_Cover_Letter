@@ -5,3 +5,5 @@ export { getJobsRepo } from './jobs';
 export { getCoverLettersRepo } from './cover-letters';
 export { getPaymentsRepo } from './payments';
 export { getUsersRepo } from './users';
+export { getInterviewRepo } from './interview';
+export { getAiUsageRepo } from './ai-usage';

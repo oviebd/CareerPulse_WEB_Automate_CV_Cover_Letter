@@ -81,7 +81,6 @@ export async function DELETE(_request: Request, { params }: RouteContext) {
 
     const jid = id?.trim();
     if (!jid) return err('invalid_id', 'INVALID', 400);
-    const now = new Date().toISOString();
 
     const cvHits = (await getCvsRepo().listByUser(user.id, { includeArchived: true })).filter(
       (r) => hasJobId(r, jid)
@@ -91,7 +90,7 @@ export async function DELETE(_request: Request, { params }: RouteContext) {
 
     if (hasLinked) {
       try {
-        await getJobsRepo().update(user.id, jid, { status: 'none', updated_at: now });
+        await getJobsRepo().update(user.id, jid, { status: 'none' });
       } catch (e) {
         console.error('jobs DELETE soft', e);
         return err('Failed to update job', 'UPDATE_FAILED', 500);

@@ -7,6 +7,7 @@ import {
 import { resolveEffectiveTier } from '@/lib/dev-subscription';
 import { canAccessFeature } from '@/lib/subscription';
 import { getSessionUser } from '@/lib/auth/session';
+import { runWithAiUsageContext } from '@/lib/ai/usage-context';
 import { rateLimitHit } from '@/lib/rate-limit';
 import { getProfilesRepo } from '@/lib/db/repositories/profiles';
 
@@ -88,6 +89,8 @@ export async function POST(request: Request) {
     if (!tool) {
       return NextResponse.json({ error: 'tool_required' }, { status: 400 });
     }
+
+    return runWithAiUsageContext({ userId: user.id, category: 'ai_suggestions' }, async () => {
 
     if (tool === 'jd_analyze') {
       const jd = str('jobDescription');
@@ -318,6 +321,7 @@ Return exactly 3 complete, meaningful suggestions, with tone/why per suggestion,
     }
 
     return NextResponse.json({ error: 'unknown_tool' }, { status: 400 });
+    });
   } catch (e) {
     console.error('ai route', e);
     return NextResponse.json({ error: 'ai_failed' }, { status: 500 });

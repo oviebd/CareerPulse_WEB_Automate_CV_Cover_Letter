@@ -11,6 +11,7 @@ import {
   isAllowedStorageUrl,
 } from '@/lib/extract-document-text';
 import { getSessionUser } from '@/lib/auth/session';
+import { runWithAiUsageContext } from '@/lib/ai/usage-context';
 import { getCvsRepo } from '@/lib/db/repositories/cvs';
 import { getProfilesRepo } from '@/lib/db/repositories/profiles';
 import { fetchStorageFileBuffer } from '@/lib/storage/fetch-file';
@@ -110,7 +111,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: fileResult.error }, { status: 400 });
     }
 
-    const ex = await extractFromBuffer(fileResult.buffer);
+    const ex = await runWithAiUsageContext({ userId: user.id, category: 'cv_creation' }, () =>
+      extractFromBuffer(fileResult.buffer)
+    );
     if ('error' in ex && ex.error) {
       return extractErrorResponse(ex);
     }

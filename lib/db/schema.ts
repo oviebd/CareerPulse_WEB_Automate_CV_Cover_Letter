@@ -8,6 +8,8 @@ import {
   jsonb,
   decimal,
   pgEnum,
+  uniqueIndex,
+  index,
 } from 'drizzle-orm/pg-core';
 
 export const jobStatusEnum = pgEnum('job_status', [
@@ -193,6 +195,348 @@ export const cvTemplates = pgTable('cv_templates', {
   availableTiers: text('available_tiers').array().default(['free', 'pro']),
   sortOrder: integer('sort_order').default(0),
 });
+
+export const interviewProfileStatusEnum = pgEnum('interview_profile_status', [
+  'idle',
+  'analyzing',
+  'needs_clarification',
+  'ready',
+  'failed',
+]);
+
+export const interviewProfiles = pgTable(
+  'interview_profiles',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    jobId: uuid('job_id')
+      .notNull()
+      .references(() => jobs.id, { onDelete: 'cascade' }),
+    cvId: uuid('cv_id').references(() => cvs.id, { onDelete: 'set null' }),
+    status: interviewProfileStatusEnum('status').notNull().default('idle'),
+    profession: text('profession'),
+    occupation: text('occupation'),
+    role: text('role'),
+    domain: text('domain'),
+    seniority: text('seniority'),
+    interviewStage: text('interview_stage'),
+    interviewDate: timestamp('interview_date', { withTimezone: true }),
+    candidateSummary: text('candidate_summary'),
+    jobSummary: text('job_summary'),
+    blueprintJson: jsonb('blueprint_json'),
+    gapJson: jsonb('gap_json'),
+    clarificationJson: jsonb('clarification_json'),
+    aiMetadataJson: jsonb('ai_metadata_json'),
+    readinessScore: integer('readiness_score'),
+    sourceJobHash: text('source_job_hash'),
+    sourceCvHash: text('source_cv_hash'),
+    extraContext: text('extra_context'),
+    jobAnalysisJson: jsonb('job_analysis_json'),
+    candidateAnalysisJson: jsonb('candidate_analysis_json'),
+    mappedContextJson: jsonb('mapped_context_json'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('interview_profiles_user_job_uidx').on(t.userId, t.jobId),
+    index('interview_profiles_user_id_idx').on(t.userId),
+    index('interview_profiles_job_id_idx').on(t.jobId),
+  ]
+);
+
+export const interviewCompetencies = pgTable(
+  'interview_competencies',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    interviewProfileId: uuid('interview_profile_id')
+      .notNull()
+      .references(() => interviewProfiles.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    category: text('category'),
+    description: text('description'),
+    importance: text('importance'),
+    priority: integer('priority'),
+    evidenceFromJob: text('evidence_from_job'),
+    evidenceFromCandidate: text('evidence_from_candidate'),
+    masteryScore: integer('mastery_score'),
+    metadataJson: jsonb('metadata_json'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('interview_competencies_profile_idx').on(t.interviewProfileId)]
+);
+
+export const interviewPreparationPlans = pgTable(
+  'interview_preparation_plans',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    interviewProfileId: uuid('interview_profile_id')
+      .notNull()
+      .references(() => interviewProfiles.id, { onDelete: 'cascade' }),
+    title: text('title'),
+    durationDays: integer('duration_days'),
+    status: text('status').notNull().default('active'),
+    planJson: jsonb('plan_json'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('interview_prep_plans_profile_idx').on(t.interviewProfileId)]
+);
+
+export const interviewPreparationTopics = pgTable(
+  'interview_preparation_topics',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    planId: uuid('plan_id')
+      .notNull()
+      .references(() => interviewPreparationPlans.id, { onDelete: 'cascade' }),
+    competencyId: uuid('competency_id').references(() => interviewCompetencies.id, {
+      onDelete: 'set null',
+    }),
+    name: text('name').notNull(),
+    description: text('description'),
+    priority: integer('priority'),
+    estimatedMinutes: integer('estimated_minutes'),
+    learningObjectivesJson: jsonb('learning_objectives_json'),
+    masteryScore: integer('mastery_score'),
+    status: text('status').notNull().default('pending'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('interview_prep_topics_plan_idx').on(t.planId)]
+);
+
+export const interviewQuizzes = pgTable(
+  'interview_quizzes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    interviewProfileId: uuid('interview_profile_id')
+      .notNull()
+      .references(() => interviewProfiles.id, { onDelete: 'cascade' }),
+    topicId: uuid('topic_id').references(() => interviewPreparationTopics.id, {
+      onDelete: 'set null',
+    }),
+    title: text('title'),
+    difficulty: text('difficulty'),
+    questionCount: integer('question_count'),
+    metadataJson: jsonb('metadata_json'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('interview_quizzes_profile_idx').on(t.interviewProfileId)]
+);
+
+export const interviewQuizQuestions = pgTable(
+  'interview_quiz_questions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    quizId: uuid('quiz_id')
+      .notNull()
+      .references(() => interviewQuizzes.id, { onDelete: 'cascade' }),
+    sequence: integer('sequence').notNull(),
+    questionType: text('question_type').notNull(),
+    questionText: text('question_text').notNull(),
+    optionsJson: jsonb('options_json'),
+    correctAnswerJson: jsonb('correct_answer_json'),
+    evaluationRubricJson: jsonb('evaluation_rubric_json'),
+    explanation: text('explanation'),
+    competencyId: uuid('competency_id').references(() => interviewCompetencies.id, {
+      onDelete: 'set null',
+    }),
+    difficulty: text('difficulty'),
+    metadataJson: jsonb('metadata_json'),
+  },
+  (t) => [index('interview_quiz_questions_quiz_idx').on(t.quizId)]
+);
+
+export const interviewQuizAttempts = pgTable(
+  'interview_quiz_attempts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    quizId: uuid('quiz_id')
+      .notNull()
+      .references(() => interviewQuizzes.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    score: integer('score'),
+    answersJson: jsonb('answers_json'),
+    evaluationJson: jsonb('evaluation_json'),
+    startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+  },
+  (t) => [index('interview_quiz_attempts_quiz_idx').on(t.quizId)]
+);
+
+export const interviewSessions = pgTable(
+  'interview_sessions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    interviewProfileId: uuid('interview_profile_id')
+      .notNull()
+      .references(() => interviewProfiles.id, { onDelete: 'cascade' }),
+    type: text('type').notNull().default('mock'),
+    mode: text('mode').notNull().default('practice'),
+    difficulty: text('difficulty'),
+    status: text('status').notNull().default('active'),
+    questionCount: integer('question_count').notNull().default(0),
+    targetQuestionCount: integer('target_question_count'),
+    durationMinutes: integer('duration_minutes'),
+    currentQuestionId: uuid('current_question_id'),
+    draftAnswer: text('draft_answer'),
+    overallScore: integer('overall_score'),
+    evaluationJson: jsonb('evaluation_json'),
+    startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('interview_sessions_profile_idx').on(t.interviewProfileId),
+    index('interview_sessions_status_idx').on(t.interviewProfileId, t.status),
+  ]
+);
+
+export const interviewQuestions = pgTable(
+  'interview_questions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    sessionId: uuid('session_id')
+      .notNull()
+      .references(() => interviewSessions.id, { onDelete: 'cascade' }),
+    sequence: integer('sequence').notNull(),
+    questionType: text('question_type').notNull(),
+    questionText: text('question_text').notNull(),
+    competencyId: uuid('competency_id').references(() => interviewCompetencies.id, {
+      onDelete: 'set null',
+    }),
+    difficulty: text('difficulty'),
+    expectedPointsJson: jsonb('expected_points_json'),
+    evaluationRubricJson: jsonb('evaluation_rubric_json'),
+    parentQuestionId: uuid('parent_question_id'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('interview_questions_session_idx').on(t.sessionId)]
+);
+
+export const interviewAnswers = pgTable(
+  'interview_answers',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    questionId: uuid('question_id')
+      .notNull()
+      .references(() => interviewQuestions.id, { onDelete: 'cascade' }),
+    textAnswer: text('text_answer'),
+    transcript: text('transcript'),
+    audioPath: text('audio_path'),
+    durationSeconds: integer('duration_seconds'),
+    attemptNumber: integer('attempt_number').notNull().default(1),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('interview_answers_question_idx').on(t.questionId)]
+);
+
+export const interviewEvaluations = pgTable(
+  'interview_evaluations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    answerId: uuid('answer_id')
+      .notNull()
+      .references(() => interviewAnswers.id, { onDelete: 'cascade' }),
+    overallScore: integer('overall_score'),
+    dimensionScoresJson: jsonb('dimension_scores_json'),
+    strengthsJson: jsonb('strengths_json'),
+    weaknessesJson: jsonb('weaknesses_json'),
+    missingPointsJson: jsonb('missing_points_json'),
+    feedback: text('feedback'),
+    recommendedActionsJson: jsonb('recommended_actions_json'),
+    aiMetadataJson: jsonb('ai_metadata_json'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('interview_evaluations_answer_idx').on(t.answerId)]
+);
+
+export const interviewMastery = pgTable(
+  'interview_mastery',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    interviewProfileId: uuid('interview_profile_id')
+      .notNull()
+      .references(() => interviewProfiles.id, { onDelete: 'cascade' }),
+    competencyId: uuid('competency_id')
+      .notNull()
+      .references(() => interviewCompetencies.id, { onDelete: 'cascade' }),
+    masteryScore: integer('mastery_score').notNull().default(0),
+    confidence: integer('confidence'),
+    evidenceCount: integer('evidence_count').notNull().default(0),
+    lastAssessedAt: timestamp('last_assessed_at', { withTimezone: true }),
+    trend: text('trend'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('interview_mastery_profile_competency_uidx').on(
+      t.interviewProfileId,
+      t.competencyId
+    ),
+    index('interview_mastery_profile_idx').on(t.interviewProfileId),
+  ]
+);
+
+export const interviewPrepQuestions = pgTable(
+  'interview_prep_questions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    interviewProfileId: uuid('interview_profile_id')
+      .notNull()
+      .references(() => interviewProfiles.id, { onDelete: 'cascade' }),
+    batchNumber: integer('batch_number').notNull(),
+    sequence: integer('sequence').notNull(),
+    questionType: text('question_type').notNull(),
+    questionText: text('question_text').notNull(),
+    competencyId: uuid('competency_id').references(() => interviewCompetencies.id, {
+      onDelete: 'set null',
+    }),
+    difficulty: text('difficulty'),
+    answerText: text('answer_text').notNull(),
+    answerSource: text('answer_source').notNull().default('ai'),
+    relevance: text('relevance').notNull().default('supported'),
+    evidenceFromCv: text('evidence_from_cv'),
+    whySelected: text('why_selected'),
+    aiMetadataJson: jsonb('ai_metadata_json'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('interview_prep_questions_profile_idx').on(t.interviewProfileId),
+    index('interview_prep_questions_profile_seq_idx').on(t.interviewProfileId, t.sequence),
+  ]
+);
+
+export const aiUsageEvents = pgTable(
+  'ai_usage_events',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    category: text('category').notNull(),
+    operation: text('operation').notNull(),
+    inputChars: integer('input_chars').notNull().default(0),
+    outputChars: integer('output_chars').notNull().default(0),
+    inputTokens: integer('input_tokens').notNull().default(0),
+    outputTokens: integer('output_tokens').notNull().default(0),
+    charsPerToken: integer('chars_per_token').notNull().default(5),
+    model: text('model'),
+    promptVersion: text('prompt_version'),
+    relatedId: uuid('related_id'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('ai_usage_events_user_created_idx').on(t.userId, t.createdAt),
+    index('ai_usage_events_user_category_idx').on(t.userId, t.category),
+  ]
+);
 
 export type DbUser = typeof users.$inferSelect;
 export type DbProfile = typeof profiles.$inferSelect;

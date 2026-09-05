@@ -49,12 +49,12 @@ export async function POST(request: Request, { params }: RouteContext) {
       newIds = currentIds.filter((id) => id !== jobId);
     }
 
-    const patch = { job_ids: newIds, updated_at: new Date().toISOString() };
+    const patch = { job_ids: newIds };
     try {
       if (type === 'cv') {
-        await getCvsRepo().update(user.id, assetId, patch);
+        await getCvsRepo().update(user.id, assetId, { ...patch, updated_at: new Date() });
       } else {
-        await getCoverLettersRepo().update(user.id, assetId, patch);
+        await getCoverLettersRepo().update(user.id, assetId, { ...patch, updated_at: new Date() });
       }
     } catch {
       return err('Failed to update asset', 500);

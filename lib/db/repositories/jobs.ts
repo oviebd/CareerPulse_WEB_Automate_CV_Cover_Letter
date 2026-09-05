@@ -31,6 +31,7 @@ async function update(userId: string, id: string, patch: Record<string, unknown>
   const mapped = fromSnake(patch);
   delete mapped.id;
   delete mapped.userId;
+  mapped.updatedAt = mapped.updatedAt instanceof Date ? mapped.updatedAt : new Date();
   const [updated] = await db
     .update(jobs)
     .set(mapped as Partial<typeof jobs.$inferInsert>)

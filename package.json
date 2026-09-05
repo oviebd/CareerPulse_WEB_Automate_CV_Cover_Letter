@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3000",
     "build": "next build",
     "build:hosting": "bash Build/package-hosting.sh",
     "start": "next start",
@@ -12,7 +12,9 @@
     "test-roundtrip": "tsx scripts/test-roundtrip.ts",
     "test-cv-docx": "tsx scripts/test-cv-docx.ts",
     "test-cover-letter-docx": "tsx scripts/test-cover-letter-docx.ts",
-    "validate-templates": "tsx scripts/validate-templates.ts"
+    "validate-templates": "tsx scripts/validate-templates.ts",
+    "test-interview": "tsx scripts/test-interview.ts",
+    "db:migrate-interview": "tsx scripts/migrate-interview.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",

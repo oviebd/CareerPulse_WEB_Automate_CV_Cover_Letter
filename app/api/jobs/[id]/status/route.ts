@@ -25,11 +25,10 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       return err('invalid_status', 'INVALID', 400);
     }
     const status = raw.trim() as JobStatus;
-    const now = new Date().toISOString();
 
     let data: Record<string, unknown>;
     try {
-      data = await getJobsRepo().update(user.id, jid, { status, updated_at: now });
+      data = await getJobsRepo().update(user.id, jid, { status });
     } catch (e) {
       if (e instanceof Error && e.message === 'Job not found') {
         return err('Not found', 'NOT_FOUND', 404);

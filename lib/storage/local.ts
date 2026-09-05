@@ -4,7 +4,7 @@ import crypto from 'crypto';
 
 const UPLOAD_ROOT = process.env.UPLOAD_DIR?.trim() || '/data/uploads';
 
-export type StorageBucket = 'cv-uploads' | 'pdf-exports' | 'cv-photos';
+export type StorageBucket = 'cv-uploads' | 'pdf-exports' | 'cv-photos' | 'interview-audio';
 
 function bucketDir(bucket: StorageBucket): string {
   return path.join(UPLOAD_ROOT, bucket);
@@ -18,7 +18,7 @@ function resolvePath(bucket: StorageBucket, objectPath: string): string {
 
 export async function ensureUploadDirs(): Promise<void> {
   await Promise.all(
-    (['cv-uploads', 'pdf-exports', 'cv-photos'] as StorageBucket[]).map((b) =>
+    (['cv-uploads', 'pdf-exports', 'cv-photos', 'interview-audio'] as StorageBucket[]).map((b) =>
       fs.mkdir(bucketDir(b), { recursive: true })
     )
   );

@@ -6,6 +6,7 @@ import {
   FolderOpen,
   Kanban,
   Menu,
+  MessageSquare,
   Settings,
   X,
   ChevronsLeft,
@@ -16,6 +17,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { ProfileMenu } from '@/components/shared/ProfileMenu';
 import { ThemeToggle } from '@/components/shared/ThemeToggle';
+import { AiUsageDebugButton } from '@/components/debug/AiUsageDebugButton';
 import { cn } from '@/lib/utils';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useTrackedJobsCount } from '@/hooks/useTracker';
@@ -32,6 +34,7 @@ interface NavItem {
 const nav: NavItem[] = [
   { href: '/dashboard', label: 'Applications', icon: Kanban },
   { href: '/documents', label: 'Documents', icon: FolderOpen },
+  { href: '/interview', label: 'Interview prep', icon: MessageSquare, proOnly: true },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -52,6 +55,9 @@ function isNavActive(pathname: string, href: string): boolean {
       pathname === '/cover-letters' ||
       pathname.startsWith('/cover-letters/')
     );
+  }
+  if (href === '/interview') {
+    return pathname === '/interview' || pathname.startsWith('/interview/');
   }
   if (href === '/settings') {
     return (pathname === '/settings' || pathname.startsWith('/settings/')) &&
@@ -248,6 +254,7 @@ export function AppHeader() {
           </Link>
         </nav>
         <div className="shrink-0 space-y-3 border-t border-[var(--color-border)] p-3">
+          <AiUsageDebugButton collapsed={sidebarCollapsed} />
           <ThemeToggle collapsed={sidebarCollapsed} />
           <div className="flex items-center justify-start">
             <ProfileMenu menuPlacement="above" />
@@ -332,7 +339,8 @@ export function AppHeader() {
                   <span className="flex-1">Billing</span>
                 </Link>
               </nav>
-              <div className="border-t border-[var(--color-border)] px-3 pb-2">
+              <div className="border-t border-[var(--color-border)] px-3 pb-2 space-y-2">
+                <AiUsageDebugButton />
                 <ThemeToggle />
               </div>
             </motion.aside>

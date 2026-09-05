@@ -1,0 +1,64 @@
+/**
+ * Applies interview preparation tables (migration 029) to an existing Postgres database.
+ * Safe to run multiple times — uses IF NOT EXISTS / duplicate_object guards.
+ *
+ * Usage: DATABASE_URL=postgresql://... npm run db:migrate-interview
+ */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import postgres from 'postgres';
+
+async function main() {
+  // Load .env.local when DATABASE_URL is not set (common for npm run dev workflow)
+  if (!process.env.DATABASE_URL?.trim()) {
+    const envPath = join(process.cwd(), '.env.local');
+    try {
+      const envContent = readFileSync(envPath, 'utf8');
+      for (const line of envContent.split('\n')) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) continue;
+        const eq = trimmed.indexOf('=');
+        if (eq <= 0) continue;
+        const key = trimmed.slice(0, eq).trim();
+        const val = trimmed.slice(eq + 1).trim();
+        if (!process.env[key]) process.env[key] = val;
+      }
+    } catch {
+      /* .env.local optional */
+    }
+  }
+
+  const url = process.env.DATABASE_URL?.trim();
+  if (!url) {
+    console.error('DATABASE_URL is required');
+    process.exit(1);
+  }
+
+  const migrations = [
+    join(process.cwd(), 'supabase/migrations/029_interview_preparation.sql'),
+    join(process.cwd(), 'supabase/migrations/030_interview_prep_questions.sql'),
+    join(process.cwd(), 'supabase/migrations/031_interview_mapped_context_and_ai_usage.sql'),
+  ];
+  const db = postgres(url, { max: 1 });
+
+  try {
+    for (const sqlPath of migrations) {
+      const migration = readFileSync(sqlPath, 'utf8');
+      await db.unsafe(migration);
+    }
+    const tables = await db<{ tablename: string }[]>`
+      SELECT tablename FROM pg_tables
+      WHERE schemaname = 'public' AND tablename LIKE 'interview%'
+      ORDER BY tablename
+    `;
+    console.log('Interview migration applied.');
+    console.log('Tables:', tables.map((t) => t.tablename).join(', ') || '(none)');
+  } catch (e) {
+    console.error('Migration failed:', e instanceof Error ? e.message : e);
+    process.exit(1);
+  } finally {
+    await db.end();
+  }
+}
+
+void main();

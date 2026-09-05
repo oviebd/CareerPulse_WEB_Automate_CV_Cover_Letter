@@ -9,6 +9,7 @@ const STATIC_PROTECTED: readonly string[] = [
   '/tracker',
   '/ai-tools',
   '/settings',
+  '/interview',
 ];
 
 export function isProtectedAppPath(pathname: string): boolean {

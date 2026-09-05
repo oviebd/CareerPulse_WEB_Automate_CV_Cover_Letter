@@ -1,4 +1,3 @@
-import Anthropic from '@anthropic-ai/sdk';
 import type {
   CoverLetterLength,
   CoverLetterTone,
@@ -6,12 +5,16 @@ import type {
   ExtractedCoverLetter,
 } from '@/types';
 import { parseClaudeJson } from '@/lib/parse-claude-json';
+import {
+  CLAUDE_MODEL,
+  claudeComplete,
+  getAnthropicClient,
+} from '@/lib/ai/anthropic-gateway';
 
 export type { ExtractedCoverLetter };
+export { CLAUDE_MODEL };
 
-const claude = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-export const CLAUDE_MODEL =
-  process.env.ANTHROPIC_MODEL?.trim() || 'claude-sonnet-4-20250514';
+const claude = getAnthropicClient();
 
 const MAX_CV_TEXT_CHARS = 60_000;
 
@@ -59,28 +62,6 @@ function truncateCvText(text: string): string {
   return `${text.slice(0, MAX_CV_TEXT_CHARS)}\n\n[TRUNCATED — document exceeded ${MAX_CV_TEXT_CHARS} characters]`;
 }
 
-function isRetryable(err: unknown): boolean {
-  if (!err || typeof err !== 'object') return false;
-  const o = err as { status?: number; type?: string };
-  return o.status === 429 || o.type === 'overloaded_error';
-}
-
-async function withRetry<T>(
-  fn: () => Promise<T>,
-  maxRetries = 3,
-  delayMs = 30000
-): Promise<T> {
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      return await fn();
-    } catch (err: unknown) {
-      if (!isRetryable(err) || attempt === maxRetries - 1) throw err;
-      await new Promise((r) => setTimeout(r, delayMs));
-    }
-  }
-  throw new Error('Max retries exceeded');
-}
-
 export async function extractCVFromText(
   rawText: string,
   embeddedHyperlinks?: string
@@ -90,11 +71,7 @@ export async function extractCVFromText(
     : '';
   const cvText = truncateCvText(rawText);
 
-  const message = await withRetry(() =>
-    claude.messages.create({
-      model: CLAUDE_MODEL,
-      max_tokens: 8192,
-      system: `You are a CV parsing expert. Extract structured information from the provided CV text and return ONLY valid JSON with no other text. The JSON must match the exact schema provided.
+  const system = `You are a CV parsing expert. Extract structured information from the provided CV text and return ONLY valid JSON with no other text. The JSON must match the exact schema provided.
 
 IMPORTANT — Link extraction rules:
 • CVs often contain hyperlinks (clickable text) whose destination URL is NOT visible in the plain text.  An "EMBEDDED HYPERLINKS" section at the end lists these hidden links.  Use them to populate the correct fields.
@@ -114,11 +91,9 @@ IMPORTANT — Skills extraction rules:
 • Only extract skills that are explicitly listed on the CV (skills section or clear skill/tool lists). Do NOT invent skills from every technology mention in experience bullets.
 • Prefer technical skills, tools, and spoken/programming languages. Omit vague soft skills (e.g. "team player", "hard working", "communication") unless the CV has a dedicated soft-skills list.
 • At most 15 skill items total across all categories. Prefer quality over volume; dedupe case-insensitively.
-• Use short category names (Technical, Tools, Languages, Soft). At most 4 categories.`,
-      messages: [
-        {
-          role: 'user',
-          content: `Extract the following structured data from this CV. Return ONLY valid JSON with no preamble or markdown.
+• Use short category names (Technical, Tools, Languages, Soft). At most 4 categories.`;
+
+  const userContent = `Extract the following structured data from this CV. Return ONLY valid JSON with no preamble or markdown.
 
 Schema:
 {
@@ -141,14 +116,15 @@ Schema:
 }
 
 CV TEXT:
-${cvText}${hyperlinkSection}`,
-        },
+${cvText}${hyperlinkSection}`;
 
-      ],
-    })
-  );
-  const block = message.content[0];
-  const text = block.type === 'text' ? block.text : '';
+  const { text } = await claudeComplete({
+    system,
+    user: userContent,
+    maxTokens: 8192,
+    category: 'cv_creation',
+    operation: 'extract',
+  });
   if (!text.trim()) {
     throw new Error('empty_model_response');
   }
@@ -232,17 +208,16 @@ export async function generateCoverLetterText(params: {
 }): Promise<string> {
   const wordTargets = { short: 200, medium: 350, long: 500 };
   const userContent = buildCoverLetterUserContent(params, wordTargets);
-  const message = await withRetry(() =>
-    claude.messages.create({
-      model: CLAUDE_MODEL,
-      max_tokens: 1000,
-      system:
-        'You are a professional career coach and expert cover letter writer. Write compelling, tailored, authentic, ATS-optimized cover letters. Return only the cover letter body text — no subject line, no "Dear Hiring Manager" header, no sign-off. Those are handled by the template. Never fabricate facts, achievements, tools, or metrics.',
-      messages: [{ role: 'user', content: userContent }],
-    })
-  );
-  const block = message.content[0];
-  return block.type === 'text' ? block.text.trim() : '';
+  const system =
+    'You are a professional career coach and expert cover letter writer. Write compelling, tailored, authentic, ATS-optimized cover letters. Return only the cover letter body text — no subject line, no "Dear Hiring Manager" header, no sign-off. Those are handled by the template. Never fabricate facts, achievements, tools, or metrics.';
+  const { text: output } = await claudeComplete({
+    system,
+    user: userContent,
+    maxTokens: 1000,
+    category: 'cover_letter',
+    operation: 'generate',
+  });
+  return output.trim();
 }
 
 /**
@@ -253,20 +228,13 @@ export async function extractCoverLetterFromText(
   rawText: string
 ): Promise<ExtractedCoverLetter> {
   const letterText = truncateCvText(rawText);
-  const message = await withRetry(() =>
-    claude.messages.create({
-      model: CLAUDE_MODEL,
-      max_tokens: 4096,
-      system: `You are a cover letter parsing expert. Extract structured fields from an uploaded cover letter and return ONLY valid JSON with no other text.
+  const system = `You are a cover letter parsing expert. Extract structured fields from an uploaded cover letter and return ONLY valid JSON with no other text.
 
 Rules:
 • "content" must be the letter BODY only — strip letterhead (name/address/contact block at top), date, recipient address, salutation (e.g. "Dear …"), and sign-off/closing (e.g. "Sincerely," + name). Preserve paragraph breaks as newlines.
 • If a field is not present, use null.
-• Do not invent contact details or role/company names.`,
-      messages: [
-        {
-          role: 'user',
-          content: `Extract from this cover letter. Return ONLY JSON:
+• Do not invent contact details or role/company names.`;
+  const userContent = `Extract from this cover letter. Return ONLY JSON:
 
 {
   "content": string,
@@ -280,13 +248,14 @@ Rules:
 }
 
 COVER LETTER TEXT:
-${letterText}`,
-        },
-      ],
-    })
-  );
-  const block = message.content[0];
-  const text = block.type === 'text' ? block.text : '';
+${letterText}`;
+  const { text } = await claudeComplete({
+    system,
+    user: userContent,
+    maxTokens: 4096,
+    category: 'cover_letter',
+    operation: 'extract',
+  });
   if (!text.trim()) {
     throw new Error('empty_model_response');
   }
@@ -345,22 +314,17 @@ export async function enhanceCoverLetter(params: {
     .filter(Boolean)
     .join('\n');
 
-  const message = await withRetry(() =>
-    claude.messages.create({
-      model: CLAUDE_MODEL,
-      max_tokens: 1000,
-      system:
-        'You are an expert cover letter coach. Rewrite and improve the provided cover letter body. Preserve the candidate\'s authentic experiences, achievements, and personal voice. Improve clarity, professional impact, sentence flow, and ATS keyword coverage. Return ONLY the improved body text — no salutation header, no sign-off, no preamble or commentary.',
-      messages: [
-        {
-          role: 'user',
-          content: `EXISTING COVER LETTER:\n${params.existingContent}\n\n---\n\nINSTRUCTIONS:\n- Tone: ${tone} (${toneDesc})\n- Target length: ~${targetWords} words\n${contextLines}\n- Preserve all real achievements, facts, and the candidate's unique voice\n- Improve sentence structure, impact, and ATS alignment\n- Do NOT invent new achievements or metrics\n\nWrite the improved cover letter body now.`,
-        },
-      ],
-    })
-  );
-  const block = message.content[0];
-  return block.type === 'text' ? block.text.trim() : '';
+  const system =
+    'You are an expert cover letter coach. Rewrite and improve the provided cover letter body. Preserve the candidate\'s authentic experiences, achievements, and personal voice. Improve clarity, professional impact, sentence flow, and ATS keyword coverage. Return ONLY the improved body text — no salutation header, no sign-off, no preamble or commentary.';
+  const userContent = `EXISTING COVER LETTER:\n${params.existingContent}\n\n---\n\nINSTRUCTIONS:\n- Tone: ${tone} (${toneDesc})\n- Target length: ~${targetWords} words\n${contextLines}\n- Preserve all real achievements, facts, and the candidate's unique voice\n- Improve sentence structure, impact, and ATS alignment\n- Do NOT invent new achievements or metrics\n\nWrite the improved cover letter body now.`;
+  const { text: output } = await claudeComplete({
+    system,
+    user: userContent,
+    maxTokens: 1000,
+    category: 'cover_letter',
+    operation: 'enhance',
+  });
+  return output.trim();
 }
 
 export async function scoreATS(
@@ -372,22 +336,16 @@ export async function scoreATS(
   keywords_missing: string[];
   summary: string;
 }> {
-  const message = await withRetry(() =>
-    claude.messages.create({
-      model: CLAUDE_MODEL,
-      max_tokens: 500,
-      system:
-        'You are an ATS expert. Analyze a cover letter against a job description and return ONLY valid JSON, no other text.',
-      messages: [
-        {
-          role: 'user',
-          content: `JOB DESCRIPTION:\n${jobDescription}\n\nCOVER LETTER:\n${coverLetter}\n\nReturn this JSON exactly:\n{"score": number (0-100), "keywords_found": [string], "keywords_missing": [string], "summary": string}`,
-        },
-      ],
-    })
-  );
-  const block = message.content[0];
-  const text = block.type === 'text' ? block.text : '{}';
+  const system =
+    'You are an ATS expert. Analyze a cover letter against a job description and return ONLY valid JSON, no other text.';
+  const userContent = `JOB DESCRIPTION:\n${jobDescription}\n\nCOVER LETTER:\n${coverLetter}\n\nReturn this JSON exactly:\n{"score": number (0-100), "keywords_found": [string], "keywords_missing": [string], "summary": string}`;
+  const { text } = await claudeComplete({
+    system,
+    user: userContent,
+    maxTokens: 500,
+    category: 'cover_letter',
+    operation: 'score_ats',
+  });
   return JSON.parse(text.replace(/```json|```/g, '').trim()) as {
     score: number;
     keywords_found: string[];
@@ -399,16 +357,15 @@ export async function scoreATS(
 export async function claudeTextCompletion(
   system: string,
   user: string,
-  maxTokens = 1024
+  maxTokens = 1024,
+  operation = 'completion'
 ): Promise<string> {
-  const message = await withRetry(() =>
-    claude.messages.create({
-      model: CLAUDE_MODEL,
-      max_tokens: maxTokens,
-      system,
-      messages: [{ role: 'user', content: user }],
-    })
-  );
-  const block = message.content[0];
-  return block.type === 'text' ? block.text : '';
+  const { text: output } = await claudeComplete({
+    system,
+    user,
+    maxTokens,
+    category: 'ai_suggestions',
+    operation,
+  });
+  return output;
 }

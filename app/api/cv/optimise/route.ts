@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/auth/session';
-import { CLAUDE_MODEL, generateCoverLetterText } from '@/lib/claude';
+import { generateCoverLetterText } from '@/lib/claude';
+import { claudeComplete } from '@/lib/ai/anthropic-gateway';
 import { rateLimitHit } from '@/lib/rate-limit';
 import { resolveEffectiveTier } from '@/lib/dev-subscription';
 import { assertGenerationAllowed } from '@/lib/subscription-server';
-import Anthropic from '@anthropic-ai/sdk';
 import type {
   CVData,
   CoverLetterLength,
@@ -16,11 +16,10 @@ import { migrateLegacyCVData } from '@/src/utils/cvDefaults';
 import { clampSkillCategories } from '@/src/utils/migrateSkills';
 import { getCvsRepo } from '@/lib/db/repositories/cvs';
 import { getProfilesRepo } from '@/lib/db/repositories/profiles';
+import { runWithAiUsageContext } from '@/lib/ai/usage-context';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
-
-const claude = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const TONES: CoverLetterTone[] = [
   'professional',
@@ -30,24 +29,6 @@ const TONES: CoverLetterTone[] = [
   'formal',
 ];
 const LENGTHS: CoverLetterLength[] = ['short', 'medium', 'long'];
-
-async function withRetry<T>(
-  fn: () => Promise<T>,
-  maxRetries = 3,
-  delayMs = 30000
-): Promise<T> {
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      return await fn();
-    } catch (err: unknown) {
-      const o = err as { status?: number; type?: string };
-      const retryable = o?.status === 429 || o?.type === 'overloaded_error';
-      if (!retryable || attempt === maxRetries - 1) throw err;
-      await new Promise((r) => setTimeout(r, delayMs));
-    }
-  }
-  throw new Error('Max retries exceeded');
-}
 
 interface OptimisedCVResponse {
   optimised_cv: CVData;
@@ -195,17 +176,13 @@ Optimise the candidate's CV for this role. Return a JSON object with:
   "inferred_company_name": "If Company was not provided above, infer the employer name from the job description if clearly stated; otherwise null or a reasonable guess."
 }`;
 
-  const message = await withRetry(() =>
-    claude.messages.create({
-      model: CLAUDE_MODEL,
-      max_tokens: 8192,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userPrompt }],
-    })
-  );
-
-  const block = message.content[0];
-  const rawText = block.type === 'text' ? block.text : '';
+  const { text: rawText } = await claudeComplete({
+    system: systemPrompt,
+    user: userPrompt,
+    maxTokens: 8192,
+    category: 'job_specific_cv',
+    operation: 'optimise',
+  });
   const clean = rawText.replace(/```json|```/g, '').trim();
 
   let parsed: OptimisedCVResponse;
@@ -268,6 +245,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'RATE_LIMIT' }, { status: 429 });
     }
 
+    return runWithAiUsageContext({ userId: user.id }, async () => {
     const body = (await request.json()) as {
       job_title?: string;
       company_name?: string;
@@ -483,6 +461,7 @@ export async function POST(request: Request) {
       }
       throw e;
     }
+    });
   } catch (e) {
     console.error('cv optimise', e);
     return NextResponse.json(
