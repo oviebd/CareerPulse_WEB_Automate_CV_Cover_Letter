@@ -35,9 +35,9 @@ async function main() {
   }
 
   const migrations = [
-    join(process.cwd(), 'supabase/migrations/029_interview_preparation.sql'),
-    join(process.cwd(), 'supabase/migrations/030_interview_prep_questions.sql'),
-    join(process.cwd(), 'supabase/migrations/031_interview_mapped_context_and_ai_usage.sql'),
+    join(process.cwd(), 'db/migrations/029_interview_preparation.sql'),
+    join(process.cwd(), 'db/migrations/030_interview_prep_questions.sql'),
+    join(process.cwd(), 'db/migrations/031_interview_mapped_context_and_ai_usage.sql'),
   ];
   const db = postgres(url, { max: 1 });
 

@@ -1,6 +1,6 @@
 # CareerPulse — UI/UX Restructure & Re-Theme Plan
 
-> Prepared as an expert UI/UX design + front-end architecture plan for an AI-powered CV / cover-letter / application-tracking platform (Next.js 15 App Router · Tailwind 3 · Supabase · Zustand · Framer Motion · Claude).
+> Prepared as an expert UI/UX design + front-end architecture plan for an AI-powered CV / cover-letter / application-tracking platform (Next.js 15 App Router · Tailwind 3 · Postgres + NextAuth · Zustand · Framer Motion · Claude).
 > Based on a full-codebase audit (6 subsystems, ~40 routes, 98 components, 73 design tokens) plus the in-repo product spec, feature summary, and CV-edit UI docs.
 
 ---
@@ -64,7 +64,7 @@ The restructure is therefore **three coordinated tracks**:
 | H4 | **"New Application" CTA doesn't create an application** — it generates a CV+cover letter and lands on the optimise result page. Terminology fragmented (Applications vs Jobs vs Tracker for one entity). | `applications/new` → `AddJobWizard` | Broken mental model at the primary action. |
 | H5 | **No headless a11y foundation** — every overlay (dialog/drawer/menu/popover) is hand-rolled with divergent focus/keyboard behavior; the "official" `Modal` has **no focus trap** (WCAG 2.4.3/2.1.2 fail). | `components/ui/modal.tsx` + 6 one-offs | Broken keyboard/SR behavior across every overlay. |
 | H6 | **No Terms/Privacy pages, no marketing footer, `/pricing` linked from nowhere.** | `app/(marketing)/*` | Legal/trust/compliance gap for a product taking real payments + GDPR export; major conversion leak. |
-| H7 | **Delete Account non-functional + leaks dev copy** ("delete the user in Supabase Dashboard"); the button only fires a toast. | `settings/account/page.tsx` | Reads as broken; blocks a basic data-rights action. |
+| H7 | **Delete Account non-functional + leaks dev copy** ("delete the user manually"); the button only fires a toast. | `settings/account/page.tsx` | Reads as broken; blocks a basic data-rights action. |
 | H8 | **Landing hero uses a generic stock desk photo** mislabeled "Live preview in the editor"; the real product proof (template iframes) sits below the fold. | `(marketing)/page.tsx` | Weak first impression at peak attention. |
 
 ### 2.3 Notable medium issues

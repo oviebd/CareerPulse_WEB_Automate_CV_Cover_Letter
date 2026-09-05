@@ -1,5 +1,5 @@
 -- Consolidated CareerPulse schema (self-hosted Postgres)
--- Replaces Supabase auth.users + public tables
+-- Source of truth for fresh database initialization
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 

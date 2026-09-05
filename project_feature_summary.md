@@ -26,7 +26,7 @@ CareerPulse is an **AI-powered CV and cover letter platform** for job seekers. U
 | **Framework** | Next.js 15 (App Router), React 18 |
 | **Language** | TypeScript 5 |
 | **Styling** | Tailwind CSS 3, CSS variables (light/dark theme) |
-| **Database & Auth** | Supabase (PostgreSQL + Auth via `@supabase/ssr`) |
+| **Database & Auth** | PostgreSQL 16 + NextAuth (Auth.js) + Drizzle ORM |
 | **AI** | Anthropic Claude (`@anthropic-ai/sdk`) |
 | **State / Data** | Zustand (client), TanStack React Query (server data) |
 | **UI / Motion** | Framer Motion, Lucide icons, `@dnd-kit` (drag-and-drop) |
@@ -56,8 +56,8 @@ CareerPulse is a **monolithic Next.js full-stack application**. There is no sepa
                                           │
                     ┌─────────────────────┼─────────────────────┐
                     ▼                     ▼                     ▼
-              Supabase DB          Anthropic Claude        SSLCommerz / Resend
-           (PostgreSQL + Auth)      (AI generation)       (payments / email)
+              Postgres DB            Anthropic Claude        SSLCommerz / Resend
+           (NextAuth + Drizzle)      (AI generation)       (payments / email)
 ```
 
 **Route groups** (parentheses in folder names do not affect URLs):
@@ -68,7 +68,7 @@ CareerPulse is a **monolithic Next.js full-stack application**. There is no sepa
 | `(auth)` | Login, register, OAuth callback |
 | `(dashboard)` | Authenticated app: CV, cover letters, tracker, settings |
 
-**Authentication** is handled by Supabase Auth with SSR cookies. `middleware.ts` protects dashboard routes and redirects unauthenticated users to `/login?returnTo=...`. Guest users can access CV builder paths without an account.
+**Authentication** is handled by NextAuth (Auth.js) with JWT sessions. `middleware.ts` protects dashboard routes and redirects unauthenticated users to `/login?returnTo=...`. Guest users can access CV builder paths without an account.
 
 ---
 
@@ -94,7 +94,7 @@ CareerPulse is a **monolithic Next.js full-stack application**. There is no sepa
 
 **Auth methods:** email/password, magic link, Google OAuth.
 
-**Guest CV handoff:** When a guest builds a CV and then signs up, their in-browser editor state is merged into a saved `cvs` row in Supabase.
+**Guest CV handoff:** When a guest builds a CV and then signs up, their in-browser editor state is merged into a saved `cvs` row in Postgres.
 
 **Guest-public paths** (no login required):
 
@@ -259,7 +259,7 @@ Payment flow: SSLCommerz checkout → success/fail/cancel callbacks → IPN webh
 
 ## Database Schema
 
-The schema is versioned in `supabase/migrations/` (18 numbered SQL files, 001–018). The app queries six active tables.
+The schema is defined in `db/schema.sql` (canonical SQL) and `lib/db/schema.ts` (Drizzle ORM). Incremental interview upgrades live in `db/migrations/`.
 
 ### Schema Evolution
 
@@ -534,7 +534,7 @@ Landing (/)
   → [Want export/AI?] 
   → /register or /login 
   → OAuth or email auth 
-  → Guest state hydrated → saved CV in Supabase
+  → Guest state hydrated → saved CV in Postgres
 ```
 
 1. User clicks **"Build my CV — free"** on `/` → redirected to `/cv/edit?guest=true`
@@ -597,7 +597,7 @@ Landing (/)
 ```
 /register or /login
   → email/password | magic link | Google OAuth
-  → /callback or /api/auth/[...supabase]
+  → /callback or /api/auth/[...nextauth]
   → redirect to /dashboard (or returnTo path)
 ```
 
@@ -690,7 +690,7 @@ Gating is enforced in:
 
 | Endpoint | Methods | Purpose |
 |----------|---------|---------|
-| `/api/auth/[...supabase]` | GET | Supabase auth callback handler |
+| `/api/auth/[...nextauth]` | GET, POST | Auth.js session handler |
 | `/api/auth/signout` | POST | Sign out |
 
 ### CV
@@ -782,7 +782,7 @@ CareerPulse_WEB/
 ├── stores/                   # useAuthStore, guestCvStore, optimise draft stores
 ├── lib/
 │   ├── claude.ts             # All Claude AI calls
-│   ├── supabase/             # client, server, public-env
+│   ├── db/                   # client, schema, repositories
 │   ├── queries/              # cvs, cover-letters, jobs query helpers
 │   ├── cv-*.ts               # parsing, mapping, completion, ATS, diff, export
 │   ├── cover-letter-html.ts
@@ -793,7 +793,7 @@ CareerPulse_WEB/
 │   └── rate-limit.ts
 ├── types/
 │   ├── index.ts              # Domain types, TIER_LIMITS, PRICING, JOB_STATUS_CONFIG
-│   ├── database.ts           # Supabase table shapes
+│   ├── database.ts           # Drizzle table shapes
 │   └── cover-letter.ts       # Wizard/editor types (WIP)
 ├── src/
 │   ├── config/templateConfig.ts   # CV template metadata
@@ -801,8 +801,11 @@ CareerPulse_WEB/
 │   ├── services/pdfRenderer.ts    # Puppeteer PDF
 │   └── types/cv.types.ts          # CVData, TemplateId, SkillCategory
 ├── templates/                # Legacy HTML templates (cv/*.html, cover-letter/*.html)
-├── supabase/migrations/      # 18 SQL migrations
-└── middleware.ts             # Supabase session + route protection
+├── db/
+│   ├── schema.sql            # Canonical Postgres schema
+│   ├── seed.sql              # Template seed data
+│   └── migrations/           # Incremental SQL (interview module)
+└── middleware.ts             # NextAuth session + route protection
 ```
 
 ---

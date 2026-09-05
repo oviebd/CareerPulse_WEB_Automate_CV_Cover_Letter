@@ -1,10 +1,11 @@
 # Database schema and relationships
 
-**Database:** PostgreSQL (Supabase)  
-**Source of truth:** `supabase/migrations/*.sql` (migrations `001`–`011`)  
-**Last aligned with migrations:** 2026-04-04  
+**Database:** PostgreSQL 16 (self-hosted)  
+**Source of truth:** [`db/schema.sql`](../db/schema.sql) (fresh init) + [`lib/db/schema.ts`](../lib/db/schema.ts) (Drizzle ORM)  
+**Incremental upgrades:** [`db/migrations/`](../db/migrations/) (interview module)  
+**Last aligned with schema:** 2026-09-05  
 
-This document describes all relational tables, storage buckets, and how they connect. Soft references (string IDs or UUID arrays with no foreign key to `jobs`) are called out explicitly.
+This document describes all relational tables, local file storage buckets, and how they connect. Soft references (string IDs or UUID arrays with no foreign key to `jobs`) are called out explicitly.
 
 ---
 
@@ -12,7 +13,7 @@ This document describes all relational tables, storage buckets, and how they con
 
 | Table | Purpose |
 |--------|---------|
-| `auth.users` | Supabase Auth identities (managed by Supabase, not application migrations) |
+| `users` | Auth identities (email/password, Google OAuth) — parent for `profiles` |
 | `profiles` | App user row: email, subscription, onboarding — FK parent for user-owned data |
 | `cvs` | All CV documents (general and job-tailored); `job_ids = '{}'` means master/general CV |
 | `jobs` | Job tracker (Kanban) — single source of truth for company, title, description |
@@ -20,7 +21,7 @@ This document describes all relational tables, storage buckets, and how they con
 | `payments` | Payment / billing records |
 | `cv_templates` | Seed catalog of CV and cover letter templates |
 
-**Storage (not SQL tables):** `cv-uploads`, `pdf-exports`, `cv-photos` — see [Storage buckets](#storage-buckets-supabase-storage).
+**Storage (not SQL tables):** `cv-uploads`, `pdf-exports`, `cv-photos`, `interview-audio` — see [Storage buckets](#storage-buckets-local-filesystem).
 
 ---
 
@@ -28,7 +29,7 @@ This document describes all relational tables, storage buckets, and how they con
 
 ```mermaid
 erDiagram
-  AUTH_USERS ||--|| PROFILES : "id = profiles.id"
+  USERS ||--|| PROFILES : "id = profiles.id"
   PROFILES ||--o{ CVS : "user_id"
   PROFILES ||--o{ JOBS : "user_id"
   PROFILES ||--o{ COVER_LETTERS : "user_id"
@@ -44,7 +45,7 @@ erDiagram
 
 | Child table | Column | Parent | On delete |
 |-------------|--------|--------|-----------|
-| `profiles` | `id` | `auth.users(id)` | CASCADE |
+| `profiles` | `id` | `users(id)` | CASCADE |
 | `cvs` | `user_id` | `profiles(id)` | CASCADE |
 | `jobs` | `user_id` | `profiles(id)` | CASCADE |
 | `cover_letters` | `user_id` | `profiles(id)` | CASCADE |
@@ -62,9 +63,9 @@ erDiagram
 
 ---
 
-## `auth.users` (Supabase Auth)
+## `users` (Auth.js)
 
-Not created by app migrations. `profiles.id` is the same UUID as `auth.users.id`. RLS and triggers in `001_schema.sql` create a `profiles` row on signup via `handle_new_user()`.
+Created by app registration or Google OAuth. `profiles.id` is the same UUID as `users.id`. Signup creates both rows via the auth layer.
 
 ---
 
@@ -74,7 +75,7 @@ Extends the auth user with subscription and app settings.
 
 | Column | Type | Notes |
 |--------|------|--------|
-| `id` | UUID | PK, FK → `auth.users(id)` ON DELETE CASCADE |
+| `id` | UUID | PK, FK → `users(id)` ON DELETE CASCADE |
 | `email` | TEXT | NOT NULL, UNIQUE |
 | `full_name` | TEXT | |
 | `avatar_url` | TEXT | |
@@ -217,30 +218,30 @@ Initial rows are inserted in `001_schema.sql`; `apex` and `nova` are added in `0
 
 ---
 
-## Storage buckets (Supabase Storage)
+## Storage buckets (local filesystem)
 
-These are not PostgreSQL tables; paths typically start with `{user_id}/...`.
+These are not PostgreSQL tables; files are stored under `UPLOAD_DIR` (default `/data/uploads`). Paths typically start with `{user_id}/...`.
 
 | Bucket | Public | Purpose |
 |--------|--------|---------|
 | `cv-uploads` | No | Temporary CV file uploads (PDF/DOCX) |
 | `pdf-exports` | No | Exported PDFs |
-| `cv-photos` | Yes | Profile photos for CV (migration `003`) |
+| `cv-photos` | Yes | Profile photos for CV |
+| `interview-audio` | No | Mock interview audio recordings |
 
-Policies: see `002_storage.sql` and `003_cv_profile_extra.sql`.
+Access is enforced by signed URLs and API routes (`lib/storage/local.ts`).
 
 ---
 
 ## Row Level Security (RLS)
 
-Production policies should allow authenticated users to manage their own rows on `profiles`, `cvs`, `jobs`, `cover_letters`, `payments`, and read `cv_templates`. Earlier migrations (`001`–`010`) targeted legacy table names; after migration `011`, ensure policies exist for `cvs`, `jobs`, and the new `cover_letters` shape. `cover_letters` may include a `share_token` read policy for public sharing.
+Not used on the self-hosted stack. User isolation is enforced in application code (NextAuth session + `user_id` checks in repositories).
 
 ---
 
 ## Triggers
 
-- `update_updated_at()` on: `profiles`, `payments`, and (per your deployed policies) `cvs`, `jobs`, `cover_letters`
-- `on_auth_user_created` on `auth.users` → inserts into `profiles`
+- `update_updated_at()` on: `users`, `profiles`, `cvs`, `jobs`, `cover_letters`, `payments`, and interview tables
 
 ---
 
@@ -260,4 +261,4 @@ Production policies should allow authenticated users to manage their own rows on
 | `010` | `font_family` on legacy CV tables |
 | `011_new_schema.sql` | **`cvs`**, **`jobs`**, **`cover_letters`** replacement schema; `profiles.preferred_cl_template_id` idempotent add; indexes |
 
-When in doubt, diff this file against the latest files in `supabase/migrations/`. Historical migrations `001`–`010` reference tables that may have been dropped in favour of `011`; **`011_new_schema.sql`** is the authoritative definition for the current CV / jobs / cover letter model.
+When in doubt, diff this file against [`db/schema.sql`](../db/schema.sql) and [`lib/db/schema.ts`](../lib/db/schema.ts).

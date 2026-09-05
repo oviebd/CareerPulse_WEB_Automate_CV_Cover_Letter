@@ -29,7 +29,6 @@ These are **baked into the client bundle** during `npm run build`. If they chang
 |---|---|
 | `NEXT_PUBLIC_APP_URL` | Your production domain (e.g. `https://yourdomain.com`) |
 | `NEXT_PUBLIC_DEV_SUBSCRIPTION_PLAN` | Dev-only plan override (leave empty in production) |
-| `NEXT_PUBLIC_DATA_BACKEND` | Set to `postgres` for self-hosted DB (baked at build time) |
 
 ### Runtime (secrets — never baked into the image)
 
@@ -37,7 +36,6 @@ Loaded at container start from `.env.prod`. Keep this file out of version contro
 
 | Variable | Description |
 |---|---|
-| `DATA_BACKEND` | `postgres` for self-hosted stack |
 | `DATABASE_URL` | Postgres connection string (auto-set in docker-compose for `app`) |
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | Postgres container credentials |
 | `AUTH_SECRET` | Auth.js session secret (or reuse `JWT_SECRET`) |

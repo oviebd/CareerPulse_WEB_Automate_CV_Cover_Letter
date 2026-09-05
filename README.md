@@ -38,7 +38,7 @@ Edit `.env.prod` and set at least:
 
 Google OAuth, Resend, and SSLCommerz can stay empty until you need those features.
 
-`DATABASE_URL` and `DATA_BACKEND=postgres` are set by Compose for the app container — you do not need to add them to `.env.prod`.
+`DATABASE_URL` is set by Compose for the app container — you do not need to add it to `.env.prod`.
 
 ### 2. Build and start
 
@@ -94,8 +94,6 @@ docker compose -f docker-compose.dev.yml --env-file .env.prod up db
 **`.env.local`** (create next to `package.json`):
 
 ```
-DATA_BACKEND=postgres
-NEXT_PUBLIC_DATA_BACKEND=postgres
 DATABASE_URL=postgresql://careerpulse:careerpulse_dev@localhost:5432/careerpulse
 AUTH_SECRET=change-me-to-a-long-random-string
 NEXT_PUBLIC_APP_URL=http://localhost:3000

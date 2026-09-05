@@ -859,7 +859,7 @@ Open in browser:
 GET /api/cv/preview-html?template_id=my-template&sample=1
 ```
 
-This uses sample data so no user account is needed. The endpoint falls back to `TEMPLATE_CONFIGS` if the template isn't in the Supabase `cv_templates` table.
+This uses sample data so no user account is needed. The endpoint falls back to `TEMPLATE_CONFIGS` if the template isn't in the `cv_templates` table.
 
 To add it to the database, insert a row in the `cv_templates` table (or leave it out and the fallback will serve it from config).
 
@@ -1032,8 +1032,8 @@ In `templateConfig.ts`, set `templateAccent` to the brand color shown in the tem
 | `components/cv/CVEditor.tsx` | Editor state manager — handles template switching, `refreshPreview()`, section order |
 | `components/cv/TemplateThumbnail.tsx` | Template picker thumbnail (iframe scaled down to card size) |
 | `lib/cv-universal-bridge.ts` | `profileToUniversalCV()` and `universalToProfilePayload()` — bidirectional DB ↔ CVData mapping |
-| `lib/cv-mapper.ts` | `dbRowToCvProfile()` — normalizes Supabase JSONB row to TypeScript interface |
+| `lib/cv-mapper.ts` | `dbRowToCvProfile()` — normalizes JSONB row to TypeScript interface |
 | `lib/cv-section-visibility.ts` | `applyCvSectionVisibility()` — zeroes out hidden sections before render |
 | `src/utils/cvDefaults.ts` | `normalizeTemplateId()` (maps legacy IDs), `createEmptyCVData()` |
-| `supabase/migrations/011_new_schema.sql` | `cvs` table schema (all JSONB section columns, template/font/accent columns) |
-| `supabase/migrations/016_cv_extra_and_templates.sql` | `cv_extra` JSONB column (publications, research, volunteer, interests, custom) |
+| `db/schema.sql` | `cvs` table schema (all JSONB section columns, template/font/accent columns) |
+| `db/schema.sql` | `cv_extra` JSONB column (publications, research, volunteer, interests, custom) |

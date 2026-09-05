@@ -125,9 +125,9 @@ A subscription-based, AI-powered career documents platform that helps global job
 | Styling | Tailwind CSS | Utility-first, consistent design system |
 | State Management | Zustand + React Query | Lightweight, server-state friendly |
 | Backend API | Next.js API Routes (Node.js) | Co-located with frontend, Cursor-friendly |
-| Database | Supabase (PostgreSQL) | Standard SQL, portable, free tier |
-| Authentication | Supabase Auth | Google OAuth, email/password, magic link |
-| File Storage | Supabase Storage | CV uploads, generated PDFs |
+| Database | PostgreSQL 16 (self-hosted) | Standard SQL, full control, Docker-managed |
+| Authentication | NextAuth (Auth.js) | Google OAuth, email/password; JWT sessions |
+| File Storage | Local filesystem (`UPLOAD_DIR`) | CV uploads, generated PDFs, signed URLs |
 | AI | Anthropic Claude Sonnet API | Best writing quality, structured JSON output |
 | PDF Generation | Puppeteer + Chromium (self-hosted) | Full Chromium on own server, no restrictions |
 | Hosting | Own server — Ubuntu + Nginx + PM2 | Full control, native Puppeteer, cost-efficient |
@@ -148,7 +148,7 @@ Internet (HTTPS)
   Next.js App (port 3000)
       ├── /app        → React pages (SSR + CSR)
       ├── /api        → API route handlers
-      │     ├── /api/auth        → Supabase auth callbacks
+      │     ├── /api/auth        → NextAuth (Auth.js) callbacks
       │     ├── /api/cv          → CV CRUD operations
       │     ├── /api/extract     → Claude CV extraction
       │     ├── /api/generate    → Claude cover letter generation
@@ -157,10 +157,12 @@ Internet (HTTPS)
       │     └── /api/subscription → Subscription state management
       └── /public     → Static assets
             ↓
-      Supabase (cloud)
-      ├── PostgreSQL database
-      ├── Auth service
-      └── Storage buckets
+      PostgreSQL 16 (self-hosted)
+      ├── users / profiles tables
+      └── Drizzle ORM repositories
+            ↓
+      Local file storage (UPLOAD_DIR)
+      ├── cv-uploads, pdf-exports, cv-photos, interview-audio
             ↓
       External APIs
       ├── Anthropic Claude API
@@ -170,10 +172,14 @@ Internet (HTTPS)
 ### 3.3 Environment Variables Required
 
 ```env
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
+# Postgres
+DATABASE_URL=postgresql://user:password@localhost:5432/careerpulse
+
+# Auth (NextAuth / Auth.js)
+AUTH_SECRET=
+JWT_SECRET=
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
 
 # Claude AI
 ANTHROPIC_API_KEY=
@@ -185,11 +191,13 @@ SSLCOMMERZ_IS_LIVE=false
 
 # App
 NEXT_PUBLIC_APP_URL=https://yourdomain.com
-JWT_SECRET=
 
 # Email
 RESEND_API_KEY=
 EMAIL_FROM=noreply@yourdomain.com
+
+# Local file storage (optional — defaults to /data/uploads in Docker)
+UPLOAD_DIR=/data/uploads
 ```
 
 ### 3.4 Next.js Project Folder Structure
@@ -225,7 +233,7 @@ EMAIL_FROM=noreply@yourdomain.com
 │   │   └── blog/page.tsx
 │   └── layout.tsx
 ├── api/
-│   ├── auth/[...supabase]/route.ts
+│   ├── auth/[...nextauth]/route.ts
 │   ├── cv/route.ts
 │   ├── extract/route.ts
 │   ├── generate/route.ts
@@ -244,10 +252,10 @@ EMAIL_FROM=noreply@yourdomain.com
 │   ├── tracker/                    ← job tracker components
 │   └── shared/                     ← layout, nav, sidebar
 ├── lib/
-│   ├── supabase/
-│   │   ├── client.ts
-│   │   └── server.ts
-│   ├── claude.ts                   ← Claude API wrapper
+│   ├── auth/                   ← NextAuth config + session helpers
+│   ├── db/                     ← Drizzle client, schema, repositories
+│   ├── storage/                ← local filesystem storage
+│   ├── claude.ts               ← Claude API wrapper
 │   ├── pdf.ts                      ← Puppeteer PDF generation
 │   ├── sslcommerz.ts               ← payment integration
 │   └── utils.ts
@@ -278,14 +286,23 @@ EMAIL_FROM=noreply@yourdomain.com
 
 ## 4. Data Models & Database Schema
 
-### 4.1 Users Table (managed by Supabase Auth)
+### 4.1 Users and Profiles (NextAuth / Auth.js)
 
-Supabase Auth creates `auth.users` automatically. We extend it with a public `profiles` table.
+Registration and OAuth create a row in `users`; a matching `profiles` row holds subscription and app settings. See [`db/schema.sql`](../db/schema.sql) for the canonical schema.
 
 ```sql
--- profiles (extends auth.users)
+-- users (auth identities)
+CREATE TABLE users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email TEXT NOT NULL UNIQUE,
+  password_hash TEXT,
+  google_id TEXT UNIQUE,
+  ...
+);
+
+-- profiles (extends users)
 CREATE TABLE profiles (
-  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
   email TEXT NOT NULL,
   full_name TEXT,
   avatar_url TEXT,
@@ -356,7 +373,7 @@ CREATE TABLE cv_profiles (
   -- Metadata
   is_complete BOOLEAN DEFAULT FALSE,
   completion_percentage INTEGER DEFAULT 0,
-  original_cv_file_url TEXT,     -- Supabase Storage URL of uploaded file
+  original_cv_file_url TEXT,     -- signed URL of uploaded file
   preferred_cv_template_id TEXT,
   preferred_cl_template_id TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -391,7 +408,7 @@ CREATE TABLE cover_letters (
   template_id TEXT,               -- which cover letter template used
 
   -- File
-  pdf_url TEXT,                   -- Supabase Storage URL if exported
+  pdf_url TEXT,                   -- signed file URL if exported
   is_favourited BOOLEAN DEFAULT FALSE,
 
   -- Linked job application
@@ -534,15 +551,15 @@ CREATE POLICY "Users can view their payments"
 ### 5.2 Auth Flow
 
 1. User lands on `/login` or `/register`
-2. Clicks "Continue with Google" → OAuth redirect → Supabase callback → profile created if first time
-3. Or enters email/password → Supabase validates → session cookie set
+2. Clicks "Continue with Google" → OAuth redirect → NextAuth callback → profile created if first time
+3. Or enters email/password → NextAuth validates → session cookie set
 4. On success → redirect to `/dashboard`
 5. If new user → redirect to `/cv/upload` (onboarding flow)
 
 ### 5.3 Session Management
 
-- Supabase JWT tokens with auto-refresh
-- Sessions persist for 7 days (refresh token)
+- NextAuth JWT sessions (30-day max age)
+- Sessions persist via HTTP-only cookies
 - `middleware.ts` checks session on every protected route
 - Unauthenticated users are redirected to `/login` with return URL preserved
 
@@ -577,7 +594,7 @@ Step 5: Dashboard (onboarding complete)
 
 1. User navigates to `/cv/upload`
 2. Drag-and-drop or file picker interface
-3. File uploaded to Supabase Storage at path: `cv-uploads/{user_id}/{timestamp}-original.pdf`
+3. File uploaded to local storage at path: `cv-uploads/{user_id}/{timestamp}-original.pdf`
 4. `POST /api/extract` is called with the file URL
 5. Server fetches file, converts to text (using `pdf-parse` for PDF, `mammoth` for DOCX)
 6. Text sent to Claude API with extraction prompt (see Section 13)
@@ -693,7 +710,7 @@ A progress bar at the top showing completion percentage. Calculated as:
 
 #### Auto-save
 
-All changes auto-save to Supabase with a 1.5-second debounce. A subtle "Saving..." / "Saved" indicator shown in the header.
+All changes auto-save to Postgres with a 1.5-second debounce. A subtle "Saving..." / "Saved" indicator shown in the header.
 
 ---
 
@@ -1420,7 +1437,7 @@ All pages below require authentication. Wrapped in the dashboard layout (sidebar
 
 ## 11. API Specification
 
-All API routes are Next.js Route Handlers. All require authentication via Supabase session cookie, except payment callbacks.
+All API routes are Next.js Route Handlers. All require authentication via NextAuth session, except payment callbacks.
 
 ### 11.1 CV Extraction
 
@@ -1429,7 +1446,7 @@ All API routes are Next.js Route Handlers. All require authentication via Supaba
 Request:
 ```json
 {
-  "file_url": "https://supabase.../cv-uploads/user-id/file.pdf",
+  "file_url": "https://yourdomain.com/api/files/signed?...",
   "file_type": "pdf"
 }
 ```
@@ -1551,7 +1568,7 @@ PDF generation uses Puppeteer running on the same server as the Next.js app.
 
 Flow:
 1. `/api/export` receives request with template ID and data source (cv_profile or cover_letter)
-2. Fetch user's data from Supabase
+2. Fetch user's data from Postgres
 3. Load HTML template file from `/templates/{type}/{template_id}.html`
 4. Replace all `{{variable}}` placeholders with real data using a templating function
 5. Launch Puppeteer (reuse browser instance — do not launch per request)
@@ -1559,7 +1576,7 @@ Flow:
 7. Wait for fonts to load (`page.waitForNetworkIdle()`)
 8. Generate PDF with A4 settings
 9. Close page (not browser)
-10. Upload PDF to Supabase Storage at `pdf-exports/{user_id}/{type}-{timestamp}.pdf`
+10. Upload PDF to local storage at `pdf-exports/{user_id}/{type}-{timestamp}.pdf`
 11. Update database record with PDF URL
 12. Stream PDF back to client as download
 
@@ -1818,25 +1835,24 @@ All Claude API calls must handle:
 
 ### 14.1 Authentication Security
 
-- Supabase Auth handles password hashing (bcrypt)
-- No passwords ever stored in our database
-- JWT tokens expire after 1 hour (auto-refreshed by Supabase client)
+- Auth.js handles password hashing (bcrypt via `users.password_hash`)
+- JWT sessions expire after 30 days (configurable in NextAuth)
 - OAuth state parameter validated to prevent CSRF
 
 ### 14.2 API Security
 
-- All API routes validate Supabase session server-side
-- Row Level Security on all Supabase tables (users can only access their own data)
+- All API routes validate NextAuth session server-side via `getSessionUser()`
+- User isolation enforced in repositories (`user_id` checks on every query)
 - API route for payment callbacks validates SSLCommerz signature before processing
 - Rate limiting on generation endpoints: 10 requests/minute per user (via simple Redis counter or in-memory with PM2 cluster limits)
-- `SUPABASE_SERVICE_ROLE_KEY` only used in server-side code, never exposed to client
+- `AUTH_SECRET` and `JWT_SECRET` only used server-side, never exposed to client
 
 ### 14.3 File Upload Security
 
 - Accepted MIME types: `application/pdf`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`
 - File size limit enforced: 10MB
-- Files stored in private Supabase Storage bucket (not publicly accessible)
-- Signed URLs generated for each file access (expire after 1 hour)
+- Files stored on local disk under `UPLOAD_DIR` (not publicly accessible)
+- Signed URLs generated for each file access (HMAC tokens via `/api/files/signed`)
 - File content scanned for basic safety (no executable code — PDF/DOCX only)
 
 ### 14.4 Payment Security
@@ -1848,7 +1864,7 @@ All Claude API calls must handle:
 
 ### 14.5 Data Privacy
 
-- User data stored in Supabase (region: nearest to target market)
+- User data stored in self-hosted PostgreSQL
 - CV data is used only to generate documents for that user — never used for AI training or shared
 - Privacy policy must clearly state: data usage, retention, and deletion rights
 - Account deletion: removes all user data including CV, cover letters, tracker entries, and uploaded files within 24 hours
@@ -1875,7 +1891,7 @@ All Claude API calls must handle:
 
 - **Puppeteer:** singleton browser instance (not launched per-request)
 - **Claude API:** streaming responses for cover letter generation (show text as it streams)
-- **Database:** connection pooling via Supabase's built-in pooler
+- **Database:** connection pooling via `postgres` npm driver (`max: 10`)
 - **Images:** Next.js `<Image>` component with lazy loading
 - **Static pages:** ISR (Incremental Static Regeneration) for marketing pages
 - **API responses:** cache subscription tier in Zustand store (re-fetch on billing page only)
@@ -1907,11 +1923,11 @@ This section documents decisions made today that must remain compatible with the
 
 ### 16.1 Same Backend
 
-The Flutter app will use the exact same Supabase database and the same Next.js API routes (via HTTPS). No mobile-specific backend needed.
+The Flutter app will use the same self-hosted PostgreSQL database and the same Next.js API routes (via HTTPS). No mobile-specific backend needed.
 
 ### 16.2 Authentication
 
-Flutter will use `supabase_flutter` package. Same Google OAuth, email/password, magic link — same Supabase project.
+Flutter will authenticate against the same NextAuth-backed API (email/password + Google OAuth).
 
 ### 16.3 PDF Generation
 
@@ -1919,7 +1935,7 @@ Flutter will call `/api/export` just like the web app. The PDF is generated serv
 
 ### 16.4 Subscription
 
-Flutter will use RevenueCat for in-app purchases (Google Play + App Store). RevenueCat webhooks will update the same `profiles.subscription_tier` field in Supabase. Both web (SSLCommerz) and mobile (RevenueCat) subscriptions write to the same column — the app checks tier, not payment source.
+Flutter will use RevenueCat for in-app purchases (Google Play + App Store). RevenueCat webhooks will update the same `profiles.subscription_tier` field in Postgres. Both web (SSLCommerz) and mobile (RevenueCat) subscriptions write to the same column — the app checks tier, not payment source.
 
 **Important:** Subscriptions purchased on web are NOT automatically available for in-app purchase and vice versa. The user must subscribe on each platform separately (this is an App Store policy requirement). However, the account and data are shared.
 
@@ -1943,10 +1959,10 @@ Flutter v1 should include: CV editor (no upload, manual entry only — file uplo
 | MAU | Monthly Active User — a user who logs in at least once in a calendar month |
 | ATS Score | Our proprietary 0–100 score indicating how well a cover letter matches a job description's keywords |
 | SSLCommerz | The payment gateway used for processing subscription payments |
-| RLS | Row Level Security — Supabase/Postgres feature ensuring users only access their own data |
+| RLS | Row Level Security — Postgres feature for row-level access control (not used on self-hosted stack; app-layer checks instead) |
 | PM2 | Process manager for Node.js — keeps the Next.js server running on the hosting server |
 | Puppeteer | Node.js library that controls a headless Chrome browser for PDF generation |
-| Supabase | Backend-as-a-service providing PostgreSQL database, authentication, and file storage |
+| NextAuth | Authentication library (Auth.js) used for Google OAuth and email/password sessions |
 | JD | Job Description — the text posted by an employer listing role requirements |
 | STAR | Situation, Task, Action, Result — a framework for writing experience bullet points |
 

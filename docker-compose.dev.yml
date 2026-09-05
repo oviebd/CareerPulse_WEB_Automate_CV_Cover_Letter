@@ -28,7 +28,6 @@ services:
       args:
         NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
         NEXT_PUBLIC_DEV_SUBSCRIPTION_PLAN: ${NEXT_PUBLIC_DEV_SUBSCRIPTION_PLAN}
-        NEXT_PUBLIC_DATA_BACKEND: postgres
     image: careerpulse:latest
     container_name: careerpulse
     restart: unless-stopped
@@ -41,8 +40,6 @@ services:
       - .env.prod
     environment:
       NODE_ENV: production
-      DATA_BACKEND: postgres
-      NEXT_PUBLIC_DATA_BACKEND: postgres
       DATABASE_URL: postgresql://${POSTGRES_USER:-careerpulse}:${POSTGRES_PASSWORD:-careerpulse_dev}@db:5432/${POSTGRES_DB:-careerpulse}
       UPLOAD_DIR: /data/uploads
       PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium

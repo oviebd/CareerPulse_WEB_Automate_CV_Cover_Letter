@@ -1,4 +1,4 @@
--- CV templates (from supabase/seed_cv_templates.sql)
+-- CV templates (seed catalog)
 INSERT INTO cv_templates (id, type, name, description, category, is_premium, available_tiers, sort_order)
 VALUES
   ('classic',     'cv', 'Classic',         'Clean single-column, ATS-optimized',                                     'professional', false, ARRAY['free','pro'], 1),
