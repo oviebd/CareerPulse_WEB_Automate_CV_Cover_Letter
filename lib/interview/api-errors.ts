@@ -7,7 +7,9 @@ export function interviewErrorResponse(e: InterviewError) {
       ? 503
       : e.code === 'CV_NOT_FOUND' ||
           e.code === 'JOB_CONTEXT_INSUFFICIENT' ||
-          e.code === 'PROFILE_NOT_READY'
+          e.code === 'PROFILE_NOT_READY' ||
+          e.code === 'TOPICS_REQUIRED' ||
+          e.code === 'TOPIC_NOT_FOUND'
         ? 422
         : 500;
   return NextResponse.json({ error: e.message, code: e.code }, { status });

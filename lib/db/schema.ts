@@ -11,6 +11,7 @@ import {
   uniqueIndex,
   index,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 
 export const jobStatusEnum = pgEnum('job_status', [
   'none',
@@ -211,10 +212,10 @@ export const interviewProfiles = pgTable(
     userId: uuid('user_id')
       .notNull()
       .references(() => profiles.id, { onDelete: 'cascade' }),
-    jobId: uuid('job_id')
-      .notNull()
-      .references(() => jobs.id, { onDelete: 'cascade' }),
+    jobId: uuid('job_id').references(() => jobs.id, { onDelete: 'cascade' }),
     cvId: uuid('cv_id').references(() => cvs.id, { onDelete: 'set null' }),
+    prepSource: text('prep_source').notNull().default('job'),
+    topicConfigJson: jsonb('topic_config_json'),
     status: interviewProfileStatusEnum('status').notNull().default('idle'),
     profession: text('profession'),
     occupation: text('occupation'),
@@ -240,9 +241,12 @@ export const interviewProfiles = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    uniqueIndex('interview_profiles_user_job_uidx').on(t.userId, t.jobId),
+    uniqueIndex('interview_profiles_user_job_uidx')
+      .on(t.userId, t.jobId)
+      .where(sql`${t.jobId} IS NOT NULL`),
     index('interview_profiles_user_id_idx').on(t.userId),
     index('interview_profiles_job_id_idx').on(t.jobId),
+    index('interview_profiles_prep_source_idx').on(t.prepSource),
   ]
 );
 
@@ -490,6 +494,9 @@ export const interviewPrepQuestions = pgTable(
     interviewProfileId: uuid('interview_profile_id')
       .notNull()
       .references(() => interviewProfiles.id, { onDelete: 'cascade' }),
+    topicId: uuid('topic_id').references(() => interviewPreparationTopics.id, {
+      onDelete: 'set null',
+    }),
     batchNumber: integer('batch_number').notNull(),
     sequence: integer('sequence').notNull(),
     questionType: text('question_type').notNull(),
@@ -503,6 +510,7 @@ export const interviewPrepQuestions = pgTable(
     relevance: text('relevance').notNull().default('supported'),
     evidenceFromCv: text('evidence_from_cv'),
     whySelected: text('why_selected'),
+    exampleAnswer: text('example_answer'),
     aiMetadataJson: jsonb('ai_metadata_json'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -510,6 +518,7 @@ export const interviewPrepQuestions = pgTable(
   (t) => [
     index('interview_prep_questions_profile_idx').on(t.interviewProfileId),
     index('interview_prep_questions_profile_seq_idx').on(t.interviewProfileId, t.sequence),
+    index('interview_prep_questions_profile_topic_idx').on(t.interviewProfileId, t.topicId),
   ]
 );
 

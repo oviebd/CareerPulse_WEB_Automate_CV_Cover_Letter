@@ -30,7 +30,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
   }
 }
 
-export async function POST(_request: Request, { params }: RouteContext) {
+export async function POST(request: Request, { params }: RouteContext) {
   try {
     const user = await getSessionUser();
     if (!user) return err('Unauthorized', 401);
@@ -39,8 +39,17 @@ export async function POST(_request: Request, { params }: RouteContext) {
     if (denied) return denied;
 
     const { id } = await params;
+    let topicId: string | null | undefined;
+    try {
+      const body = (await request.json()) as { topic_id?: string | null };
+      const raw = body.topic_id;
+      topicId = typeof raw === 'string' && raw.trim() ? raw.trim() : null;
+    } catch {
+      topicId = null;
+    }
+
     const result = await withInterviewAiRoute(user.id, id, () =>
-      runPrepQuestionBatch(user.id, id)
+      runPrepQuestionBatch(user.id, id, { topicId })
     );
     return NextResponse.json(result);
   } catch (e) {

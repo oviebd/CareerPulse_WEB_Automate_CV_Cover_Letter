@@ -1,7 +1,6 @@
 import { getCvsRepo } from '@/lib/db/repositories/cvs';
 import { getJobsRepo } from '@/lib/db/repositories/jobs';
 import { getInterviewRepo } from '@/lib/db/repositories/interview';
-import { analyzeJobDescription } from '@/lib/jobs/analyze-job';
 import { InterviewError } from '@/lib/interview/errors';
 import {
   analyzeCandidateForInterview,
@@ -17,6 +16,9 @@ import {
   generateInterviewQuestion,
   generatePreparationTopics,
   generatePrepQuestionBatch,
+  generatePrepQuestionExample,
+  explainPrepQuestion,
+  reshapePrepQuestion,
   generateQuiz,
   performGapAnalysis,
 } from '@/lib/interview/ai/operations';
@@ -33,6 +35,18 @@ import { updateMasteryScore } from '@/lib/interview/mastery';
 import { calculateReadiness } from '@/lib/interview/readiness';
 import { evaluateQuizAnswerLocal } from '@/lib/interview/quiz-eval';
 import { normalizeBlueprint } from '@/lib/interview/validators';
+import { parseTopicPrepConfig, enrichProfileDisplay, seedPreparationTopicsFromProfile, skillLevelToExpertise } from '@/lib/interview/topic-config';
+import { generateTopicPrepQuestionBatch } from '@/lib/interview/ai/topic-operations';
+import {
+  buildJobSeedContext,
+  competencyNamesForAi,
+  competenciesFromSeedTopics,
+  seedBlueprintFromTopics,
+} from '@/lib/interview/seed-profile';
+import { matchTopicId } from '@/lib/interview/topic-match';
+import { displayPrepAnswer } from '@/lib/interview/prep-answer';
+import { setAiUsageContext } from '@/lib/ai/usage-context';
+import type { InterviewProfile } from '@/types/interview';
 import type {
   ClarificationPayload,
   CompetencyItem,
@@ -410,54 +424,65 @@ export async function runPreparePipeline(
 
   let mappedContext = await ensureMappedContextForProfile(userId, profile);
   const competencies = await repo.listCompetencies(profileId);
-  const competencyNames = competencies.map((c) => c.name).join(', ');
+  const seededTopics = seedPreparationTopicsFromProfile(profile);
 
-  const planResult = await generatePreparationTopics(
-    mappedContextPrompt(mappedContext),
-    competencyNames,
-    {
-      job: profile.source_job_hash as string,
-      cv: profile.source_cv_hash as string,
-    }
-  );
+  let planTitle: string;
+  let planJson: unknown;
+  let topicInputs: Array<{ name: string; priority: number; competency_id?: string }>;
+
+  if (seededTopics?.length) {
+    planTitle = `Prep: ${seededTopics.map((t) => t.name).join(', ')}`.slice(0, 80);
+    planJson = { title: planTitle, topics: seededTopics };
+    topicInputs = seededTopics;
+  } else {
+    const competencyNames = competencies.map((c) => c.name).join(', ');
+    const planResult = await generatePreparationTopics(
+      mappedContextPrompt(mappedContext),
+      competencyNames,
+      {
+        job: profile.source_job_hash as string,
+        cv: profile.source_cv_hash as string,
+      }
+    );
+    planTitle = planResult.data.title;
+    planJson = planResult.data;
+    topicInputs = planResult.data.topics;
+  }
 
   await repo.deletePlansForProfile(profileId);
   const plan = await repo.insertPlan(profileId, {
-    title: planResult.data.title,
+    title: planTitle,
     duration_days: null,
     status: 'active',
-    plan_json: planResult.data,
+    plan_json: planJson,
   });
 
   const compByAiId = new Map(
     competencies.map((c) => [(c.metadata_json as { ai_id?: string })?.ai_id, c.id])
   );
+  const compByName = new Map(
+    competencies.map((c) => [(c.name as string).trim().toLowerCase(), c.id as string])
+  );
 
   const topics = await repo.insertTopics(
     plan.id as string,
-    planResult.data.topics.map((t) => ({
+    topicInputs.map((t) => ({
       name: t.name,
       priority: t.priority,
-      competency_id: t.competency_id ? compByAiId.get(t.competency_id) : null,
+      competency_id: t.competency_id
+        ? (compByAiId.get(t.competency_id) ?? null)
+        : (compByName.get(t.name.trim().toLowerCase()) ?? null),
       status: 'pending',
     }))
   );
 
   mappedContext = updateMappedContextTopics(
     mappedContext,
-    planResult.data.topics.map((t) => t.name)
+    topicInputs.map((t) => t.name)
   );
   await repo.updateProfile(userId, profileId, { mapped_context_json: mappedContext });
 
-  let prep_questions: Record<string, unknown>[] = [];
-  const existingPrep = await repo.listPrepQuestions(profileId);
-  if (existingPrep.length === 0) {
-    const batch = await runPrepQuestionBatch(userId, profileId);
-    prep_questions = batch.questions;
-  } else {
-    prep_questions = existingPrep;
-  }
-
+  const prep_questions = await repo.listPrepQuestions(profileId);
   return { plan, topics, prep_questions };
 }
 
@@ -474,20 +499,39 @@ export async function runQuizGeneration(
   const competencies = await repo.listCompetencies(profileId);
   const plan = await repo.getActivePlan(profileId);
   const topicRows = plan ? await repo.listTopics(plan.id as string) : [];
-  const topicNames = topicRows.map((t) => t.name as string).join(', ');
+  if (!topicRows.length) {
+    throw new InterviewError(
+      'TOPICS_REQUIRED',
+      'Generate preparation topics before starting a quiz.'
+    );
+  }
+
+  const focusTopic = opts?.topicId
+    ? topicRows.find((t) => t.id === opts.topicId)
+    : null;
+  if (opts?.topicId && !focusTopic) {
+    throw new InterviewError('TOPIC_NOT_FOUND', 'Topic not found.');
+  }
+
+  const allNames = topicRows.map((t) => t.name as string).join(', ');
 
   const quizResult = await generateQuiz(
     mappedContextPrompt(mappedContext),
     compactCompetencyList(competencies),
-    topicNames || mappedContext.topic_names.join(', '),
+    allNames || mappedContext.topic_names.join(', '),
     opts?.difficulty ?? 'medium',
     opts?.count ?? 5,
-    { job: profile.source_job_hash as string, cv: profile.source_cv_hash as string }
+    { job: profile.source_job_hash as string, cv: profile.source_cv_hash as string },
+    focusTopic ? (focusTopic.name as string) : null
   );
+
+  const defaultTitle = focusTopic
+    ? `${focusTopic.name as string} quiz`
+    : 'All topics quiz';
 
   const quiz = await repo.insertQuiz(profileId, {
     topic_id: opts?.topicId ?? null,
-    title: quizResult.data.title,
+    title: quizResult.data.title?.trim() || defaultTitle,
     difficulty: opts?.difficulty ?? 'medium',
     question_count: quizResult.data.questions.length,
     metadata_json: quizResult.metadata,
@@ -523,38 +567,97 @@ export async function runQuizGeneration(
 
 const PREP_QUESTIONS_BATCH_SIZE = 5;
 
-export async function runPrepQuestionBatch(userId: string, profileId: string) {
+export async function runPrepQuestionBatch(
+  userId: string,
+  profileId: string,
+  opts?: { topicId?: string | null }
+) {
   const repo = getInterviewRepo();
   const profile = await repo.getProfileById(userId, profileId);
-  if (!profile || profile.status !== 'ready' || !profile.blueprint_json) {
+  if (!profile || profile.status !== 'ready') {
     throw new Error('Profile not ready');
+  }
+  if (!profile.mapped_context_json) {
+    throw new Error('Profile not ready');
+  }
+
+  const plan = await repo.getActivePlan(profileId);
+  const topicRows = plan ? await repo.listTopics(plan.id as string) : [];
+  if (!topicRows.length) {
+    throw new InterviewError(
+      'TOPICS_REQUIRED',
+      'Generate preparation topics before loading questions.'
+    );
+  }
+
+  const matchable = topicRows.map((t) => ({
+    id: t.id as string,
+    name: t.name as string,
+    priority: (t.priority as number | null) ?? null,
+  }));
+
+  const focusTopicId = opts?.topicId ?? null;
+  const focusTopic = focusTopicId ? matchable.find((t) => t.id === focusTopicId) : null;
+  if (focusTopicId && !focusTopic) {
+    throw new InterviewError('TOPIC_NOT_FOUND', 'Topic not found.');
   }
 
   const mappedContext = await ensureMappedContextForProfile(userId, profile);
   const competencies = await repo.listCompetencies(profileId);
-  const existingQuestions = await repo.listPrepQuestionTexts(profileId);
+  const existingQuestions = await repo.listPrepQuestionTexts(profileId, focusTopicId);
   const batchNumber = await repo.getNextPrepBatchNumber(profileId);
   let nextSequence = await repo.getNextPrepSequence(profileId);
 
-  const batchResult = await generatePrepQuestionBatch(
-    {
-      mappedContext: mappedContextPrompt(mappedContext),
-      seniority: (profile.seniority as string) ?? 'mid',
-      interviewStage: (profile.interview_stage as string | null) ?? null,
-      existingQuestions,
-      count: PREP_QUESTIONS_BATCH_SIZE,
-    },
-    { job: profile.source_job_hash as string, cv: profile.source_cv_hash as string }
-  );
+  const isTopic = profile.prep_source === 'topic';
+  const topicConfig = isTopic ? parseTopicPrepConfig(profile.topic_config_json) : null;
+  const topicNames = matchable.map((t) => t.name);
+
+  const batchResult =
+    isTopic && topicConfig
+      ? await generateTopicPrepQuestionBatch(
+          {
+            mappedContext: mappedContextPrompt(mappedContext),
+            purpose: topicConfig.purpose,
+            difficulty: topicConfig.difficulty,
+            currentLevel:
+              topicConfig.current_level ??
+              (topicConfig.topics.length === 1
+                ? skillLevelToExpertise(topicConfig.topics[0].skill_level)
+                : 'intermediate'),
+            goalLevel: topicConfig.goal_level,
+            notes: topicConfig.notes,
+            existingQuestions,
+            count: PREP_QUESTIONS_BATCH_SIZE,
+            topicNames,
+            focusTopic: focusTopic?.name ?? null,
+          },
+          (profile.source_job_hash as string) ?? ''
+        )
+      : await generatePrepQuestionBatch(
+          {
+            mappedContext: mappedContextPrompt(mappedContext),
+            seniority: (profile.seniority as string) ?? 'mid',
+            interviewStage: (profile.interview_stage as string | null) ?? null,
+            existingQuestions,
+            count: PREP_QUESTIONS_BATCH_SIZE,
+            topicNames,
+            focusTopic: focusTopic?.name ?? null,
+          },
+          { job: profile.source_job_hash as string, cv: profile.source_cv_hash as string }
+        );
 
   const compByAiId = new Map(
     competencies.map((c) => [(c.metadata_json as { ai_id?: string })?.ai_id, c.id])
   );
 
   const rows = batchResult.data.questions.map((q) => {
-    const row = {
+    const topicId = focusTopic
+      ? focusTopic.id
+      : matchTopicId(q.topic_name, matchable);
+    return {
       batch_number: batchNumber,
       sequence: nextSequence++,
+      topic_id: topicId,
       question_type: q.type,
       question_text: q.question,
       competency_id: q.competency_id ? compByAiId.get(q.competency_id) : null,
@@ -564,13 +667,128 @@ export async function runPrepQuestionBatch(userId: string, profileId: string) {
       relevance: q.relevance,
       evidence_from_cv: q.evidence_from_cv ?? null,
       why_selected: q.why_selected ?? null,
+      example_answer: null,
       ai_metadata_json: batchResult.metadata,
     };
-    return row;
   });
 
   const questions = await repo.insertPrepQuestions(profileId, rows);
   return { questions, batch_number: batchNumber };
+}
+
+export async function runGeneratePrepQuestionExample(userId: string, questionId: string) {
+  const repo = getInterviewRepo();
+  const question = await repo.getPrepQuestionById(userId, questionId);
+  if (!question) throw new Error('Prep question not found');
+
+  const existingExample = typeof question.example_answer === 'string' ? question.example_answer.trim() : '';
+  if (existingExample) {
+    return { question, input_tokens: 0, output_tokens: 0 };
+  }
+
+  const profile = await repo.getProfileById(userId, question.interview_profile_id as string);
+  if (!profile || profile.status !== 'ready') {
+    throw new Error('Profile not ready');
+  }
+
+  setAiUsageContext({ relatedId: profile.id as string });
+
+  const mappedContext = await ensureMappedContextForProfile(userId, profile);
+  const result = await generatePrepQuestionExample({
+    question: (question.question_text as string) ?? '',
+    answer: (question.answer_text as string) ?? '',
+    evidence: (question.evidence_from_cv as string | null) ?? null,
+    relevance: (question.relevance as string) ?? 'supported',
+    mappedContext: mappedContextPrompt(mappedContext),
+    isTopic: profile.prep_source === 'topic',
+  });
+
+  const exampleAnswer = result.data.example_answer.trim();
+  if (!exampleAnswer) throw new Error('ai_generation_failed');
+
+  const updated = await repo.updatePrepQuestionExample(userId, questionId, exampleAnswer);
+  return {
+    question: updated,
+    input_tokens: result.inputTokens,
+    output_tokens: result.outputTokens,
+  };
+}
+
+export async function runExplainPrepQuestion(
+  userId: string,
+  questionId: string,
+  opts: { message?: string; history?: Array<{ role: 'user' | 'assistant'; content: string }> }
+) {
+  const repo = getInterviewRepo();
+  const question = await repo.getPrepQuestionById(userId, questionId);
+  if (!question) throw new Error('Prep question not found');
+
+  const profile = await repo.getProfileById(userId, question.interview_profile_id as string);
+  if (!profile || profile.status !== 'ready') {
+    throw new Error('Profile not ready');
+  }
+
+  setAiUsageContext({ relatedId: profile.id as string });
+
+  const mappedContext = await ensureMappedContextForProfile(userId, profile);
+  const result = await explainPrepQuestion({
+    question: (question.question_text as string) ?? '',
+    answer: displayPrepAnswer({
+      answer_text: (question.answer_text as string) ?? '',
+      example_answer: (question.example_answer as string | null) ?? null,
+      answer_source: (question.answer_source as string) ?? 'ai',
+    }),
+    evidence: (question.evidence_from_cv as string | null) ?? null,
+    mappedContext: mappedContextPrompt(mappedContext),
+    history: opts.history ?? [],
+    message: opts.message,
+  });
+
+  const explanation = result.data.explanation.trim();
+  if (!explanation) throw new Error('ai_generation_failed');
+
+  return {
+    explanation,
+    input_tokens: result.inputTokens,
+    output_tokens: result.outputTokens,
+  };
+}
+
+export async function runReshapePrepQuestion(
+  userId: string,
+  questionId: string,
+  opts: { draft: string; tone: string; targetChars: number }
+) {
+  const repo = getInterviewRepo();
+  const question = await repo.getPrepQuestionById(userId, questionId);
+  if (!question) throw new Error('Prep question not found');
+
+  const profile = await repo.getProfileById(userId, question.interview_profile_id as string);
+  if (!profile || profile.status !== 'ready') {
+    throw new Error('Profile not ready');
+  }
+
+  setAiUsageContext({ relatedId: profile.id as string });
+
+  const mappedContext = await ensureMappedContextForProfile(userId, profile);
+  const result = await reshapePrepQuestion({
+    question: (question.question_text as string) ?? '',
+    draft: opts.draft,
+    tone: opts.tone,
+    targetChars: opts.targetChars,
+    mappedContext: mappedContextPrompt(mappedContext),
+    isTopic: profile.prep_source === 'topic',
+    evidence: (question.evidence_from_cv as string | null) ?? null,
+  });
+
+  const answerText = result.data.answer_text.trim();
+  if (!answerText) throw new Error('ai_generation_failed');
+
+  return {
+    answer_text: answerText,
+    input_tokens: result.inputTokens,
+    output_tokens: result.outputTokens,
+  };
 }
 
 export async function runQuizSubmit(
@@ -926,8 +1144,19 @@ export async function getProfileDashboard(userId: string, profileId: string) {
   const profile = await repo.getProfileById(userId, profileId);
   if (!profile) throw new Error('Profile not found');
 
-  const jobs = getJobsRepo();
-  const job = await jobs.getById(userId, profile.job_id as string);
+  let jobTitle: string | undefined;
+  let companyName: string | undefined;
+
+  if (profile.job_id) {
+    const jobs = getJobsRepo();
+    const job = await jobs.getById(userId, profile.job_id as string);
+    jobTitle = job?.job_title as string | undefined;
+    companyName = job?.company_name as string | undefined;
+  } else {
+    const enriched = enrichProfileDisplay(profile as unknown as InterviewProfile);
+    jobTitle = enriched.job_title;
+    companyName = enriched.company_name;
+  }
 
   const competencies = await repo.listCompetencies(profileId);
   const mastery = await repo.listMastery(profileId);
@@ -946,8 +1175,8 @@ export async function getProfileDashboard(userId: string, profileId: string) {
   return {
     profile: {
       ...profile,
-      job_title: job?.job_title,
-      company_name: job?.company_name,
+      job_title: jobTitle,
+      company_name: companyName,
     },
     competencies,
     mastery,
@@ -975,31 +1204,209 @@ async function linkCvToJob(userId: string, cvId: string, jobId: string) {
   await cvs.update(userId, cvId, { job_ids: [...jobIds, jobId] });
 }
 
-async function enrichJobSummaryIfNeeded(
+async function insertJobTopicsPlan(
+  profileId: string,
+  planResult: { title: string; topics: Array<{ name: string; priority: number; competency_id?: string }> }
+) {
+  const repo = getInterviewRepo();
+  await repo.deletePlansForProfile(profileId);
+
+  const plan = await repo.insertPlan(profileId, {
+    title: planResult.title,
+    duration_days: null,
+    status: 'active',
+    plan_json: planResult,
+  });
+
+  const compRows = await repo.listCompetencies(profileId);
+  const compByAiId = new Map(
+    compRows.map((c) => [(c.metadata_json as { ai_id?: string })?.ai_id, c.id as string])
+  );
+  const compByName = new Map(
+    compRows.map((c) => [(c.name as string).trim().toLowerCase(), c.id as string])
+  );
+
+  const topics = await repo.insertTopics(
+    plan.id as string,
+    planResult.topics.map((t) => ({
+      name: t.name,
+      priority: t.priority,
+      competency_id: t.competency_id
+        ? (compByAiId.get(t.competency_id) ?? null)
+        : (compByName.get(t.name.trim().toLowerCase()) ?? null),
+      status: 'pending',
+    }))
+  );
+
+  return { plan, topics };
+}
+
+export async function runFastJobStart(
   userId: string,
   jobId: string,
-  jobDescription: string,
-  cvId: string
+  opts?: {
+    cvId?: string;
+    extraContext?: string;
+    interviewDate?: string;
+    interviewStage?: string;
+  }
 ) {
   const jobs = getJobsRepo();
-  const job = await jobs.getById(userId, jobId);
-  if (!job) return;
-  const summary = typeof job.job_summary === 'string' ? job.job_summary.trim() : '';
-  if (summary.length >= JOB_CONTEXT_MIN) return;
+  const repo = getInterviewRepo();
+  const job = (await jobs.getById(userId, jobId)) as JobRow | null;
+  if (!job) throw new Error('Job not found');
 
-  const cv = await getCvsRepo().getById(userId, cvId);
-  if (!cv) return;
+  const cv = await resolveCv(userId, jobId, opts?.cvId);
+  if (!cv) throw new Error('CV not found');
 
-  const analysis = await analyzeJobDescription({
-    jobDescription,
-    cvRow: cv as Record<string, unknown>,
+  const keywords = Array.isArray(job.keywords) ? (job.keywords as string[]) : [];
+  const jobHash = hashJobContext({
+    jobTitle: job.job_title,
+    companyName: job.company_name,
+    jobSummary: job.job_summary,
+    keywords,
+    extraContext: opts?.extraContext,
   });
-  const nextSummary = analysis.jobSummary || analysis.shortDescription;
-  if (!nextSummary) return;
+  const cvHash = hashCvContext(cv);
+  const hashes = { job: jobHash, cv: cvHash };
 
-  await jobs.update(userId, jobId, {
-    job_summary: nextSummary,
-    keywords: analysis.keywords.length ? analysis.keywords : job.keywords,
+  let profile = await repo.getProfileByJob(userId, jobId);
+  if (profile?.status === 'ready' && profile.source_job_hash === jobHash && profile.source_cv_hash === cvHash) {
+    const existing = await repo.getActivePlan(profile.id as string);
+    if (existing) {
+      return {
+        profile,
+        status: 'reused' as const,
+        plan: existing,
+        topics: await repo.listTopics(existing.id as string),
+        prep_questions: await repo.listPrepQuestions(profile.id as string),
+      };
+    }
+  }
+
+  if (!profile) {
+    profile = await repo.insertProfile(userId, {
+      job_id: jobId,
+      cv_id: cv.id,
+      status: 'analyzing',
+      source_job_hash: jobHash,
+      source_cv_hash: cvHash,
+      extra_context: opts?.extraContext ?? null,
+      interview_date: opts?.interviewDate ?? null,
+      interview_stage: opts?.interviewStage ?? null,
+    });
+  } else {
+    profile = await repo.updateProfile(userId, profile.id as string, {
+      status: 'analyzing',
+      cv_id: cv.id,
+      source_job_hash: jobHash,
+      source_cv_hash: cvHash,
+      extra_context: opts?.extraContext ?? profile.extra_context,
+      ...(opts?.interviewDate ? { interview_date: opts.interviewDate } : {}),
+      ...(opts?.interviewStage ? { interview_stage: opts.interviewStage } : {}),
+    });
+  }
+
+  const profileId = profile.id as string;
+
+  try {
+    const cvSummary = buildCvSummary(cv);
+    const jobSummary =
+      typeof job.job_summary === 'string' && job.job_summary.trim()
+        ? job.job_summary.trim()
+        : (opts?.extraContext ?? '').slice(0, 2000);
+
+    let mappedContext = buildJobSeedContext({
+      jobTitle: job.job_title,
+      companyName: job.company_name,
+      jobSummary,
+      keywords,
+      cvSummary,
+    });
+
+    const seedComps = competenciesFromSeedTopics(
+      keywords.length
+        ? keywords.slice(0, 8).map((k, i) => ({ name: k, priority: i + 1 }))
+        : [{ name: job.job_title, priority: 1 }],
+      job.job_title
+    );
+
+    const planResult = await generatePreparationTopics(
+      mappedContextPrompt(mappedContext),
+      competencyNamesForAi(seedComps),
+      hashes
+    );
+
+    const topicSeeds = planResult.data.topics.map((t) => ({
+      name: t.name,
+      priority: t.priority,
+    }));
+    const blueprint = seedBlueprintFromTopics(topicSeeds, 'intermediate');
+    const topicCompetencies = competenciesFromSeedTopics(topicSeeds, job.job_title);
+
+    await repo.deleteCompetenciesForProfile(profileId);
+    await repo.insertCompetencies(
+      profileId,
+      topicCompetencies.map((c) => ({
+        name: c.name,
+        category: c.category,
+        description: c.description,
+        importance: c.importance,
+        priority: c.priority,
+        evidence_from_job: c.evidence_from_job,
+        evidence_from_candidate: c.evidence_from_candidate,
+        mastery_score: c.candidate_mastery,
+        metadata_json: { ai_id: c.id },
+      }))
+    );
+
+    mappedContext = updateMappedContextTopics(
+      mappedContext,
+      topicSeeds.map((t) => t.name)
+    );
+
+    profile = await repo.updateProfile(userId, profileId, {
+      status: 'ready',
+      role: job.job_title,
+      seniority: 'mid',
+      profession: job.job_title,
+      candidate_summary: cvSummary.slice(0, 600),
+      job_summary: jobSummary.slice(0, 600),
+      mapped_context_json: mappedContext,
+      blueprint_json: blueprint,
+      gap_json: [],
+      ai_metadata_json: planResult.metadata,
+      readiness_score: 0,
+      clarification_json: { needs_clarification: false, questions: [] },
+    });
+
+    const { plan, topics } = await insertJobTopicsPlan(profileId, planResult.data);
+    const prep_questions = await repo.listPrepQuestions(profileId);
+
+    return {
+      profile,
+      status: 'ready' as const,
+      plan,
+      topics,
+      prep_questions,
+    };
+  } catch (e) {
+    await repo.updateProfile(userId, profileId, { status: 'failed' });
+    throw e;
+  }
+}
+
+export async function retryJobInterview(userId: string, profileId: string) {
+  const repo = getInterviewRepo();
+  const profile = await repo.getProfileById(userId, profileId);
+  if (!profile?.job_id) {
+    throw new InterviewError('PROFILE_NOT_FOUND', 'Job profile not found.');
+  }
+  return runFastJobStart(userId, profile.job_id as string, {
+    cvId: profile.cv_id as string | undefined,
+    extraContext: (profile.extra_context as string | null) ?? undefined,
+    interviewDate: (profile.interview_date as string | null) ?? undefined,
+    interviewStage: (profile.interview_stage as string | null) ?? undefined,
   });
 }
 
@@ -1048,7 +1455,9 @@ export async function startInterviewFromJob(
   }
 
   if (jd.length >= JOB_CONTEXT_MIN) {
-    await enrichJobSummaryIfNeeded(userId, input.jobId, jd, cvId);
+    await jobs.update(userId, input.jobId, {
+      job_summary: jd.slice(0, 4000),
+    });
   }
 
   const extraContext = buildExtraContext([
@@ -1058,7 +1467,7 @@ export async function startInterviewFromJob(
     input.interviewStage ? `Interview stage: ${input.interviewStage}` : undefined,
   ]);
 
-  const result = await runAnalyzePipeline(userId, input.jobId, {
+  const result = await runFastJobStart(userId, input.jobId, {
     cvId,
     extraContext: extraContext || undefined,
     interviewDate: input.interviewDate,
@@ -1097,18 +1506,12 @@ export async function startInterviewFromManualJob(
     );
   }
 
-  const analysis = await analyzeJobDescription({
-    jobDescription: jd,
-    jobUrl: input.jobUrl,
-    cvRow: cv as Record<string, unknown>,
-  });
-
   const job = await getJobsRepo().insert(userId, {
-    job_title: input.jobTitle.trim() || analysis.jobTitle || 'Untitled role',
-    company_name: input.companyName.trim() || analysis.company || 'Company',
+    job_title: input.jobTitle.trim() || 'Untitled role',
+    company_name: input.companyName.trim() || 'Company',
     job_url: input.jobUrl?.trim() || null,
-    keywords: analysis.keywords,
-    job_summary: analysis.jobSummary || analysis.shortDescription || null,
+    keywords: [],
+    job_summary: jd.slice(0, 4000) || null,
     status: 'applied',
   });
 
@@ -1122,7 +1525,7 @@ export async function startInterviewFromManualJob(
     input.interviewStage ? `Interview stage: ${input.interviewStage}` : undefined,
   ]);
 
-  const result = await runAnalyzePipeline(userId, jobId, {
+  const result = await runFastJobStart(userId, jobId, {
     cvId: input.cvId,
     extraContext,
     interviewDate: input.interviewDate,

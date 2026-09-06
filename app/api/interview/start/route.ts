@@ -6,11 +6,12 @@ import {
   startInterviewFromJob,
   startInterviewFromManualJob,
 } from '@/lib/interview/orchestrator';
+import { startInterviewFromTopic } from '@/lib/interview/topic-orchestrator';
 import { mapOrchestratorError } from '@/lib/interview/errors';
 import { interviewErrorResponse } from '@/lib/interview/api-errors';
 
 export const runtime = 'nodejs';
-export const maxDuration = 240;
+export const maxDuration = 60;
 
 export async function POST(request: Request) {
   try {
@@ -21,6 +22,27 @@ export async function POST(request: Request) {
     if (denied) return denied;
 
     const body = (await request.json()) as Record<string, unknown>;
+    const source = typeof body.source === 'string' ? body.source.trim() : 'job';
+
+    if (source === 'topic') {
+      const topic = typeof body.topic === 'string' ? body.topic.trim() : '';
+      const currentLevel = typeof body.current_level === 'string' ? body.current_level.trim() : '';
+      const goalLevel = typeof body.goal_level === 'string' ? body.goal_level.trim() : '';
+      const purpose = typeof body.purpose === 'string' ? body.purpose.trim() : '';
+      const notes = typeof body.notes === 'string' ? body.notes.trim() : undefined;
+
+      const result = await withInterviewAiRoute(user.id, undefined, () =>
+        startInterviewFromTopic(user.id, {
+          topic,
+          current_level: currentLevel,
+          goal_level: goalLevel,
+          purpose,
+          notes,
+        })
+      );
+      return NextResponse.json(result);
+    }
+
     const jobId = typeof body.job_id === 'string' ? body.job_id.trim() : '';
 
     if (jobId) {

@@ -5,12 +5,17 @@ import { ClipboardList, Play, Trophy } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { PREP_TOPIC_ALL } from '@/lib/interview/prep-topic-query';
+
+type TopicRow = { id: string; name: string };
 
 type Props = {
   profileId: string;
   quizAttempts: Record<string, unknown>[];
   inProgressQuiz: Record<string, unknown> | null;
   isReady: boolean;
+  topics: TopicRow[];
+  topicFilter: string;
   onNewQuiz: () => Promise<void>;
   onResumeQuiz: () => void;
   generating?: boolean;
@@ -26,17 +31,32 @@ function formatDate(value: unknown) {
   });
 }
 
+function matchesTopicFilter(row: Record<string, unknown>, filter: string) {
+  if (filter === PREP_TOPIC_ALL) return true;
+  return (row.quiz_topic_id as string | null) === filter;
+}
+
 export function PrepQuizPanel({
   profileId,
   quizAttempts,
   inProgressQuiz,
   isReady,
+  topics,
+  topicFilter,
   onNewQuiz,
   onResumeQuiz,
   generating,
 }: Props) {
-  const completed = quizAttempts.filter((a) => a.completed_at);
+  const selectedTopic = topics.find((t) => t.id === topicFilter);
+  const visibleAttempts = quizAttempts.filter((a) => matchesTopicFilter(a, topicFilter));
+  const visibleInProgress =
+    inProgressQuiz && matchesTopicFilter(inProgressQuiz, topicFilter) ? inProgressQuiz : null;
+  const completed = visibleAttempts.filter((a) => a.completed_at);
   const lastScore = completed[0]?.score as number | undefined;
+  const canGenerate = isReady && topics.length > 0;
+  const ctaLabel = selectedTopic
+    ? `Take quiz on ${selectedTopic.name}`
+    : 'Take quiz on all topics';
 
   return (
     <div className="space-y-4">
@@ -44,11 +64,13 @@ export function PrepQuizPanel({
         <div>
           <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">Quiz practice</h3>
           <p className="mt-1 text-xs text-[var(--color-muted)]">
-            Test your knowledge with role-specific questions
+            {selectedTopic
+              ? `Test your knowledge of ${selectedTopic.name}`
+              : 'Test your knowledge across all preparation topics'}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {inProgressQuiz ? (
+          {visibleInProgress ? (
             <Button
               size="sm"
               variant="secondary"
@@ -64,15 +86,19 @@ export function PrepQuizPanel({
             variant="primary"
             icon={<ClipboardList className="h-4 w-4" />}
             loading={generating}
-            disabled={!isReady}
+            disabled={!canGenerate}
             onClick={() => void onNewQuiz()}
           >
-            {inProgressQuiz ? 'New quiz' : 'Take quiz'}
+            {visibleInProgress ? 'New quiz' : ctaLabel}
           </Button>
         </div>
       </div>
 
-      {lastScore != null ? (
+      {topics.length === 0 ? (
+        <Card className="py-8 text-center text-sm text-[var(--color-muted)]">
+          Generate preparation topics first, then take a quiz by topic or across all topics.
+        </Card>
+      ) : lastScore != null ? (
         <Card
           padding="sm"
           className="flex items-center gap-4 border-[var(--color-accent-gold)]/25 bg-[var(--color-accent-gold)]/5"
@@ -91,56 +117,66 @@ export function PrepQuizPanel({
         </Card>
       ) : null}
 
-      <Card>
-        {quizAttempts.length === 0 ? (
-          <p className="py-8 text-center text-sm text-[var(--color-muted)]">
-            No quizzes yet. Take your first quiz to boost your readiness score.
-          </p>
-        ) : (
-          <ul className="divide-y divide-[var(--color-border)]">
-            {quizAttempts.map((a) => {
-              const done = Boolean(a.completed_at);
-              return (
-                <li
-                  key={a.id as string}
-                  className="flex items-center justify-between gap-4 py-3 text-sm first:pt-0 last:pb-0"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate font-medium text-[var(--color-text-primary)]">
-                      {a.quiz_title as string}
-                    </p>
-                    <p className="text-xs text-[var(--color-muted)]">
-                      {formatDate(a.started_at)}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    {done ? (
-                      <Badge variant="success">{a.score as number}%</Badge>
-                    ) : (
-                      <Badge variant="warning">In progress</Badge>
-                    )}
-                    {done ? (
-                      <Link
-                        href={`/interview/${profileId}/quiz/${a.quiz_id as string}/review/${a.id as string}`}
-                        className="text-xs font-semibold text-[var(--color-primary)] hover:underline"
-                      >
-                        Review →
-                      </Link>
-                    ) : (
-                      <Link
-                        href={`/interview/${profileId}/quiz/${a.quiz_id as string}`}
-                        className="text-xs font-semibold text-[var(--color-primary)] hover:underline"
-                      >
-                        Resume →
-                      </Link>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </Card>
+      {topics.length > 0 ? (
+        <Card>
+          {visibleAttempts.length === 0 ? (
+            <p className="py-8 text-center text-sm text-[var(--color-muted)]">
+              {selectedTopic
+                ? `No quizzes for ${selectedTopic.name} yet.`
+                : 'No quizzes yet. Take a quiz on all topics or pick one topic.'}
+            </p>
+          ) : (
+            <ul className="divide-y divide-[var(--color-border)]">
+              {visibleAttempts.map((a) => {
+                const done = Boolean(a.completed_at);
+                const topicName = a.quiz_topic_name as string | null | undefined;
+                return (
+                  <li
+                    key={a.id as string}
+                    className="flex items-center justify-between gap-4 py-3 text-sm first:pt-0 last:pb-0"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-[var(--color-text-primary)]">
+                        {a.quiz_title as string}
+                      </p>
+                      <p className="text-xs text-[var(--color-muted)]">
+                        {topicName ? `${topicName} · ` : topicFilter === PREP_TOPIC_ALL ? 'All topics · ' : ''}
+                        {formatDate(a.started_at)}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      {done ? (
+                        <Badge variant="success">{a.score as number}%</Badge>
+                      ) : (
+                        <Badge variant="warning">In progress</Badge>
+                      )}
+                      {done ? (
+                        <Link
+                          href={`/interview/${profileId}/quiz/${a.quiz_id as string}/review/${a.id as string}${
+                            topicFilter === PREP_TOPIC_ALL ? '' : `?topic=${topicFilter}`
+                          }`}
+                          className="text-xs font-semibold text-[var(--color-primary)] hover:underline"
+                        >
+                          Review →
+                        </Link>
+                      ) : (
+                        <Link
+                          href={`/interview/${profileId}/quiz/${a.quiz_id as string}${
+                            topicFilter === PREP_TOPIC_ALL ? '' : `?topic=${topicFilter}`
+                          }`}
+                          className="text-xs font-semibold text-[var(--color-primary)] hover:underline"
+                        >
+                          Resume →
+                        </Link>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Card>
+      ) : null}
     </div>
   );
 }

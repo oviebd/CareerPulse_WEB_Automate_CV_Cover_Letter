@@ -13,6 +13,7 @@ import { Step2JobDetails } from '@/components/cv/optimise/Step2JobDetails';
 import { useAllCVVersions } from '@/hooks/useCV';
 import { useStartInterview, type StartInterviewBody } from '@/hooks/useInterview';
 import { ApiError } from '@/lib/api-fetch';
+import { AiWorkingOverlay } from '@/components/shared/AiWorkingOverlay';
 import { cn } from '@/lib/utils';
 
 const STAGE_OPTIONS = [
@@ -108,6 +109,15 @@ export function InterviewStartWizard() {
 
   return (
     <div className="space-y-6">
+      <AiWorkingOverlay
+        open={start.isPending}
+        title="Finding topics to practice"
+        messages={[
+          'Reading the job and your CV…',
+          'AI is building your prep topic list…',
+          'Organizing focus areas for you…',
+        ]}
+      />
       <nav className="flex gap-2">
         {([1, 2, 3] as StepId[]).map((id) => (
           <button
@@ -216,7 +226,7 @@ export function InterviewStartWizard() {
             disabled={!canStep3}
             onClick={() => void handleSubmit()}
           >
-            {start.isPending ? 'Analyzing and building your plan…' : 'Start preparation'}
+            {start.isPending ? 'Finding topics…' : 'Start preparation'}
           </Button>
         )}
       </div>

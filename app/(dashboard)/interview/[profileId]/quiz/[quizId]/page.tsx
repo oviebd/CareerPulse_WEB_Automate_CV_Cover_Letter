@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Trophy } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -14,6 +14,7 @@ import { QuizQuestionField } from '@/components/interview/QuizQuestionField';
 import { apiFetch } from '@/lib/api-fetch';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useGenerateQuiz, useQuizAttempt, useSaveQuizDraft } from '@/hooks/useInterview';
+import { parsePrepTopicParam, prepDashboardHref, quizHref, quizReviewHref, topicIdForApi } from '@/lib/interview/prep-topic-query';
 
 type SubmitResult = {
   score?: number;
@@ -23,9 +24,11 @@ type SubmitResult = {
 export default function InterviewQuizPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const profileId = typeof params.profileId === 'string' ? params.profileId : '';
   const quizId = typeof params.quizId === 'string' ? params.quizId : '';
+  const topicFilter = parsePrepTopicParam(searchParams.get('topic'));
 
   const { data, isLoading } = useQuery({
     queryKey: ['interview-quiz', quizId],
@@ -104,8 +107,11 @@ export default function InterviewQuizPage() {
   }
 
   async function handleNewQuiz() {
-    const next = await generateQuiz.mutateAsync({ profile_id: profileId });
-    router.push(`/interview/${profileId}/quiz/${next.quiz.id}`);
+    const next = await generateQuiz.mutateAsync({
+      profile_id: profileId,
+      topic_id: topicIdForApi(topicFilter),
+    });
+    router.push(quizHref(profileId, next.quiz.id, topicFilter));
   }
 
   if (isLoading || !data) {
@@ -134,14 +140,14 @@ export default function InterviewQuizPage() {
           <Progress value={score} className="mx-auto max-w-xs" />
           <div className="flex flex-wrap justify-center gap-2 pt-2">
             {attemptId ? (
-              <Link href={`/interview/${profileId}/quiz/${quizId}/review/${attemptId}`}>
+              <Link href={quizReviewHref(profileId, quizId, attemptId, topicFilter)}>
                 <Button variant="secondary">View result</Button>
               </Link>
             ) : null}
             <Button variant="primary" loading={generateQuiz.isPending} onClick={() => void handleNewQuiz()}>
               Take another quiz
             </Button>
-            <Link href={`/interview/${profileId}?tab=quiz`}>
+            <Link href={prepDashboardHref(profileId, 'quiz', topicFilter)}>
               <Button variant="ghost">Back to dashboard</Button>
             </Link>
           </div>
@@ -153,7 +159,7 @@ export default function InterviewQuizPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <Link
-        href={`/interview/${profileId}?tab=quiz`}
+        href={prepDashboardHref(profileId, 'quiz', topicFilter)}
         className="inline-flex items-center gap-1 text-sm text-[var(--color-muted)] hover:text-[var(--color-primary)]"
       >
         <ArrowLeft className="h-4 w-4" /> Quiz

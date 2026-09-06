@@ -140,6 +140,13 @@ export interface MappedInterviewContext {
   competency_focus: Array<{ id: string; name: string; importance: string }>;
   topic_names: string[];
   generated_at: string;
+  /** Topic prep only */
+  source?: 'job' | 'topic';
+  purpose?: 'learning' | 'interview' | 'work';
+  difficulty?: 'beginner' | 'intermediate' | 'advanced';
+  current_level?: TopicExpertiseLevel;
+  notes?: string;
+  self_rated_skills?: Array<{ name: string; skill_level: number }>;
 }
 
 export interface QuizQuestionOutput {
@@ -170,6 +177,15 @@ export interface PrepQuestionOutput {
   relevance: PrepQuestionRelevance;
   evidence_from_cv?: string;
   why_selected?: string;
+  topic_name?: string;
+  example_answer?: string;
+}
+
+export type PrepExplainRole = 'user' | 'assistant';
+
+export interface PrepExplainTurn {
+  role: PrepExplainRole;
+  content: string;
 }
 
 export interface PrepQuestionBatchOutput {
@@ -179,6 +195,8 @@ export interface PrepQuestionBatchOutput {
 export interface PrepQuestion {
   id: string;
   interview_profile_id: string;
+  topic_id: string | null;
+  topic_name: string | null;
   batch_number: number;
   sequence: number;
   question_type: string;
@@ -190,6 +208,7 @@ export interface PrepQuestion {
   relevance: PrepQuestionRelevance;
   evidence_from_cv: string | null;
   why_selected: string | null;
+  example_answer: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -249,11 +268,50 @@ export interface ReadinessBreakdown {
   next_action: string;
 }
 
+export type PrepSource = 'job' | 'topic';
+
+export type TopicPrepPurpose = 'learning' | 'interview' | 'work';
+export type TopicPrepDifficulty = 'beginner' | 'intermediate' | 'advanced';
+export type TopicExpertiseLevel = 'beginner' | 'intermediate' | 'expert';
+
+export interface TopicPrepTopicItem {
+  name: string;
+  skill_level: 1 | 2 | 3 | 4 | 5;
+}
+
+export interface TopicPrepConfig {
+  purpose: TopicPrepPurpose;
+  difficulty: TopicPrepDifficulty;
+  goal_role: string;
+  goal_level: string;
+  /** Starting expertise (new simplified form); derived from topics for legacy profiles */
+  current_level?: TopicExpertiseLevel;
+  notes?: string;
+  topics: TopicPrepTopicItem[];
+}
+
+export interface TopicInterviewAnalysis {
+  profession: string;
+  occupation: string;
+  role: string;
+  domain: string;
+  seniority: string;
+  focus_areas: string[];
+  learning_objectives: string[];
+  likely_question_types: string[];
+  evaluation_dimensions: string[];
+  candidate_strengths: string[];
+  candidate_gaps: string[];
+  summary: string;
+}
+
 export interface InterviewProfile {
   id: string;
   user_id: string;
-  job_id: string;
+  job_id: string | null;
   cv_id: string | null;
+  prep_source: PrepSource;
+  topic_config_json: TopicPrepConfig | null;
   status: InterviewProfileStatus;
   profession: string | null;
   occupation: string | null;

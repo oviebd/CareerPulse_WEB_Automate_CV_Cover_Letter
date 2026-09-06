@@ -1,4 +1,5 @@
 import { isQuizQuestionType } from '@/lib/interview/quiz-eval';
+import { clampPrepAnswer } from '@/lib/interview/prep-answer';
 import type {
   AnswerEvaluation,
   CandidateInterviewAnalysis,
@@ -17,6 +18,7 @@ import type {
   PrepQuestionRelevance,
   QuizOutput,
   QuizQuestionOutput,
+  TopicInterviewAnalysis,
 } from '@/types/interview';
 
 const FOLLOW_UP_ACTIONS: FollowUpAction[] = [
@@ -369,13 +371,16 @@ export function normalizePrepQuestion(raw: Record<string, unknown>): PrepQuestio
     type: str(raw.type) || 'behavioral',
     competency_id: str(raw.competency_id) || undefined,
     difficulty: str(raw.difficulty) || 'medium',
-    answer_text:
+    answer_text: clampPrepAnswer(
       relevance === 'irrelevant'
         ? answerText || 'Irrelevant experience — no matching evidence in your CV for this question.'
-        : answerText,
+        : answerText
+    ),
     relevance,
     evidence_from_cv: evidence || undefined,
     why_selected: str(raw.why_selected) || undefined,
+    topic_name: str(raw.topic_name) || undefined,
+    example_answer: str(raw.example_answer) || undefined,
   };
 }
 
@@ -386,4 +391,75 @@ export function normalizePrepQuestionBatch(raw: Record<string, unknown>): PrepQu
         .filter((q): q is PrepQuestionOutput => Boolean(q.question))
     : [];
   return { questions };
+}
+
+export function normalizeTopicPrepQuestion(raw: Record<string, unknown>): PrepQuestionOutput {
+  const answerText = str(raw.answer_text);
+  return {
+    question: str(raw.question),
+    type: str(raw.type) || 'conceptual',
+    competency_id: str(raw.competency_id) || undefined,
+    difficulty: str(raw.difficulty) || 'medium',
+    answer_text: clampPrepAnswer(answerText),
+    relevance: 'supported',
+    evidence_from_cv: str(raw.key_points) || undefined,
+    why_selected: str(raw.why_selected) || undefined,
+    topic_name: str(raw.topic_name) || undefined,
+    example_answer: str(raw.example_answer) || undefined,
+  };
+}
+
+export function normalizeExampleAnswer(raw: Record<string, unknown>): { example_answer: string } {
+  return { example_answer: clampPrepAnswer(str(raw.example_answer)) };
+}
+
+export function normalizeExplanation(raw: Record<string, unknown>): { explanation: string } {
+  return { explanation: str(raw.explanation) };
+}
+
+export function normalizeReshapedAnswer(raw: Record<string, unknown>): { answer_text: string } {
+  return { answer_text: clampPrepAnswer(str(raw.answer_text)) };
+}
+
+export function normalizeTopicPrepQuestionBatch(
+  raw: Record<string, unknown>
+): PrepQuestionBatchOutput {
+  const questions = Array.isArray(raw.questions)
+    ? (raw.questions as Record<string, unknown>[])
+        .map((q) => normalizeTopicPrepQuestion(q))
+        .filter((q): q is PrepQuestionOutput => Boolean(q.question))
+    : [];
+  return { questions };
+}
+
+export function normalizeTopicAnalysis(raw: Record<string, unknown>): TopicInterviewAnalysis {
+  return {
+    profession: str(raw.profession) || 'general',
+    occupation: str(raw.occupation) || 'professional',
+    role: str(raw.role) || 'learner',
+    domain: str(raw.domain) || 'general',
+    seniority: str(raw.seniority) || 'mid',
+    focus_areas: strArr(raw.focus_areas),
+    learning_objectives: strArr(raw.learning_objectives),
+    likely_question_types: strArr(raw.likely_question_types),
+    evaluation_dimensions: strArr(raw.evaluation_dimensions),
+    candidate_strengths: strArr(raw.candidate_strengths),
+    candidate_gaps: strArr(raw.candidate_gaps),
+    summary: str(raw.summary),
+  };
+}
+
+export function normalizeTopicPipelineOutput(raw: Record<string, unknown>): {
+  analysis: TopicInterviewAnalysis;
+  competencies: CompetencyItem[];
+  blueprint: InterviewBlueprint;
+} {
+  const analysis = normalizeTopicAnalysis(
+    (raw.analysis as Record<string, unknown>) ?? raw
+  );
+  const competencies = normalizeCompetencies(raw.competencies);
+  const blueprint = normalizeBlueprint(
+    (raw.blueprint as Record<string, unknown>) ?? {}
+  );
+  return { analysis, competencies, blueprint };
 }

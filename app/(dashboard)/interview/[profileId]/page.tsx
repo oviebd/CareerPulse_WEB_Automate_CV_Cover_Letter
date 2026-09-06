@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Loader2 } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { AiWorkingOverlay } from '@/components/shared/AiWorkingOverlay';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -16,6 +17,7 @@ import { PrepTopicsPanel } from '@/components/interview/PrepTopicsPanel';
 import { PrepQuizPanel } from '@/components/interview/PrepQuizPanel';
 import { PrepMockPanel, PrepContextDisclosure } from '@/components/interview/PrepMockPanel';
 import { PrepQuestionList } from '@/components/interview/PrepQuestionList';
+import { PrepTopicFilter } from '@/components/interview/PrepTopicFilter';
 import { ClarificationForm } from '@/components/interview/ClarificationForm';
 import { DeleteInterviewProfileButton } from '@/components/interview/DeleteInterviewProfileButton';
 import { parsePrepTab, type PrepTab } from '@/components/interview/prep-tabs';
@@ -24,9 +26,16 @@ import {
   usePrepareInterview,
   useGenerateQuiz,
   useClarifyInterview,
-  useStartInterview,
+  useRetryInterview,
   usePrepQuestions,
 } from '@/hooks/useInterview';
+import { isTopicPrepProfile } from '@/lib/interview/topic-config';
+import {
+  parsePrepTopicParam,
+  PREP_TOPIC_ALL,
+  quizHref,
+  topicIdForApi,
+} from '@/lib/interview/prep-topic-query';
 import type { ClarificationPayload } from '@/types/interview';
 
 function ProfileStatusBadge({ status, analyzing }: { status: string; analyzing?: boolean }) {
@@ -48,23 +57,37 @@ export default function InterviewDashboardPage() {
   const prepare = usePrepareInterview();
   const quiz = useGenerateQuiz();
   const clarify = useClarifyInterview();
-  const retryStart = useStartInterview();
+  const retryInterview = useRetryInterview(profileId);
 
   const [showClarifyEdit, setShowClarifyEdit] = useState(false);
   const [clarifyError, setClarifyError] = useState<string | null>(null);
 
   const activeTab = parsePrepTab(searchParams.get('tab'));
+  const topicFilter = parsePrepTopicParam(searchParams.get('topic'));
 
   function setTab(tab: PrepTab) {
-    router.replace(`/interview/${profileId}?tab=${tab}`, { scroll: false });
+    const params = new URLSearchParams();
+    params.set('tab', tab);
+    if (topicFilter !== PREP_TOPIC_ALL) params.set('topic', topicFilter);
+    router.replace(`/interview/${profileId}?${params.toString()}`, { scroll: false });
+  }
+
+  function setTopicFilter(next: string) {
+    const params = new URLSearchParams();
+    params.set('tab', activeTab);
+    if (next !== PREP_TOPIC_ALL) params.set('topic', next);
+    router.replace(`/interview/${profileId}?${params.toString()}`, { scroll: false });
   }
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (window.location.hash === '#likely-questions') {
-      router.replace(`/interview/${profileId}?tab=questions`, { scroll: false });
+      const params = new URLSearchParams();
+      params.set('tab', 'questions');
+      if (topicFilter !== PREP_TOPIC_ALL) params.set('topic', topicFilter);
+      router.replace(`/interview/${profileId}?${params.toString()}`, { scroll: false });
     }
-  }, [profileId, router]);
+  }, [profileId, router, topicFilter]);
 
   if (isLoading) {
     return <Skeleton className="mx-auto h-64 max-w-4xl rounded-xl" />;
@@ -96,8 +119,17 @@ export default function InterviewDashboardPage() {
   }
 
   const { profile, readiness, topics, sessions, plan, quiz_attempts, in_progress_quiz } = data;
+  const topicOptions = topics.map((t) => ({
+    id: t.id as string,
+    name: t.name as string,
+  }));
+  const safeTopicFilter =
+    topicFilter === PREP_TOPIC_ALL || topicOptions.some((t) => t.id === topicFilter)
+      ? topicFilter
+      : PREP_TOPIC_ALL;
+  const topicProfile = isTopicPrepProfile(profile);
   const clarification = profile.clarification_json as ClarificationPayload | null;
-  const isReady = profile.status === 'ready' && Boolean(profile.blueprint_json);
+  const isReady = profile.status === 'ready' && topics.length > 0;
   const isAnalyzing = profile.status === 'analyzing' || clarify.isPending;
   const analyzingStaleMs = 5 * 60 * 1000;
   const isAnalyzingStale =
@@ -138,12 +170,15 @@ export default function InterviewDashboardPage() {
 
   async function handleResumeQuiz() {
     if (!in_progress_quiz?.quiz_id) return;
-    router.push(`/interview/${profileId}/quiz/${in_progress_quiz.quiz_id as string}`);
+    router.push(quizHref(profileId, in_progress_quiz.quiz_id as string, safeTopicFilter));
   }
 
   async function handleNewQuiz() {
-    const result = await quiz.mutateAsync({ profile_id: profileId });
-    router.push(`/interview/${profileId}/quiz/${result.quiz.id}`);
+    const result = await quiz.mutateAsync({
+      profile_id: profileId,
+      topic_id: topicIdForApi(safeTopicFilter),
+    });
+    router.push(quizHref(profileId, result.quiz.id, safeTopicFilter));
   }
 
   async function handleClarify(answers: Record<string, string>) {
@@ -164,12 +199,21 @@ export default function InterviewDashboardPage() {
   }
 
   async function handleRetry() {
-    await retryStart.mutateAsync({ job_id: profile.job_id });
+    await retryInterview.mutateAsync();
     void refetch();
   }
 
   return (
     <div className="mx-auto max-w-4xl space-y-4">
+      <AiWorkingOverlay
+        open={isAnalyzing && !isReady}
+        title={topicProfile ? 'Setting up your topics' : 'Finding topics to practice'}
+        messages={[
+          topicProfile ? 'Saving your topic plan…' : 'Reading the job and your CV…',
+          'AI is organizing your preparation focus…',
+          'This usually takes under a minute…',
+        ]}
+      />
       <Link
         href="/interview"
         className="inline-flex items-center gap-1 text-sm text-[var(--color-muted)] hover:text-[var(--color-primary)]"
@@ -192,18 +236,28 @@ export default function InterviewDashboardPage() {
 
       {isAnalyzing ? (
         <Card className="border-[var(--color-warning)]/30 bg-[var(--color-accent-gold)]/8 p-4 text-sm">
-          <p className="font-medium text-[var(--color-text-primary)]">
-            Building your interview profile and preparation plan…
-          </p>
-          <p className="mt-1 text-[var(--color-muted)]">
-            This usually takes 1–3 minutes. Keep this tab open — the page updates automatically.
-          </p>
+          <div className="flex items-start gap-3">
+            <Loader2
+              className="mt-0.5 h-5 w-5 shrink-0 animate-spin text-[var(--color-primary)] motion-reduce:animate-none"
+              aria-hidden
+            />
+            <div>
+              <p className="font-medium text-[var(--color-text-primary)]">
+                {topicProfile
+                  ? 'Setting up your topic preparation…'
+                  : 'AI is finding topics to practice…'}
+              </p>
+              <p className="mt-1 text-[var(--color-muted)]">
+                Keep this tab open — the page updates automatically when topics are ready.
+              </p>
+            </div>
+          </div>
           {isAnalyzingStale ? (
             <Button
               className="mt-3"
               size="sm"
               variant="secondary"
-              loading={retryStart.isPending}
+              loading={retryInterview.isPending}
               onClick={() => void handleRetry()}
             >
               Retry analysis
@@ -219,7 +273,7 @@ export default function InterviewDashboardPage() {
             className="mt-3"
             size="sm"
             variant="primary"
-            loading={retryStart.isPending}
+            loading={retryInterview.isPending}
             onClick={() => void handleRetry()}
           >
             Retry analysis
@@ -227,7 +281,10 @@ export default function InterviewDashboardPage() {
         </Card>
       ) : null}
 
-      {profile.status === 'needs_clarification' && clarification?.questions?.length && !isAnalyzing ? (
+      {!topicProfile &&
+      profile.status === 'needs_clarification' &&
+      clarification?.questions?.length &&
+      !isAnalyzing ? (
         <>
           <Card className="border-[var(--color-border)] bg-[var(--color-surface-2)]/40 p-4 text-sm">
             <p className="font-medium text-[var(--color-text-primary)]">
@@ -278,7 +335,9 @@ export default function InterviewDashboardPage() {
             }
           />
 
-          {clarification?.answers && Object.keys(clarification.answers).length > 0 ? (
+          {clarification?.answers &&
+          Object.keys(clarification.answers).length > 0 &&
+          !topicProfile ? (
             <PrepContextDisclosure
               questions={clarification.questions ?? []}
               answers={clarification.answers}
@@ -297,6 +356,15 @@ export default function InterviewDashboardPage() {
             </PrepContextDisclosure>
           ) : null}
 
+          {activeTab === 'questions' || activeTab === 'quiz' ? (
+            <PrepTopicFilter
+              topics={topicOptions}
+              value={safeTopicFilter}
+              onChange={setTopicFilter}
+              disabled={!isReady || topicOptions.length === 0}
+            />
+          ) : null}
+
           <PrepTabPanel tab={activeTab}>
             {activeTab === 'topics' ? (
               <PrepTopicsPanel
@@ -313,6 +381,8 @@ export default function InterviewDashboardPage() {
                 profileId={profileId}
                 profileReady={isReady}
                 profileStatus={profile.status}
+                topics={topicOptions}
+                topicFilter={safeTopicFilter}
               />
             ) : null}
             {activeTab === 'quiz' ? (
@@ -321,6 +391,8 @@ export default function InterviewDashboardPage() {
                 quizAttempts={quiz_attempts}
                 inProgressQuiz={in_progress_quiz}
                 isReady={isReady}
+                topics={topicOptions}
+                topicFilter={safeTopicFilter}
                 generating={quiz.isPending}
                 onNewQuiz={handleNewQuiz}
                 onResumeQuiz={() => void handleResumeQuiz()}

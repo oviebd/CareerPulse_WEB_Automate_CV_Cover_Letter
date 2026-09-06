@@ -17,12 +17,27 @@ const PROMPT_OPERATION: Record<string, string> = {
   interview_blueprint_v1: 'blueprint',
   interview_prep_v1: 'planning',
   interview_prep_questions_v1: 'prep_questions',
+  interview_prep_questions_v2: 'prep_questions',
+  interview_prep_questions_v3: 'prep_questions',
+  interview_prep_questions_v4: 'prep_questions',
+  interview_prep_questions_v5: 'prep_questions',
+  interview_topic_prep_questions_v2: 'prep_questions',
+  interview_topic_prep_questions_v3: 'prep_questions',
+  interview_topic_prep_questions_v4: 'prep_questions',
+  interview_topic_prep_questions_v5: 'prep_questions',
+  interview_topic_prep_questions_v6: 'prep_questions',
+  interview_topic_analyze_v1: 'analysis_topic',
   interview_quiz_v1: 'quiz',
+  interview_quiz_v2: 'quiz',
   interview_quiz_eval_v1: 'quiz_eval',
   interview_question_v1: 'mock_question',
   interview_eval_v1: 'mock_eval',
   interview_follow_up_v1: 'follow_up',
   interview_report_v1: 'report',
+  interview_prep_question_explain_v1: 'prep_question_explain',
+  interview_prep_question_explain_v2: 'prep_question_explain',
+  interview_prep_question_example_v1: 'prep_question_example',
+  interview_prep_question_reshape_v1: 'prep_question_reshape',
 };
 
 export async function runInterviewAi<T>(opts: {
@@ -35,7 +50,7 @@ export async function runInterviewAi<T>(opts: {
   sourceCvHash?: string;
   operation?: string;
   normalize: (raw: Record<string, unknown>) => T;
-}): Promise<{ data: T; metadata: AiMetadata }> {
+}): Promise<{ data: T; metadata: AiMetadata; inputTokens: number; outputTokens: number }> {
   const model = opts.model ?? CLAUDE_MODEL;
   const operation = opts.operation ?? PROMPT_OPERATION[opts.promptVersion] ?? 'unknown';
   let lastErr: unknown;
@@ -47,7 +62,7 @@ export async function runInterviewAi<T>(opts: {
           ? opts.user
           : `${opts.user}\n\nYour previous response was invalid JSON or missing required fields. Return ONLY valid JSON matching the schema exactly.`;
 
-      const { text } = await claudeComplete({
+      const { text, inputTokens, outputTokens } = await claudeComplete({
         system: opts.system,
         user: userContent,
         maxTokens: opts.maxTokens ?? 4096,
@@ -72,6 +87,8 @@ export async function runInterviewAi<T>(opts: {
           source_cv_hash: opts.sourceCvHash,
           generated_at: new Date().toISOString(),
         },
+        inputTokens,
+        outputTokens,
       };
     } catch (e) {
       lastErr = e;

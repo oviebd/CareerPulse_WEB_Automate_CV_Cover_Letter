@@ -5,7 +5,11 @@ export type InterviewErrorCode =
   | 'ANALYSIS_FAILED'
   | 'UPGRADE_REQUIRED'
   | 'SCHEMA_NOT_MIGRATED'
-  | 'PROFILE_NOT_READY';
+  | 'PROFILE_NOT_READY'
+  | 'TOPIC_CONFIG_INVALID'
+  | 'PROFILE_NOT_FOUND'
+  | 'TOPICS_REQUIRED'
+  | 'TOPIC_NOT_FOUND';
 
 export class InterviewError extends Error {
   code: InterviewErrorCode;
@@ -47,6 +51,15 @@ export function mapOrchestratorError(e: unknown): InterviewError {
       'PROFILE_NOT_READY',
       'Complete interview analysis before starting quizzes or mock interviews.'
     );
+  }
+  if (msg.includes('Generate preparation topics')) {
+    return new InterviewError(
+      'TOPICS_REQUIRED',
+      'Generate preparation topics before loading questions or quizzes.'
+    );
+  }
+  if (msg.includes('Topic not found')) {
+    return new InterviewError('TOPIC_NOT_FOUND', 'That topic is not part of this preparation plan.');
   }
   if (msg.includes('invalid_json_response') || msg.includes('JSON')) {
     return new InterviewError(

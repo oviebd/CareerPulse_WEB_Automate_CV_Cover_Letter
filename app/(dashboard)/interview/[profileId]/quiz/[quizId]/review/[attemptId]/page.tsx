@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, CheckCircle2, XCircle } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card } from '@/components/ui/card';
@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api-fetch';
 import { useGenerateQuiz } from '@/hooks/useInterview';
+import { parsePrepTopicParam, prepDashboardHref, quizHref, topicIdForApi } from '@/lib/interview/prep-topic-query';
 
 type ReviewPayload = {
   attempt: {
@@ -42,10 +43,12 @@ function formatAnswer(value: unknown) {
 export default function QuizReviewPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const profileId = typeof params.profileId === 'string' ? params.profileId : '';
   const quizId = typeof params.quizId === 'string' ? params.quizId : '';
   const attemptId = typeof params.attemptId === 'string' ? params.attemptId : '';
   const generateQuiz = useGenerateQuiz();
+  const topicFilter = parsePrepTopicParam(searchParams.get('topic'));
 
   const { data, isLoading } = useQuery({
     queryKey: ['interview-quiz-review', quizId, attemptId],
@@ -55,8 +58,11 @@ export default function QuizReviewPage() {
   });
 
   async function handleNewQuiz() {
-    const next = await generateQuiz.mutateAsync({ profile_id: profileId });
-    router.push(`/interview/${profileId}/quiz/${next.quiz.id}`);
+    const next = await generateQuiz.mutateAsync({
+      profile_id: profileId,
+      topic_id: topicIdForApi(topicFilter),
+    });
+    router.push(quizHref(profileId, next.quiz.id, topicFilter));
   }
 
   if (isLoading || !data) {
@@ -69,7 +75,7 @@ export default function QuizReviewPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <Link
-        href={`/interview/${profileId}?tab=quiz`}
+        href={prepDashboardHref(profileId, 'quiz', topicFilter)}
         className="inline-flex items-center gap-1 text-sm text-[var(--color-muted)] hover:text-[var(--color-primary)]"
       >
         <ArrowLeft className="h-4 w-4" /> Quiz
@@ -141,7 +147,7 @@ export default function QuizReviewPage() {
         <Button variant="primary" loading={generateQuiz.isPending} onClick={() => void handleNewQuiz()}>
           Take another quiz
         </Button>
-        <Link href={`/interview/${profileId}?tab=quiz`}>
+        <Link href={prepDashboardHref(profileId, 'quiz', topicFilter)}>
           <Button variant="secondary">Back to dashboard</Button>
         </Link>
       </div>

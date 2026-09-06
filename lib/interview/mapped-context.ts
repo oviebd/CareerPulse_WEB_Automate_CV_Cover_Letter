@@ -48,22 +48,30 @@ export function buildMappedContext(input: {
 }
 
 export function mappedContextPrompt(ctx: MappedInterviewContext): string {
-  return JSON.stringify(
-    {
-      brief: ctx.brief,
-      role: ctx.role,
-      seniority: ctx.seniority,
-      must_haves: ctx.job_must_haves,
-      responsibilities: ctx.job_responsibilities,
-      candidate_strengths: ctx.candidate_strengths,
-      candidate_experience: ctx.candidate_experience,
-      gaps: ctx.candidate_gaps,
-      competencies: ctx.competency_focus,
-      topics: ctx.topic_names,
-    },
-    null,
-    0
-  );
+  const payload: Record<string, unknown> = {
+    brief: ctx.brief,
+    role: ctx.role,
+    seniority: ctx.seniority,
+    must_haves: ctx.job_must_haves,
+    responsibilities: ctx.job_responsibilities,
+    candidate_strengths: ctx.candidate_strengths,
+    candidate_experience: ctx.candidate_experience,
+    gaps: ctx.candidate_gaps,
+    competencies: ctx.competency_focus,
+    topics: ctx.topic_names,
+  };
+  if (ctx.source === 'topic') {
+    payload.source = 'topic';
+    payload.purpose = ctx.purpose;
+    payload.difficulty = ctx.difficulty;
+    payload.current_level = ctx.current_level;
+    payload.goal_level = ctx.seniority;
+    payload.self_rated_skills = ctx.self_rated_skills;
+    if (ctx.notes?.trim()) {
+      payload.notes = ctx.notes.trim();
+    }
+  }
+  return JSON.stringify(payload, null, 0);
 }
 
 export function compactCompetencyList(

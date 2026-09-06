@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/auth/session';
 import { getInterviewRepo } from '@/lib/db/repositories/interview';
 import { err } from '@/lib/interview/api-auth';
+import { PREP_ANSWER_MAX_CHARS } from '@/lib/interview/prep-answer';
 
 export const runtime = 'nodejs';
 
@@ -16,6 +17,9 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     const body = (await request.json()) as { answer_text?: string };
     const answerText = body.answer_text?.trim();
     if (!answerText) return err('answer_text is required', 422);
+    if (answerText.length > PREP_ANSWER_MAX_CHARS) {
+      return err(`Answer must be ${PREP_ANSWER_MAX_CHARS} characters or fewer`, 422);
+    }
 
     const updated = await getInterviewRepo().updatePrepQuestionAnswer(user.id, id, answerText);
     return NextResponse.json(updated);

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { MessageSquare, Plus } from 'lucide-react';
+import { BookOpen, Briefcase, MessageSquare, Plus } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -16,11 +16,13 @@ import { DeleteInterviewProfileButton } from '@/components/interview/DeleteInter
 import { useInterviewDashboard, useStartInterview } from '@/hooks/useInterview';
 import { useSubscription } from '@/hooks/useSubscription';
 import { ApiError } from '@/lib/api-fetch';
+import { AiWorkingOverlay } from '@/components/shared/AiWorkingOverlay';
+import { isTopicPrepProfile } from '@/lib/interview/topic-config';
 import {
   jobStatusToColumn,
   KANBAN_COLUMN_CONFIG,
 } from '@/lib/job-status-ui';
-import type { EligibleInterviewJob } from '@/types/interview';
+import type { EligibleInterviewJob, InterviewProfile } from '@/types/interview';
 import type { JobStatus } from '@/types/database';
 
 function interviewErrorMessage(e: unknown): string {
@@ -39,6 +41,13 @@ function ProfileStatusChip({ status }: { status: string }) {
   if (status === 'failed') return <Badge variant="danger">Failed</Badge>;
   if (status === 'needs_clarification') return <Badge variant="info">Setup needed</Badge>;
   return <Badge variant="default">{status}</Badge>;
+}
+
+function PrepSourceBadge({ profile }: { profile: InterviewProfile }) {
+  if (isTopicPrepProfile(profile)) {
+    return <Badge variant="default">Topic</Badge>;
+  }
+  return <Badge variant="default">Job</Badge>;
 }
 
 function JobStatusBadge({ status }: { status: JobStatus }) {
@@ -96,26 +105,58 @@ export default function InterviewListPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <PageHeader
-          title="Interview Preparation"
-          subtitle="Prepare for interviews from your tracked applications or add a new role"
-        />
-        {limits.interviewPrep ? (
+      <AiWorkingOverlay
+        open={start.isPending}
+        title="Finding topics to practice"
+        messages={[
+          'Reading the job and your CV…',
+          'AI is building your prep topic list…',
+          'Organizing focus areas for you…',
+        ]}
+      />
+      <PageHeader
+        title="Interview Preparation"
+        subtitle="Prepare for a specific job or build skills by topic"
+      />
+
+      {limits.interviewPrep ? (
+        <section className="grid gap-3 sm:grid-cols-2">
           <Link href="/interview/new">
-            <Button variant="primary" size="sm">
-              <Plus className="mr-1.5 h-4 w-4" />
-              Start new preparation
-            </Button>
+            <Card hoverable className="flex h-full flex-col gap-3 p-5">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--color-primary-100)]">
+                <Briefcase className="h-5 w-5 text-[var(--color-primary)]" />
+              </div>
+              <div>
+                <p className="font-semibold text-[var(--color-text-primary)]">Prepare for a job</p>
+                <p className="mt-1 text-sm text-[var(--color-muted)]">
+                  Match your CV to a role and get tailored interview prep
+                </p>
+              </div>
+            </Card>
           </Link>
-        ) : (
+          <Link href="/interview/new/topic">
+            <Card hoverable className="flex h-full flex-col gap-3 p-5">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--color-primary-100)]">
+                <BookOpen className="h-5 w-5 text-[var(--color-primary)]" />
+              </div>
+              <div>
+                <p className="font-semibold text-[var(--color-text-primary)]">Prepare by topic</p>
+                <p className="mt-1 text-sm text-[var(--color-muted)]">
+                  Choose topics and goals — no CV or job application needed
+                </p>
+              </div>
+            </Card>
+          </Link>
+        </section>
+      ) : (
+        <Card className="p-4 text-center">
           <Link href="/settings/billing">
             <Button variant="secondary" size="sm">
               Upgrade for interview prep
             </Button>
           </Link>
-        )}
-      </div>
+        </Card>
+      )}
 
       {isLoading ? (
         <Skeleton className="h-32 rounded-xl" />
@@ -133,12 +174,13 @@ export default function InterviewListPage() {
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <p className="font-semibold text-[var(--color-text-primary)]">
-                            {p.job_title ?? 'Role'}
+                            {p.job_title ?? 'Preparation'}
                           </p>
+                          <PrepSourceBadge profile={p} />
                           <ProfileStatusChip status={p.status} />
                         </div>
                         <p className="text-sm text-[var(--color-muted)]">
-                          {p.company_name ?? 'Company'}
+                          {p.company_name ?? (isTopicPrepProfile(p) ? 'Topic-based' : 'Company')}
                         </p>
                         {typeof p.readiness_score === 'number' ? (
                           <Progress value={p.readiness_score} className="mt-2 h-1.5" />
@@ -187,10 +229,10 @@ export default function InterviewListPage() {
                     <Button
                       size="sm"
                       variant="primary"
-            loading={start.isPending}
-            onClick={() => void handlePrepare(job)}
-          >
-            {start.isPending ? 'Building plan…' : 'Prepare'}
+                      loading={start.isPending}
+                      onClick={() => void handlePrepare(job)}
+                    >
+                      {start.isPending ? 'Finding topics…' : 'Prepare'}
                     </Button>
                   ) : null}
                 </Card>
@@ -205,12 +247,20 @@ export default function InterviewListPage() {
                 No interview preparations yet
               </p>
               <p className="mt-1 text-sm text-[var(--color-muted)]">
-                Start by adding job details and your CV—we&apos;ll build a personalized prep plan.
+                Start with a job from your applications or prepare by topic above.
               </p>
               {limits.interviewPrep ? (
-                <Link href="/interview/new" className="mt-4 inline-block">
-                  <Button variant="primary">Start new preparation</Button>
-                </Link>
+                <div className="mt-4 flex flex-wrap justify-center gap-2">
+                  <Link href="/interview/new">
+                    <Button variant="primary">
+                      <Plus className="mr-1.5 h-4 w-4" />
+                      Job preparation
+                    </Button>
+                  </Link>
+                  <Link href="/interview/new/topic">
+                    <Button variant="secondary">Topic preparation</Button>
+                  </Link>
+                </div>
               ) : (
                 <Link
                   href="/settings/billing"

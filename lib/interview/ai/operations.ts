@@ -13,6 +13,9 @@ import {
   normalizePreparationPlan,
   normalizePrepQuestionBatch,
   normalizeQuizOutput,
+  normalizeExampleAnswer,
+  normalizeExplanation,
+  normalizeReshapedAnswer,
 } from '@/lib/interview/validators';
 
 export const PROMPT_V = {
@@ -23,8 +26,11 @@ export const PROMPT_V = {
   BLUEPRINT: 'interview_blueprint_v1',
   CLARIFY: 'interview_clarify_v1',
   PREP: 'interview_prep_v1',
-  PREP_QUESTIONS: 'interview_prep_questions_v1',
-  QUIZ: 'interview_quiz_v1',
+  PREP_QUESTIONS: 'interview_prep_questions_v5',
+  PREP_QUESTION_EXPLAIN: 'interview_prep_question_explain_v2',
+  PREP_QUESTION_EXAMPLE: 'interview_prep_question_example_v1',
+  PREP_QUESTION_RESHAPE: 'interview_prep_question_reshape_v1',
+  QUIZ: 'interview_quiz_v2',
   QUIZ_EVAL: 'interview_quiz_eval_v1',
   QUESTION: 'interview_question_v1',
   EVAL: 'interview_eval_v1',
@@ -33,8 +39,12 @@ export const PROMPT_V = {
 } as const;
 
 const BASE_RULES = `You are an expert interview coach. Infer profession, role, seniority, and interview strategy dynamically from the job and candidate context.
-Do NOT assume software engineering unless the job indicates it. Return ONLY valid JSON. No markdown.
+Do NOT assume software engineering unless the job indicates it. Return ONLY valid JSON. No markdown fences around the JSON itself.
 Do not claim guaranteed interview questions or hiring probability. Frame as interview preparation only.`;
+
+const PREP_MARKDOWN_RULE = `Format answer_text, evidence_from_cv, and explanation fields as Markdown (not HTML): start with a brief opening line, then use 3–6 bullet points (- item) when helpful, **bold** for emphasis, inline \`code\`, and a brief fenced \`\`\`language block only if the question requires it. Do not write guidelines, headings, or study tips in answer_text.`;
+
+const PREP_ANSWER_LENGTH_RULE = `Aim for 800–1000 characters. Never exceed 1500 characters.`;
 
 export function buildCvSummary(cv: Record<string, unknown>): string {
   const skills = Array.isArray(cv.skills)
@@ -326,8 +336,13 @@ export async function generateQuiz(
   topicNames: string,
   difficulty: string,
   count: number,
-  hashes: { job?: string; cv?: string }
+  hashes: { job?: string; cv?: string },
+  focusTopic?: string | null
 ) {
+  const scopeRule = focusTopic
+    ? `- ALL questions must be about this topic only: ${focusTopic}. Title must mention this topic.`
+    : `- Cover a mix of these topics: ${topicNames}. Title should indicate an all-topics quiz.`;
+
   return runInterviewAi({
     system: BASE_RULES,
     user: `Generate ${count} objective quiz questions for interview preparation. Return JSON only:
@@ -341,9 +356,10 @@ Rules:
 - scenario: workplace situation with decision options; correct_answer is one option string
 - Every question MUST include correct_answer and explanation
 - Do NOT use short_answer or open-ended questions
+${scopeRule}
 
 MAPPED CONTEXT: ${mappedContext}
-TOPICS: ${topicNames}
+TOPICS: ${focusTopic || topicNames}
 COMPETENCIES: ${competencies}
 DIFFICULTY: ${difficulty}`,
     promptVersion: PROMPT_V.QUIZ,
@@ -360,6 +376,8 @@ export async function generatePrepQuestionBatch(
     interviewStage: string | null;
     existingQuestions: string[];
     count: number;
+    topicNames: string[];
+    focusTopic?: string | null;
   },
   hashes: { job?: string; cv?: string }
 ) {
@@ -368,29 +386,41 @@ export async function generatePrepQuestionBatch(
       ? `\nALREADY GENERATED (do NOT repeat or rephrase these):\n${ctx.existingQuestions.map((q, i) => `${i + 1}. ${q}`).join('\n')}`
       : '';
 
+  const topicList = ctx.topicNames.join(', ');
+  const scopeRule = ctx.focusTopic
+    ? `- ALL questions must be about this topic only: ${ctx.focusTopic}. Set topic_name to exactly "${ctx.focusTopic}".`
+    : `- Cover these topics: ${topicList}. Each question MUST include topic_name matching one of those labels.`;
+
   return runInterviewAi({
     system: `${BASE_RULES}
-For prep study Q&A: suggested answers must ONLY use facts from the mapped candidate context. Never invent employers, dates, metrics, tools, projects, or outcomes.
+For prep study Q&A: answers must ONLY use facts from the mapped candidate context. Never invent employers, dates, metrics, tools, projects, or outcomes.
 If the candidate has no relevant evidence for a question, set relevance to "irrelevant" and answer_text to a short honest message like "Irrelevant experience — no matching evidence in your CV for this question." Do NOT write a fabricated STAR story.`,
     user: `Generate exactly ${ctx.count} likely interview questions an interviewer might ask for THIS job, seniority, and stage.
 Return JSON:
-{"questions":[{"question":"","type":"","competency_id":"","difficulty":"","answer_text":"","relevance":"supported|irrelevant","evidence_from_cv":"","why_selected":""}]}
+{"questions":[{"question":"","type":"","competency_id":"","difficulty":"","answer_text":"","relevance":"supported|irrelevant","evidence_from_cv":"","why_selected":"","topic_name":""}]}
 
 Rules:
 - Questions must be realistic for the role and interview stage — not generic trivia.
 - Prefer overlap between job requirements and candidate experience; include high-likelihood gap questions where evidence is weak.
-- For relevance "supported": answer_text must cite only real facts from mapped context in evidence_from_cv.
+- answer_text is the ANSWER the candidate can use — a complete first-person response using ONLY real facts from mapped context.
+- Do NOT write a coaching guideline, structure tips, or "how to answer" notes. No separate sample.
+- ${PREP_ANSWER_LENGTH_RULE}
+- ${PREP_MARKDOWN_RULE}
+- For relevance "supported": evidence_from_cv must cite only real facts from mapped context.
 - For relevance "irrelevant": answer_text must NOT fabricate experience.
 - why_selected: one sentence on why this question is likely.
 - Vary question types (behavioral, technical, situational, role-specific) as appropriate for the profession.
+${scopeRule}
 ${exclude}
 
 SENIORITY: ${ctx.seniority}
 INTERVIEW STAGE: ${ctx.interviewStage ?? 'general'}
+FOCUS TOPIC: ${ctx.focusTopic ?? 'any of the listed topics'}
+AVAILABLE TOPICS: ${topicList}
 MAPPED CONTEXT:
 ${ctx.mappedContext}`,
     promptVersion: PROMPT_V.PREP_QUESTIONS,
-    maxTokens: 4096,
+    maxTokens: 8192,
     sourceJobHash: hashes.job,
     sourceCvHash: hashes.cv,
     normalize: normalizePrepQuestionBatch,
@@ -527,5 +557,124 @@ MASTERY: ${ctx.masterySummary}`,
     sourceJobHash: hashes.job,
     sourceCvHash: hashes.cv,
     normalize: normalizeFinalReport,
+  });
+}
+
+export async function generatePrepQuestionExample(ctx: {
+  question: string;
+  answer: string;
+  evidence?: string | null;
+  relevance: string;
+  mappedContext: string;
+  isTopic: boolean;
+}) {
+  const grounding = ctx.isTopic
+    ? 'Do NOT invent personal work history. Write a realistic sample at the target level using only the mapped topic context.'
+    : 'Use ONLY facts from the mapped candidate context. Never invent employers, dates, metrics, tools, projects, or outcomes.';
+  const irrelevantRule =
+    ctx.relevance === 'irrelevant'
+      ? 'Relevance is irrelevant: return a short honest note, not a fabricated sample.'
+      : `Write a complete first-person answer. ${PREP_ANSWER_LENGTH_RULE}`;
+
+  return runInterviewAi({
+    system: `${BASE_RULES}
+${grounding}`,
+    user: `Write one example answer for this interview prep question.
+Return JSON: {"example_answer":""}
+
+${irrelevantRule}
+Do not write a guideline. Use light Markdown only if needed.
+
+QUESTION: ${ctx.question}
+EXISTING ANSWER: ${ctx.answer}
+EVIDENCE: ${ctx.evidence ?? ''}
+MAPPED CONTEXT:
+${ctx.mappedContext}`,
+    promptVersion: PROMPT_V.PREP_QUESTION_EXAMPLE,
+    maxTokens: 1024,
+    normalize: normalizeExampleAnswer,
+  });
+}
+
+export async function explainPrepQuestion(ctx: {
+  question: string;
+  answer: string;
+  evidence?: string | null;
+  mappedContext: string;
+  history: Array<{ role: 'user' | 'assistant'; content: string }>;
+  message?: string;
+}) {
+  const historyBlock =
+    ctx.history.length > 0
+      ? `\nPRIOR TURNS:\n${ctx.history.map((t) => `${t.role.toUpperCase()}: ${t.content}`).join('\n')}`
+      : '';
+  const userAsk = ctx.message?.trim()
+    ? `\nUSER FOLLOW-UP: ${ctx.message.trim()}`
+    : '\nNo follow-up yet. Explain the question itself.';
+
+  return runInterviewAi({
+    system: `${BASE_RULES}
+You are coaching a candidate. Explain what the interviewer is probing and how to think about the answer.
+Do not invent CV facts. Do not repeat the full answer verbatim. Keep explanations practical and concise.
+${PREP_MARKDOWN_RULE}`,
+    user: `Explain this interview prep question.
+Return JSON: {"explanation":""}
+
+QUESTION: ${ctx.question}
+ANSWER: ${ctx.answer}
+EVIDENCE: ${ctx.evidence ?? ''}
+MAPPED CONTEXT:
+${ctx.mappedContext}
+${historyBlock}
+${userAsk}`,
+    promptVersion: PROMPT_V.PREP_QUESTION_EXPLAIN,
+    maxTokens: 1024,
+    normalize: normalizeExplanation,
+  });
+}
+
+const RESHAPE_TONE_GUIDE: Record<string, string> = {
+  professional: 'Polished, formal, and interview-ready. Clear structure without slang.',
+  easy: 'Simple, accessible language. Explain clearly as if speaking to a non-expert.',
+  confident: 'Assertive and ownership-focused. Strong verbs and decisive phrasing.',
+  concise: 'Short and punchy. Cut filler; keep only the strongest points.',
+};
+
+export async function reshapePrepQuestion(ctx: {
+  question: string;
+  draft: string;
+  tone: string;
+  targetChars: number;
+  mappedContext: string;
+  isTopic: boolean;
+  evidence?: string | null;
+}) {
+  const grounding = ctx.isTopic
+    ? 'Do NOT invent personal work history. Reshape using only the user draft and mapped topic context.'
+    : 'Use ONLY facts from the user draft and mapped candidate context. Never invent employers, dates, metrics, tools, projects, or outcomes.';
+  const toneGuide = RESHAPE_TONE_GUIDE[ctx.tone] ?? RESHAPE_TONE_GUIDE.professional;
+
+  return runInterviewAi({
+    system: `${BASE_RULES}
+${grounding}
+You reshape a candidate's rough answer into a polished interview response.`,
+    user: `Reshape the user's draft into a stronger interview answer.
+Return JSON: {"answer_text":""}
+
+Rules:
+- Preserve the user's core facts and intent. Do not invent new experience.
+- Tone: ${ctx.tone} — ${toneGuide}
+- Target length: about ${ctx.targetChars} characters. Never exceed 1500 characters.
+- ${PREP_MARKDOWN_RULE}
+- Do NOT write coaching guidelines, structure tips, or "how to answer" notes.
+
+QUESTION: ${ctx.question}
+USER DRAFT: ${ctx.draft}
+EVIDENCE: ${ctx.evidence ?? ''}
+MAPPED CONTEXT:
+${ctx.mappedContext}`,
+    promptVersion: PROMPT_V.PREP_QUESTION_RESHAPE,
+    maxTokens: 2048,
+    normalize: normalizeReshapedAnswer,
   });
 }

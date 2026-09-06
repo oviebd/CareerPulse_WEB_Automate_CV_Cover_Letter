@@ -39,7 +39,11 @@ const JOB_CONTEXT_MIN = 80;
 async function listEligibleJobs(userId: string) {
   const allJobs = await getJobsRepo().listByUser(userId);
   const profiles = await listProfiles(userId);
-  const profileJobIds = new Set(profiles.map((p) => p.job_id as string));
+  const profileJobIds = new Set(
+    profiles
+      .map((p) => p.job_id as string | null)
+      .filter((id): id is string => Boolean(id))
+  );
   const cvs = await getCvsRepo().listByUser(userId);
 
   return allJobs
@@ -377,6 +381,7 @@ async function getQuizAttemptById(userId: string, quizId: string, attemptId: str
     ...(toSnake(row.attempt) as Record<string, unknown>),
     quiz_id: row.quiz.id,
     quiz_title: row.quiz.title,
+    quiz_topic_id: row.quiz.topicId ?? null,
   };
 }
 
@@ -442,10 +447,18 @@ async function updateQuizAttempt(userId: string, attemptId: string, patch: Row) 
 async function listQuizAttemptsForProfile(userId: string, profileId: string) {
   const db = getDb();
   const rows = await db
-    .select({ attempt: interviewQuizAttempts, quiz: interviewQuizzes })
+    .select({
+      attempt: interviewQuizAttempts,
+      quiz: interviewQuizzes,
+      topicName: interviewPreparationTopics.name,
+    })
     .from(interviewQuizAttempts)
     .innerJoin(interviewQuizzes, eq(interviewQuizAttempts.quizId, interviewQuizzes.id))
     .innerJoin(interviewProfiles, eq(interviewQuizzes.interviewProfileId, interviewProfiles.id))
+    .leftJoin(
+      interviewPreparationTopics,
+      eq(interviewQuizzes.topicId, interviewPreparationTopics.id)
+    )
     .where(
       and(eq(interviewProfiles.userId, userId), eq(interviewQuizzes.interviewProfileId, profileId))
     )
@@ -454,16 +467,26 @@ async function listQuizAttemptsForProfile(userId: string, profileId: string) {
     ...(toSnake(r.attempt) as Record<string, unknown>),
     quiz_id: r.quiz.id,
     quiz_title: r.quiz.title,
+    quiz_topic_id: r.quiz.topicId ?? null,
+    quiz_topic_name: r.topicName ?? null,
   }));
 }
 
 async function getInProgressQuizForProfile(userId: string, profileId: string) {
   const db = getDb();
   const [row] = await db
-    .select({ attempt: interviewQuizAttempts, quiz: interviewQuizzes })
+    .select({
+      attempt: interviewQuizAttempts,
+      quiz: interviewQuizzes,
+      topicName: interviewPreparationTopics.name,
+    })
     .from(interviewQuizAttempts)
     .innerJoin(interviewQuizzes, eq(interviewQuizAttempts.quizId, interviewQuizzes.id))
     .innerJoin(interviewProfiles, eq(interviewQuizzes.interviewProfileId, interviewProfiles.id))
+    .leftJoin(
+      interviewPreparationTopics,
+      eq(interviewQuizzes.topicId, interviewPreparationTopics.id)
+    )
     .where(
       and(
         eq(interviewProfiles.userId, userId),
@@ -478,6 +501,8 @@ async function getInProgressQuizForProfile(userId: string, profileId: string) {
     ...(toSnake(row.attempt) as Record<string, unknown>),
     quiz_id: row.quiz.id,
     quiz_title: row.quiz.title,
+    quiz_topic_id: row.quiz.topicId ?? null,
+    quiz_topic_name: row.topicName ?? null,
   };
 }
 
@@ -686,19 +711,39 @@ async function listMastery(profileId: string): Promise<Record<string, unknown>[]
 async function listPrepQuestions(profileId: string): Promise<Record<string, unknown>[]> {
   const db = getDb();
   const rows = await db
-    .select()
+    .select({
+      question: interviewPrepQuestions,
+      topicName: interviewPreparationTopics.name,
+    })
     .from(interviewPrepQuestions)
+    .leftJoin(
+      interviewPreparationTopics,
+      eq(interviewPrepQuestions.topicId, interviewPreparationTopics.id)
+    )
     .where(eq(interviewPrepQuestions.interviewProfileId, profileId))
     .orderBy(interviewPrepQuestions.sequence);
-  return rows.map((r) => toSnake(r));
+  return rows.map((r) => ({
+    ...toSnake(r.question),
+    topic_name: r.topicName ?? null,
+  }));
 }
 
-async function listPrepQuestionTexts(profileId: string): Promise<string[]> {
+async function listPrepQuestionTexts(
+  profileId: string,
+  topicId?: string | null
+): Promise<string[]> {
   const db = getDb();
   const rows = await db
     .select({ questionText: interviewPrepQuestions.questionText })
     .from(interviewPrepQuestions)
-    .where(eq(interviewPrepQuestions.interviewProfileId, profileId))
+    .where(
+      topicId
+        ? and(
+            eq(interviewPrepQuestions.interviewProfileId, profileId),
+            eq(interviewPrepQuestions.topicId, topicId)
+          )
+        : eq(interviewPrepQuestions.interviewProfileId, profileId)
+    )
     .orderBy(interviewPrepQuestions.sequence);
   return rows.map((r) => r.questionText);
 }
@@ -726,6 +771,7 @@ async function getNextPrepSequence(profileId: string): Promise<number> {
 }
 
 async function insertPrepQuestions(profileId: string, rows: Row[]): Promise<Record<string, unknown>[]> {
+  if (!rows.length) return [];
   const db = getDb();
   const values = rows.map((row) => {
     const m = fromSnake(row);
@@ -765,6 +811,22 @@ async function updatePrepQuestionAnswer(
   const [updated] = await db
     .update(interviewPrepQuestions)
     .set({ answerText, answerSource: 'user' })
+    .where(eq(interviewPrepQuestions.id, questionId))
+    .returning();
+  return toSnake(updated);
+}
+
+async function updatePrepQuestionExample(
+  userId: string,
+  questionId: string,
+  exampleAnswer: string
+) {
+  const existing = await getPrepQuestionById(userId, questionId);
+  if (!existing) throw new Error('Prep question not found');
+  const db = getDb();
+  const [updated] = await db
+    .update(interviewPrepQuestions)
+    .set({ exampleAnswer })
     .where(eq(interviewPrepQuestions.id, questionId))
     .returning();
   return toSnake(updated);
@@ -823,5 +885,6 @@ export function getInterviewRepo() {
     insertPrepQuestions,
     getPrepQuestionById,
     updatePrepQuestionAnswer,
+    updatePrepQuestionExample,
   };
 }

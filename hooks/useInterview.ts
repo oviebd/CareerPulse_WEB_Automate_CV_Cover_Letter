@@ -27,6 +27,14 @@ export type StartInterviewBody =
       interview_date?: string;
       interview_stage?: string;
       extra_context?: string;
+    }
+  | {
+      source: 'topic';
+      topic: string;
+      current_level: string;
+      goal_level: string;
+      purpose: string;
+      notes?: string;
     };
 
 export function useInterviewDashboard() {
@@ -94,9 +102,24 @@ export function useStartInterview() {
       }),
     onSuccess: (_d, body) => {
       void qc.invalidateQueries({ queryKey: ['interview-profiles'] });
-      if ('job_id' in body) {
+      if ('job_id' in body || ('source' in body && body.source === 'topic')) {
         void qc.invalidateQueries({ queryKey: ['interview-profile'] });
       }
+    },
+  });
+}
+
+export function useRetryInterview(profileId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      apiFetch<{ profile: InterviewProfile; status: string }>(
+        `/api/interview/profiles/${profileId}/retry`,
+        { method: 'POST' }
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['interview-profiles'] });
+      void qc.invalidateQueries({ queryKey: ['interview-profile', profileId] });
     },
   });
 }
@@ -332,10 +355,13 @@ export function usePrepQuestions(profileId: string) {
 export function useGeneratePrepQuestions(profileId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () =>
+    mutationFn: (body?: { topic_id?: string | null }) =>
       apiFetch<{ questions: Record<string, unknown>[]; batch_number: number }>(
         `/api/interview/profiles/${profileId}/prep-questions`,
-        { method: 'POST' }
+        {
+          method: 'POST',
+          body: JSON.stringify({ topic_id: body?.topic_id ?? null }),
+        }
       ),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['interview-prep-questions', profileId] });
@@ -354,5 +380,65 @@ export function useUpdatePrepQuestionAnswer(profileId: string) {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['interview-prep-questions', profileId] });
     },
+  });
+}
+
+export type PrepExplainResult = {
+  explanation: string;
+  input_tokens: number;
+  output_tokens: number;
+};
+
+export function useExplainPrepQuestion() {
+  return useMutation({
+    mutationFn: (body: {
+      questionId: string;
+      message?: string;
+      history: Array<{ role: 'user' | 'assistant'; content: string }>;
+    }) =>
+      apiFetch<PrepExplainResult>(`/api/interview/prep-questions/${body.questionId}/explain`, {
+        method: 'POST',
+        body: JSON.stringify({ message: body.message, history: body.history }),
+      }),
+  });
+}
+
+export function useGeneratePrepQuestionExample(profileId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (questionId: string) =>
+      apiFetch<{
+        question: Record<string, unknown>;
+        input_tokens: number;
+        output_tokens: number;
+      }>(`/api/interview/prep-questions/${questionId}/example`, { method: 'POST' }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['interview-prep-questions', profileId] });
+    },
+  });
+}
+
+export type PrepReshapeResult = {
+  answer_text: string;
+  input_tokens: number;
+  output_tokens: number;
+};
+
+export function useReshapePrepQuestion() {
+  return useMutation({
+    mutationFn: (body: {
+      questionId: string;
+      draft: string;
+      tone: string;
+      target_chars: number;
+    }) =>
+      apiFetch<PrepReshapeResult>(`/api/interview/prep-questions/${body.questionId}/reshape`, {
+        method: 'POST',
+        body: JSON.stringify({
+          draft: body.draft,
+          tone: body.tone,
+          target_chars: body.target_chars,
+        }),
+      }),
   });
 }

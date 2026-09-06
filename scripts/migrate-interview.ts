@@ -38,6 +38,9 @@ async function main() {
     join(process.cwd(), 'db/migrations/029_interview_preparation.sql'),
     join(process.cwd(), 'db/migrations/030_interview_prep_questions.sql'),
     join(process.cwd(), 'db/migrations/031_interview_mapped_context_and_ai_usage.sql'),
+    join(process.cwd(), 'db/migrations/032_interview_topic_prep.sql'),
+    join(process.cwd(), 'db/migrations/033_prep_question_topic.sql'),
+    join(process.cwd(), 'db/migrations/034_prep_question_example.sql'),
   ];
   const db = postgres(url, { max: 1 });
 

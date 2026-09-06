@@ -2,14 +2,16 @@ import { NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/auth/session';
 import { withInterviewAiRoute } from '@/lib/ai/with-user-route';
 import { requireInterviewAccess, err } from '@/lib/interview/api-auth';
-import { runQuizGeneration } from '@/lib/interview/orchestrator';
+import { runGeneratePrepQuestionExample } from '@/lib/interview/orchestrator';
 import { mapOrchestratorError } from '@/lib/interview/errors';
 import { interviewErrorResponse } from '@/lib/interview/api-errors';
 
 export const runtime = 'nodejs';
-export const maxDuration = 120;
+export const maxDuration = 60;
 
-export async function POST(request: Request) {
+type RouteContext = { params: Promise<{ id: string }> };
+
+export async function POST(_request: Request, { params }: RouteContext) {
   try {
     const user = await getSessionUser();
     if (!user) return err('Unauthorized', 401);
@@ -17,25 +19,16 @@ export async function POST(request: Request) {
     const denied = await requireInterviewAccess(user.id);
     if (denied) return denied;
 
-    const body = (await request.json()) as {
-      profile_id?: string;
-      topic_id?: string;
-      difficulty?: string;
-      count?: number;
-    };
-    const profileId = body.profile_id?.trim();
-    if (!profileId) return err('profile_id is required', 422);
-
-    const result = await withInterviewAiRoute(user.id, profileId, () =>
-      runQuizGeneration(user.id, profileId, {
-        topicId: body.topic_id?.trim() || undefined,
-        difficulty: body.difficulty,
-        count: body.count,
-      })
+    const { id } = await params;
+    const result = await withInterviewAiRoute(user.id, undefined, () =>
+      runGeneratePrepQuestionExample(user.id, id)
     );
     return NextResponse.json(result);
   } catch (e) {
-    console.error('interview/quizzes POST', e);
+    console.error('interview/prep-questions/[id]/example POST', e);
+    if (e instanceof Error && e.message === 'Prep question not found') {
+      return err('Not found', 404);
+    }
     const mapped = mapOrchestratorError(e);
     return interviewErrorResponse(mapped);
   }

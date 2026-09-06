@@ -119,6 +119,22 @@
   --radius-md: 8px;
   --radius-lg: 12px;
   --radius-xl: 16px;
+
+  /* Rich code blocks & inline chips */
+  --code-bg: var(--color-preview-well);
+  --code-toolbar-bg: var(--bg-elevated);
+  --code-gutter: var(--text-muted);
+  --code-gutter-border: var(--color-border);
+  --code-plain: var(--text-primary);
+  --code-keyword: var(--color-primary-700);
+  --code-function: var(--color-accent);
+  --code-string: var(--color-warning);
+  --code-number: var(--color-danger);
+  --code-type: var(--color-info);
+  --code-comment: var(--text-muted);
+  --code-operator: var(--color-primary-600);
+  --code-inline-bg: var(--color-surface-2);
+  --code-inline-border: var(--color-border);
 }
 
 /* --- Dark: deep navy-slate with a subtle azure glow --- */
@@ -224,6 +240,22 @@
     0 4px 14px rgba(0, 0, 0, 0.45);
   --shadow-nav-active-glow: inset 0 0 0 1px color-mix(in srgb, var(--brand) 30%, transparent),
     0 0 20px color-mix(in srgb, var(--brand) 12%, transparent);
+
+  /* Rich code blocks & inline chips */
+  --code-bg: var(--color-surface-3);
+  --code-toolbar-bg: var(--color-surface-2);
+  --code-gutter: var(--text-muted);
+  --code-gutter-border: var(--color-border);
+  --code-plain: var(--text-primary);
+  --code-keyword: var(--color-accent-mint);
+  --code-function: var(--accent-cyan);
+  --code-string: var(--color-accent-gold);
+  --code-number: var(--color-accent-coral);
+  --code-type: var(--color-primary-300);
+  --code-comment: var(--text-muted);
+  --code-operator: var(--color-accent);
+  --code-inline-bg: var(--color-surface-2);
+  --code-inline-border: var(--color-border);
 }
 
 @layer base {
@@ -325,6 +357,55 @@
   .btn-primary-themed {
     box-shadow: var(--shadow-primary-btn);
   }
+}
+
+/* Rich code editor — outside @layer so Tailwind cannot purge token classes */
+.rich-code-editor {
+  background: var(--code-bg);
+  color: var(--code-plain);
+}
+
+.rich-code-editor-toolbar {
+  background: var(--code-toolbar-bg);
+}
+
+.rich-code-editor-gutter {
+  color: var(--code-gutter);
+  border-right: 1px solid var(--code-gutter-border);
+}
+
+.rich-code-token-plain {
+  color: var(--code-plain);
+}
+
+.rich-code-token-keyword {
+  color: var(--code-keyword);
+}
+
+.rich-code-token-function {
+  color: var(--code-function);
+}
+
+.rich-code-token-string {
+  color: var(--code-string);
+}
+
+.rich-code-token-comment {
+  color: var(--code-comment);
+  font-style: italic;
+}
+
+.rich-code-token-number {
+  color: var(--code-number);
+}
+
+.rich-code-token-type {
+  color: var(--code-type);
+}
+
+.rich-code-token-operator,
+.rich-code-token-punctuation {
+  color: var(--code-operator);
 }
 
 @keyframes shimmer {

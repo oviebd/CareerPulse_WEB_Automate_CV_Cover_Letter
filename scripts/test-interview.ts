@@ -9,7 +9,17 @@ import {
   normalizePreparationPlan,
   normalizeQuizOutput,
   normalizeQuizQuestion,
+  normalizePrepQuestion,
+  normalizeExplanation,
+  normalizeTopicPrepQuestion,
 } from '../lib/interview/validators';
+import {
+  PREP_ANSWER_MAX_CHARS,
+  clampPrepAnswer,
+  displayPrepAnswer,
+} from '../lib/interview/prep-answer';
+import { parseRichTextBlocks } from '../lib/rich-text/parse-blocks';
+import { highlightCodeLine } from '../lib/rich-text/highlight-code';
 import { calculateReadiness } from '../lib/interview/readiness';
 import { evaluateQuizAnswerLocal } from '../lib/interview/quiz-eval';
 import { updateMasteryScore } from '../lib/interview/mastery';
@@ -65,6 +75,141 @@ describe('interview validators', () => {
       ],
     });
     assert.equal(quiz.questions[0].type, 'single_choice');
+  });
+
+  it('normalizes prep questions as concise answers', () => {
+    const q = normalizePrepQuestion({
+      question: 'Tell me about a project.',
+      type: 'behavioral',
+      answer_text: 'I led the checkout rewrite at Acme and cut latency by 40%.',
+      evidence_from_cv: 'Led checkout rewrite at Acme',
+      relevance: 'supported',
+    });
+    assert.equal(q.answer_text, 'I led the checkout rewrite at Acme and cut latency by 40%.');
+  });
+
+  it('clamps prep answers to 1500 characters', () => {
+    const long = 'A'.repeat(PREP_ANSWER_MAX_CHARS + 80);
+    const q = normalizePrepQuestion({
+      question: 'How do you prioritize?',
+      type: 'behavioral',
+      answer_text: long,
+      evidence_from_cv: 'Prioritized roadmap at Acme',
+      relevance: 'supported',
+    });
+    assert.equal(q.answer_text.length, PREP_ANSWER_MAX_CHARS);
+    assert.equal(clampPrepAnswer(long).length, PREP_ANSWER_MAX_CHARS);
+  });
+
+  it('prefers a stored sample for legacy guideline rows', () => {
+    assert.equal(
+      displayPrepAnswer({
+        answer_text: 'Use STAR and mention impact.',
+        example_answer: 'I led the checkout rewrite at Acme.',
+        answer_source: 'ai',
+      }),
+      'I led the checkout rewrite at Acme.'
+    );
+    assert.equal(
+      displayPrepAnswer({
+        answer_text: 'I edited this answer.',
+        example_answer: 'I led the checkout rewrite at Acme.',
+        answer_source: 'user',
+      }),
+      'I edited this answer.'
+    );
+  });
+
+  it('normalizes topic prep answers without a guideline field', () => {
+    const q = normalizeTopicPrepQuestion({
+      question: 'What is a closure?',
+      type: 'conceptual',
+      answer_text: 'A closure is a function that remembers variables from its outer scope.',
+      key_points: 'Lexical scope, captured variables',
+    });
+    assert.equal(
+      q.answer_text,
+      'A closure is a function that remembers variables from its outer scope.'
+    );
+    assert.equal(q.evidence_from_cv, 'Lexical scope, captured variables');
+  });
+
+  it('normalizes an explanation payload', () => {
+    const result = normalizeExplanation({ explanation: ' They want architecture depth. ' });
+    assert.equal(result.explanation, 'They want architecture depth.');
+  });
+
+  it('parses markdown blocks for prep rich text', () => {
+    const blocks = parseRichTextBlocks(`Intro line
+
+- First bullet with \`code\`
+- Second bullet
+
+\`\`\`swift
+let x = 1
+\`\`\``);
+    assert.equal(blocks.length, 3);
+    assert.equal(blocks[0].type, 'paragraph');
+    assert.equal(blocks[1].type, 'ul');
+    if (blocks[1].type === 'ul') assert.equal(blocks[1].items.length, 2);
+    assert.equal(blocks[2].type, 'code');
+    if (blocks[2].type === 'code') {
+      assert.equal(blocks[2].language, 'swift');
+      assert.match(blocks[2].text, /let x = 1/);
+    }
+  });
+
+  it('parses headings and bare language code blocks', () => {
+    const blocks = parseRichTextBlocks(`## The Problem
+
+swift
+func fetchUser() {
+  return true
+}
+
+More text`);
+    assert.equal(blocks[0].type, 'heading');
+    if (blocks[0].type === 'heading') {
+      assert.equal(blocks[0].level, 2);
+      assert.match(blocks[0].text, /Problem/);
+    }
+    assert.equal(blocks[1].type, 'code');
+    if (blocks[1].type === 'code') {
+      assert.equal(blocks[1].language, 'swift');
+      assert.match(blocks[1].text, /func fetchUser/);
+    }
+    assert.equal(blocks[2].type, 'paragraph');
+  });
+
+  it('keeps interview prose as a paragraph, not a one-line code block', () => {
+    const prose =
+      'Use protocol-oriented programming to keep your architecture loosely coupled. Define protocols for dependencies like `NetworkService` and inject implementations, making tests easier. This approach reduces duplication and makes the codebase more maintainable.';
+    const withFunc =
+      'I would use protocol-oriented programming. Define a func fetch() and inject implementations, making tests easier.';
+    const withBraces =
+      'Define protocols for dependencies like NetworkService { } and inject implementations, making tests easier.';
+
+    for (const sample of [prose, withFunc, withBraces]) {
+      const blocks = parseRichTextBlocks(sample);
+      assert.equal(blocks.length, 1);
+      assert.equal(blocks[0].type, 'paragraph');
+    }
+  });
+
+  it('highlights Swift keywords, strings, attributes, and function calls', () => {
+    const keywordLine = highlightCodeLine('func fetchUserProfile() {');
+    assert.ok(keywordLine.some((t) => t.kind === 'keyword' && t.text === 'func'));
+    assert.ok(keywordLine.some((t) => t.kind === 'function' && t.text === 'fetchUserProfile'));
+
+    const stringLine = highlightCodeLine('let url = "/users/\\(userId)"');
+    assert.ok(stringLine.some((t) => t.kind === 'string'));
+
+    const attrLine = highlightCodeLine('@escaping (Result<User, Error>) -> Void');
+    assert.ok(attrLine.some((t) => t.kind === 'keyword' && t.text === '@escaping'));
+    assert.ok(attrLine.some((t) => t.kind === 'type' && t.text === 'Result'));
+
+    const weakLine = highlightCodeLine('[weak self] in');
+    assert.ok(weakLine.some((t) => t.kind === 'keyword' && t.text === 'weak'));
   });
 
   it('clamps evaluation scores', () => {

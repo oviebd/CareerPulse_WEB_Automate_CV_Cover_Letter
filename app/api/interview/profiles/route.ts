@@ -2,7 +2,9 @@ import { NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/auth/session';
 import { getInterviewRepo } from '@/lib/db/repositories/interview';
 import { getJobsRepo } from '@/lib/db/repositories/jobs';
+import { enrichProfileDisplay } from '@/lib/interview/topic-config';
 import { err } from '@/lib/interview/api-auth';
+import type { InterviewProfile } from '@/types/interview';
 
 export const runtime = 'nodejs';
 
@@ -16,6 +18,9 @@ export async function GET() {
     const jobs = getJobsRepo();
     const enriched = await Promise.all(
       profiles.map(async (p) => {
+        if (!p.job_id || p.prep_source === 'topic') {
+          return enrichProfileDisplay(p as unknown as InterviewProfile);
+        }
         const job = await jobs.getById(user.id, p.job_id as string);
         return {
           ...p,
