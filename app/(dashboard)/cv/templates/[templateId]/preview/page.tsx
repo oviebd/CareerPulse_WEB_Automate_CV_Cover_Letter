@@ -746,7 +746,7 @@ export default function CVTemplatePreviewPage() {
             style={{ aspectRatio: '210 / 297' }}
           >
             {previewBusy ? (
-              <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/80 text-sm text-[var(--color-muted)]">
+              <div className="absolute inset-0 z-10 flex items-center justify-center bg-[var(--color-preview-overlay)] text-sm text-[var(--color-muted)]">
                 Updating preview…
               </div>
             ) : null}

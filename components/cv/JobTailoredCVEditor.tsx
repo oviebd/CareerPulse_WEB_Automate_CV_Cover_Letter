@@ -1293,7 +1293,7 @@ export function JobTailoredCVEditor() {
 
       <div className="relative mt-1 px-1 sm:px-0">
         {pageSaveState === 'saving' ? (
-          <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-xl bg-white/75">
+          <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-xl bg-[var(--color-preview-overlay)]">
             <Loader2 className="h-10 w-10 animate-spin text-[var(--color-primary)]" />
           </div>
         ) : null}

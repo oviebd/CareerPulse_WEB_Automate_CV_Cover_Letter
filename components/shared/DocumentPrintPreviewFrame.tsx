@@ -231,8 +231,8 @@ export function DocumentPrintPreviewFrame({
           </div>
         )}
         {isLoading && src ? (
-          <div className="absolute inset-0 flex items-center justify-center bg-white/50 backdrop-blur-[1px]">
-            <span className="rounded-md bg-white/90 px-2 py-1 text-xs font-medium text-[var(--color-muted)] shadow-sm">
+          <div className="absolute inset-0 flex items-center justify-center bg-[var(--color-preview-overlay)] backdrop-blur-[1px]">
+            <span className="rounded-md bg-[var(--color-surface)] px-2 py-1 text-xs font-medium text-[var(--color-muted)] shadow-sm">
               Updating…
             </span>
           </div>

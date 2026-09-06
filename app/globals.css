@@ -4,15 +4,15 @@
 @tailwind components;
 @tailwind utilities;
 
-/* --- Design tokens: default = light (soft white) --- */
+/* --- Design tokens: default = light (Azure Mist) --- */
 :root {
   --font-clash: "Clash Display", var(--font-inter), var(--font-dm-sans), ui-sans-serif, system-ui,
     sans-serif;
 
-  --bg-primary: #f8fafc;
-  --bg-secondary: #ffffff;
-  --bg-muted: #f1f5f9;
-  --bg-elevated: #ffffff;
+  --bg-primary: #dde4ef;
+  --bg-secondary: #f0f4fa;
+  --bg-muted: #d4dce8;
+  --bg-elevated: #f7f9fc;
 
   --text-primary: #0f172a;
   --text-secondary: #475569;
@@ -26,7 +26,7 @@
 
   --primary: var(--brand);
   --primary-hover: hsl(var(--brand-h) 76% 45%); /* ~#1d4ed8 */
-  --primary-light: hsl(var(--brand-h) 83% 95%); /* azure tint (was violet #ede9fe) */
+  --primary-light: hsl(var(--brand-h) 42% 90%); /* azure tint tuned for Azure Mist canvas */
   --primary-glow: hsl(var(--brand-h) 90% 70%);
   --primary-deep: hsl(var(--brand-h) 76% 40%);
 
@@ -37,7 +37,7 @@
   --color-accent: hsl(var(--accent-h) var(--accent-s) var(--accent-l)); /* cyan #06B6D4 */
   --accent-cyan: #22d3ee;
 
-  --border: #e2e8f0;
+  --border: #b8c5d6;
 
   --transition-base: all 0.2s ease;
 
@@ -49,7 +49,7 @@
   --color-surface: var(--bg-secondary);
   --color-surface-1: var(--bg-secondary);
   --color-surface-2: var(--bg-muted);
-  --color-surface-3: #e2e8f0;
+  --color-surface-3: #c9d4e3;
 
   --color-border: var(--border);
   --color-border-hover: color-mix(in srgb, var(--brand) 35%, transparent);
@@ -86,33 +86,33 @@
   --color-danger: #dc2626;
   --color-info: var(--brand);
 
-  --color-input-bg: #ffffff;
-  --color-glass-bg: rgba(255, 255, 255, 0.92);
+  --color-input-bg: #f7f9fc;
+  --color-glass-bg: rgba(240, 244, 250, 0.88);
   --color-glass-border: var(--border);
 
-  --color-hover-surface: rgba(15, 23, 42, 0.04);
-  --color-hover-surface-strong: rgba(15, 23, 42, 0.08);
+  --color-hover-surface: rgba(15, 23, 42, 0.07);
+  --color-hover-surface-strong: rgba(15, 23, 42, 0.11);
   --color-focus-ring: color-mix(in srgb, var(--brand) 40%, transparent);
 
-  --color-control-bg: rgba(15, 23, 42, 0.04);
-  --color-control-bg-hover: rgba(15, 23, 42, 0.09);
-  --color-surface-faint: rgba(15, 23, 42, 0.03);
-  --color-progress-track: rgba(15, 23, 42, 0.08);
+  --color-control-bg: rgba(15, 23, 42, 0.07);
+  --color-control-bg-hover: rgba(15, 23, 42, 0.11);
+  --color-surface-faint: rgba(15, 23, 42, 0.05);
+  --color-progress-track: rgba(15, 23, 42, 0.1);
 
-  --color-preview-well: rgba(241, 245, 249, 0.9);
-  --color-preview-overlay: rgba(255, 255, 255, 0.85);
+  --color-preview-well: rgba(212, 220, 232, 0.95);
+  --color-preview-overlay: rgba(240, 244, 250, 0.88);
 
-  --auth-hero-from: hsl(var(--brand-h) 83% 95%);
-  --auth-hero-via: #f8fafc;
-  --auth-hero-to: hsl(210 60% 96%);
+  --auth-hero-from: #d5deeb;
+  --auth-hero-via: #dde4ef;
+  --auth-hero-to: #d8e2ee;
 
-  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
-  --shadow-md: 0 4px 16px rgba(15, 23, 42, 0.08);
-  --shadow-lg: 0 12px 40px rgba(15, 23, 42, 0.1);
-  --shadow-xl: 0 24px 64px rgba(15, 23, 42, 0.12);
-  --shadow-card: 0 4px 24px rgba(15, 23, 42, 0.06);
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.08);
+  --shadow-md: 0 4px 16px rgba(15, 23, 42, 0.1);
+  --shadow-lg: 0 12px 40px rgba(15, 23, 42, 0.12);
+  --shadow-xl: 0 24px 64px rgba(15, 23, 42, 0.14);
+  --shadow-card: 0 4px 24px rgba(15, 23, 42, 0.1);
   /* Primary CTA: neutral depth in light (no colored glow) */
-  --shadow-primary-btn: 0 1px 3px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06);
+  --shadow-primary-btn: 0 1px 3px rgba(15, 23, 42, 0.14), 0 2px 8px rgba(15, 23, 42, 0.08);
   --shadow-nav-active-glow: inset 0 0 0 1px color-mix(in srgb, var(--brand) 15%, transparent);
 
   --radius-sm: 6px;
@@ -249,9 +249,17 @@
   }
 }
 
-/* Ambient mesh: slightly stronger in dark mode (glow reads on deep bg) */
+/* Ambient mesh: stronger in light (Azure Mist canvas) and dark (glow reads on deep bg) */
+.mesh-bg-blob-a {
+  opacity: 0.1;
+}
+.mesh-bg-blob-b {
+  opacity: 0.07;
+}
+.mesh-bg-blob-c {
+  opacity: 0.08;
+}
 .mesh-bg-blob {
-  opacity: 0.055;
   transition: opacity 0.35s ease;
 }
 [data-theme='dark'] .mesh-bg-blob-a {

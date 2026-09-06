@@ -54,7 +54,7 @@ export function TemplateGate({
   return (
     <div className="relative">
       <div className="pointer-events-none opacity-40">{children}</div>
-      <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-white/70 p-4">
+      <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-[var(--color-preview-overlay)] p-4">
         {lockedOverlay ?? (
           <Link
             href="/settings/billing"

@@ -8,7 +8,7 @@ export default function NewCoverLetterLoading() {
           <div className="h-10 rounded-lg bg-slate-100" />
           <div className="h-10 rounded-lg bg-slate-100" />
         </div>
-        <div className="h-96 rounded-xl border border-[var(--color-border)] bg-slate-50" />
+        <div className="h-96 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]" />
       </div>
     </div>
   );

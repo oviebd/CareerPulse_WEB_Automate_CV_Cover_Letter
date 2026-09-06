@@ -900,7 +900,7 @@ function CvPreviewPane({
   return (
     <div className="relative max-h-[min(70vh,720px)] overflow-y-auto overflow-x-hidden rounded-xl border border-[var(--color-border)] bg-slate-100 p-3">
       {busy ? (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/80 text-sm text-[var(--color-muted)]">
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-[var(--color-preview-overlay)] text-sm text-[var(--color-muted)]">
           <Loader2 className="mr-2 h-5 w-5 animate-spin" />
           Rendering preview…
         </div>
@@ -933,7 +933,7 @@ function ClPreviewPane({
   return (
     <div className="relative max-h-[min(70vh,720px)] overflow-y-auto overflow-x-hidden rounded-xl border border-[var(--color-border)] bg-slate-100 p-3">
       {busy ? (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/80 text-sm text-[var(--color-muted)]">
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-[var(--color-preview-overlay)] text-sm text-[var(--color-muted)]">
           <Loader2 className="mr-2 h-5 w-5 animate-spin" />
           Rendering preview…
         </div>

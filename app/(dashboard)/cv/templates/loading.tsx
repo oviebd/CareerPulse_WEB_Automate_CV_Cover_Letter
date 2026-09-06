@@ -7,7 +7,7 @@ export default function TemplatesLoading() {
         {Array.from({ length: 6 }).map((_, i) => (
           <div
             key={i}
-            className="h-48 rounded-xl border border-[var(--color-border)] bg-slate-50"
+            className="h-48 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]"
           />
         ))}
       </div>

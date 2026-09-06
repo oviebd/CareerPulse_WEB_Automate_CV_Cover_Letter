@@ -433,7 +433,7 @@ function CoverLettersTab() {
       {isFree && letters.length > 5 ? (
         <div className="relative rounded-xl border border-dashed border-[var(--color-border)] p-8 text-center">
           <p className="text-sm text-[var(--color-muted)] blur-sm">Older letters hidden on Free plan.</p>
-          <div className="absolute inset-0 flex items-center justify-center bg-white/70">
+          <div className="absolute inset-0 flex items-center justify-center bg-[var(--color-preview-overlay)]">
             <UpgradeCTA />
           </div>
         </div>
