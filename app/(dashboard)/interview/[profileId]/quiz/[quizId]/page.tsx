@@ -3,10 +3,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Trophy } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { QuizQuestionField } from '@/components/interview/QuizQuestionField';
 import { apiFetch } from '@/lib/api-fetch';
@@ -112,17 +114,25 @@ export default function InterviewQuizPage() {
 
   const questions = data.questions;
   const current = questions[step];
+  const progressPct = questions.length > 0 ? Math.round(((step + 1) / questions.length) * 100) : 0;
 
   if (result) {
     const attemptId = result.attempt?.id;
+    const score = result.score ?? 0;
     return (
       <div className="mx-auto max-w-2xl space-y-6">
-        <Card className="text-center">
-          <p className="text-sm text-[var(--color-muted)]">Quiz complete</p>
-          <p className="font-display text-4xl font-bold text-[var(--color-primary)]">
-            {result.score ?? '—'}%
-          </p>
-          <div className="mt-4 flex flex-wrap justify-center gap-2">
+        <Card className="space-y-4 py-8 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--color-accent-gold)]/15 text-[var(--color-accent-gold)]">
+            <Trophy className="h-7 w-7" />
+          </div>
+          <div>
+            <p className="text-sm text-[var(--color-muted)]">Quiz complete</p>
+            <p className="font-display text-5xl font-bold text-[var(--color-primary)]">
+              {score}%
+            </p>
+          </div>
+          <Progress value={score} className="mx-auto max-w-xs" />
+          <div className="flex flex-wrap justify-center gap-2 pt-2">
             {attemptId ? (
               <Link href={`/interview/${profileId}/quiz/${quizId}/review/${attemptId}`}>
                 <Button variant="secondary">View result</Button>
@@ -131,7 +141,7 @@ export default function InterviewQuizPage() {
             <Button variant="primary" loading={generateQuiz.isPending} onClick={() => void handleNewQuiz()}>
               Take another quiz
             </Button>
-            <Link href={`/interview/${profileId}`}>
+            <Link href={`/interview/${profileId}?tab=quiz`}>
               <Button variant="ghost">Back to dashboard</Button>
             </Link>
           </div>
@@ -143,10 +153,10 @@ export default function InterviewQuizPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <Link
-        href={`/interview/${profileId}`}
+        href={`/interview/${profileId}?tab=quiz`}
         className="inline-flex items-center gap-1 text-sm text-[var(--color-muted)] hover:text-[var(--color-primary)]"
       >
-        <ArrowLeft className="h-4 w-4" /> Dashboard
+        <ArrowLeft className="h-4 w-4" /> Quiz
       </Link>
 
       <PageHeader
@@ -154,10 +164,20 @@ export default function InterviewQuizPage() {
         subtitle={`Question ${step + 1} of ${questions.length}`}
       />
 
+      <div className="space-y-2">
+        <div className="flex items-center justify-between text-xs text-[var(--color-muted)]">
+          <span>Progress</span>
+          <span>{progressPct}%</span>
+        </div>
+        <Progress value={progressPct} className="h-2" />
+      </div>
+
       {current ? (
         <Card className="space-y-4">
-          <p className="text-sm capitalize text-[var(--color-muted)]">{current.question_type.replace(/_/g, ' ')}</p>
-          <p className="text-base font-medium text-[var(--color-text-primary)]">
+          <Badge variant="info" className="capitalize">
+            {current.question_type.replace(/_/g, ' ')}
+          </Badge>
+          <p className="text-base font-medium leading-relaxed text-[var(--color-text-primary)]">
             {current.question_text}
           </p>
           <QuizQuestionField
@@ -165,7 +185,7 @@ export default function InterviewQuizPage() {
             value={answers[current.id] ?? ''}
             onChange={(v) => updateAnswer(current.id, v)}
           />
-          <div className="flex justify-between pt-2">
+          <div className="flex justify-between border-t border-[var(--color-border)] pt-4">
             <Button variant="ghost" size="sm" disabled={step === 0} onClick={() => goToStep(step - 1)}>
               Previous
             </Button>

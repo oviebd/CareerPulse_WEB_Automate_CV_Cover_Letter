@@ -1,12 +1,13 @@
 'use client';
 
 import { useMemo } from 'react';
-import Link from 'next/link';
 import { MessageSquarePlus } from 'lucide-react';
+import { motion, useReducedMotion } from 'framer-motion';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PrepQuestionCard } from '@/components/interview/PrepQuestionCard';
+import { fadeUp, staggerChildren } from '@/lib/animations';
 import {
   usePrepQuestions,
   useGeneratePrepQuestions,
@@ -41,6 +42,7 @@ function mapQuestion(row: Record<string, unknown>): PrepQuestion {
 }
 
 export function PrepQuestionList({ profileId, profileReady, profileStatus }: Props) {
+  const reduce = useReducedMotion();
   const { data, isLoading } = usePrepQuestions(profileId);
   const generate = useGeneratePrepQuestions(profileId);
   const updateAnswer = useUpdatePrepQuestionAnswer(profileId);
@@ -60,32 +62,18 @@ export function PrepQuestionList({ profileId, profileReady, profileStatus }: Pro
 
   if (!profileReady) {
     return (
-      <div id="likely-questions" className="scroll-mt-6">
-        <Card className="space-y-3 py-6 text-center text-sm">
-          {profileStatus === 'needs_clarification' ? (
-            <>
-              <p className="text-[var(--color-text-secondary)]">
-                Answer the clarification questions on your interview dashboard first. Analysis must
-                finish before likely questions can be generated.
-              </p>
-              <Link href={`/interview/${profileId}`}>
-                <Button size="sm" variant="primary">
-                  Go to interview dashboard
-                </Button>
-              </Link>
-            </>
-          ) : profileStatus === 'analyzing' ? (
-            <p className="text-[var(--color-muted)]">
-              Interview analysis in progress… Likely questions will be available when your profile is
-              ready.
-            </p>
-          ) : (
-            <p className="text-[var(--color-muted)]">
-              Complete interview analysis before loading likely questions.
-            </p>
-          )}
-        </Card>
-      </div>
+      <Card className="space-y-3 py-6 text-center text-sm">
+        {profileStatus === 'analyzing' ? (
+          <p className="text-[var(--color-muted)]">
+            Interview analysis in progress… Likely questions will be available when your profile is
+            ready.
+          </p>
+        ) : (
+          <p className="text-[var(--color-muted)]">
+            Complete interview analysis before loading likely questions.
+          </p>
+        )}
+      </Card>
     );
   }
 
@@ -120,7 +108,10 @@ export function PrepQuestionList({ profileId, profileReady, profileStatus }: Pro
           <Skeleton className="h-28 rounded-xl" />
         </div>
       ) : questions.length === 0 ? (
-        <Card className="space-y-4 py-8 text-center">
+        <Card className="space-y-4 py-10 text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--color-accent-mint)]/15 text-[var(--color-accent-mint)]">
+            <MessageSquarePlus className="h-6 w-6" />
+          </div>
           <p className="text-sm text-[var(--color-muted)]">
             Your first 5 likely questions are generated during preparation. If none appear yet,
             load a batch below.
@@ -135,15 +126,24 @@ export function PrepQuestionList({ profileId, profileReady, profileStatus }: Pro
           </Button>
         </Card>
       ) : (
-        <div className="space-y-3">
+        <motion.div
+          className="space-y-3"
+          initial={reduce ? false : 'initial'}
+          animate={reduce ? false : 'animate'}
+          variants={reduce ? undefined : staggerChildren}
+        >
           {questions.map((q, i) => (
-            <PrepQuestionCard
+            <motion.div
               key={q.id}
-              question={q}
-              index={i + 1}
-              saving={updateAnswer.isPending}
-              onSaveAnswer={handleSaveAnswer}
-            />
+              variants={reduce ? undefined : { initial: fadeUp.initial, animate: fadeUp.animate }}
+            >
+              <PrepQuestionCard
+                question={q}
+                index={i + 1}
+                saving={updateAnswer.isPending}
+                onSaveAnswer={handleSaveAnswer}
+              />
+            </motion.div>
           ))}
           <div className="flex justify-center pt-2">
             <Button
@@ -155,7 +155,7 @@ export function PrepQuestionList({ profileId, profileReady, profileStatus }: Pro
               Load more
             </Button>
           </div>
-        </div>
+        </motion.div>
       )}
 
       {generate.isError ? (

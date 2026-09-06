@@ -7,7 +7,9 @@ import { MessageSquare, Plus } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/components/ui/toast';
 import { PrepareJobModal } from '@/components/interview/PrepareJobModal';
 import { DeleteInterviewProfileButton } from '@/components/interview/DeleteInterviewProfileButton';
@@ -31,7 +33,15 @@ function interviewErrorMessage(e: unknown): string {
   return 'Could not start interview preparation. Please try again.';
 }
 
-function StatusBadge({ status }: { status: JobStatus }) {
+function ProfileStatusChip({ status }: { status: string }) {
+  if (status === 'ready') return <Badge variant="info">Ready</Badge>;
+  if (status === 'analyzing') return <Badge variant="warning">Analyzing</Badge>;
+  if (status === 'failed') return <Badge variant="danger">Failed</Badge>;
+  if (status === 'needs_clarification') return <Badge variant="info">Setup needed</Badge>;
+  return <Badge variant="default">{status}</Badge>;
+}
+
+function JobStatusBadge({ status }: { status: JobStatus }) {
   const column = jobStatusToColumn(status);
   if (!column) return null;
   const config = KANBAN_COLUMN_CONFIG[column];
@@ -119,20 +129,28 @@ export default function InterviewListPage() {
               {profiles.map((p) => (
                 <div key={p.id} className="flex items-stretch gap-2">
                   <Link href={`/interview/${p.id}`} className="min-w-0 flex-1">
-                    <Card hoverable className="flex items-center justify-between">
-                      <div>
-                        <p className="font-semibold text-[var(--color-text-primary)]">
-                          {p.job_title ?? 'Role'}
-                        </p>
+                    <Card hoverable className="flex items-center justify-between gap-4">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-semibold text-[var(--color-text-primary)]">
+                            {p.job_title ?? 'Role'}
+                          </p>
+                          <ProfileStatusChip status={p.status} />
+                        </div>
                         <p className="text-sm text-[var(--color-muted)]">
                           {p.company_name ?? 'Company'}
                         </p>
+                        {typeof p.readiness_score === 'number' ? (
+                          <Progress value={p.readiness_score} className="mt-2 h-1.5" />
+                        ) : null}
                       </div>
-                      <div className="text-right">
-                        <p className="text-2xl font-bold text-[var(--color-primary)]">
+                      <div className="shrink-0 text-right">
+                        <p className="font-display text-2xl font-bold tabular-nums text-[var(--color-primary)]">
                           {p.readiness_score ?? '—'}%
                         </p>
-                        <p className="text-xs capitalize text-[var(--color-muted)]">{p.status}</p>
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-muted)]">
+                          Progress
+                        </p>
                       </div>
                     </Card>
                   </Link>
@@ -156,11 +174,11 @@ export default function InterviewListPage() {
                       <p className="font-semibold text-[var(--color-text-primary)]">
                         {job.job_title}
                       </p>
-                      <StatusBadge status={job.status} />
+                      <JobStatusBadge status={job.status} />
                     </div>
                     <p className="text-sm text-[var(--color-muted)]">{job.company_name}</p>
                     {job.needs_job_context ? (
-                      <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                      <p className="mt-1 text-xs text-[var(--color-warning)]">
                         Job description needed for best results
                       </p>
                     ) : null}
