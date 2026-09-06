@@ -33,7 +33,7 @@ import {
   useToggleCoverLetterFavourite,
 } from '@/hooks/useCoverLetters';
 import { useSubscription } from '@/hooks/useSubscription';
-import { formatDate } from '@/lib/utils';
+import { formatDate, cn } from '@/lib/utils';
 import { relativeTime } from '@/lib/cv-dashboard-utils';
 import type { CVProfile } from '@/types';
 
@@ -81,7 +81,7 @@ function CVCard({ cv, onDelete, deleting }: { cv: CVProfile; onDelete: (id: stri
             </span>
           )}
         </div>
-        <FileText className="h-5 w-5 shrink-0 text-[var(--color-muted)]" />
+        <FileText className="h-5 w-5 shrink-0 text-[var(--color-icon)]" />
       </div>
 
       <div className="space-y-0.5 text-xs text-[var(--color-muted)]">
@@ -140,7 +140,7 @@ function CVCard({ cv, onDelete, deleting }: { cv: CVProfile; onDelete: (id: stri
           </div>
         ) : (
           <Button variant="ghost" size="sm" onClick={() => setConfirmDelete(true)} aria-label="Delete CV">
-            <Trash2 className="h-3.5 w-3.5" />
+            <Trash2 className="h-3.5 w-3.5 text-[var(--color-icon)]" />
           </Button>
         )}
       </div>
@@ -217,7 +217,7 @@ function ResumesTab() {
           disabled={creating}
           className="flex items-start gap-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-left transition hover:border-[var(--color-primary-300)] hover:bg-[var(--color-surface-2)] disabled:opacity-50"
         >
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--color-primary-100)] text-[var(--color-primary)]">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--color-primary-100)] text-[var(--color-icon-accent)]">
             {creating ? (
               <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -235,7 +235,7 @@ function ResumesTab() {
 
         <Link href="/applications/new" className="block">
           <div className="flex items-start gap-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-left transition hover:border-[var(--color-primary-300)] hover:bg-[var(--color-surface-2)]">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--color-primary-100)] text-[var(--color-icon-accent)]">
               <Target className="h-5 w-5" />
             </div>
             <div>
@@ -273,7 +273,7 @@ function ResumesTab() {
         </div>
       ) : filtered.length === 0 ? (
         <div className="rounded-xl border border-dashed border-[var(--color-border)] py-16 text-center">
-          <FileText className="mx-auto h-10 w-10 text-[var(--color-muted)]" />
+          <FileText className="mx-auto h-10 w-10 text-[var(--color-icon)]" />
           <p className="mt-3 font-medium text-[var(--color-text-primary)]">
             {filter === 'all' ? 'No resumes yet' : `No ${filter} resumes`}
           </p>
@@ -387,7 +387,7 @@ function CoverLettersTab() {
 
       {!isLoading && letters.length === 0 ? (
         <div className="rounded-xl border border-dashed border-[var(--color-border)] py-12 text-center">
-          <Mail className="mx-auto h-10 w-10 text-[var(--color-muted)]" />
+          <Mail className="mx-auto h-10 w-10 text-[var(--color-icon)]" />
           <p className="mt-3 font-medium text-[var(--color-text-primary)]">No cover letters yet</p>
           <p className="mt-1 text-sm text-[var(--color-muted)]">Choose a creation mode above to get started.</p>
         </div>
@@ -492,7 +492,12 @@ export default function DocumentsPage() {
                 : 'text-[var(--color-muted)] hover:text-[var(--color-text-primary)]'
             }`}
           >
-            <Icon className="h-4 w-4" />
+            <Icon
+              className={cn(
+                'h-4 w-4',
+                activeTab !== key && 'text-[var(--color-icon-muted)]'
+              )}
+            />
             {label}
           </button>
         ))}

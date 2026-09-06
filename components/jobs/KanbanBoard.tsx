@@ -114,9 +114,9 @@ export function KanbanBoard() {
 
   if (isLoading) {
     return (
-      <div className="flex gap-3 overflow-x-auto pb-4">
+      <div className="grid w-full grid-cols-7 gap-3 pb-4">
         {KANBAN_COLUMNS.map((col) => (
-          <Skeleton key={col} className="h-64 min-w-[220px] rounded-xl" />
+          <Skeleton key={col} className="h-64 min-w-0 rounded-xl" />
         ))}
       </div>
     );
@@ -152,18 +152,16 @@ export function KanbanBoard() {
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
-        <div className="overflow-x-auto pb-4">
-          <div className="flex gap-3" style={{ minWidth: 'max-content' }}>
-            {KANBAN_COLUMNS.map((col) => (
-              <KanbanColumnComponent
-                key={col}
-                column={col}
-                jobs={grouped[col]}
-                onCardOpen={handleCardOpen}
-                onAddJob={handleAddJobToColumn}
-              />
-            ))}
-          </div>
+        <div className="grid w-full grid-cols-7 gap-3 pb-4">
+          {KANBAN_COLUMNS.map((col) => (
+            <KanbanColumnComponent
+              key={col}
+              column={col}
+              jobs={grouped[col]}
+              onCardOpen={handleCardOpen}
+              onAddJob={handleAddJobToColumn}
+            />
+          ))}
         </div>
 
         <DragOverlay dropAnimation={{ duration: 150, easing: 'ease-out' }}>

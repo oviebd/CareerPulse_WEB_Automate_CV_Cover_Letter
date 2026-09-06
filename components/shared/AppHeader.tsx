@@ -115,7 +115,12 @@ function NavLinkContent({
                       : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-hover-surface)] hover:text-[var(--color-text-primary)]'
                   )}
                 >
-                  <ChildIcon className="h-4 w-4 shrink-0 opacity-90" />
+                  <ChildIcon
+                    className={cn(
+                      'h-4 w-4 shrink-0',
+                      !childActive && 'text-[var(--color-icon)]'
+                    )}
+                  />
                   <span className="min-w-0 flex-1 truncate">{child.label}</span>
                   {child.proOnly && isFree ? (
                     <span className="shrink-0 rounded-badge bg-[var(--color-accent-gold)]/20 px-2 py-0.5 text-[10px] font-semibold text-[var(--color-accent-gold)]">
@@ -149,7 +154,9 @@ function NavLinkContent({
           : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-hover-surface)] hover:text-[var(--color-text-primary)]'
       )}
     >
-      <Icon className="h-4 w-4 shrink-0" />
+      <Icon
+        className={cn('h-4 w-4 shrink-0', !active && 'text-[var(--color-icon)]')}
+      />
       {!collapsed && (
         <span className="min-w-0 flex-1 truncate">{item.label}</span>
       )}
@@ -210,7 +217,7 @@ export function AppHeader() {
           <button
             type="button"
             className={cn(
-              'group rounded-btn flex items-center justify-center p-2 text-[var(--color-muted)] transition-all duration-200 hover:bg-[var(--color-hover-surface)] hover:text-[var(--color-text-primary)] active:scale-95',
+              'group rounded-btn flex items-center justify-center p-2 text-[var(--color-icon)] transition-all duration-200 hover:bg-[var(--color-hover-surface)] hover:text-[var(--color-text-primary)] active:scale-95',
               sidebarCollapsed ? 'mt-2' : ''
             )}
             onClick={toggleSidebar}
@@ -249,7 +256,12 @@ export function AppHeader() {
                 : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-hover-surface)] hover:text-[var(--color-text-primary)]'
             )}
           >
-            <CreditCard className="h-4 w-4 shrink-0" />
+            <CreditCard
+              className={cn(
+                'h-4 w-4 shrink-0',
+                pathname !== '/settings/billing' && 'text-[var(--color-icon)]'
+              )}
+            />
             {!sidebarCollapsed && <span className="min-w-0 flex-1 truncate">Billing</span>}
           </Link>
         </nav>
@@ -335,7 +347,12 @@ export function AppHeader() {
                       : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-hover-surface)] hover:text-[var(--color-text-primary)]'
                   )}
                 >
-                  <CreditCard className="h-4 w-4 shrink-0" />
+                  <CreditCard
+              className={cn(
+                'h-4 w-4 shrink-0',
+                pathname !== '/settings/billing' && 'text-[var(--color-icon)]'
+              )}
+            />
                   <span className="flex-1">Billing</span>
                 </Link>
               </nav>

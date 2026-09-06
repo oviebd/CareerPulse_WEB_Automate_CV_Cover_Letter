@@ -22,6 +22,11 @@ const config: Config = {
         foreground: "var(--foreground)",
         primary: "var(--color-primary)",
         surface: "var(--color-surface)",
+        icon: {
+          DEFAULT: "var(--color-icon)",
+          muted: "var(--color-icon-muted)",
+          accent: "var(--color-icon-accent)",
+        },
         accent: {
           DEFAULT: "var(--color-primary-500)",
           mint: "var(--color-accent-mint)",

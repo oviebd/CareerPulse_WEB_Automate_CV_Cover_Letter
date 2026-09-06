@@ -72,6 +72,11 @@
   --color-text-primary: var(--text-primary);
   --color-text-secondary: var(--text-secondary);
 
+  /* Icon tints — darker than muted for Lucide strokes on pale surfaces */
+  --color-icon: color-mix(in srgb, var(--text-primary) 82%, var(--brand));
+  --color-icon-muted: var(--text-secondary);
+  --color-icon-accent: var(--color-primary-700);
+
   /* Decorative accents (illustration / variety) — NOT status */
   --color-accent-mint: #00d4a8;
   --color-accent-coral: #ff6b6b;
@@ -197,6 +202,11 @@
   --color-text-primary: var(--text-primary);
   --color-text-secondary: var(--text-secondary);
 
+  /* Icon tints — inherit lifted dark-theme text ramp */
+  --color-icon: var(--text-secondary);
+  --color-icon-muted: var(--text-muted);
+  --color-icon-accent: var(--color-primary-400);
+
   /* Decorative accents — dark-tuned */
   --color-accent-mint: #2dd4bf;
   --color-accent-coral: #fb7185;
@@ -321,6 +331,18 @@
 }
 
 @layer utilities {
+  .text-icon {
+    color: var(--color-icon);
+  }
+
+  .text-icon-muted {
+    color: var(--color-icon-muted);
+  }
+
+  .text-icon-accent {
+    color: var(--color-icon-accent);
+  }
+
   .focus-ring {
     outline: 2px solid var(--color-primary-400);
     outline-offset: 2px;

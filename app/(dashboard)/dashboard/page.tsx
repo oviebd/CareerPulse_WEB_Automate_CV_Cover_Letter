@@ -65,10 +65,34 @@ export default function HomePage() {
       {/* Quick stats row */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
-          { label: 'Active', value: stats.active, icon: Briefcase, color: 'text-[var(--color-primary)]', bg: 'bg-[var(--color-primary-100)]' },
-          { label: 'Applied', value: stats.applied, icon: FileText, color: 'text-cyan-600 dark:text-cyan-400', bg: 'bg-cyan-50 dark:bg-cyan-950/40' },
-          { label: 'Interviews', value: stats.interviews, icon: MessageSquare, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-950/40' },
-          { label: 'Offers', value: stats.offers, icon: Trophy, color: 'text-green-600 dark:text-green-400', bg: 'bg-green-50 dark:bg-green-950/40' },
+          {
+            label: 'Active',
+            value: stats.active,
+            icon: Briefcase,
+            color: 'text-[var(--color-icon-accent)]',
+            bg: 'bg-[var(--color-primary-100)]',
+          },
+          {
+            label: 'Applied',
+            value: stats.applied,
+            icon: FileText,
+            color: 'text-[var(--color-info)]',
+            bg: 'bg-[color-mix(in_srgb,var(--color-info)_12%,transparent)]',
+          },
+          {
+            label: 'Interviews',
+            value: stats.interviews,
+            icon: MessageSquare,
+            color: 'text-[var(--color-warning)]',
+            bg: 'bg-[color-mix(in_srgb,var(--color-warning)_12%,transparent)]',
+          },
+          {
+            label: 'Offers',
+            value: stats.offers,
+            icon: Trophy,
+            color: 'text-[var(--color-success)]',
+            bg: 'bg-[color-mix(in_srgb,var(--color-success)_12%,transparent)]',
+          },
         ].map(({ label, value, icon: Icon, color, bg }) => (
           <div
             key={label}
