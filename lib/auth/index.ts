@@ -1,16 +1,19 @@
 import NextAuth from 'next-auth';
 import { ensureSuperAdminRole, isSuperAdminEmail } from '@/lib/auth/roles';
 import { grantInitialCredits } from '@/lib/credits/grant';
+import { rateLimitHit } from '@/lib/rate-limit';
 import Credentials from 'next-auth/providers/credentials';
 import Google from 'next-auth/providers/google';
 import type { Provider } from 'next-auth/providers';
 
 function authSecret(): string {
-  return (
-    process.env.AUTH_SECRET?.trim() ||
-    process.env.JWT_SECRET?.trim() ||
-    'dev-insecure-auth-secret-change-me'
-  );
+  const secret =
+    process.env.AUTH_SECRET?.trim() || process.env.JWT_SECRET?.trim() || '';
+  if (secret) return secret;
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('AUTH_SECRET or JWT_SECRET must be set in production');
+  }
+  return 'dev-insecure-auth-secret-change-me';
 }
 
 /** Resend/magic-link needs a DB adapter — enable only when one is wired up. */
@@ -48,6 +51,7 @@ function buildAuthProviders(): Provider[] {
         const email = String(credentials?.email ?? '').trim().toLowerCase();
         const password = String(credentials?.password ?? '');
         if (!email || !password) return null;
+        if (rateLimitHit(`login:${email}`)) return null;
 
         const { getUsersRepo } = await import('@/lib/db/repositories/users');
         const { default: bcrypt } = await import('bcryptjs');

@@ -2,7 +2,7 @@
 
 CV and cover-letter generator with job tracking, templates, PDF export, and billing. The self-hosted stack is **Next.js + Postgres**, packaged as Docker images.
 
-For VPS / Nginx / SSL deployment, see [Setup.md](Setup.md).
+For VPS / Nginx / SSL deployment, see [Setup.md](Setup.md). For CI/CD, shared-VPS isolation, and LLM/operator contract details, see [CICD.md](CICD.md).
 
 ---
 
@@ -132,11 +132,14 @@ Open [http://localhost:3000](http://localhost:3000). Do not run the Docker `app`
 |---|---|
 | `Dockerfile` | Multi-stage build: Next.js standalone server + Chromium for PDF export |
 | `docker-compose.dev.yml` | **Local:** builds the image and runs `app` + `db` |
-| `docker-compose.yml` | **Production:** runs a pre-built `careerpulse:latest` image + Postgres (no build step) |
-| `.env.prod` | Runtime secrets. Gitignored. Loaded by Compose |
+| `docker-compose.yml` | **Production:** pulls a pre-built GHCR image + Postgres (no build step) |
+| `.env.example` / `.env.prod.example` | Variable inventory (no real secrets) |
+| `.env.prod` | Runtime secrets on the VPS. Gitignored. Loaded by Compose |
 | `db/schema.sql` / `db/seed.sql` | Applied once when the Postgres volume is empty |
+| `db/migrations/` | Applied on app start (idempotent) |
+| `infra/nginx-careerpulse.conf.example` | Host reverse-proxy example |
 
-`NEXT_PUBLIC_*` values are compiled into the client during `docker build`. Changing them requires `--build`. API keys stay out of the image and are injected at container start.
+`NEXT_PUBLIC_*` values are compiled into the client during `docker build` in CI. Changing them requires a new image. API keys stay out of the image and are injected at container start.
 
 ---
 
@@ -197,11 +200,8 @@ Close other apps or give Docker more RAM (Settings → Resources). The VPS path 
 
 ## Production
 
-CI builds `careerpulse:latest` and streams it to the VPS. On the server:
+Production branch is **`main`**. GitHub Actions tests, builds the image, pushes it to **GHCR**, then SSHs to the VPS and runs `docker compose pull` + `up -d` (the VPS does not compile the app).
 
-```bash
-cd /opt/careerpulse
-docker compose --env-file .env.prod up -d --pull never
-```
+The VPS reverse proxy should terminate HTTPS and forward to `127.0.0.1:3000`. Postgres is not published.
 
-Full VPS, Nginx, SSL, backup, and update steps: **[Setup.md](Setup.md)**.
+Full VPS, Nginx, SSL, CI/CD secrets, backup, and rollback: **[Setup.md](Setup.md)**. Pipeline and shared-VPS contract: **[CICD.md](CICD.md)**.

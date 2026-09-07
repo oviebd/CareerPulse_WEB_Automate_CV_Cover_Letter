@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/auth/session';
 import { getCvStorageContentType } from '@/lib/cv-file';
+import { assertFileSize } from '@/lib/file-magic';
 import { storageDelete, storageSignedUrl, storageUpload } from '@/lib/storage';
 
 const BUCKETS = ['cv-uploads', 'pdf-exports', 'cv-photos'] as const;
@@ -25,6 +26,11 @@ export async function POST(request: Request) {
     }
     if (!(file instanceof File)) {
       return NextResponse.json({ error: 'file is required' }, { status: 422 });
+    }
+    try {
+      assertFileSize(file.size);
+    } catch {
+      return NextResponse.json({ error: 'file_too_large' }, { status: 413 });
     }
 
     const path =

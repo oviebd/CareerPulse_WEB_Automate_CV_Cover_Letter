@@ -1,16 +1,30 @@
+# Git
+.git
+.github
+.gitignore
+
+# Secrets — never bake into the image
+.env
+.env.*
+!.env.prod.example
+!.env.example
+*.pem
+*.key
+*.p12
+*.mobileprovision
+id_rsa
+id_rsa.pub
+
 # Dependencies and build output (rebuilt inside Docker)
 node_modules
 .next
 npm-debug.log*
+coverage
+*.log
 
-# Git
-.git
-.gitignore
-
-# Secrets — never bake into the image
-.env.local
-.env.prod
-.env.production
+# Local data and backups
+data
+backups
 
 # Dev/build tooling not needed in the image
 Build/
@@ -23,5 +37,6 @@ Build/
 .DS_Store
 Thumbs.db
 
-# Tests
-coverage/
+# Docs (not required at runtime)
+Documents
+*.md

@@ -20,9 +20,8 @@ async function checkDatabase(): Promise<CheckResult> {
     const { checkDbConnection } = await import('@/lib/db');
     await checkDbConnection();
     return { ok: true, detail: 'postgres_connected' };
-  } catch (e) {
-    const message = e instanceof Error ? e.message : 'connection_failed';
-    return { ok: false, detail: message.slice(0, 120) };
+  } catch {
+    return { ok: false, detail: 'connection_failed' };
   }
 }
 
@@ -52,7 +51,11 @@ export async function GET() {
       ok: Boolean(CLAUDE_MODEL),
       model: CLAUDE_MODEL,
     },
-    auth_secret: envConfigured('AUTH_SECRET'),
+    auth_secret: (() => {
+      const auth = envConfigured('AUTH_SECRET');
+      if (auth.ok) return auth;
+      return envConfigured('JWT_SECRET');
+    })(),
     pdf_parser: await checkPdfParser(),
   };
 

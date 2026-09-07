@@ -7,12 +7,14 @@ RUN npm ci
 
 COPY . .
 
-# NEXT_PUBLIC_* vars are baked into the client bundle at build time — pass them here.
-# Secrets (API keys) are NOT needed here; they are injected at runtime via env_file.
+# Public NEXT_PUBLIC_* values are baked into the client bundle.
+# Never pass private runtime secrets as build args.
 ARG NEXT_PUBLIC_APP_URL
+ARG NEXT_PUBLIC_GOOGLE_CLIENT_ID
 ARG NEXT_PUBLIC_DEV_SUBSCRIPTION_PLAN
 
 ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
+ENV NEXT_PUBLIC_GOOGLE_CLIENT_ID=$NEXT_PUBLIC_GOOGLE_CLIENT_ID
 ENV NEXT_PUBLIC_DEV_SUBSCRIPTION_PLAN=$NEXT_PUBLIC_DEV_SUBSCRIPTION_PLAN
 ENV NODE_ENV=production
 
@@ -22,7 +24,7 @@ RUN npm run build && mkdir -p /app/public
 FROM node:20-slim AS runner
 WORKDIR /app
 
-# Chromium system dependencies required by Puppeteer for PDF generation
+# Chromium (PDF export) + gosu (drop root after volume chown)
 RUN apt-get update && apt-get install -y --no-install-recommends \
   chromium \
   fonts-liberation \
@@ -40,26 +42,43 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   libxdamage1 \
   libxrandr2 \
   xdg-utils \
-  && rm -rf /var/lib/apt/lists/*
+  gosu \
+  && rm -rf /var/lib/apt/lists/* \
+  && groupadd --gid 1001 nodejs \
+  && useradd --uid 1001 --gid nodejs --home-dir /app --shell /usr/sbin/nologin nextjs
 
-# Tell Puppeteer to use the system Chromium instead of downloading its own
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
-
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
+ENV UPLOAD_DIR=/data/uploads
 
-# Copy the standalone output from builder (includes node_modules for server-only packages)
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
+COPY --from=builder /app/src/templates ./src/templates
+COPY --from=builder /app/templates ./templates
+COPY --from=builder /app/db/migrations ./db/migrations
+COPY --from=builder /app/scripts/migrate-runtime.mjs ./scripts/migrate-runtime.mjs
+COPY docker-entrypoint.sh ./docker-entrypoint.sh
 
-# Belt-and-suspenders: ship pdfjs + native canvas + pdf-parse fallback for CV PDF parsing
+# Extra native/parser packages Next standalone tracing can miss
 COPY --from=builder /app/node_modules/pdfjs-dist ./node_modules/pdfjs-dist
 COPY --from=builder /app/node_modules/pdf-parse ./node_modules/pdf-parse
 COPY --from=builder /app/node_modules/@napi-rs ./node_modules/@napi-rs
+COPY --from=builder /app/node_modules/postgres ./node_modules/postgres
+
+RUN chmod +x /app/docker-entrypoint.sh \
+  && mkdir -p /data/uploads \
+  && chown -R nextjs:nodejs /app /data/uploads
 
 EXPOSE 3000
 
-CMD ["node", "server.js"]
+# Liveness only — full dependency checks are at GET /api/health
+HEALTHCHECK --interval=30s --timeout=5s --start-period=45s --retries=5 \
+  CMD node -e "fetch('http://127.0.0.1:3000/api/health/live').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
+# Entrypoint starts as root to chown the uploads volume, then drops to nextjs.
+# Chromium PDF export uses --no-sandbox (see src/services/pdfRenderer.ts).
+ENTRYPOINT ["/app/docker-entrypoint.sh"]

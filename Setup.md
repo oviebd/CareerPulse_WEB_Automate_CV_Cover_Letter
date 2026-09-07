@@ -1,267 +1,250 @@
 # CareerPulse — Docker & VPS Deployment Guide
 
-## Prerequisites
+Production architecture:
 
-- Docker & Docker Compose installed locally (for building/testing)
-- A VPS with at least **2 vCPU / 2 GB RAM** (4 GB recommended — Puppeteer is memory-heavy)
-- Ubuntu 22.04 LTS on the VPS (recommended)
-- A domain name pointed to your VPS IP
-
----
-
-## Project Files
-
-| File | Purpose |
-|---|---|
-| `Dockerfile` | Multi-stage build: compiles Next.js, then creates a lean runner with Chromium for PDF generation |
-| `docker-compose.yml` | Orchestration shortcut — loads secrets from `.env.prod` at runtime |
-| `.dockerignore` | Excludes `node_modules`, build artifacts, and secrets from the Docker build context |
-
----
-
-## Environment Variables
-
-### Build-time (`NEXT_PUBLIC_*`)
-
-These are **baked into the client bundle** during `npm run build`. If they change, you must rebuild the image.
-
-| Variable | Description |
-|---|---|
-| `NEXT_PUBLIC_APP_URL` | Your production domain (e.g. `https://yourdomain.com`) |
-| `NEXT_PUBLIC_DEV_SUBSCRIPTION_PLAN` | Dev-only plan override (leave empty in production) |
-
-### Runtime (secrets — never baked into the image)
-
-Loaded at container start from `.env.prod`. Keep this file out of version control.
-
-| Variable | Description |
-|---|---|
-| `DATABASE_URL` | Postgres connection string (auto-set in docker-compose for `app`) |
-| `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | Postgres container credentials |
-| `AUTH_SECRET` | Auth.js session secret (or reuse `JWT_SECRET`) |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth (redirect: `{APP_URL}/api/auth/callback/google`) |
-| `UPLOAD_DIR` | Local file storage root (`/data/uploads` in Docker; `./data/uploads` for `npm run dev`) |
-| `ANTHROPIC_API_KEY` | Claude API key |
-| `ANTHROPIC_MODEL` | Claude model ID (e.g. `claude-haiku-4-5-20251001`) |
-| `CV_ANALYZER_API_MODEL` | Model used for job fit analysis |
-| `JWT_SECRET` | Secret for signing JWTs |
-| `RESEND_API_KEY` | Resend email API key |
-| `EMAIL_FROM` | Sender email address |
-| `SSLCOMMERZ_STORE_ID` | SSLCommerz store ID |
-| `SSLCOMMERZ_STORE_PASSWORD` | SSLCommerz store password |
-| `SSLCOMMERZ_IS_LIVE` | `true` for production, `false` for sandbox |
-
-### Backups (Postgres)
-
-Nightly backup script: [`db/backup.sh`](db/backup.sh)
-
-```bash
-chmod +x db/backup.sh
-./db/backup.sh
+```text
+GitHub (branch main)
+  → CI tests
+  → Docker build in GitHub Actions
+  → GHCR (sha-<commit> and latest)
+  → VPS: docker compose pull && up -d
+  → Nginx (HTTPS) → 127.0.0.1:3000
 ```
 
-Requires the `careerpulse-db` container to be running.
+The VPS is a **runtime** machine. It must not compile the Next.js app or run `docker compose build`.
+
+LLM/operator contract (names, isolation, pipelines, forbidden commands): **[CICD.md](CICD.md)**.
 
 ---
 
-## Local Testing
+## Prerequisites
 
-Build and run the container locally before deploying:
+- Docker Engine + Compose plugin on the VPS
+- About **2 GB RAM** for the app container (4 GB host recommended — Puppeteer is memory-heavy)
+- Ubuntu 22.04 LTS (recommended)
+- A domain name pointed at the VPS
+- GitHub repository with Actions enabled
+
+---
+
+## Environment variables
+
+See [`.env.example`](.env.example) and [`.env.prod.example`](.env.prod.example).
+
+### PUBLIC BUILD-TIME (GitHub Actions **Variables**, also Docker build-args)
+
+These are baked into the browser bundle. Changing them requires a new image.
+
+| Variable | Notes |
+|---|---|
+| `NEXT_PUBLIC_APP_URL` | Public **HTTPS** origin, e.g. `https://your-domain`. Never `localhost` or a Docker hostname. |
+| `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | Optional. Public Google OAuth client id (same as `GOOGLE_CLIENT_ID`). |
+
+### PRIVATE RUNTIME SECRET (VPS `.env.prod` only)
+
+Never pass these as Docker build-args. Never put them in `NEXT_PUBLIC_*`.
+
+| Variable | Notes |
+|---|---|
+| `POSTGRES_PASSWORD` | Strong password; Compose injects `DATABASE_URL` for `app` |
+| `AUTH_SECRET` / `JWT_SECRET` | `openssl rand -base64 32` |
+| `ANTHROPIC_API_KEY` | Claude API key |
+| `GOOGLE_CLIENT_SECRET` | Server-side OAuth secret |
+| `RESEND_API_KEY` | Email |
+| `SSLCOMMERZ_STORE_ID` / `SSLCOMMERZ_STORE_PASSWORD` | Payments |
+
+### SERVER-ONLY NON-SECRET (VPS `.env.prod`)
+
+| Variable | Notes |
+|---|---|
+| `AUTH_URL` | Same HTTPS origin as `NEXT_PUBLIC_APP_URL` |
+| `AUTH_TRUST_HOST` | `true` behind Nginx |
+| `POSTGRES_USER` / `POSTGRES_DB` | Defaults `careerpulse` |
+| `ANTHROPIC_MODEL` / `CV_ANALYZER_API_MODEL` | Model ids |
+| `SSLCOMMERZ_IS_LIVE` | `true` only for live payments |
+| `SUPER_ADMIN_EMAILS` | Comma-separated bootstrap admins |
+| `APP_BIND_HOST` / `APP_PORT` | Defaults `127.0.0.1` and `3000` |
+| `CAREERPULSE_IMAGE` | Written by CI into `.env.deploy` |
+
+`DATABASE_URL` is set by Compose for the app container — do not put a public host or credentials in frontend variables.
+
+---
+
+## Local testing (build allowed)
 
 ```bash
+cp .env.prod.example .env.prod
+# set AUTH_SECRET, POSTGRES_PASSWORD, ANTHROPIC_API_KEY, NEXT_PUBLIC_APP_URL=http://localhost:3000
 docker compose -f docker-compose.dev.yml --env-file .env.prod up --build
 ```
 
-Visit `http://localhost:3000` to verify the app works. Check logs with:
+Health:
 
 ```bash
-docker compose logs -f
+curl -s http://localhost:3000/api/health/live
+curl -s http://localhost:3000/api/health
 ```
 
-Stop the container:
-
-```bash
-docker compose down
-```
+`--build` is for **local development only**.
 
 ---
 
-## VPS Setup (First Time)
+## GitHub configuration (required before CD)
 
-### 1. Install Docker
+Create a GitHub **Environment** named `production` (used by the deploy job).
+
+### Variables (Settings → Secrets and variables → Actions → Variables)
+
+| Name | Value |
+|---|---|
+| `NEXT_PUBLIC_APP_URL` | `https://your-real-domain` |
+| `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | Optional public OAuth client id |
+
+### Secrets
+
+| Name | Value |
+|---|---|
+| `VPS_HOST` | VPS hostname or IP |
+| `VPS_USER` | SSH user that can run Docker |
+| `VPS_SSH_KEY` | Private key for that user |
+| `VPS_PORT` | SSH port (usually `22`) |
+
+Restrict the `production` environment to the `main` branch. Protect `main` so it only merges via reviewed pull requests.
+
+The image is pushed to `ghcr.io/<owner>/<repo>` (lowercased). Keep the package **private**. The deploy job logs into GHCR on the VPS with the job `GITHUB_TOKEN` for the duration of the pull.
+
+---
+
+## VPS first-time setup
+
+### 1. Docker
 
 ```bash
-ssh root@your-vps-ip
-
 apt update && apt upgrade -y
 curl -fsSL https://get.docker.com | sh
 systemctl enable docker && systemctl start docker
 apt install -y docker-compose-plugin
 ```
 
-### 2. Install Nginx and Certbot
+### 2. Nginx and Certbot
 
 ```bash
 apt install -y nginx certbot python3-certbot-nginx
 ```
 
-### 3. Copy Project Files to VPS
-
-From your local machine:
+### 3. Application directory
 
 ```bash
-rsync -az \
-  --exclude '.git' \
-  --exclude 'node_modules' \
-  --exclude '.next' \
-  ./ root@your-vps-ip:/app/careerpulse/
+mkdir -p /opt/careerpulse
+# copy .env.prod.example from the repo, then:
+nano /opt/careerpulse/.env.prod
 ```
 
-### 4. Configure Environment on VPS
+Set production values (HTTPS `NEXT_PUBLIC_APP_URL` and `AUTH_URL`, strong `POSTGRES_PASSWORD`, `AUTH_SECRET`, API keys). Do not commit this file.
 
-SSH into the VPS and update `.env.prod`:
+CI copies `docker-compose.yml`, `db/*.sql`, and `scripts/vps-pull-up.sh` into `/opt/careerpulse`. Schema/seed SQL are used only when the Postgres volume is empty.
+
+### 4. Reverse proxy
+
+Use [`infra/nginx-careerpulse.conf.example`](infra/nginx-careerpulse.conf.example). Replace the hostname, enable the site, then:
 
 ```bash
-cd /app/careerpulse
-nano .env.prod
-```
-
-Make sure `NEXT_PUBLIC_APP_URL` is set to your real domain:
-
-```
-NEXT_PUBLIC_APP_URL=https://yourdomain.com
-```
-
-### 5. Build and Start the Container
-
-```bash
-docker compose up -d --build
-```
-
-Verify it's running:
-
-```bash
-docker ps
-docker logs careerpulse -f
-```
-
----
-
-## Nginx Reverse Proxy
-
-Create the site config:
-
-```bash
-nano /etc/nginx/sites-available/careerpulse
-```
-
-Paste the following (replace `yourdomain.com`):
-
-```nginx
-server {
-    listen 80;
-    server_name yourdomain.com www.yourdomain.com;
-
-    client_max_body_size 10M;
-
-    location / {
-        proxy_pass http://localhost:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
-        proxy_read_timeout 120s;
-    }
-}
-```
-
-Enable it and reload Nginx:
-
-```bash
-ln -s /etc/nginx/sites-available/careerpulse /etc/nginx/sites-enabled/
-nginx -t && systemctl reload nginx
-```
-
----
-
-## SSL Certificate (Free via Let's Encrypt)
-
-```bash
-certbot --nginx -d yourdomain.com -d www.yourdomain.com
+certbot --nginx -d your-domain
 systemctl enable certbot.timer
 ```
 
-Certbot auto-updates the Nginx config and sets up auto-renewal.
+Google OAuth redirect: `https://your-domain/api/auth/callback/google`.
 
----
+SSLCommerz IPN: `https://your-domain/api/payment/ipn`.
 
-## Deploying Updates
+### 5. Backups
 
 ```bash
-# On VPS — pull latest code and rebuild
-cd /app/careerpulse
-git pull
-docker compose up -d --build
+# from /opt/careerpulse after the db container exists
+chmod +x db/backup.sh
+BACKUP_DIR=/opt/careerpulse/backups ./db/backup.sh
 ```
 
-Old containers are replaced automatically. Zero-downtime deployments require a load balancer (optional).
+Schedule nightly via cron (example):
+
+```bash
+0 2 * * * cd /opt/careerpulse && BACKUP_DIR=/opt/careerpulse/backups ./db/backup.sh
+```
+
+Copy gzip dumps off the VPS. Restore is `gunzip -c dump.sql.gz | docker exec -i careerpulse-db psql -U careerpulse careerpulse` after a maintenance window. Test restore on a non-production volume first.
 
 ---
 
-## Pros and Cons
+## Production deploy (CI)
 
-### Pros
-- Full control over the runtime environment (Node version, Chromium, system libs)
-- Puppeteer works reliably — you control the Chromium installation
-- Predictable: the same Docker image runs locally and in production
-- Easy rollback: re-run the previous image tag
-- No vendor lock-in
-- Cost-effective for sustained traffic vs. serverless platforms
+Push or merge to **`main`**. The workflow:
 
-### Cons
-- You manage server security, OS updates, and uptime
-- No automatic scaling — provision for peak load manually
-- Puppeteer requires ~300 MB of extra Chromium system dependencies in the image
-- `NEXT_PUBLIC_*` vars require a full image rebuild if changed
-- No CDN edge caching out of the box (add Cloudflare in front to mitigate)
+1. Runs unit tests (`npm test`). Failed tests stop the pipeline.
+2. Builds the production image in GitHub Actions (not on the VPS).
+3. Pushes `sha-<git-sha>` and `latest` to GHCR.
+4. Copies Compose/SQL to `/opt/careerpulse`.
+5. Runs [`scripts/vps-pull-up.sh`](scripts/vps-pull-up.sh): `docker compose pull` then `docker compose up -d`.
+6. Checks `GET /api/health/live`.
+
+Forbidden on the VPS:
+
+```bash
+docker compose build
+docker compose up --build
+docker compose down -v
+docker system prune -a
+```
+
+---
+
+## Rollback
+
+Images are immutable by commit. On the VPS:
+
+```bash
+cd /opt/careerpulse
+printf 'CAREERPULSE_IMAGE=ghcr.io/<owner>/<repo>:sha-<previous-commit>\n' > .env.deploy
+docker compose --env-file .env.prod --env-file .env.deploy pull
+docker compose --env-file .env.prod --env-file .env.deploy up -d --remove-orphans
+```
+
+Rolling back application code does **not** undo database migrations. If a release included a destructive schema change, restore from backup first.
+
+---
+
+## Health
+
+| URL | Meaning |
+|---|---|
+| `/api/health/live` | Process is up (Docker / CD) |
+| `/api/health` | Database, auth secret, Anthropic, PDF parser |
+
+---
+
+## Shared VPS notes
+
+- App network: `careerpulse_internal` (not shared with other apps).
+- Postgres is not published.
+- App binds `127.0.0.1:3000` by default. If another app uses host port 3000, set `APP_PORT` in `.env.prod`.
+- No Docker socket, privileged mode, or host networking.
+- Independent volumes `pgdata` and `uploads`.
 
 ---
 
 ## Troubleshooting
 
-**Container exits immediately:**
-```bash
-docker logs careerpulse-app-1
-```
-
-**Puppeteer / PDF generation fails:**
-- Confirm `PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium` is set in the container
-- Run `docker exec -it careerpulse-app-1 chromium --version` to verify Chromium is present
-
-**Port 3000 not reachable:**
-- Check `docker ps` — container must show `0.0.0.0:3000->3000/tcp`
-- Check firewall: `ufw allow 3000` (temporary test) or rely on Nginx on port 80/443
-
-**Out of memory during build:**
-- Build locally and push the image to Docker Hub, then pull it on the VPS (avoids ~1.5 GB build RAM usage on the VPS)
+**Container exits immediately**
 
 ```bash
-# Local
-docker build \
-  --build-arg NEXT_PUBLIC_APP_URL=https://yourdomain.com \
-  -t youruser/careerpulse:latest .
-docker push youruser/careerpulse:latest
-
-# VPS
-docker pull youruser/careerpulse:latest
-docker run -d --name careerpulse --restart unless-stopped \
-  --env-file .env.prod \
-  -e PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
-  -e PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
-  -p 3000:3000 \
-  youruser/careerpulse:latest
+cd /opt/careerpulse
+docker compose --env-file .env.prod --env-file .env.deploy logs --tail=100 app
 ```
+
+**Login fails / missing AUTH_SECRET**  
+Set `AUTH_SECRET` in `.env.prod` and recreate the app container (`up -d`, no `--build`).
+
+**PDF export fails**  
+`docker exec careerpulse chromium --version`
+
+**GHCR pull denied**  
+Confirm the package is linked to this repository and the deploy job `packages: write` permission is present. If the token cannot pull, create a `read:packages` PAT and switch the VPS login to that credential (do not commit it).

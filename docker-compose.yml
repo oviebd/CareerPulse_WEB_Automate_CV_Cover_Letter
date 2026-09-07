@@ -1,5 +1,7 @@
-# Production compose — app + Postgres on the same VPS
-# Runtime secrets: /opt/careerpulse/.env.prod
+# Production runtime — pull pre-built images. Do not build on the VPS.
+# Usage: docker compose --env-file .env.prod up -d
+#
+# CAREERPULSE_IMAGE is set by CI/CD (immutable sha tag) or in .env.prod.
 
 services:
   db:
@@ -19,17 +21,21 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    networks:
+      - internal
+    # Database is not published to the host.
 
   app:
-    image: careerpulse:latest
+    image: ${CAREERPULSE_IMAGE:?Set CAREERPULSE_IMAGE to the GHCR image (e.g. ghcr.io/org/repo:sha-<commit>)}
     container_name: careerpulse
-    pull_policy: never
     restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
+    # Bind to loopback so only the host reverse proxy can reach the app.
+    # Override APP_BIND_HOST / APP_PORT on a shared VPS if 3000 is taken.
     ports:
-      - '3000:3000'
+      - '${APP_BIND_HOST:-127.0.0.1}:${APP_PORT:-3000}:3000'
     env_file:
       - .env.prod
     environment:
@@ -40,7 +46,26 @@ services:
       PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: 'true'
     volumes:
       - uploads:/data/uploads
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/api/health/live').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+    mem_limit: 2g
+    networks:
+      - internal
 
 volumes:
   pgdata:
   uploads:
+
+networks:
+  internal:
+    name: careerpulse_internal

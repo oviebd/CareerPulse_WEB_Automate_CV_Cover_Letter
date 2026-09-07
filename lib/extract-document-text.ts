@@ -27,7 +27,10 @@ export function isAllowedStorageUrl(url: string): boolean {
     const appHost = process.env.NEXT_PUBLIC_APP_URL
       ? new URL(process.env.NEXT_PUBLIC_APP_URL).host
       : null;
-    const allowedHosts = [appHost, 'localhost:3000'].filter(Boolean);
+    const allowedHosts =
+      process.env.NODE_ENV === 'production'
+        ? [appHost].filter(Boolean)
+        : [appHost, 'localhost:3000'].filter(Boolean);
     return (
       (parsed.protocol === 'https:' || parsed.protocol === 'http:') &&
       allowedHosts.includes(parsed.host)

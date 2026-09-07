@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { registerWithCredentials } from '@/lib/auth';
+import { clientIp, rateLimitHit } from '@/lib/rate-limit';
 
 export async function POST(request: Request) {
   try {
+    if (rateLimitHit(`register:${clientIp(request)}`)) {
+      return NextResponse.json({ error: 'Too many attempts' }, { status: 429 });
+    }
     const body = (await request.json()) as {
       email?: string;
       password?: string;

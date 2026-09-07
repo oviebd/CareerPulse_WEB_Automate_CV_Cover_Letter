@@ -58,7 +58,11 @@ export function createSignedLocalPath(
 ): string {
   const exp = Math.floor(Date.now() / 1000) + expiresInSec;
   const payload = `${bucket}:${objectPath}:${exp}`;
-  const secret = process.env.AUTH_SECRET ?? process.env.JWT_SECRET ?? 'dev-secret';
+  const secret =
+    process.env.AUTH_SECRET?.trim() ||
+    process.env.JWT_SECRET?.trim() ||
+    (process.env.NODE_ENV === 'production' ? '' : 'dev-secret');
+  if (!secret) throw new Error('AUTH_SECRET or JWT_SECRET must be set');
   const sig = crypto.createHmac('sha256', secret).update(payload).digest('hex');
   const token = Buffer.from(`${payload}:${sig}`).toString('base64url');
   return `/api/files/signed?token=${token}`;
@@ -70,7 +74,11 @@ export function verifySignedToken(token: string): { bucket: StorageBucket; path:
     const [bucket, objectPath, expStr, sig] = decoded.split(':');
     if (!bucket || !objectPath || !expStr || !sig) return null;
     if (Number(expStr) < Math.floor(Date.now() / 1000)) return null;
-    const secret = process.env.AUTH_SECRET ?? process.env.JWT_SECRET ?? 'dev-secret';
+    const secret =
+      process.env.AUTH_SECRET?.trim() ||
+      process.env.JWT_SECRET?.trim() ||
+      (process.env.NODE_ENV === 'production' ? '' : 'dev-secret');
+    if (!secret) return null;
     const payload = `${bucket}:${objectPath}:${expStr}`;
     const expected = crypto.createHmac('sha256', secret).update(payload).digest('hex');
     if (expected !== sig) return null;

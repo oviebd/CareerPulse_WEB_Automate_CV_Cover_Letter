@@ -31,10 +31,22 @@ yarn-error.log*
 # local file uploads (`npm run dev` / UPLOAD_DIR=./data/uploads)
 /data/
 
-# local env files
+# local env files and deploy overlays
 .env*.local
 .env*.prod
 .env
+.env.deploy
+!.env.example
+!.env.prod.example
+
+# secrets / keys
+*.key
+*.p12
+*.mobileprovision
+id_rsa
+
+# database dumps
+/backups/
 
 # vercel
 .vercel

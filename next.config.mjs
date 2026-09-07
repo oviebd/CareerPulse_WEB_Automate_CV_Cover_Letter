@@ -48,6 +48,18 @@ const nextConfig = {
     })),
   },
   poweredByHeader: false,
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+        ],
+      },
+    ];
+  },
   reactStrictMode: true,
   /** Hide the bottom-left dev "N" indicator in development (logout lives in the profile avatar menu). */
   devIndicators: false,
