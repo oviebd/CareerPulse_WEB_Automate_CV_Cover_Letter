@@ -3,8 +3,7 @@ import { getSessionUser } from '@/lib/auth/session';
 import { withInterviewAiRoute } from '@/lib/ai/with-user-route';
 import { requireInterviewAccess, err } from '@/lib/interview/api-auth';
 import { runAnalyzePipeline } from '@/lib/interview/orchestrator';
-import { mapOrchestratorError } from '@/lib/interview/errors';
-import { interviewErrorResponse } from '@/lib/interview/api-errors';
+import { handleInterviewApiError } from '@/lib/interview/api-errors';
 
 export const runtime = 'nodejs';
 export const maxDuration = 240;
@@ -38,7 +37,6 @@ export async function POST(request: Request) {
     return NextResponse.json(result);
   } catch (e) {
     console.error('interview/clarify', e);
-    const mapped = mapOrchestratorError(e);
-    return interviewErrorResponse(mapped);
+    return handleInterviewApiError(e);
   }
 }

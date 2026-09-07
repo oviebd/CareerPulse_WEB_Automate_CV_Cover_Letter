@@ -14,6 +14,9 @@ type ProfilePatch = Partial<
     | 'subscription_status'
     | 'subscription_expires_at'
     | 'promo_code_used'
+    | 'can_use_ai'
+    | 'can_create_documents'
+    | 'can_use_interview_prep'
   >
 >;
 
@@ -41,6 +44,9 @@ async function update(userId: string, patch: ProfilePatch): Promise<Profile> {
   }
   dbPatch.updatedAt = new Date();
   if (patch.promo_code_used !== undefined) dbPatch.promoCodeUsed = patch.promo_code_used;
+  if (patch.can_use_ai !== undefined) dbPatch.canUseAi = patch.can_use_ai;
+  if (patch.can_create_documents !== undefined) dbPatch.canCreateDocuments = patch.can_create_documents;
+  if (patch.can_use_interview_prep !== undefined) dbPatch.canUseInterviewPrep = patch.can_use_interview_prep;
   const [row] = await db.update(profiles).set(dbPatch).where(eq(profiles.id, userId)).returning();
   if (!row) throw new Error('Profile not found');
   return toSnake(row) as unknown as Profile;

@@ -9,6 +9,8 @@ import {
   isAllowedStorageUrl,
 } from '@/lib/extract-document-text';
 import { getSessionUser } from '@/lib/auth/session';
+import { runWithAiUsageContext } from '@/lib/ai/usage-context';
+import { handleAiRouteError } from '@/lib/credits/api-errors';
 import { getCvsRepo } from '@/lib/db/repositories/cvs';
 import { getProfilesRepo } from '@/lib/db/repositories/profiles';
 import { fetchStorageFileBuffer } from '@/lib/storage/fetch-file';
@@ -122,8 +124,13 @@ export async function POST(request: Request) {
     let extracted: ExtractedCoverLetter | null = null;
     if (anthropicApiKeyConfigured()) {
       try {
-        extracted = await extractCoverLetterFromText(textEx.rawText);
+        extracted = await runWithAiUsageContext(
+          { userId: user.id, category: 'cover_letter', operation: 'extract' },
+          () => extractCoverLetterFromText(textEx.rawText)
+        );
       } catch (e) {
+        const creditErr = handleAiRouteError(e);
+        if (creditErr) return creditErr;
         console.error('cover-letter Claude extract failed', e);
         extracted = null;
         void describeAnthropicError(e);

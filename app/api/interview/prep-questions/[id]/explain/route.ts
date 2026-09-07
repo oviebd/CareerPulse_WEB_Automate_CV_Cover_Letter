@@ -3,8 +3,7 @@ import { getSessionUser } from '@/lib/auth/session';
 import { withInterviewAiRoute } from '@/lib/ai/with-user-route';
 import { requireInterviewAccess, err } from '@/lib/interview/api-auth';
 import { runExplainPrepQuestion } from '@/lib/interview/orchestrator';
-import { mapOrchestratorError } from '@/lib/interview/errors';
-import { interviewErrorResponse } from '@/lib/interview/api-errors';
+import { handleInterviewApiError } from '@/lib/interview/api-errors';
 import type { PrepExplainTurn } from '@/types/interview';
 
 export const runtime = 'nodejs';
@@ -60,7 +59,6 @@ export async function POST(request: Request, { params }: RouteContext) {
     if (e instanceof Error && e.message === 'Prep question not found') {
       return err('Not found', 404);
     }
-    const mapped = mapOrchestratorError(e);
-    return interviewErrorResponse(mapped);
+    return handleInterviewApiError(e);
   }
 }

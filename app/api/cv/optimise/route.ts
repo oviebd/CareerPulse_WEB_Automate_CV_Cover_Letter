@@ -3,8 +3,7 @@ import { getSessionUser } from '@/lib/auth/session';
 import { generateCoverLetterText } from '@/lib/claude';
 import { claudeComplete } from '@/lib/ai/anthropic-gateway';
 import { rateLimitHit } from '@/lib/rate-limit';
-import { resolveEffectiveTier } from '@/lib/dev-subscription';
-import { assertGenerationAllowed } from '@/lib/subscription-server';
+import { handleAiRouteError } from '@/lib/credits/api-errors';
 import type {
   CVData,
   CoverLetterLength,
@@ -15,7 +14,6 @@ import type {
 import { migrateLegacyCVData } from '@/src/utils/cvDefaults';
 import { clampSkillCategories } from '@/src/utils/migrateSkills';
 import { getCvsRepo } from '@/lib/db/repositories/cvs';
-import { getProfilesRepo } from '@/lib/db/repositories/profiles';
 import { runWithAiUsageContext } from '@/lib/ai/usage-context';
 
 export const runtime = 'nodejs';
@@ -292,26 +290,6 @@ export async function POST(request: Request) {
     const emphasis =
       body.specific_emphasis?.trim() ?? body.specificEmphasis?.trim() ?? '';
 
-    const prof = await getProfilesRepo().getById(user.id);
-    const tier = resolveEffectiveTier(prof?.subscription_tier);
-
-    try {
-      await assertGenerationAllowed(user.id, tier);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : '';
-      if (msg.startsWith('GENERATION_LIMIT_REACHED')) {
-        return NextResponse.json(
-          {
-            error: 'GENERATION_LIMIT_REACHED',
-            message: 'Monthly tailored application limit reached. Upgrade to Pro for unlimited.',
-            upgrade_url: '/settings/billing',
-          },
-          { status: 402 }
-        );
-      }
-      throw e;
-    }
-
     let cvRow: CvRow | null = null;
     if (body.core_cv_id) {
       cvRow = (await getCvsRepo().getById(user.id, body.core_cv_id)) as CvRow | null;
@@ -463,6 +441,8 @@ export async function POST(request: Request) {
     }
     });
   } catch (e) {
+    const creditErr = handleAiRouteError(e);
+    if (creditErr) return creditErr;
     console.error('cv optimise', e);
     return NextResponse.json(
       { error: 'generation_failed' },

@@ -28,6 +28,7 @@ export const jobStatusEnum = pgEnum('job_status', [
   'archived',
 ]);
 
+
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   email: text('email').notNull().unique(),
@@ -36,6 +37,8 @@ export const users = pgTable('users', {
   emailVerified: timestamp('email_verified', { withTimezone: true }),
   fullName: text('full_name'),
   avatarUrl: text('avatar_url'),
+  role: text('role').notNull().default('user'),
+  isActive: boolean('is_active').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -54,6 +57,9 @@ export const profiles = pgTable('profiles', {
   isOnboarded: boolean('is_onboarded').notNull().default(false),
   preferredClTemplateId: text('preferred_cl_template_id').default('cl-classic'),
   promoCodeUsed: text('promo_code_used'),
+  canUseAi: boolean('can_use_ai').notNull().default(true),
+  canCreateDocuments: boolean('can_create_documents').notNull().default(true),
+  canUseInterviewPrep: boolean('can_use_interview_prep').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -522,6 +528,85 @@ export const interviewPrepQuestions = pgTable(
   ]
 );
 
+export const plans = pgTable('plans', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  slug: text('slug').notNull().unique(),
+  name: text('name').notNull(),
+  description: text('description'),
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const creditBalances = pgTable('credit_balances', {
+  userId: uuid('user_id')
+    .primaryKey()
+    .references(() => profiles.id, { onDelete: 'cascade' }),
+  balance: integer('balance').notNull().default(0),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const creditRuleVersions = pgTable(
+  'credit_rule_versions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    inputTokenUnit: integer('input_token_unit').notNull().default(1000),
+    inputTokenCredits: integer('input_token_credits').notNull().default(1),
+    outputTokenUnit: integer('output_token_unit').notNull().default(1000),
+    outputTokenCredits: integer('output_token_credits').notNull().default(5),
+    isActive: boolean('is_active').notNull().default(false),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+  },
+  (t) => [index('credit_rule_versions_active_idx').on(t.isActive)]
+);
+
+export const creditTransactions = pgTable(
+  'credit_transactions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    type: text('type').notNull(),
+    amount: integer('amount').notNull(),
+    balanceBefore: integer('balance_before').notNull(),
+    balanceAfter: integer('balance_after').notNull(),
+    source: text('source'),
+    referenceId: uuid('reference_id'),
+    aiUsageId: uuid('ai_usage_id'),
+    description: text('description'),
+    ruleSnapshot: jsonb('rule_snapshot'),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('credit_transactions_user_created_idx').on(t.userId, t.createdAt),
+    index('credit_transactions_type_idx').on(t.type),
+    index('credit_transactions_ai_usage_idx').on(t.aiUsageId),
+  ]
+);
+
+export const systemSettings = pgTable('system_settings', {
+  key: text('key').primaryKey(),
+  value: jsonb('value').notNull().default({}),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedBy: uuid('updated_by').references(() => users.id, { onDelete: 'set null' }),
+});
+
+export const promoCodes = pgTable('promo_codes', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  code: text('code').notNull().unique(),
+  isActive: boolean('is_active').notNull().default(true),
+  maxRedemptions: integer('max_redemptions'),
+  redemptionCount: integer('redemption_count').notNull().default(0),
+  grantsPlan: text('grants_plan'),
+  bonusCredits: integer('bonus_credits').notNull().default(0),
+  expiresAt: timestamp('expires_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const aiUsageEvents = pgTable(
   'ai_usage_events',
   {
@@ -539,13 +624,29 @@ export const aiUsageEvents = pgTable(
     model: text('model'),
     promptVersion: text('prompt_version'),
     relatedId: uuid('related_id'),
+    provider: text('provider').default('anthropic'),
+    feature: text('feature'),
+    requestId: text('request_id'),
+    creditsConsumed: integer('credits_consumed').notNull().default(0),
+    creditRuleVersion: uuid('credit_rule_version').references(() => creditRuleVersions.id, {
+      onDelete: 'set null',
+    }),
+    tokenSource: text('token_source').notNull().default('api'),
+    cachedInputTokens: integer('cached_input_tokens').notNull().default(0),
+    metadata: jsonb('metadata').notNull().default({}),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     index('ai_usage_events_user_created_idx').on(t.userId, t.createdAt),
     index('ai_usage_events_user_category_idx').on(t.userId, t.category),
+    index('ai_usage_events_feature_created_idx').on(t.feature, t.createdAt),
   ]
 );
 
 export type DbUser = typeof users.$inferSelect;
 export type DbProfile = typeof profiles.$inferSelect;
+export type DbCreditBalance = typeof creditBalances.$inferSelect;
+export type DbCreditTransaction = typeof creditTransactions.$inferSelect;
+export type DbCreditRuleVersion = typeof creditRuleVersions.$inferSelect;
+export type DbPromoCode = typeof promoCodes.$inferSelect;
+export type DbPlan = typeof plans.$inferSelect;

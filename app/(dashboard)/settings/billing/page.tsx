@@ -157,7 +157,7 @@ export default function BillingPage() {
         <p className="mt-1 text-sm text-[var(--color-muted)]">Manage your plan and payment details.</p>
       </div>
 
-      {/* Current plan — Pro */}
+      {/* Current plan — Premium */}
       {tier === 'pro' ? (
         <div className="relative overflow-hidden rounded-xl border border-[var(--color-primary-500)]/30 bg-gradient-to-br from-[var(--color-primary-500)]/10 via-[var(--color-surface)] to-[var(--color-accent-mint)]/10 p-6 shadow-sm">
           <div className="pointer-events-none absolute right-0 top-0 h-40 w-40 -translate-y-12 translate-x-12 rounded-full bg-[var(--color-primary-500)]/10 blur-3xl" />
@@ -169,7 +169,7 @@ export default function BillingPage() {
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h2 className="font-display text-lg font-bold text-[var(--color-text-primary)]">Pro Plan</h2>
+                    <h2 className="font-display text-lg font-bold text-[var(--color-text-primary)]">Premium Plan</h2>
                     <span className="rounded-full bg-[var(--color-accent-gold)]/20 px-2.5 py-0.5 text-xs font-semibold capitalize text-[var(--color-accent-gold)]">
                       {status}
                     </span>
@@ -239,7 +239,7 @@ export default function BillingPage() {
                 <span>{feat.label}</span>
                 {!feat.included && (
                   <span className="rounded bg-[var(--color-accent-gold)]/15 px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[var(--color-accent-gold)]">
-                    Pro
+                    Premium
                   </span>
                 )}
               </div>
@@ -251,7 +251,7 @@ export default function BillingPage() {
       {/* Upgrade section — free users only */}
       {tier === 'free' && (
         <div>
-          <h2 className="mb-4 font-display text-lg font-semibold">Upgrade to Pro</h2>
+          <h2 className="mb-4 font-display text-lg font-semibold">Upgrade to Premium</h2>
           <div className="grid gap-4 sm:grid-cols-2">
             {PRO_PLANS.map((key) => {
               const p = PRICING[key];
@@ -403,23 +403,23 @@ export default function BillingPage() {
       <Modal
         isOpen={showPromoSuccess}
         onClose={() => setShowPromoSuccess(false)}
-        title="You're now Pro!"
+        title="You're now Premium!"
       >
         <div className="space-y-4 text-center">
           <div className="text-5xl">🎉</div>
           <p className="text-[var(--color-text-primary)]">
-            Promo code applied successfully. Pro access is now unlimited.
+            Promo code applied successfully. Premium access is now unlimited.
           </p>
           <p className="text-sm text-[var(--color-muted)]">
             You now have unlimited tailored applications, premium CV templates, AI
-            enhancements, DOCX export, and all Pro features.
+            enhancements, DOCX export, and all Premium features.
           </p>
           <Button
             variant="primary"
             className="w-full"
             onClick={() => setShowPromoSuccess(false)}
           >
-            Start using Pro
+            Start using Premium
           </Button>
         </div>
       </Modal>
@@ -433,7 +433,7 @@ export default function BillingPage() {
         <div className="space-y-4">
           <p className="text-sm text-[var(--color-muted)]">
             Your plan will be downgraded to Free immediately. You will lose access to
-            unlimited applications, AI enhancements, DOCX export, and all Pro features.
+            unlimited applications, AI enhancements, DOCX export, and all Premium features.
           </p>
           <div className="flex gap-3">
             <Button

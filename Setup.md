@@ -40,7 +40,7 @@ Loaded at container start from `.env.prod`. Keep this file out of version contro
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | Postgres container credentials |
 | `AUTH_SECRET` | Auth.js session secret (or reuse `JWT_SECRET`) |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth (redirect: `{APP_URL}/api/auth/callback/google`) |
-| `UPLOAD_DIR` | Local file storage root (default `/data/uploads` in Docker) |
+| `UPLOAD_DIR` | Local file storage root (`/data/uploads` in Docker; `./data/uploads` for `npm run dev`) |
 | `ANTHROPIC_API_KEY` | Claude API key |
 | `ANTHROPIC_MODEL` | Claude model ID (e.g. `claude-haiku-4-5-20251001`) |
 | `CV_ANALYZER_API_MODEL` | Model used for job fit analysis |

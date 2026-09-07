@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/auth/session';
 import { getCoverLettersRepo } from '@/lib/db/repositories/cover-letters';
+import { guardFeatureAccess } from '@/lib/access/guard-feature';
+import { Feature } from '@/lib/access/feature-flags';
 
 function err(msg: string, code: string | undefined, status: number) {
   return NextResponse.json({ error: msg, code }, { status });
@@ -25,6 +27,9 @@ export async function POST(request: Request) {
   try {
     const user = await getSessionUser();
     if (!user) return err('Unauthorized', 'UNAUTHORIZED', 401);
+
+    const guard = await guardFeatureAccess(user.id, Feature.CV_BUILDER);
+    if (!guard.ok) return err(guard.error, guard.code, guard.status);
 
     const body = (await request.json().catch(() => ({}))) as {
       name?: string | null;

@@ -1,25 +1,25 @@
 import { NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/auth/session';
-import { resolveEffectiveTier } from '@/lib/dev-subscription';
-import { canAccessFeature } from '@/lib/subscription';
 import { rateLimitHit } from '@/lib/rate-limit';
-import { getProfilesRepo } from '@/lib/db/repositories/profiles';
+import { assertFeatureAccess, FeatureDisabledError, featureDisabledMessage } from '@/lib/access/user-permissions';
+import { Feature } from '@/lib/access/feature-flags';
 
 export const runtime = 'nodejs';
 
+/** Authenticated users may use interview prep; AI credits are enforced in claudeComplete. */
 export async function requireInterviewAccess(userId: string) {
-  const profile = await getProfilesRepo().getById(userId);
-  const tier = resolveEffectiveTier(profile?.subscription_tier);
-  if (!canAccessFeature(tier, 'interviewPrep')) {
-    return NextResponse.json(
-      {
-        error: 'UPGRADE_REQUIRED',
-        message: 'Interview preparation requires a Pro plan.',
-        upgrade_url: '/settings/billing',
-      },
-      { status: 403 }
-    );
+  try {
+    await assertFeatureAccess(userId, Feature.INTERVIEW_PREPARATION);
+  } catch (err) {
+    if (err instanceof FeatureDisabledError) {
+      return NextResponse.json(
+        { error: featureDisabledMessage(Feature.INTERVIEW_PREPARATION), code: 'FEATURE_DISABLED' },
+        { status: 403 }
+      );
+    }
+    return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 });
   }
+
   if (rateLimitHit(`interview:${userId}`)) {
     return NextResponse.json({ error: 'RATE_LIMIT' }, { status: 429 });
   }
@@ -28,4 +28,10 @@ export async function requireInterviewAccess(userId: string) {
 
 export function err(msg: string, status: number, code?: string) {
   return NextResponse.json({ error: msg, code }, { status });
+}
+
+export async function requireAuthenticatedUser() {
+  const user = await getSessionUser();
+  if (!user) return null;
+  return user;
 }

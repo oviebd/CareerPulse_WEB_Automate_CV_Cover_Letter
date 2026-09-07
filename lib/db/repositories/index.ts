@@ -7,3 +7,7 @@ export { getPaymentsRepo } from './payments';
 export { getUsersRepo } from './users';
 export { getInterviewRepo } from './interview';
 export { getAiUsageRepo } from './ai-usage';
+export { getCreditsRepo } from './credits';
+export { getPromoRepo } from './promo';
+export { getPlansRepo } from './plans';
+export { getAdminRepo } from './admin';

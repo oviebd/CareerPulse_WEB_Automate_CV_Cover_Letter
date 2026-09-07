@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { InterviewError } from '@/lib/interview/errors';
+import { mapOrchestratorError } from '@/lib/interview/errors';
+import { handleAiRouteError } from '@/lib/credits/api-errors';
 
 export function interviewErrorResponse(e: InterviewError) {
   const status =
@@ -13,4 +15,10 @@ export function interviewErrorResponse(e: InterviewError) {
         ? 422
         : 500;
   return NextResponse.json({ error: e.message, code: e.code }, { status });
+}
+
+export function handleInterviewApiError(e: unknown) {
+  const creditErr = handleAiRouteError(e);
+  if (creditErr) return creditErr;
+  return interviewErrorResponse(mapOrchestratorError(e));
 }

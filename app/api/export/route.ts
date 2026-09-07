@@ -10,6 +10,7 @@ import { generateCoverLetterDocx } from '@/lib/cover-letter-docx';
 import { exportCV, generatePDF } from '@/lib/pdf';
 import { canAccessFeature } from '@/lib/subscription';
 import { resolveEffectiveTier } from '@/lib/dev-subscription';
+import { assertTemplateAccess } from '@/lib/templates/access';
 import { rateLimitHit } from '@/lib/rate-limit';
 import { CL_TEMPLATE_IDS } from '@/src/config/templateConfig';
 import type { CoverLetter, CVProfile } from '@/types';
@@ -241,6 +242,12 @@ export async function POST(request: Request) {
     }
 
     const profile = await getProfilesRepo().getById(user.id);
+    const tier = resolveEffectiveTier(profile?.subscription_tier ?? 'free');
+    try {
+      await assertTemplateAccess(templateId, tier);
+    } catch {
+      return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+    }
 
     const letter = await getCoverLettersRepo().getById(user.id, body.id);
     if (!letter) {

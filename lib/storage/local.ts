@@ -2,7 +2,8 @@ import fs from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
 
-const UPLOAD_ROOT = process.env.UPLOAD_DIR?.trim() || '/data/uploads';
+const UPLOAD_ROOT =
+  process.env.UPLOAD_DIR?.trim() || path.join(process.cwd(), 'data', 'uploads');
 
 export type StorageBucket = 'cv-uploads' | 'pdf-exports' | 'cv-photos' | 'interview-audio';
 

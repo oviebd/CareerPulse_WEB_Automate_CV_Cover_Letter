@@ -28,6 +28,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# local file uploads (`npm run dev` / UPLOAD_DIR=./data/uploads)
+/data/
+
 # local env files
 .env*.local
 .env*.prod

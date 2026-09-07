@@ -7,8 +7,7 @@ import {
   startInterviewFromManualJob,
 } from '@/lib/interview/orchestrator';
 import { startInterviewFromTopic } from '@/lib/interview/topic-orchestrator';
-import { mapOrchestratorError } from '@/lib/interview/errors';
-import { interviewErrorResponse } from '@/lib/interview/api-errors';
+import { handleInterviewApiError } from '@/lib/interview/api-errors';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -86,6 +85,6 @@ export async function POST(request: Request) {
     return NextResponse.json(result);
   } catch (e) {
     console.error('interview/start', e);
-    return interviewErrorResponse(mapOrchestratorError(e));
+    return handleInterviewApiError(e);
   }
 }

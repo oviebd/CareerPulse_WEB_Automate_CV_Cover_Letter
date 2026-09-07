@@ -15,6 +15,13 @@ export type AiUsageEventInsert = {
   model?: string | null;
   prompt_version?: string | null;
   related_id?: string | null;
+  provider?: string | null;
+  feature?: string | null;
+  request_id?: string | null;
+  credits_consumed?: number;
+  credit_rule_version?: string | null;
+  token_source?: string;
+  metadata?: Record<string, unknown>;
 };
 
 async function insertEvent(event: AiUsageEventInsert) {
@@ -33,6 +40,13 @@ async function insertEvent(event: AiUsageEventInsert) {
       model: event.model ?? null,
       promptVersion: event.prompt_version ?? null,
       relatedId: event.related_id ?? null,
+      provider: event.provider ?? 'anthropic',
+      feature: event.feature ?? null,
+      requestId: event.request_id ?? null,
+      creditsConsumed: event.credits_consumed ?? 0,
+      creditRuleVersion: event.credit_rule_version ?? null,
+      tokenSource: event.token_source ?? 'api',
+      metadata: event.metadata ?? {},
     })
     .returning();
   return row ? toSnake(row) : null;

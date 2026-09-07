@@ -1,13 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/auth/session';
-import { generateCoverLetterStream, scoreATS } from '@/lib/claude';
+import { generateCoverLetterText } from '@/lib/claude';
 import { rateLimitHit } from '@/lib/rate-limit';
-import { resolveEffectiveTier } from '@/lib/dev-subscription';
-import { canAccessFeature } from '@/lib/subscription';
-import { assertGenerationAllowed } from '@/lib/subscription-server';
+import { runWithAiUsageContext } from '@/lib/ai/usage-context';
+import { handleAiRouteError } from '@/lib/credits/api-errors';
 import type { CoverLetterLength, CoverLetterTone } from '@/types';
 import { getCvsRepo } from '@/lib/db/repositories/cvs';
-import { getProfilesRepo } from '@/lib/db/repositories/profiles';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
@@ -39,32 +37,10 @@ export async function POST(request: Request) {
       tone?: CoverLetterTone;
       length?: CoverLetterLength;
       specificEmphasis?: string;
-      templateId?: string;
     };
 
     if (!body.jobDescription?.trim()) {
       return NextResponse.json({ error: 'job_description_required' }, { status: 400 });
-    }
-
-    const prof = await getProfilesRepo().getById(user.id);
-    const tier = resolveEffectiveTier(prof?.subscription_tier);
-
-    try {
-      await assertGenerationAllowed(user.id, tier);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : '';
-      if (msg.startsWith('GENERATION_LIMIT_REACHED')) {
-        const parts = msg.split(':');
-        return NextResponse.json(
-          {
-            error: 'GENERATION_LIMIT_REACHED',
-            tier: parts[1],
-            limit: Number(parts[2]),
-          },
-          { status: 402 }
-        );
-      }
-      throw e;
     }
 
     const cvRows = await getCvsRepo().listByUser(user.id, { includeArchived: true });
@@ -76,82 +52,31 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'cv_profile_required' }, { status: 400 });
     }
     if (!cvRow.is_complete && Number(cvRow.completion_percentage ?? 0) < 40) {
-      return NextResponse.json(
-        { error: 'cv_profile_incomplete' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'cv_profile_incomplete' }, { status: 400 });
     }
 
     const tone = body.tone && TONES.includes(body.tone) ? body.tone : 'professional';
     const length =
       body.length && LENGTHS.includes(body.length) ? body.length : 'medium';
-    const companyName = body.companyName?.trim() || 'the company';
-    const jobTitle = body.jobTitle?.trim() || 'the role';
-    const stream = generateCoverLetterStream({
-      cvProfile: cvRow,
-      jobDescription: body.jobDescription,
-      companyName,
-      jobTitle,
-      tone,
-      length,
-      specificEmphasis: body.specificEmphasis?.trim() ?? '',
-    });
 
-    const encoder = new TextEncoder();
-    let fullText = '';
+    const content = await runWithAiUsageContext(
+      { userId: user.id, category: 'cover_letter', operation: 'generate' },
+      () =>
+        generateCoverLetterText({
+          cvProfile: cvRow,
+          jobDescription: body.jobDescription!,
+          companyName: body.companyName?.trim() || 'the company',
+          jobTitle: body.jobTitle?.trim() || 'the role',
+          tone,
+          length,
+          specificEmphasis: body.specificEmphasis?.trim() ?? '',
+        })
+    );
 
-    const readable = new ReadableStream({
-      async start(controller) {
-        try {
-          for await (const event of stream) {
-            if (
-              event.type === 'content_block_delta' &&
-              event.delta.type === 'text_delta'
-            ) {
-              const t = event.delta.text;
-              fullText += t;
-              controller.enqueue(
-                encoder.encode(`data: ${JSON.stringify({ text: t })}\n\n`)
-              );
-            }
-          }
-
-          await stream.finalMessage();
-
-          if (canAccessFeature(tier, 'atsAccess')) {
-            try {
-              await scoreATS(body.jobDescription!, fullText);
-            } catch (atsErr) {
-              console.error('ATS scoring failed', atsErr);
-            }
-          }
-
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({ done: true, id: null })}\n\n`
-            )
-          );
-          controller.close();
-        } catch (err) {
-          console.error('generate stream', err);
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({ error: 'generation_failed' })}\n\n`
-            )
-          );
-          controller.close();
-        }
-      },
-    });
-
-    return new Response(readable, {
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        Connection: 'keep-alive',
-      },
-    });
+    return NextResponse.json({ content });
   } catch (e) {
+    const creditErr = handleAiRouteError(e);
+    if (creditErr) return creditErr;
     console.error('generate', e);
     return NextResponse.json({ error: 'generation_failed' }, { status: 500 });
   }

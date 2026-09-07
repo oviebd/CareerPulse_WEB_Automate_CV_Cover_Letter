@@ -6,8 +6,9 @@ import { generateCVDocx } from '@/lib/cv-docx';
 import { profileToUniversalCV } from '@/lib/cv-universal-bridge';
 import type { CVProfile, SubscriptionTier } from '@/types';
 import type { CVData } from '@/types';
-import { canAccessFeature, canUseTemplate } from '@/lib/subscription';
+import { canAccessFeature } from '@/lib/subscription';
 import { resolveEffectiveTier } from '@/lib/dev-subscription';
+import { assertTemplateAccess } from '@/lib/templates/access';
 import { ALL_TEMPLATE_IDS } from '@/src/config/templateConfig';
 import { migrateLegacyCVData } from '@/src/utils/cvDefaults';
 import { normalizeTemplateId } from '@/src/utils/cvDefaults';
@@ -158,17 +159,15 @@ export async function exportCV(
 
   const tmpl = await getTemplatesRepo().getById(normalizedId);
 
-  /** Tier gates from DB when present; unified `src/templates/{id}` works without a row (partial migrations). */
-  let tiers: SubscriptionTier[];
   if (!tmpl || tmpl.type !== 'cv') {
     if (!ALL_TEMPLATE_IDS.includes(normalizedId)) {
       throw new Error('TEMPLATE_NOT_FOUND');
     }
-    tiers = ['free', 'pro'];
-  } else {
-    tiers = (tmpl.available_tiers ?? ['free', 'pro']) as SubscriptionTier[];
   }
-  if (!canUseTemplate(tiers, tier)) {
+
+  try {
+    await assertTemplateAccess(normalizedId, tier);
+  } catch {
     throw new Error('TEMPLATE_FORBIDDEN');
   }
 

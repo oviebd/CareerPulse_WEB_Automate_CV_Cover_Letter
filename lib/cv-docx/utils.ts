@@ -43,6 +43,10 @@ export function nameInitial(full: string): string {
 }
 
 const PREMIUM_IDS = new Set([
+  'modern',
+  'academic',
+  'technical',
+  'creative',
   'amber-strike',
   'midnight-pro',
   'golden-hour',

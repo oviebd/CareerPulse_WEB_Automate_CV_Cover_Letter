@@ -1,4 +1,6 @@
 import NextAuth from 'next-auth';
+import { ensureSuperAdminRole, isSuperAdminEmail } from '@/lib/auth/roles';
+import { grantInitialCredits } from '@/lib/credits/grant';
 import Credentials from 'next-auth/providers/credentials';
 import Google from 'next-auth/providers/google';
 import type { Provider } from 'next-auth/providers';
@@ -55,8 +57,10 @@ function buildAuthProviders(): Provider[] {
           password_hash?: string | null;
           full_name?: string | null;
           avatar_url?: string | null;
+          is_active?: boolean;
         } | null;
         if (!row?.password_hash) return null;
+        if (row.is_active === false) return null;
         const ok = await bcrypt.compare(password, row.password_hash);
         if (!ok) return null;
         return {
@@ -87,7 +91,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const { getProfilesRepo } = await import('@/lib/db/repositories/profiles');
       const email = user.email.toLowerCase();
 
-      let dbUser = (await getUsersRepo().findByEmail(email)) as { id: string } | null;
+      let dbUser = (await getUsersRepo().findByEmail(email)) as {
+        id: string;
+        is_active?: boolean;
+      } | null;
       if (!dbUser && account?.provider === 'google' && account.providerAccountId) {
         dbUser = (await getUsersRepo().create({
           email,
@@ -95,9 +102,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           fullName: user.name ?? null,
           avatarUrl: user.image ?? null,
           emailVerified: new Date(),
-        })) as { id: string };
+        })) as { id: string; is_active?: boolean };
       }
       if (!dbUser?.id) return account?.provider === 'credentials';
+
+      if (dbUser.is_active === false) return false;
 
       const profile = await getProfilesRepo().getById(dbUser.id);
       if (!profile) {
@@ -107,7 +116,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           full_name: user.name ?? null,
           avatar_url: user.image ?? null,
         });
+        await grantInitialCredits(dbUser.id);
       }
+      await ensureSuperAdminRole(dbUser.id, email);
       user.id = dbUser.id;
       return true;
     },
@@ -144,11 +155,13 @@ export async function registerWithCredentials(input: {
     email,
     passwordHash,
     fullName: input.fullName ?? null,
+    role: isSuperAdminEmail(email) ? 'super_admin' : 'user',
   })) as { id: string };
   await getProfilesRepo().createProfile({
     id: created.id,
     email,
     full_name: input.fullName ?? null,
   });
+  await grantInitialCredits(created.id);
   return { ok: true, userId: created.id };
 }

@@ -35,6 +35,7 @@ async function create(input: {
   fullName?: string | null;
   avatarUrl?: string | null;
   emailVerified?: Date | null;
+  role?: string;
 }) {
   const db = getDb();
   const [row] = await db
@@ -46,6 +47,7 @@ async function create(input: {
       fullName: input.fullName ?? null,
       avatarUrl: input.avatarUrl ?? null,
       emailVerified: input.emailVerified ?? null,
+      role: input.role ?? 'user',
     })
     .returning();
   return toSnake(row);

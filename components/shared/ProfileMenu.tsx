@@ -1,7 +1,7 @@
 'use client';
 
 import { AnimatePresence, motion } from 'framer-motion';
-import { CreditCard, LogOut, Settings } from 'lucide-react';
+import { CreditCard, LogOut, Settings, Sparkles, Shield } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { signOutAndGoHome } from '@/lib/sign-out-client';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useCredits } from '@/hooks/useCredits';
 
 function initials(name: string | null | undefined, email: string | undefined) {
   if (name?.trim()) {
@@ -26,7 +27,9 @@ type ProfileMenuProps = {
 export function ProfileMenu({ menuPlacement = 'below' }: ProfileMenuProps) {
   const pathname = usePathname();
   const profile = useAuthStore((s) => s.profile);
+  const user = useAuthStore((s) => s.user);
   const { tier } = useSubscription();
+  const { data: credits } = useCredits();
   const [open, setOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -107,6 +110,15 @@ export function ProfileMenu({ menuPlacement = 'below' }: ProfileMenuProps) {
                 {planLabel}
               </p>
               <Link
+                href="/settings/credits"
+                role="menuitem"
+                className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm text-[var(--color-text-primary)] transition hover:bg-[var(--color-hover-surface)]"
+                onClick={() => setOpen(false)}
+              >
+                <Sparkles className="h-4 w-4 shrink-0 text-[var(--color-muted)]" />
+                AI Credits ({credits?.balance ?? '…'})
+              </Link>
+              <Link
                 href="/settings/billing"
                 role="menuitem"
                 className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm text-[var(--color-text-primary)] transition hover:bg-[var(--color-hover-surface)]"
@@ -118,6 +130,17 @@ export function ProfileMenu({ menuPlacement = 'below' }: ProfileMenuProps) {
             </div>
 
             <div className="border-b border-[var(--color-border)] px-2 py-1">
+              {user?.role === 'super_admin' ? (
+                <Link
+                  href="/admin"
+                  role="menuitem"
+                  className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm text-[var(--color-text-primary)] transition hover:bg-[var(--color-hover-surface)]"
+                  onClick={() => setOpen(false)}
+                >
+                  <Shield className="h-4 w-4 shrink-0 text-[var(--color-muted)]" />
+                  Admin dashboard
+                </Link>
+              ) : null}
               <Link
                 href="/settings"
                 role="menuitem"

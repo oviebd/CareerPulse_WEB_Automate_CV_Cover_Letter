@@ -12,6 +12,81 @@ export function normalizeSubscriptionTier(
   return 'free';
 }
 export type SubscriptionStatus = 'active' | 'inactive' | 'cancelled' | 'past_due';
+export type UserRole = 'user' | 'super_admin';
+
+export type CreditTransactionType =
+  | 'initial_grant'
+  | 'admin_grant'
+  | 'admin_adjust'
+  | 'promo_grant'
+  | 'reservation'
+  | 'reservation_release'
+  | 'ai_usage'
+  | 'refund';
+
+export interface CreditRuleSnapshot {
+  input_token_unit: number;
+  input_token_credits: number;
+  output_token_unit: number;
+  output_token_credits: number;
+  rule_version_id?: string;
+}
+
+export interface CreditBalance {
+  user_id: string;
+  balance: number;
+  updated_at: string;
+}
+
+export interface CreditTransaction {
+  id: string;
+  user_id: string;
+  type: CreditTransactionType;
+  amount: number;
+  balance_before: number;
+  balance_after: number;
+  source: string | null;
+  reference_id: string | null;
+  ai_usage_id: string | null;
+  description: string | null;
+  rule_snapshot: CreditRuleSnapshot | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface CreditRuleVersion {
+  id: string;
+  input_token_unit: number;
+  input_token_credits: number;
+  output_token_unit: number;
+  output_token_credits: number;
+  is_active: boolean;
+  created_at: string;
+  created_by: string | null;
+}
+
+export interface PromoCode {
+  id: string;
+  code: string;
+  is_active: boolean;
+  max_redemptions: number | null;
+  redemption_count: number;
+  grants_plan: string | null;
+  bonus_credits: number;
+  expires_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Plan {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
 export type CoverLetterTone =
   | 'professional'
   | 'confident'
@@ -233,6 +308,7 @@ export interface Profile {
   email: string;
   full_name: string | null;
   avatar_url: string | null;
+  role?: UserRole;
   subscription_tier: SubscriptionTier;
   subscription_status: SubscriptionStatus;
   subscription_expires_at: string | null;
@@ -242,6 +318,10 @@ export interface Profile {
   preferred_cl_template_id?: string | null;
   /** Promo code redeemed by this user (null = none used) */
   promo_code_used?: string | null;
+  /** Per-user feature permissions (default true) */
+  can_use_ai?: boolean;
+  can_create_documents?: boolean;
+  can_use_interview_prep?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -468,30 +548,32 @@ export interface Payment {
   updated_at: string;
 }
 
-// Tier limits (V3: free tracker + ATS visibility; pro unlocks AI generation & auto-fix)
+// Tier limits (V3: free gets CV builder + interview prep; AI is credit-gated)
 export const TIER_LIMITS: Record<
   SubscriptionTier,
   {
-    /** Tailored applications per month (job + CV bundle) */
+    /** @deprecated Use AI credits instead */
     generationsPerMonth: number;
     cvUploads: number;
     trackerAccess: boolean;
     atsAccess: boolean;
     atsAutoFix: boolean;
+    /** @deprecated AI extras are credit-gated for all users */
     aiExtrasAccess: boolean;
     docxExport: boolean;
+    /** @deprecated Interview prep is available to all authenticated users */
     interviewPrep: boolean;
   }
 > = {
   free: {
-    generationsPerMonth: 3,
+    generationsPerMonth: Number.POSITIVE_INFINITY,
     cvUploads: Number.POSITIVE_INFINITY,
     trackerAccess: true,
     atsAccess: true,
     atsAutoFix: false,
-    aiExtrasAccess: false,
+    aiExtrasAccess: true,
     docxExport: false,
-    interviewPrep: false,
+    interviewPrep: true,
   },
   pro: {
     generationsPerMonth: Number.POSITIVE_INFINITY,

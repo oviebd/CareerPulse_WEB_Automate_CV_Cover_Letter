@@ -1,6 +1,7 @@
 export type AppUser = {
   id: string;
   email: string;
+  role?: 'user' | 'super_admin';
 };
 
 export interface AuthState {

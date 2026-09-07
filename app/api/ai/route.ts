@@ -1,15 +1,9 @@
 import { NextResponse } from 'next/server';
 import { claudeTextCompletion } from '@/lib/claude';
-import {
-  getJdAnalyzeCountThisMonth,
-  incrementJdAnalyze,
-} from '@/lib/jd-monthly-limit';
-import { resolveEffectiveTier } from '@/lib/dev-subscription';
-import { canAccessFeature } from '@/lib/subscription';
 import { getSessionUser } from '@/lib/auth/session';
 import { runWithAiUsageContext } from '@/lib/ai/usage-context';
 import { rateLimitHit } from '@/lib/rate-limit';
-import { getProfilesRepo } from '@/lib/db/repositories/profiles';
+import { handleAiRouteError } from '@/lib/credits/api-errors';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -71,9 +65,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'RATE_LIMIT' }, { status: 429 });
     }
 
-    const profile = await getProfilesRepo().getById(user.id);
-    const tier = resolveEffectiveTier(profile?.subscription_tier);
-
     const body = (await request.json()) as {
       tool?: Tool;
       payload?: Record<string, string | string[]>;
@@ -97,28 +88,16 @@ export async function POST(request: Request) {
       if (!jd.trim()) {
         return NextResponse.json({ error: 'job_description_required' }, { status: 400 });
       }
-      if (
-        !canAccessFeature(tier, 'aiExtrasAccess') &&
-        getJdAnalyzeCountThisMonth(user.id) >= 3
-      ) {
-        return NextResponse.json({ error: 'JD_ANALYZE_LIMIT' }, { status: 402 });
-      }
       const text = await claudeTextCompletion(
         'Return ONLY valid JSON. No markdown.',
         `Analyze this job description and return JSON: {"seniority":"string","role_type":"string","required_skills":["string"],"red_flags":["string"],"summary":"string"}\n\nJOB:\n${jd}`,
         800
       );
       const clean = text.replace(/```json|```/g, '').trim();
-      if (!canAccessFeature(tier, 'aiExtrasAccess')) {
-        incrementJdAnalyze(user.id);
-      }
       return NextResponse.json({ result: JSON.parse(clean) });
     }
 
     if (tool === 'linkedin_summary') {
-      if (!canAccessFeature(tier, 'aiExtrasAccess')) {
-        return NextResponse.json({ error: 'upgrade_required' }, { status: 402 });
-      }
       const current = str('text');
       const out = await claudeTextCompletion(
         'You rewrite LinkedIn summaries. Return only the new summary text.',
@@ -129,9 +108,6 @@ export async function POST(request: Request) {
     }
 
     if (tool === 'cold_email') {
-      if (!canAccessFeature(tier, 'aiExtrasAccess')) {
-        return NextResponse.json({ error: 'upgrade_required' }, { status: 402 });
-      }
       const ctx = str('context');
       const out = await claudeTextCompletion(
         'Return JSON with keys professional, friendly, concise — each a cold outreach email body.',
@@ -143,9 +119,6 @@ export async function POST(request: Request) {
     }
 
     if (tool === 'bullet_improve') {
-      if (!canAccessFeature(tier, 'aiExtrasAccess')) {
-        return NextResponse.json({ error: 'upgrade_required' }, { status: 402 });
-      }
       const bullet = str('bullet');
       const out = await claudeTextCompletion(
         'You are an ATS-focused resume writer. Return ONLY valid JSON {"before":"","after":""}. Keep meaning truthful and evidence-based.',
@@ -165,9 +138,6 @@ Bullet: ${bullet}`,
     }
 
     if (tool === 'interview_questions') {
-      if (!canAccessFeature(tier, 'interviewPrep')) {
-        return NextResponse.json({ error: 'upgrade_required' }, { status: 402 });
-      }
       const jd = str('jobDescription');
       const out = await claudeTextCompletion(
         'Return ONLY JSON: {"behavioral":[],"technical":[],"questions_to_ask":[]}',
@@ -179,9 +149,6 @@ Bullet: ${bullet}`,
     }
 
     if (tool === 'cv_rewrite_suggestions') {
-      if (!canAccessFeature(tier, 'aiExtrasAccess')) {
-        return NextResponse.json({ error: 'upgrade_required' }, { status: 402 });
-      }
       const section = str('section') || 'CV section';
       const inputLabel = str('input_label') || 'field';
       const text = str('text');
@@ -323,6 +290,8 @@ Return exactly 3 complete, meaningful suggestions, with tone/why per suggestion,
     return NextResponse.json({ error: 'unknown_tool' }, { status: 400 });
     });
   } catch (e) {
+    const creditErr = handleAiRouteError(e);
+    if (creditErr) return creditErr;
     console.error('ai route', e);
     return NextResponse.json({ error: 'ai_failed' }, { status: 500 });
   }

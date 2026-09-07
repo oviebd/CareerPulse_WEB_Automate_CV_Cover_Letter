@@ -4,6 +4,7 @@ import { extractCVFromText, describeAnthropicError } from '@/lib/claude';
 import { computeCompletionPercentage } from '@/lib/cv-completion';
 import { normalizeExtractedCV } from '@/lib/cv-parse-payload';
 import { rateLimitHit } from '@/lib/rate-limit';
+import { handleAiRouteError } from '@/lib/credits/api-errors';
 import { resolveEffectiveTier } from '@/lib/dev-subscription';
 import { TIER_LIMITS } from '@/types';
 import {
@@ -154,6 +155,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, cvProfile });
   } catch (e) {
+    const creditErr = handleAiRouteError(e);
+    if (creditErr) return creditErr;
     console.error('extract route', e);
     const msg = e instanceof Error ? e.message : '';
     if (msg === 'FILE_TOO_LARGE') {

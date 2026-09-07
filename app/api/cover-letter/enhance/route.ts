@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/auth/session';
 import { enhanceCoverLetter } from '@/lib/claude';
+import { runWithAiUsageContext } from '@/lib/ai/usage-context';
+import { handleAiRouteError } from '@/lib/credits/api-errors';
 import type { CoverLetterTone, CoverLetterLength } from '@/types';
 
 export const runtime = 'nodejs';
@@ -30,17 +32,23 @@ export async function POST(request: Request) {
       );
     }
 
-    const enhanced = await enhanceCoverLetter({
-      existingContent: content,
-      targetRole: body.targetRole?.trim() || undefined,
-      targetCompany: body.targetCompany?.trim() || undefined,
-      tone: body.tone,
-      length: body.length,
-      specificEmphasis: body.specificEmphasis?.trim() || undefined,
-    });
+    const enhanced = await runWithAiUsageContext(
+      { userId: user.id, category: 'cover_letter', operation: 'enhance' },
+      () =>
+        enhanceCoverLetter({
+          existingContent: content,
+          targetRole: body.targetRole?.trim() || undefined,
+          targetCompany: body.targetCompany?.trim() || undefined,
+          tone: body.tone,
+          length: body.length,
+          specificEmphasis: body.specificEmphasis?.trim() || undefined,
+        })
+    );
 
     return NextResponse.json({ content: enhanced });
   } catch (e) {
+    const creditErr = handleAiRouteError(e);
+    if (creditErr) return creditErr;
     console.error('cover-letter/enhance POST', e);
     return NextResponse.json({ error: 'enhance_failed' }, { status: 500 });
   }

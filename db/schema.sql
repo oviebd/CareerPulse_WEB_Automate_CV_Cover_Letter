@@ -20,6 +20,8 @@ CREATE TABLE IF NOT EXISTS users (
   email_verified TIMESTAMPTZ,
   full_name TEXT,
   avatar_url TEXT,
+  role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'super_admin')),
+  is_active BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -38,6 +40,9 @@ CREATE TABLE IF NOT EXISTS profiles (
   is_onboarded BOOLEAN NOT NULL DEFAULT false,
   preferred_cl_template_id TEXT DEFAULT 'cl-classic',
   promo_code_used TEXT,
+  can_use_ai BOOLEAN NOT NULL DEFAULT true,
+  can_create_documents BOOLEAN NOT NULL DEFAULT true,
+  can_use_interview_prep BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -222,14 +227,108 @@ CREATE TABLE IF NOT EXISTS ai_usage_events (
   model TEXT,
   prompt_version TEXT,
   related_id UUID,
+  provider TEXT DEFAULT 'anthropic',
+  feature TEXT,
+  request_id TEXT,
+  credits_consumed INTEGER NOT NULL DEFAULT 0,
+  credit_rule_version UUID,
+  token_source TEXT NOT NULL DEFAULT 'api' CHECK (token_source IN ('api', 'estimated')),
+  cached_input_tokens INTEGER NOT NULL DEFAULT 0,
+  metadata JSONB NOT NULL DEFAULT '{}',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS plans (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  description TEXT,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS credit_rule_versions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  input_token_unit INTEGER NOT NULL DEFAULT 1000 CHECK (input_token_unit > 0),
+  input_token_credits INTEGER NOT NULL DEFAULT 1 CHECK (input_token_credits >= 0),
+  output_token_unit INTEGER NOT NULL DEFAULT 1000 CHECK (output_token_unit > 0),
+  output_token_credits INTEGER NOT NULL DEFAULT 5 CHECK (output_token_credits >= 0),
+  is_active BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_by UUID REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS credit_balances (
+  user_id UUID PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
+  balance INTEGER NOT NULL DEFAULT 0 CHECK (balance >= 0),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS credit_transactions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  type TEXT NOT NULL CHECK (type IN (
+    'initial_grant', 'admin_grant', 'admin_adjust', 'promo_grant',
+    'reservation', 'reservation_release', 'ai_usage', 'refund'
+  )),
+  amount INTEGER NOT NULL,
+  balance_before INTEGER NOT NULL,
+  balance_after INTEGER NOT NULL,
+  source TEXT,
+  reference_id UUID,
+  ai_usage_id UUID,
+  description TEXT,
+  rule_snapshot JSONB,
+  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS system_settings (
+  key TEXT PRIMARY KEY,
+  value JSONB NOT NULL DEFAULT '{}',
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_by UUID REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS promo_codes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  code TEXT NOT NULL UNIQUE,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  max_redemptions INTEGER,
+  redemption_count INTEGER NOT NULL DEFAULT 0,
+  grants_plan TEXT,
+  bonus_credits INTEGER NOT NULL DEFAULT 0,
+  expires_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE ai_usage_events
+  DROP CONSTRAINT IF EXISTS ai_usage_events_credit_rule_version_fkey;
+ALTER TABLE ai_usage_events
+  ADD CONSTRAINT ai_usage_events_credit_rule_version_fkey
+  FOREIGN KEY (credit_rule_version) REFERENCES credit_rule_versions(id) ON DELETE SET NULL;
 
 CREATE INDEX IF NOT EXISTS ai_usage_events_user_created_idx
   ON ai_usage_events (user_id, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS ai_usage_events_user_category_idx
   ON ai_usage_events (user_id, category);
+
+CREATE INDEX IF NOT EXISTS ai_usage_events_feature_created_idx
+  ON ai_usage_events (feature, created_at DESC)
+  WHERE feature IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS credit_transactions_user_created_idx
+  ON credit_transactions (user_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS credit_transactions_type_idx
+  ON credit_transactions (type);
+
+CREATE INDEX IF NOT EXISTS credit_rule_versions_active_idx
+  ON credit_rule_versions (is_active)
+  WHERE is_active = true;
 
 CREATE TABLE IF NOT EXISTS interview_competencies (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

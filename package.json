@@ -14,7 +14,10 @@
     "test-cover-letter-docx": "tsx scripts/test-cover-letter-docx.ts",
     "validate-templates": "tsx scripts/validate-templates.ts",
     "test-interview": "tsx scripts/test-interview.ts",
-    "db:migrate-interview": "tsx scripts/migrate-interview.ts"
+    "db:migrate-interview": "tsx scripts/migrate-interview.ts",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
@@ -54,6 +57,7 @@
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
     "tsx": "^4.19.4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^2.1.9"
   }
 }

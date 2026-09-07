@@ -28,6 +28,35 @@ ON CONFLICT (id) DO UPDATE SET
   available_tiers = EXCLUDED.available_tiers,
   sort_order = EXCLUDED.sort_order;
 
+-- Plans, credit rules, system settings, promo codes
+INSERT INTO plans (slug, name, description, is_active)
+VALUES
+  ('free', 'Free', 'CV builder, interview prep, and AI credits', true),
+  ('pro', 'Premium', 'Premium templates, DOCX export, and ATS auto-fix', true)
+ON CONFLICT (slug) DO UPDATE SET
+  name = EXCLUDED.name,
+  description = EXCLUDED.description,
+  is_active = EXCLUDED.is_active,
+  updated_at = NOW();
+
+INSERT INTO credit_rule_versions (
+  input_token_unit, input_token_credits, output_token_unit, output_token_credits, is_active
+)
+SELECT 1000, 1, 1000, 5, true
+WHERE NOT EXISTS (SELECT 1 FROM credit_rule_versions WHERE is_active = true);
+
+INSERT INTO system_settings (key, value)
+VALUES
+  ('initial_free_credits', '150'::jsonb),
+  ('minimum_credit_balance', '0'::jsonb)
+ON CONFLICT (key) DO NOTHING;
+
+INSERT INTO promo_codes (code, is_active, max_redemptions, grants_plan, bonus_credits)
+VALUES ('2468', true, NULL, 'pro', 0)
+ON CONFLICT (code) DO UPDATE SET
+  is_active = EXCLUDED.is_active,
+  grants_plan = EXCLUDED.grants_plan;
+
 INSERT INTO cv_templates (id, type, name, description, category, is_premium, available_tiers, sort_order)
 VALUES
   ('cl-classic',  'cover_letter', 'Classic',           'Traditional letter format',          'professional', false, ARRAY['free','pro'], 1),

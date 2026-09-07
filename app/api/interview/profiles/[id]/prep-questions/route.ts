@@ -4,8 +4,7 @@ import { getInterviewRepo } from '@/lib/db/repositories/interview';
 import { withInterviewAiRoute } from '@/lib/ai/with-user-route';
 import { requireInterviewAccess, err } from '@/lib/interview/api-auth';
 import { runPrepQuestionBatch } from '@/lib/interview/orchestrator';
-import { mapOrchestratorError } from '@/lib/interview/errors';
-import { interviewErrorResponse } from '@/lib/interview/api-errors';
+import { handleInterviewApiError } from '@/lib/interview/api-errors';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
@@ -54,7 +53,6 @@ export async function POST(request: Request, { params }: RouteContext) {
     return NextResponse.json(result);
   } catch (e) {
     console.error('interview/profiles/[id]/prep-questions POST', e);
-    const mapped = mapOrchestratorError(e);
-    return interviewErrorResponse(mapped);
+    return handleInterviewApiError(e);
   }
 }

@@ -40,12 +40,15 @@ function AuthJsSessionSync() {
       try {
         const res = await fetch('/api/auth/session', { credentials: 'same-origin' });
         const json = (await res.json()) as {
-          user: { id: string; email: string } | null;
+          user: { id: string; email: string; role?: 'user' | 'super_admin' } | null;
           profile: Profile | null;
         };
         if (cancelled) return;
         if (json.user) {
-          setUser(json.user);
+          setUser({
+            ...json.user,
+            role: (json.user as { role?: 'user' | 'super_admin' }).role,
+          });
           setProfile(
             json.profile ? mapProfile(json.profile as unknown as Record<string, unknown>) : null
           );

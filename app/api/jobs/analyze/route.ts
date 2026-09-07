@@ -2,11 +2,9 @@ import { NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/auth/session';
 import { runWithAiUsageContext } from '@/lib/ai/usage-context';
 import { rateLimitHit } from '@/lib/rate-limit';
-import { resolveEffectiveTier } from '@/lib/dev-subscription';
-import { canAccessFeature } from '@/lib/subscription';
+import { handleAiRouteError } from '@/lib/credits/api-errors';
 import { analyzeJobDescription, emptyAnalysis } from '@/lib/jobs/analyze-job';
 import { getCvsRepo } from '@/lib/db/repositories/cvs';
-import { getProfilesRepo } from '@/lib/db/repositories/profiles';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
@@ -40,20 +38,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'cvId is required' }, { status: 422 });
     }
 
-    const prof = await getProfilesRepo().getById(user.id);
-    const tier = resolveEffectiveTier(prof?.subscription_tier);
-
-    if (!canAccessFeature(tier, 'aiExtrasAccess')) {
-      return NextResponse.json(
-        {
-          error: 'UPGRADE_REQUIRED',
-          message: 'This feature requires a Pro plan or above.',
-          upgrade_url: '/settings/billing',
-        },
-        { status: 403 }
-      );
-    }
-
     const cvRow = await getCvsRepo().getById(user.id, cvId);
 
     if (!cvRow) {
@@ -72,6 +56,8 @@ export async function POST(request: Request) {
       );
       return NextResponse.json(result);
     } catch (e) {
+      const creditErr = handleAiRouteError(e);
+      if (creditErr) return creditErr;
       console.error('jobs/analyze claude', e);
       return NextResponse.json(
         { error: 'Analysis failed. Please try again.' },

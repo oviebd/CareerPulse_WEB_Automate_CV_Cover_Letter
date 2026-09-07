@@ -20,6 +20,8 @@ import { ThemeToggle } from '@/components/shared/ThemeToggle';
 import { AiUsageDebugButton } from '@/components/debug/AiUsageDebugButton';
 import { cn } from '@/lib/utils';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useCredits } from '@/hooks/useCredits';
+import { useAuthStore } from '@/stores/useAuthStore';
 import { useTrackedJobsCount } from '@/hooks/useTracker';
 import { useUIStore } from '@/stores/useUIStore';
 
@@ -34,7 +36,7 @@ interface NavItem {
 const nav: NavItem[] = [
   { href: '/dashboard', label: 'Applications', icon: Kanban },
   { href: '/documents', label: 'Documents', icon: FolderOpen },
-  { href: '/interview', label: 'Interview prep', icon: MessageSquare, proOnly: true },
+  { href: '/interview', label: 'Interview prep', icon: MessageSquare },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -175,10 +177,19 @@ function NavLinkContent({
 export function AppHeader() {
   const pathname = usePathname();
   const { tier } = useSubscription();
+  const { data: credits } = useCredits();
+  const user = useAuthStore((s) => s.user);
+  const profile = useAuthStore((s) => s.profile);
   const { data: trackerBadge } = useTrackedJobsCount();
   const isFree = tier === 'free';
   const { mobileMenuOpen, setMobileMenuOpen, toggleMobileMenu, sidebarCollapsed, toggleSidebar } = useUIStore();
   const navRef = useRef<HTMLElement>(null);
+
+  const visibleNav = nav.filter((item) => {
+    if (item.href === '/documents' && profile?.can_create_documents === false) return false;
+    if (item.href === '/interview' && profile?.can_use_interview_prep === false) return false;
+    return true;
+  });
 
   useEffect(() => {
     setMobileMenuOpen(false);
@@ -231,7 +242,7 @@ export function AppHeader() {
           </button>
         </div>
         <nav ref={navRef} className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
-          {nav.map((item) => (
+          {visibleNav.map((item) => (
             <NavLinkContent
               key={item.href}
               item={item}
@@ -241,6 +252,41 @@ export function AppHeader() {
               trackerBadge={trackerBadge}
             />
           ))}
+          <Link
+            href="/settings/credits"
+            title={sidebarCollapsed ? 'AI Credits' : undefined}
+            className={cn(
+              'relative mt-1 flex items-center gap-2 rounded-lg py-2.5 text-sm font-semibold transition-all duration-200 ease-out active:scale-[0.98]',
+              sidebarCollapsed ? 'justify-center px-0' : 'pl-3 pr-3',
+              pathname.startsWith('/settings/credits')
+                ? 'bg-[var(--color-primary-100)] text-[var(--color-primary-500)]'
+                : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-hover-surface)] hover:text-[var(--color-text-primary)]'
+            )}
+          >
+            <CreditCard className="h-4 w-4 shrink-0" />
+            {!sidebarCollapsed && (
+              <span className="flex flex-1 items-center justify-between gap-2">
+                AI Credits
+                <span className="rounded-full bg-[var(--color-primary-100)] px-2 py-0.5 text-xs font-bold text-[var(--color-primary-500)]">
+                  {credits?.balance ?? '…'}
+                </span>
+              </span>
+            )}
+          </Link>
+          {user?.role === 'super_admin' ? (
+            <Link
+              href="/admin"
+              className={cn(
+                'relative mt-1 flex items-center gap-2 rounded-lg py-2.5 text-sm font-semibold transition-all duration-200 ease-out',
+                sidebarCollapsed ? 'justify-center px-0' : 'pl-3 pr-3',
+                pathname.startsWith('/admin')
+                  ? 'bg-[var(--color-primary-100)] text-[var(--color-primary-500)]'
+                  : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-hover-surface)]'
+              )}
+            >
+              {!sidebarCollapsed ? 'Admin' : 'A'}
+            </Link>
+          ) : null}
           <Link
             href="/settings/billing"
             title={sidebarCollapsed ? 'Billing' : undefined}
@@ -325,7 +371,7 @@ export function AppHeader() {
                 </button>
               </div>
               <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
-                {nav.map((item) => (
+                {visibleNav.map((item) => (
                   <NavLinkContent
                     key={item.href}
                     item={item}

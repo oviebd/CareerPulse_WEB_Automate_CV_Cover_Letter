@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth';
+import { getUsersRepo } from '@/lib/db/repositories/users';
 
 export type AppSessionUser = {
   id: string;
@@ -11,6 +12,10 @@ export async function getSessionUser(): Promise<AppSessionUser | null> {
   const id = session?.user?.id;
   const email = session?.user?.email;
   if (!id || !email) return null;
+
+  const row = await getUsersRepo().findById(id);
+  if (!row || row.is_active === false) return null;
+
   return { id, email };
 }
 

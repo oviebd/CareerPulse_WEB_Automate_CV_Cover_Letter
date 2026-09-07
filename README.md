@@ -96,11 +96,24 @@ docker compose -f docker-compose.dev.yml --env-file .env.prod up db
 ```
 DATABASE_URL=postgresql://careerpulse:careerpulse_dev@localhost:5432/careerpulse
 AUTH_SECRET=change-me-to-a-long-random-string
+JWT_SECRET=change-me-to-a-long-random-string
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ANTHROPIC_API_KEY=your-key
+SUPER_ADMIN_EMAILS=you@example.com
+UPLOAD_DIR=./data/uploads
 ```
 
 Match `DATABASE_URL` to `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` in `.env.prod`.
+
+**Important:** `npm run dev` reads `.env.local`, **not** `.env.prod`. Put `SUPER_ADMIN_EMAILS` in both files if you use Docker and local dev.
+
+`UPLOAD_DIR` must be a path the host process can write to. Docker uses `/data/uploads`; that directory does not exist on macOS, so hybrid `npm run dev` should use `./data/uploads`.
+
+After pulling monetization changes, run migrations on an existing database:
+
+```bash
+npm run db:migrate
+```
 
 **Terminal 2 — Next.js:**
 
@@ -127,6 +140,25 @@ Open [http://localhost:3000](http://localhost:3000). Do not run the Docker `app`
 
 ---
 
+## Database migrations
+
+After pulling changes that add tables (e.g. monetization / credits), apply SQL migrations:
+
+```bash
+npm run db:migrate
+```
+
+Fresh Docker installs apply `db/schema.sql` and `db/seed.sql` automatically.
+
+## AI credits & Super Admin
+
+- New users receive **configurable free AI credits** (default 150) on registration.
+- AI features consume credits based on **actual token usage** (input/output rates are admin-configurable).
+- **Premium** unlocks premium CV templates, DOCX export, and ATS auto-fix; promo codes upgrade plans without payment.
+- Set `SUPER_ADMIN_EMAILS` in `.env.prod` (comma-separated) to bootstrap Super Admin access, then open `/admin`.
+
+---
+
 ## Troubleshooting
 
 **`Bind for 0.0.0.0:3000 failed` or port 5432 in use**  
@@ -147,6 +179,9 @@ Set `AUTH_SECRET` in `.env.prod` and recreate the app container (`up --build` ag
 
 **Empty database after you expected seed data**  
 Init scripts only run on a new volume. Reset with `down -v`, then `up --build`.
+
+**CV upload fails with “check the cv-uploads bucket”**  
+Hybrid `npm run dev` cannot write to Docker’s `/data/uploads`. Set `UPLOAD_DIR=./data/uploads` in `.env.local` and restart the Next.js process.
 
 **PDF export fails**  
 Confirm Chromium is in the image:
