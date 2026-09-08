@@ -96,7 +96,7 @@ export function PrepareJobModal({
     cvOptions.length > 0
       ? cvOptions.map((cv) => ({
           value: cv.id,
-          label: `${cv.name || 'Untitled CV'} · ${cv.kind === 'job-specific' ? 'Job-specific' : 'General'} · Updated ${formatDate(cv.updated_at)}`,
+          label: `${cv.name || 'Untitled CV'} · Updated ${formatDate(cv.updated_at)}`,
         }))
       : [{ value: '', label: 'No CV found', disabled: true }];
 

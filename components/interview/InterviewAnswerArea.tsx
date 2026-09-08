@@ -54,7 +54,7 @@ export function InterviewAnswerArea({
       <div className="flex items-center justify-between text-xs text-[var(--color-muted)]">
         <span>Voice: {STATE_LABELS[voice.voiceState]}</span>
         {mode === 'realistic' ? (
-          <span>Realistic mode — feedback after interview</span>
+          <span>Realistic mode — brief note after each answer, full scores at end</span>
         ) : (
           <span>Practice mode — feedback after each answer</span>
         )}

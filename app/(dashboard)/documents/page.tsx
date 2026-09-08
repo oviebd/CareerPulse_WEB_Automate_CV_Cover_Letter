@@ -53,11 +53,9 @@ function useAllCVs() {
   });
 }
 
-type CvFilterTab = 'all' | 'general' | 'job-specific';
-
 function CVCard({ cv, onDelete, deleting }: { cv: CVProfile; onDelete: (id: string) => void; deleting: boolean }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const isJobSpecific = (cv.job_ids?.length ?? 0) > 0;
+  const preparedFromJob = (cv.job_ids?.length ?? 0) > 0;
 
   return (
     <motion.div
@@ -71,15 +69,6 @@ function CVCard({ cv, onDelete, deleting }: { cv: CVProfile; onDelete: (id: stri
           <p className="truncate font-semibold text-[var(--color-text-primary)]">
             {cv.name || 'Untitled CV'}
           </p>
-          {isJobSpecific ? (
-            <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-[var(--color-primary-100)] px-2 py-0.5 text-[10px] font-medium text-[var(--color-primary-700)]">
-              <Target className="h-2.5 w-2.5" /> Job-specific
-            </span>
-          ) : (
-            <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-[var(--color-surface-2)] px-2 py-0.5 text-[10px] font-medium text-[var(--color-muted)]">
-              <FileText className="h-2.5 w-2.5" /> General
-            </span>
-          )}
         </div>
         <FileText className="h-5 w-5 shrink-0 text-[var(--color-icon)]" />
       </div>
@@ -107,7 +96,7 @@ function CVCard({ cv, onDelete, deleting }: { cv: CVProfile; onDelete: (id: stri
       <div className="flex items-center gap-2">
         <Link
           href={
-            isJobSpecific
+            preparedFromJob
               ? `/cv/edit/${cv.id}?tailored=true`
               : `/cv/edit/${cv.id}`
           }
@@ -153,16 +142,9 @@ function ResumesTab() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const userId = useAuthStore((s) => s.user?.id);
-  const [filter, setFilter] = useState<CvFilterTab>('all');
   const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const { data: cvs = [], isLoading } = useAllCVs();
-
-  const filtered = cvs.filter((cv) => {
-    if (filter === 'general') return (cv.job_ids?.length ?? 0) === 0;
-    if (filter === 'job-specific') return (cv.job_ids?.length ?? 0) > 0;
-    return true;
-  });
 
   async function handleCreateCV() {
     setCreating(true);
@@ -201,12 +183,6 @@ function ResumesTab() {
     }
   }
 
-  const TABS: { key: CvFilterTab; label: string }[] = [
-    { key: 'all', label: `All (${cvs.length})` },
-    { key: 'general', label: `General (${cvs.filter((c) => (c.job_ids?.length ?? 0) === 0).length})` },
-    { key: 'job-specific', label: `Job-specific (${cvs.filter((c) => (c.job_ids?.length ?? 0) > 0).length})` },
-  ];
-
   return (
     <div className="space-y-6">
       {/* Creation CTAs */}
@@ -229,7 +205,7 @@ function ResumesTab() {
           </div>
           <div>
             <p className="font-semibold text-[var(--color-text-primary)]">{creating ? 'Creating…' : 'Create Resume'}</p>
-            <p className="mt-0.5 text-sm text-[var(--color-muted)]">Start from scratch or build your general resume.</p>
+            <p className="mt-0.5 text-sm text-[var(--color-muted)]">Start from scratch or build a new resume.</p>
           </div>
         </button>
 
@@ -246,48 +222,23 @@ function ResumesTab() {
         </Link>
       </div>
 
-      {/* Filter tabs */}
-      <div className="flex gap-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-faint)] p-1">
-        {TABS.map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => setFilter(tab.key)}
-            className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition ${
-              filter === tab.key
-                ? 'bg-[var(--color-surface)] text-[var(--color-text-primary)] shadow-sm'
-                : 'text-[var(--color-muted)] hover:text-[var(--color-text-primary)]'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* CV grid */}
       {isLoading ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3].map((i) => (
             <div key={i} className="h-40 animate-pulse rounded-xl bg-[var(--color-surface-2)]" />
           ))}
         </div>
-      ) : filtered.length === 0 ? (
+      ) : cvs.length === 0 ? (
         <div className="rounded-xl border border-dashed border-[var(--color-border)] py-16 text-center">
           <FileText className="mx-auto h-10 w-10 text-[var(--color-icon)]" />
-          <p className="mt-3 font-medium text-[var(--color-text-primary)]">
-            {filter === 'all' ? 'No resumes yet' : `No ${filter} resumes`}
-          </p>
+          <p className="mt-3 font-medium text-[var(--color-text-primary)]">No resumes yet</p>
           <p className="mt-1 text-sm text-[var(--color-muted)]">
-            {filter === 'all'
-              ? 'Create your first resume to get started.'
-              : filter === 'general'
-              ? 'Create a general resume to reuse across applications.'
-              : 'Generate a job-specific resume from the options above.'}
+            Create your first resume to get started.
           </p>
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((cv) => (
+          {cvs.map((cv) => (
             <CVCard key={cv.id} cv={cv} onDelete={handleDelete} deleting={deletingId === cv.id} />
           ))}
         </div>
@@ -297,18 +248,6 @@ function ResumesTab() {
 }
 
 // ─── Cover Letters tab ────────────────────────────────────────────────────────
-
-const SOURCE_LABEL: Record<string, string> = {
-  scratch: 'From scratch',
-  existing_cover_letter: 'From existing',
-  job_description: 'From JD',
-};
-
-const SOURCE_COLOR: Record<string, string> = {
-  scratch: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300',
-  existing_cover_letter: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
-  job_description: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
-};
 
 function CoverLettersTab() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -407,11 +346,6 @@ function CoverLettersTab() {
             </Link>
             <div className="flex flex-wrap items-center gap-2">
               {l.ats_score != null ? <ATSBadge score={l.ats_score} /> : null}
-              {l.source_type ? (
-                <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${SOURCE_COLOR[l.source_type] ?? 'bg-[var(--color-surface-2)] text-[var(--color-muted)]'}`}>
-                  {SOURCE_LABEL[l.source_type] ?? l.source_type}
-                </span>
-              ) : null}
               {l.tone ? <Badge variant="default">{l.tone}</Badge> : null}
               <button type="button" className="text-lg text-amber-500" onClick={() => fav.mutate({ id: l.id, is_favourited: !l.is_favourited })}>
                 <Star className={`h-4 w-4 ${l.is_favourited ? 'fill-current' : ''}`} />

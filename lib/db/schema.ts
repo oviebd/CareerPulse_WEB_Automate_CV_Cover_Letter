@@ -398,6 +398,8 @@ export const interviewSessions = pgTable(
     overallScore: integer('overall_score'),
     evaluationJson: jsonb('evaluation_json'),
     startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+    elapsedSeconds: integer('elapsed_seconds').notNull().default(0),
+    timerStartedAt: timestamp('timer_started_at', { withTimezone: true }),
     completedAt: timestamp('completed_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },

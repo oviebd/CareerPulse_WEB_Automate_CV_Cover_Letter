@@ -32,7 +32,7 @@ function useLinkableCVs(jobId: string, enabled: boolean) {
       const res = await fetch('/api/cvs');
       if (!res.ok) throw new Error('Failed to load CVs');
       const data = (await res.json()) as CVProfile[];
-      // Show all CVs (general and job-specific), sorted by name
+      // Show all CVs, sorted by name
       return data.sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
     },
     staleTime: 30_000,

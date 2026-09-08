@@ -219,7 +219,7 @@ export function useSaveSessionDraft(sessionId: string) {
     mutationFn: (draft_answer: string) =>
       apiFetch(`/api/interview/sessions/${sessionId}`, {
         method: 'PATCH',
-        body: JSON.stringify({ draft_answer }),
+        body: JSON.stringify({ action: 'draft', draft_answer }),
       }),
   });
 }
@@ -248,13 +248,47 @@ export function useSubmitInterviewAnswer(sessionId: string) {
       audio_path?: string;
       duration_seconds?: number;
     }) =>
-      apiFetch(`/api/interview/sessions/${sessionId}/answer`, {
+      apiFetch<{
+        evaluation: Record<string, unknown> | null;
+        feedback: Record<string, unknown> | null;
+        instant_feedback: string;
+        overall_score?: number;
+        next_question: Record<string, unknown> | null;
+        complete: boolean;
+      }>(`/api/interview/sessions/${sessionId}/answer`, {
         method: 'POST',
         body: JSON.stringify(body),
       }),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['interview-session', sessionId] });
       invalidateCreditQueries(qc);
+    },
+  });
+}
+
+export function usePauseInterviewSession(sessionId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      apiFetch(`/api/interview/sessions/${sessionId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ action: 'pause' }),
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['interview-session', sessionId] });
+    },
+  });
+}
+
+export function useResumeInterviewSession(sessionId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      apiFetch(`/api/interview/sessions/${sessionId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ action: 'resume' }),
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['interview-session', sessionId] });
     },
   });
 }

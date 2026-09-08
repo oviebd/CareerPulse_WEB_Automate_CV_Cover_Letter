@@ -239,6 +239,18 @@ export interface FollowUpDecision {
   next_competency_id?: string;
 }
 
+/** Single AI turn: evaluate last answer and optionally generate next question. */
+export interface InterviewTurnResult {
+  overall_score: number;
+  dimension_scores: Array<{ name: string; score: number; feedback: string }>;
+  strengths: string[];
+  weaknesses: string[];
+  missing_points: string[];
+  feedback: string;
+  action: FollowUpAction;
+  next_question: InterviewQuestionOutput | null;
+}
+
 export interface FinalReport {
   overall_score: number;
   readiness_score: number;

@@ -40,7 +40,7 @@ export function HomeSidebar() {
     <aside className="flex flex-col gap-4">
       <Card padding="sm">
         <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
-          Base CV Health
+          CV Health
         </h3>
         {cvLoading ? (
           <div className="mt-3 h-2 animate-pulse rounded bg-[var(--color-border)]" />

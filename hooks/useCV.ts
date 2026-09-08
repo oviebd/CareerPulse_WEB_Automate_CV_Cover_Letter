@@ -22,9 +22,7 @@ export type CoreCVVersion = {
   preferred_template_id: string | null;
 };
 
-export type InterviewCVOption = CoreCVVersion & {
-  kind: 'general' | 'job-specific';
-};
+export type InterviewCVOption = CoreCVVersion;
 
 export function useCoreCVVersions() {
   const userId = useAuthStore((s) => s.user?.id);
@@ -68,7 +66,6 @@ export function useAllCVVersions() {
         created_at: v.created_at,
         updated_at: v.updated_at,
         preferred_template_id: v.preferred_template_id ?? null,
-        kind: (v.job_ids?.length ?? 0) > 0 ? 'job-specific' : 'general',
       }));
     },
     staleTime: 30_000,

@@ -58,6 +58,31 @@ export default function InterviewReportPage() {
         </Card>
       ) : null}
 
+      {report?.question_review?.length ? (
+        <Card>
+          <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">Question review</h3>
+          <ul className="mt-3 space-y-4">
+            {report.question_review.map((q, i) => (
+              <li
+                key={`${q.question}-${i}`}
+                className="border-t border-[var(--color-border)] pt-3 first:border-0 first:pt-0"
+              >
+                <p className="text-sm font-medium text-[var(--color-text-primary)]">{q.question}</p>
+                {q.answer_summary ? (
+                  <p className="mt-1 text-xs text-[var(--color-muted)]">{q.answer_summary}</p>
+                ) : null}
+                <div className="mt-2 flex items-start justify-between gap-3 text-sm">
+                  <p className="text-[var(--color-text-secondary)]">{q.feedback}</p>
+                  <span className="shrink-0 font-semibold text-[var(--color-primary)]">
+                    {q.score}/10
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
+
       {report?.strengths?.length ? (
         <Card>
           <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">Strengths</h3>

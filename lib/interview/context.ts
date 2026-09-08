@@ -23,6 +23,30 @@ export function summarizeMasteryForAi(
     .join(', ');
 }
 
+export function summarizeEvaluationsForReport(
+  pairs: Array<{
+    sequence: number;
+    question_text: string;
+    answer_text: string;
+    overall_score: number | null;
+    strengths: string[];
+    weaknesses: string[];
+    feedback: string | null;
+  }>
+): string {
+  return pairs
+    .map((p) => {
+      const q = p.question_text.slice(0, 120);
+      const a = p.answer_text.slice(0, 150);
+      const score = p.overall_score != null ? `${p.overall_score / 10}/10` : '—';
+      const str = p.strengths.slice(0, 1).join('; ') || '—';
+      const weak = p.weaknesses.slice(0, 1).join('; ') || '—';
+      const fb = (p.feedback ?? '').slice(0, 120);
+      return `Q${p.sequence}: ${q}\nA: ${a}\nScore: ${score} | Strength: ${str} | Weakness: ${weak}\nNote: ${fb}`;
+    })
+    .join('\n\n');
+}
+
 export function blueprintSummary(blueprint: Record<string, unknown> | null): string {
   if (!blueprint) return '{}';
   const strategy = (blueprint.interview_strategy ?? {}) as Record<string, unknown>;

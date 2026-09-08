@@ -11,6 +11,7 @@ import type {
   GapItem,
   InterviewBlueprint,
   InterviewQuestionOutput,
+  InterviewTurnResult,
   JobInterviewAnalysis,
   PreparationPlanOutput,
   PrepQuestionBatchOutput,
@@ -326,6 +327,34 @@ export function normalizeFollowUpDecision(raw: Record<string, unknown>): FollowU
     action: FOLLOW_UP_ACTIONS.includes(action) ? action : 'next_competency',
     rationale: str(raw.rationale),
     next_competency_id: str(raw.next_competency_id) || undefined,
+  };
+}
+
+export function normalizeInterviewTurn(raw: Record<string, unknown>): InterviewTurnResult {
+  const action = str(raw.action) as FollowUpAction;
+  const nextRaw = raw.next_question;
+  const nextQuestion =
+    nextRaw && typeof nextRaw === 'object' && !Array.isArray(nextRaw)
+      ? normalizeInterviewQuestion(nextRaw as Record<string, unknown>)
+      : null;
+
+  return {
+    overall_score: num(raw.overall_score, 0, 10, 5),
+    dimension_scores: Array.isArray(raw.dimension_scores)
+      ? (raw.dimension_scores as Record<string, unknown>[])
+          .slice(0, 3)
+          .map((d) => ({
+            name: str(d.name) || 'General',
+            score: num(d.score, 0, 10, 5),
+            feedback: str(d.feedback),
+          }))
+      : [],
+    strengths: strArr(raw.strengths).slice(0, 2),
+    weaknesses: strArr(raw.weaknesses).slice(0, 2),
+    missing_points: strArr(raw.missing_points).slice(0, 3),
+    feedback: str(raw.feedback),
+    action: FOLLOW_UP_ACTIONS.includes(action) ? action : 'next_competency',
+    next_question: nextQuestion?.question ? nextQuestion : null,
   };
 }
 

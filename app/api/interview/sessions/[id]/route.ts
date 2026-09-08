@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/auth/session';
 import { getInterviewRepo } from '@/lib/db/repositories/interview';
+import { pauseInterviewSession, resumeInterviewSession } from '@/lib/interview/orchestrator';
 import { err } from '@/lib/interview/api-auth';
 
 export const runtime = 'nodejs';
@@ -21,18 +22,13 @@ export async function GET(_request: Request, { params }: RouteContext) {
       ? await getInterviewRepo().getQuestion(id, session.current_question_id as string)
       : null;
 
-    let evaluation = null;
-    if (current && session.mode === 'practice') {
-      evaluation = await getInterviewRepo().getLatestEvaluation(current.id as string);
-    }
-
     const answeredQuestions = await getInterviewRepo().listAnswersForSession(id);
 
     return NextResponse.json({
       session,
       questions,
       current_question: current,
-      latest_evaluation: evaluation,
+      latest_evaluation: null,
       answered_questions: answeredQuestions,
     });
   } catch (e) {
@@ -47,13 +43,27 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     if (!user) return err('Unauthorized', 401);
 
     const { id } = await params;
-    const body = (await request.json()) as { draft_answer?: string };
+    const body = (await request.json()) as {
+      action?: 'pause' | 'resume' | 'draft';
+      draft_answer?: string;
+    };
+
+    if (body.action === 'pause') {
+      const session = await pauseInterviewSession(user.id, id);
+      return NextResponse.json(session);
+    }
+
+    if (body.action === 'resume') {
+      const session = await resumeInterviewSession(user.id, id);
+      return NextResponse.json(session);
+    }
+
     const session = await getInterviewRepo().updateSession(user.id, id, {
       draft_answer: body.draft_answer ?? null,
     });
     return NextResponse.json(session);
   } catch (e) {
     console.error('interview/sessions/[id] PATCH', e);
-    return err('Failed to save draft', 500);
+    return err('Failed to update session', 500);
   }
 }

@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, isNull, or } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
 import {
   interviewAnswers,
@@ -512,7 +512,10 @@ async function getActiveSession(profileId: string) {
     .select()
     .from(interviewSessions)
     .where(
-      and(eq(interviewSessions.interviewProfileId, profileId), eq(interviewSessions.status, 'active'))
+      and(
+        eq(interviewSessions.interviewProfileId, profileId),
+        or(eq(interviewSessions.status, 'active'), eq(interviewSessions.status, 'paused'))
+      )
     )
     .orderBy(desc(interviewSessions.startedAt))
     .limit(1);

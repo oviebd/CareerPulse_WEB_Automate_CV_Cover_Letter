@@ -10,9 +10,8 @@ import {
   buildCvSummary,
   buildJobContext,
   checkClarificationNeeded,
-  decideFollowUp,
-  evaluateInterviewAnswer,
-  generateFinalReport,
+  evaluateAndContinueInterview,
+  generateFinalReportFromEvaluations,
   generateInterviewQuestion,
   generatePreparationTopics,
   generatePrepQuestionBatch,
@@ -22,7 +21,11 @@ import {
   generateQuiz,
   performGapAnalysis,
 } from '@/lib/interview/ai/operations';
-import { blueprintSummary, summarizeMasteryForAi, summarizeSessionForAi } from '@/lib/interview/context';
+import {
+  blueprintSummary,
+  summarizeEvaluationsForReport,
+  summarizeMasteryForAi,
+} from '@/lib/interview/context';
 import {
   buildMappedContext,
   compactCompetencyList,
@@ -149,15 +152,22 @@ function followUpDepth(
   return depth;
 }
 
-function sessionElapsedMinutes(session: Record<string, unknown>): number {
-  const started = session.started_at ?? session.created_at;
-  if (!started) return 0;
-  return (Date.now() - new Date(started as string).getTime()) / 60_000;
+function sessionElapsedSeconds(session: Record<string, unknown>): number {
+  const base = (session.elapsed_seconds as number) ?? 0;
+  if (session.status === 'paused') return base;
+
+  const timerStart = session.timer_started_at ?? session.started_at ?? session.created_at;
+  if (!timerStart) return base;
+
+  const started = new Date(timerStart as string).getTime();
+  const live = Math.max(0, Math.floor((Date.now() - started) / 1000));
+  return base + live;
 }
 
 function sessionRemainingMinutes(session: Record<string, unknown>): number {
-  const budget = (session.duration_minutes as number) ?? 25;
-  return Math.max(0, budget - sessionElapsedMinutes(session));
+  const budget = ((session.duration_minutes as number) ?? 25) * 60;
+  const remaining = Math.max(0, budget - sessionElapsedSeconds(session));
+  return remaining / 60;
 }
 
 type JobRow = {
@@ -858,7 +868,13 @@ export async function startInterviewSession(
     const current = existing.current_question_id
       ? await repo.getQuestion(existing.id as string, existing.current_question_id as string)
       : null;
-    return { session: existing, question: current, questions, resumed: true };
+    let session = existing;
+    if (existing.status === 'active' && !existing.timer_started_at) {
+      session = await repo.updateSession(userId, existing.id as string, {
+        timer_started_at: new Date().toISOString(),
+      });
+    }
+    return { session, question: current, questions, resumed: true };
   }
 
   const blueprint = normalizedBlueprintFromProfile(profile);
@@ -871,6 +887,8 @@ export async function startInterviewSession(
     target_question_count: strategy.question_count,
     duration_minutes: strategy.duration_minutes,
     question_count: 0,
+    elapsed_seconds: 0,
+    timer_started_at: new Date().toISOString(),
   });
 
   const question = await generateFirstQuestion(userId, profile, session.id as string);
@@ -952,25 +970,56 @@ export async function submitInterviewAnswer(
     attempt_number: attemptNum,
   });
 
-  const evaluation = await evaluateInterviewAnswer(
+  const mappedContext = await ensureMappedContextForProfile(userId, profile);
+  const remainingMinutes = sessionRemainingMinutes(session);
+  const targetCount = (session.target_question_count as number) ?? 8;
+  const currentDepth = followUpDepth(question, priorAnswers);
+  const answeredPairs = await repo.listAnswersForSession(sessionId);
+  const coveredCompetencies = new Set(
+    answeredPairs.map((p) => (p.question as Record<string, unknown>).competency_id).filter(Boolean)
+  );
+
+  const competencies = await repo.listCompetencies(profile.id as string);
+  const compByAiId = new Map(
+    competencies.map((c) => [(c.metadata_json as { ai_id?: string })?.ai_id, c.id])
+  );
+  const uncovered = competencies.filter((c) => !coveredCompetencies.has(c.id));
+  const focusCompetency = uncovered[0] ?? competencies[0];
+
+  const timeUp = remainingMinutes <= 0;
+  const atQuestionLimit = (session.question_count as number) >= targetCount;
+  const shouldComplete = timeUp || atQuestionLimit;
+
+  const focusHint: 'follow_up' | 'next_competency' =
+    !shouldComplete && currentDepth === 0 ? 'follow_up' : 'next_competency';
+
+  const turn = await evaluateAndContinueInterview(
     {
       question: question.question_text as string,
       rubric: JSON.stringify(question.evaluation_rubric_json ?? []),
       answer: answerText,
       mode: session.mode as string,
+      difficulty: session.difficulty as string,
+      mappedContext: mappedContextPrompt(mappedContext),
+      focusHint,
+      competencyFocus: (focusCompetency?.name as string) ?? undefined,
+      questionCount: session.question_count as number,
+      targetCount,
+      remainingMinutes: Math.round(remainingMinutes),
+      evaluationOnly: shouldComplete,
     },
     { job: profile.source_job_hash as string, cv: profile.source_cv_hash as string }
   );
 
   const evalRow = await repo.insertEvaluation(answer.id as string, {
-    overall_score: Math.round(evaluation.data.overall_score * 10),
-    dimension_scores_json: evaluation.data.dimension_scores,
-    strengths_json: evaluation.data.strengths,
-    weaknesses_json: evaluation.data.weaknesses,
-    missing_points_json: evaluation.data.missing_points,
-    feedback: evaluation.data.feedback,
-    recommended_actions_json: [evaluation.data.recommended_action],
-    ai_metadata_json: evaluation.metadata,
+    overall_score: Math.round(turn.data.overall_score * 10),
+    dimension_scores_json: turn.data.dimension_scores,
+    strengths_json: turn.data.strengths,
+    weaknesses_json: turn.data.weaknesses,
+    missing_points_json: turn.data.missing_points,
+    feedback: turn.data.feedback,
+    recommended_actions_json: [turn.data.action],
+    ai_metadata_json: turn.metadata,
   });
 
   if (question.competency_id) {
@@ -978,7 +1027,7 @@ export async function submitInterviewAnswer(
     const m = masteryList.find((x) => x.competency_id === question.competency_id);
     const updated = updateMasteryScore(
       m?.mastery_score as number | null,
-      evaluation.data.overall_score,
+      turn.data.overall_score,
       ((m?.evidence_count as number) ?? 0) + 1
     );
     await repo.upsertMastery(profile.id as string, question.competency_id as string, {
@@ -990,89 +1039,26 @@ export async function submitInterviewAnswer(
     });
   }
 
-  const questions = await repo.listQuestions(sessionId);
-  const answeredPairs = await repo.listAnswersForSession(sessionId);
-  const sessionSummary = summarizeSessionForAi(
-    answeredPairs.map((p) => ({
-      question_text: (p.question as Record<string, unknown>).question_text as string,
-      sequence: (p.question as Record<string, unknown>).sequence as number,
-    })),
-    answeredPairs.map((p) => ({
-      text_answer: (p.answer as Record<string, unknown>).text_answer as string | null,
-      transcript: (p.answer as Record<string, unknown>).transcript as string | null,
-    }))
-  );
-
-  const mappedContext = await ensureMappedContextForProfile(userId, profile);
-  const remainingMinutes = sessionRemainingMinutes(session);
-  const targetCount = (session.target_question_count as number) ?? 8;
-  const currentDepth = followUpDepth(question, questions);
-  const coveredCompetencies = new Set(
-    answeredPairs.map((p) => (p.question as Record<string, unknown>).competency_id).filter(Boolean)
-  );
-  const remainingTopics = mappedContext.topic_names;
-
-  let followUp = await decideFollowUp(
-    {
-      sessionSummary,
-      lastEvaluation: JSON.stringify(evaluation.data),
-      questionCount: session.question_count as number,
-      targetCount,
-      remainingMinutes: Math.round(remainingMinutes),
-      followUpDepth: currentDepth,
-      remainingTopics: remainingTopics.join(', ') || mappedContext.topic_names.join(', '),
-    },
-    { job: profile.source_job_hash as string, cv: profile.source_cv_hash as string }
-  );
-
-  if (followUp.data.action === 'follow_up' && currentDepth >= 1) {
-    followUp = {
-      ...followUp,
-      data: { ...followUp.data, action: 'next_competency' as const },
-    };
-  }
-
   let nextQuestion = null;
-  const timeUp = remainingMinutes <= 0;
-  const shouldComplete =
-    timeUp ||
-    followUp.data.action === 'complete' ||
-    (session.question_count as number) >= targetCount;
+  const completeNow =
+    shouldComplete || turn.data.action === 'complete' || !turn.data.next_question;
 
-  if (!shouldComplete) {
-    const competencies = await repo.listCompetencies(profile.id as string);
-    const compByAiId = new Map(
-      competencies.map((c) => [(c.metadata_json as { ai_id?: string })?.ai_id, c.id])
-    );
-    const uncovered = competencies.filter((c) => !coveredCompetencies.has(c.id));
-    const focusName =
-      followUp.data.next_competency_id
-        ? competencies.find(
-            (c) => (c.metadata_json as { ai_id?: string })?.ai_id === followUp.data.next_competency_id
-          )?.name
-        : uncovered[0]?.name;
+  if (!completeNow && turn.data.next_question) {
+    const qData = turn.data.next_question;
+    const isFollowUp =
+      turn.data.action === 'follow_up' && currentDepth < 1 && focusHint === 'follow_up';
 
-    const qResult = await generateInterviewQuestion(
-      {
-        mappedContext: mappedContextPrompt(mappedContext),
-        sessionSummary,
-        competencyFocus: (focusName as string) ?? undefined,
-        remainingTopics: remainingTopics.join(', ') || mappedContext.topic_names.join(', '),
-        difficulty: session.difficulty as string,
-      },
-      { job: profile.source_job_hash as string, cv: profile.source_cv_hash as string }
-    );
     nextQuestion = await repo.insertQuestion(sessionId, {
       sequence: (session.question_count as number) + 1,
-      question_type: qResult.data.type,
-      question_text: qResult.data.question,
-      competency_id: qResult.data.competency_id
-        ? compByAiId.get(qResult.data.competency_id)
-        : null,
-      difficulty: qResult.data.difficulty,
-      expected_points_json: qResult.data.expected_points,
-      evaluation_rubric_json: qResult.data.evaluation_rubric,
-      parent_question_id: followUp.data.action === 'follow_up' ? questionId : null,
+      question_type: qData.type,
+      question_text: qData.question,
+      competency_id: qData.competency_id
+        ? compByAiId.get(qData.competency_id)
+        : focusCompetency?.id ?? null,
+      difficulty: qData.difficulty,
+      expected_points_json: qData.expected_points,
+      evaluation_rubric_json: qData.evaluation_rubric,
+      parent_question_id: isFollowUp ? questionId : null,
     });
     await repo.updateSession(userId, sessionId, {
       question_count: (session.question_count as number) + 1,
@@ -1086,13 +1072,14 @@ export async function submitInterviewAnswer(
     });
   }
 
-  const showFeedback = session.mode === 'practice';
+  const showScores = session.mode === 'practice';
   return {
-    evaluation: showFeedback ? evalRow : null,
-    feedback: showFeedback ? evaluation.data : null,
-    follow_up: followUp.data,
+    evaluation: evalRow,
+    feedback: turn.data,
+    instant_feedback: turn.data.feedback,
+    overall_score: showScores ? turn.data.overall_score : undefined,
     next_question: nextQuestion,
-    complete: shouldComplete,
+    complete: completeNow,
   };
 }
 
@@ -1100,15 +1087,34 @@ export async function completeInterviewSession(userId: string, sessionId: string
   const repo = getInterviewRepo();
   const session = await repo.getSession(userId, sessionId);
   if (!session) throw new Error('Session not found');
+  if (session.status === 'completed') {
+    return {
+      report: session.evaluation_json,
+      readiness: await recalculateProfileProgress(userId, session.interview_profile_id as string),
+    };
+  }
 
   const profile = await repo.getProfileById(userId, session.interview_profile_id as string);
   if (!profile) throw new Error('Profile not found');
 
-  const questions = await repo.listQuestions(sessionId);
-  const history = summarizeSessionForAi(
-    questions.map((q) => ({ question_text: q.question_text as string, sequence: q.sequence as number })),
-    questions.map(() => ({ text_answer: '', transcript: null }))
+  const answeredPairs = await repo.listAnswersForSession(sessionId);
+  const evaluationDigest = summarizeEvaluationsForReport(
+    answeredPairs.map((p) => {
+      const q = p.question as Record<string, unknown>;
+      const a = p.answer as Record<string, unknown>;
+      const e = p.evaluation as Record<string, unknown> | null;
+      return {
+        sequence: q.sequence as number,
+        question_text: q.question_text as string,
+        answer_text: ((a.transcript as string) || (a.text_answer as string) || '').trim(),
+        overall_score: (e?.overall_score as number) ?? null,
+        strengths: (e?.strengths_json as string[]) ?? [],
+        weaknesses: (e?.weaknesses_json as string[]) ?? [],
+        feedback: (e?.feedback as string) ?? null,
+      };
+    })
   );
+
   const mastery = await repo.listMastery(profile.id as string);
   const masterySummary = summarizeMasteryForAi(
     mastery.map((m) => ({
@@ -1118,10 +1124,10 @@ export async function completeInterviewSession(userId: string, sessionId: string
     }))
   );
 
-  const report = await generateFinalReport(
+  const report = await generateFinalReportFromEvaluations(
     {
-      blueprint: JSON.stringify(profile.blueprint_json),
-      sessionHistory: history,
+      blueprintSummary: blueprintSummary(profile.blueprint_json as Record<string, unknown>),
+      evaluationDigest,
       masterySummary,
     },
     { job: profile.source_job_hash as string, cv: profile.source_cv_hash as string }
@@ -1132,11 +1138,36 @@ export async function completeInterviewSession(userId: string, sessionId: string
     completed_at: new Date().toISOString(),
     overall_score: Math.round(report.data.overall_score * 10),
     evaluation_json: report.data,
+    timer_started_at: null,
   });
 
   const readiness = await recalculateProfileProgress(userId, profile.id as string);
 
   return { report: report.data, readiness };
+}
+
+export async function pauseInterviewSession(userId: string, sessionId: string) {
+  const repo = getInterviewRepo();
+  const session = await repo.getSession(userId, sessionId);
+  if (!session || session.status !== 'active') throw new Error('Session not found');
+
+  const elapsed = sessionElapsedSeconds(session);
+  return repo.updateSession(userId, sessionId, {
+    status: 'paused',
+    elapsed_seconds: elapsed,
+    timer_started_at: null,
+  });
+}
+
+export async function resumeInterviewSession(userId: string, sessionId: string) {
+  const repo = getInterviewRepo();
+  const session = await repo.getSession(userId, sessionId);
+  if (!session || session.status !== 'paused') throw new Error('Session not found');
+
+  return repo.updateSession(userId, sessionId, {
+    status: 'active',
+    timer_started_at: new Date().toISOString(),
+  });
 }
 
 export async function getProfileDashboard(userId: string, profileId: string) {

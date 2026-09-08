@@ -87,7 +87,7 @@ export function PrepMockPanel({ profileId, isReady, sessions, blueprint }: Props
           <p className="mt-2 text-xs text-[var(--color-muted)]">
             {mode === 'practice'
               ? 'Get feedback after each answer.'
-              : 'Feedback only at the end.'}
+              : 'Brief interviewer note after each answer; scores at the end.'}
           </p>
         </div>
 
@@ -123,12 +123,12 @@ export function PrepMockPanel({ profileId, isReady, sessions, blueprint }: Props
                     <Badge variant="success">{(s.overall_score as number) ?? '—'}%</Badge>
                     <span className="text-xs font-semibold text-[var(--color-primary)]">View →</span>
                   </Link>
-                ) : s.status === 'active' ? (
+                ) : s.status === 'active' || s.status === 'paused' ? (
                   <Link
                     href={`/interview/${profileId}/session/${s.id as string}`}
                     className="text-xs font-semibold text-[var(--color-primary)]"
                   >
-                    Resume →
+                    {s.status === 'paused' ? 'Resume (paused) →' : 'Resume →'}
                   </Link>
                 ) : (
                   <Badge variant="default">{s.status as string}</Badge>

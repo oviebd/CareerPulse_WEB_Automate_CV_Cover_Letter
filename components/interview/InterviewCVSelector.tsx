@@ -13,8 +13,7 @@ type InterviewCVSelectorProps = {
 };
 
 function cvLabel(cv: InterviewCVOption) {
-  const kind = cv.kind === 'job-specific' ? 'Job-specific' : 'General';
-  return `${cv.name || 'Untitled CV'} · ${kind} · Updated ${formatDate(cv.updated_at)}`;
+  return `${cv.name || 'Untitled CV'} · Updated ${formatDate(cv.updated_at)}`;
 }
 
 export function InterviewCVSelector({
@@ -41,7 +40,7 @@ export function InterviewCVSelector({
           Choose your CV
         </h2>
         <p className="text-sm text-[var(--color-muted)]">
-          Use any general or job-specific CV as the basis for your interview preparation.
+          Choose a CV as the basis for your interview preparation.
         </p>
       </header>
 

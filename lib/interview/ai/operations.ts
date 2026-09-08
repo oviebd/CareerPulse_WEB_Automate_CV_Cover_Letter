@@ -9,6 +9,7 @@ import {
   normalizeFollowUpDecision,
   normalizeGapAnalysis,
   normalizeInterviewQuestion,
+  normalizeInterviewTurn,
   normalizeJobAnalysis,
   normalizePreparationPlan,
   normalizePrepQuestionBatch,
@@ -35,7 +36,9 @@ export const PROMPT_V = {
   QUESTION: 'interview_question_v1',
   EVAL: 'interview_eval_v1',
   FOLLOW_UP: 'interview_follow_up_v1',
+  TURN: 'interview_turn_v1',
   REPORT: 'interview_report_v1',
+  REPORT_V2: 'interview_report_v2',
 } as const;
 
 const BASE_RULES = `You are an expert interview coach. Infer profession, role, seniority, and interview strategy dynamically from the job and candidate context.
@@ -503,6 +506,60 @@ MODE: ${ctx.mode}`,
   });
 }
 
+const INTERVIEWER_VOICE = `${BASE_RULES}
+You are a senior, experienced interviewer conducting a mock interview. Speak naturally and conversationally in feedback (max 2 sentences, ~40 words). Transition smoothly to the next question when moving on.`;
+
+export async function evaluateAndContinueInterview(
+  ctx: {
+    question: string;
+    rubric: string;
+    answer: string;
+    mode: string;
+    difficulty?: string;
+    mappedContext: string;
+    focusHint: 'follow_up' | 'next_competency';
+    competencyFocus?: string;
+    questionCount: number;
+    targetCount: number;
+    remainingMinutes: number;
+    evaluationOnly: boolean;
+  },
+  hashes: { job?: string; cv?: string }
+) {
+  const nextQuestionSchema = ctx.evaluationOnly
+    ? 'Set next_question to null.'
+    : `Include next_question with question, type, competency_id, difficulty, expected_points (max 3), evaluation_rubric (max 3).
+If focusHint is follow_up, probe the last answer naturally. Otherwise transition to competencyFocus with a fresh question.`;
+
+  return runInterviewAi({
+    system: INTERVIEWER_VOICE,
+    user: `Evaluate the candidate's answer and ${ctx.evaluationOnly ? 'wrap up the interview' : 'generate your next question'}. Return JSON:
+{"overall_score":0,"dimension_scores":[{"name":"","score":0,"feedback":""}],"strengths":[],"weaknesses":[],"missing_points":[],"feedback":"","action":"follow_up|next_competency|complete","next_question":null}
+
+Rules:
+- feedback: natural spoken interviewer note (max 2 sentences, ~40 words). No bullet lists.
+- dimension_scores: max 3 items. strengths/weaknesses: max 2 each. missing_points: max 3.
+- action: follow_up only if focusHint is follow_up and answer warrants a probe; otherwise next_competency or complete.
+- ${nextQuestionSchema}
+
+QUESTION: ${ctx.question}
+RUBRIC: ${ctx.rubric}
+ANSWER: ${ctx.answer}
+MODE: ${ctx.mode}
+DIFFICULTY: ${ctx.difficulty ?? 'medium'}
+MAPPED CONTEXT: ${ctx.mappedContext}
+FOCUS HINT: ${ctx.focusHint}
+COMPETENCY FOCUS: ${ctx.competencyFocus ?? 'balanced'}
+PROGRESS: ${ctx.questionCount}/${ctx.targetCount}
+REMAINING MINUTES: ${ctx.remainingMinutes}`,
+    promptVersion: PROMPT_V.TURN,
+    maxTokens: 1200,
+    sourceJobHash: hashes.job,
+    sourceCvHash: hashes.cv,
+    normalize: normalizeInterviewTurn,
+  });
+}
+
 export async function decideFollowUp(
   ctx: {
     sessionSummary: string;
@@ -554,6 +611,28 @@ SESSION: ${ctx.sessionHistory}
 MASTERY: ${ctx.masterySummary}`,
     promptVersion: PROMPT_V.REPORT,
     maxTokens: 4096,
+    sourceJobHash: hashes.job,
+    sourceCvHash: hashes.cv,
+    normalize: normalizeFinalReport,
+  });
+}
+
+export async function generateFinalReportFromEvaluations(
+  ctx: { blueprintSummary: string; evaluationDigest: string; masterySummary: string },
+  hashes: { job?: string; cv?: string }
+) {
+  return runInterviewAi({
+    system: BASE_RULES,
+    user: `Generate final interview report from per-question evaluations. readiness_score is 0-100 practice indicator, NOT hiring probability. Return JSON:
+{"overall_score":0,"readiness_score":0,"dimensions":[],"strengths":[],"weaknesses":[],"missing_areas":[],"question_review":[],"recommendations":[],"improvement_trend":""}
+
+Use EVALUATIONS for question_review (one entry per question). Do not invent scores — derive from provided data.
+
+STRATEGY: ${ctx.blueprintSummary}
+EVALUATIONS: ${ctx.evaluationDigest}
+MASTERY: ${ctx.masterySummary}`,
+    promptVersion: PROMPT_V.REPORT_V2,
+    maxTokens: 3072,
     sourceJobHash: hashes.job,
     sourceCvHash: hashes.cv,
     normalize: normalizeFinalReport,
