@@ -121,6 +121,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Test VPS TCP connectivity
+        run: |
+          set -eux
+          timeout 10 bash -c '</dev/tcp/${{ secrets.VPS_HOST }}/${{ secrets.VPS_PORT }}'
+          echo "TCP connection to VPS succeeded"
+
       - name: Copy runtime files to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
