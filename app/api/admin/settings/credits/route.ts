@@ -34,7 +34,7 @@ export async function PUT(request: Request) {
   };
 
   if (typeof body.initial_free_credits === 'number') {
-    await getCreditsRepo().setInitialFreeCredits(Math.max(0, Math.round(body.initial_free_credits)), admin.id);
+    await getCreditsRepo().setInitialFreeCredits(Math.max(0, Number(body.initial_free_credits)), admin.id);
   }
 
   if (
@@ -45,9 +45,9 @@ export async function PUT(request: Request) {
   ) {
     await getCreditsRepo().saveCreditRule({
       input_token_unit: Math.max(1, Math.round(body.input_token_unit)),
-      input_token_credits: Math.max(0, Math.round(body.input_token_credits)),
+      input_token_credits: Math.max(0, Number(body.input_token_credits)),
       output_token_unit: Math.max(1, Math.round(body.output_token_unit)),
-      output_token_credits: Math.max(0, Math.round(body.output_token_credits)),
+      output_token_credits: Math.max(0, Number(body.output_token_credits)),
       createdBy: admin.id,
     });
   }

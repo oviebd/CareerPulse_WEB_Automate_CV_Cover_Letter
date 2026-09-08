@@ -1,5 +1,8 @@
 import type { CreditRuleSnapshot } from '@/types';
 
+const CREDIT_SCALE = 4;
+const CREDIT_FACTOR = 10 ** CREDIT_SCALE;
+
 export type CreditRuleInput = {
   input_token_unit: number;
   input_token_credits: number;
@@ -7,6 +10,18 @@ export type CreditRuleInput = {
   output_token_credits: number;
   rule_version_id?: string;
 };
+
+export function roundCredits(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.round(value * CREDIT_FACTOR) / CREDIT_FACTOR;
+}
+
+export function formatCredits(value: number): string {
+  return roundCredits(value).toLocaleString(undefined, {
+    maximumFractionDigits: CREDIT_SCALE,
+    minimumFractionDigits: 0,
+  });
+}
 
 export function toRuleSnapshot(rule: CreditRuleInput): CreditRuleSnapshot {
   return {
@@ -30,17 +45,10 @@ export function calculateCreditsFromTokens(
   const inputUnit = Math.max(1, rule.input_token_unit);
   const outputUnit = Math.max(1, rule.output_token_unit);
 
-  const inputCredits =
-    input > 0
-      ? Math.ceil(input / inputUnit) * Math.max(0, rule.input_token_credits)
-      : 0;
-  const outputCredits =
-    output > 0
-      ? Math.ceil(output / outputUnit) * Math.max(0, rule.output_token_credits)
-      : 0;
+  const inputCredits = (input / inputUnit) * Math.max(0, rule.input_token_credits);
+  const outputCredits = (output / outputUnit) * Math.max(0, rule.output_token_credits);
 
-  const total = inputCredits + outputCredits;
-  return total > 0 ? total : 1;
+  return roundCredits(inputCredits + outputCredits);
 }
 
 export function estimateCreditsFromPrompt(

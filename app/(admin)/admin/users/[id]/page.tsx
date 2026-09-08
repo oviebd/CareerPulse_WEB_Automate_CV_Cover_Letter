@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
+import { formatCredits } from '@/lib/credits/calculator';
 
 type AdminUserDetail = {
   id: string;
@@ -156,7 +157,7 @@ export default function AdminUserDetailPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="p-4">
           <p className="text-xs text-[var(--color-text-muted)]">Credits</p>
-          <p className="mt-1 text-xl font-semibold">{user.balance.toLocaleString()}</p>
+          <p className="mt-1 text-xl font-semibold">{formatCredits(user.balance)}</p>
         </Card>
         <Card className="p-4">
           <p className="text-xs text-[var(--color-text-muted)]">Joined</p>
@@ -277,7 +278,7 @@ export default function AdminUserDetailPage() {
             {
               key: 'credits',
               header: 'Credits',
-              render: (r) => r.credits_consumed,
+              render: (r) => formatCredits(Number(r.credits_consumed)),
             },
             {
               key: 'when',
@@ -302,7 +303,7 @@ export default function AdminUserDetailPage() {
                 <span className="text-[var(--color-text-secondary)]">
                   {String(t.type)} · {String(t.description ?? '')}
                 </span>
-                <span className="font-medium">{String(t.amount)}</span>
+                <span className="font-medium">{formatCredits(Number(t.amount))}</span>
               </div>
             ))
           )}

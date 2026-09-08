@@ -358,7 +358,8 @@ export async function claudeTextCompletion(
   system: string,
   user: string,
   maxTokens = 1024,
-  operation = 'completion'
+  operation = 'completion',
+  options?: { skipBilling?: boolean }
 ): Promise<string> {
   const { text: output } = await claudeComplete({
     system,
@@ -366,6 +367,35 @@ export async function claudeTextCompletion(
     maxTokens,
     category: 'ai_suggestions',
     operation,
+    skipBilling: options?.skipBilling,
   });
   return output;
+}
+
+export async function claudeTextCompletionWithMetrics(
+  system: string,
+  user: string,
+  maxTokens = 1024,
+  operation = 'completion',
+  options?: { skipBilling?: boolean }
+): Promise<{
+  text: string;
+  inputTokens: number;
+  outputTokens: number;
+  aiUsageId?: string | null;
+}> {
+  const result = await claudeComplete({
+    system,
+    user,
+    maxTokens,
+    category: 'ai_suggestions',
+    operation,
+    skipBilling: options?.skipBilling,
+  });
+  return {
+    text: result.text,
+    inputTokens: result.inputTokens,
+    outputTokens: result.outputTokens,
+    aiUsageId: result.aiUsageId ?? null,
+  };
 }

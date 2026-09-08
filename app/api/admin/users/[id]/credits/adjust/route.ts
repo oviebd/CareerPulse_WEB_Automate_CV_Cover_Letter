@@ -20,7 +20,7 @@ export async function POST(request: Request, ctx: RouteCtx) {
   try {
     const result = await getCreditsRepo().adjustCredits({
       userId: id,
-      amount: Math.round(amount),
+      amount,
       description: body.description?.trim() || 'Admin credit adjustment',
       createdBy: admin.id,
     });

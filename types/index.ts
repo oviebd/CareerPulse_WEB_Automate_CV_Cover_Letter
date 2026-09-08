@@ -52,6 +52,8 @@ export interface CreditTransaction {
   rule_snapshot: CreditRuleSnapshot | null;
   created_by: string | null;
   created_at: string;
+  input_tokens?: number | null;
+  output_tokens?: number | null;
 }
 
 export interface CreditRuleVersion {

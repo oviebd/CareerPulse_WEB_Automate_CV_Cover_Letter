@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
-import { claudeTextCompletion } from '@/lib/claude';
+import { claudeTextCompletion, claudeTextCompletionWithMetrics } from '@/lib/claude';
 import { getSessionUser } from '@/lib/auth/session';
 import { runWithAiUsageContext } from '@/lib/ai/usage-context';
 import { rateLimitHit } from '@/lib/rate-limit';
 import { handleAiRouteError } from '@/lib/credits/api-errors';
+import { chargeAiUsageFromTokens } from '@/lib/credits/ai-billing';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -228,13 +229,18 @@ ${isCoverLetterRequest
         suggestions: Array<{ text: string; tone: string; why: string }>;
         best_index: number;
         best_reason: string;
+        inputTokens: number;
+        outputTokens: number;
+        aiUsageId: string | null;
       }> {
-        const out = await claudeTextCompletion(
+        const completion = await claudeTextCompletionWithMetrics(
           systemPrompt,
           extraInstruction ? `${basePrompt}\n\n${extraInstruction}` : basePrompt,
-          1200
+          1200,
+          'cv_rewrite',
+          { skipBilling: true }
         );
-        const clean = out.replace(/```json|```/g, '').trim();
+        const clean = completion.text.replace(/```json|```/g, '').trim();
         const parsed = JSON.parse(clean) as {
           suggestions?: Array<string | { text?: string; tone?: string; why?: string }>;
           best_index?: number;
@@ -273,18 +279,47 @@ ${isCoverLetterRequest
               ? parsed.best_index
               : 0,
           best_reason: (parsed.best_reason ?? '').trim(),
+          inputTokens: completion.inputTokens,
+          outputTokens: completion.outputTokens,
+          aiUsageId: completion.aiUsageId ?? null,
         };
       }
 
+      let totalInputTokens = 0;
+      let totalOutputTokens = 0;
+      let lastAiUsageId: string | null = null;
+
       let result = await generateOnce();
+      totalInputTokens += result.inputTokens;
+      totalOutputTokens += result.outputTokens;
+      lastAiUsageId = result.aiUsageId;
+
       if (result.suggestions.length < 3) {
-        result = await generateOnce(
+        const retry = await generateOnce(
           `Your previous response had incomplete or fragmented lines.
 Return exactly 3 complete, meaningful suggestions, with tone/why per suggestion, plus best_index and best_reason.`
         );
+        totalInputTokens += retry.inputTokens;
+        totalOutputTokens += retry.outputTokens;
+        lastAiUsageId = retry.aiUsageId ?? lastAiUsageId;
+        result = retry;
       }
 
-      return NextResponse.json({ result });
+      await chargeAiUsageFromTokens({
+        userId: user.id,
+        inputTokens: totalInputTokens,
+        outputTokens: totalOutputTokens,
+        feature: 'ai_suggestions:cv_rewrite',
+        aiUsageId: lastAiUsageId ?? undefined,
+      });
+
+      return NextResponse.json({
+        result: {
+          suggestions: result.suggestions,
+          best_index: result.best_index,
+          best_reason: result.best_reason,
+        },
+      });
     }
 
     return NextResponse.json({ error: 'unknown_tool' }, { status: 400 });

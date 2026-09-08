@@ -12,20 +12,24 @@ const rule = {
 };
 
 describe('calculateCreditsFromTokens', () => {
-  it('charges input tokens only', () => {
-    expect(calculateCreditsFromTokens(1500, 0, rule)).toBe(2);
+  it('charges input tokens only as a fraction of the unit', () => {
+    expect(calculateCreditsFromTokens(1500, 0, rule)).toBe(1.5);
   });
 
-  it('charges output tokens only', () => {
-    expect(calculateCreditsFromTokens(0, 2500, rule)).toBe(15);
+  it('charges output tokens only as a fraction of the unit', () => {
+    expect(calculateCreditsFromTokens(0, 2500, rule)).toBe(12.5);
   });
 
-  it('combines input and output with ceil rounding', () => {
-    expect(calculateCreditsFromTokens(500, 500, rule)).toBe(6);
+  it('combines input and output proportionally', () => {
+    expect(calculateCreditsFromTokens(500, 500, rule)).toBe(3);
   });
 
   it('returns zero for zero tokens', () => {
     expect(calculateCreditsFromTokens(0, 0, rule)).toBe(0);
+  });
+
+  it('returns fractional credits for small token counts', () => {
+    expect(calculateCreditsFromTokens(100, 200, rule)).toBe(1.1);
   });
 
   it('handles large token counts', () => {

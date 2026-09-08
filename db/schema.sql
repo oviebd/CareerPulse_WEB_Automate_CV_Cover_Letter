@@ -230,7 +230,7 @@ CREATE TABLE IF NOT EXISTS ai_usage_events (
   provider TEXT DEFAULT 'anthropic',
   feature TEXT,
   request_id TEXT,
-  credits_consumed INTEGER NOT NULL DEFAULT 0,
+  credits_consumed NUMERIC(12, 4) NOT NULL DEFAULT 0,
   credit_rule_version UUID,
   token_source TEXT NOT NULL DEFAULT 'api' CHECK (token_source IN ('api', 'estimated')),
   cached_input_tokens INTEGER NOT NULL DEFAULT 0,
@@ -251,9 +251,9 @@ CREATE TABLE IF NOT EXISTS plans (
 CREATE TABLE IF NOT EXISTS credit_rule_versions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   input_token_unit INTEGER NOT NULL DEFAULT 1000 CHECK (input_token_unit > 0),
-  input_token_credits INTEGER NOT NULL DEFAULT 1 CHECK (input_token_credits >= 0),
+  input_token_credits NUMERIC(12, 4) NOT NULL DEFAULT 1 CHECK (input_token_credits >= 0),
   output_token_unit INTEGER NOT NULL DEFAULT 1000 CHECK (output_token_unit > 0),
-  output_token_credits INTEGER NOT NULL DEFAULT 5 CHECK (output_token_credits >= 0),
+  output_token_credits NUMERIC(12, 4) NOT NULL DEFAULT 5 CHECK (output_token_credits >= 0),
   is_active BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   created_by UUID REFERENCES users(id) ON DELETE SET NULL
@@ -261,7 +261,7 @@ CREATE TABLE IF NOT EXISTS credit_rule_versions (
 
 CREATE TABLE IF NOT EXISTS credit_balances (
   user_id UUID PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
-  balance INTEGER NOT NULL DEFAULT 0 CHECK (balance >= 0),
+  balance NUMERIC(12, 4) NOT NULL DEFAULT 0 CHECK (balance >= 0),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -272,9 +272,9 @@ CREATE TABLE IF NOT EXISTS credit_transactions (
     'initial_grant', 'admin_grant', 'admin_adjust', 'promo_grant',
     'reservation', 'reservation_release', 'ai_usage', 'refund'
   )),
-  amount INTEGER NOT NULL,
-  balance_before INTEGER NOT NULL,
-  balance_after INTEGER NOT NULL,
+  amount NUMERIC(12, 4) NOT NULL,
+  balance_before NUMERIC(12, 4) NOT NULL,
+  balance_after NUMERIC(12, 4) NOT NULL,
   source TEXT,
   reference_id UUID,
   ai_usage_id UUID,

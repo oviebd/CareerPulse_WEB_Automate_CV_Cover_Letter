@@ -5,6 +5,7 @@ import { Coins, Sparkles, Users } from 'lucide-react';
 import { apiFetch } from '@/lib/api-fetch';
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { AdminStatCard } from '@/components/admin/AdminShell';
+import { formatCredits } from '@/lib/credits/calculator';
 
 type DashboardStats = {
   total_users: number;
@@ -25,7 +26,7 @@ export default function AdminOverviewPage() {
     { label: 'Free users', value: data?.free_users ?? 0, icon: Users },
     { label: 'Premium users', value: data?.premium_users ?? 0, icon: Users },
     { label: 'AI requests', value: data?.total_ai_requests ?? 0, icon: Sparkles },
-    { label: 'Credits consumed', value: data?.total_credits_consumed ?? 0, icon: Coins },
+    { label: 'Credits consumed', value: formatCredits(data?.total_credits_consumed ?? 0), icon: Coins },
   ];
 
   return (

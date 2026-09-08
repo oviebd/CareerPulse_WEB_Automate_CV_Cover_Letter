@@ -6,6 +6,7 @@ import { apiFetch } from '@/lib/api-fetch';
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { AdminDataTable } from '@/components/admin/AdminDataTable';
 import { Input } from '@/components/ui/input';
+import { formatCredits } from '@/lib/credits/calculator';
 
 type AiUsageRow = {
   id: string;
@@ -82,7 +83,7 @@ export default function AdminAiUsagePage() {
           {
             key: 'credits',
             header: 'Credits',
-            render: (r) => r.credits_consumed,
+            render: (r) => formatCredits(Number(r.credits_consumed)),
           },
           {
             key: 'when',

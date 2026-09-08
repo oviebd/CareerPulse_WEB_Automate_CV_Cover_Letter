@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useRef } from 'react';
 import { apiFetch, ApiError } from '@/lib/api-fetch';
+import { invalidateCreditQueries } from '@/hooks/useCredits';
 import type {
   InterviewDashboard,
   InterviewProfile,
@@ -134,6 +135,7 @@ export function useAnalyzeInterview() {
       }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['interview-profiles'] });
+      invalidateCreditQueries(qc);
     },
   });
 }
@@ -153,6 +155,7 @@ export function usePrepareInterview() {
       const profileId = typeof input === 'string' ? input : input.profileId;
       void qc.invalidateQueries({ queryKey: ['interview-profile', profileId] });
       void qc.invalidateQueries({ queryKey: ['prep-questions', profileId] });
+      invalidateCreditQueries(qc);
     },
   });
 }
@@ -167,6 +170,7 @@ export function useGenerateQuiz() {
       }),
     onSuccess: (_d, body) => {
       void qc.invalidateQueries({ queryKey: ['interview-profile', body.profile_id] });
+      invalidateCreditQueries(qc);
     },
   });
 }
@@ -250,14 +254,19 @@ export function useSubmitInterviewAnswer(sessionId: string) {
       }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['interview-session', sessionId] });
+      invalidateCreditQueries(qc);
     },
   });
 }
 
 export function useCompleteInterviewSession(sessionId: string) {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: () =>
       apiFetch(`/api/interview/sessions/${sessionId}/complete`, { method: 'POST' }),
+    onSuccess: () => {
+      invalidateCreditQueries(qc);
+    },
   });
 }
 
@@ -301,6 +310,7 @@ export function useClarifyInterview() {
     },
     onSettled: (_d, _e, body) => {
       void qc.invalidateQueries({ queryKey: ['interview-profile', body.profile_id] });
+      invalidateCreditQueries(qc);
     },
   });
 }
@@ -365,6 +375,7 @@ export function useGeneratePrepQuestions(profileId: string) {
       ),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['interview-prep-questions', profileId] });
+      invalidateCreditQueries(qc);
     },
   });
 }
@@ -390,6 +401,7 @@ export type PrepExplainResult = {
 };
 
 export function useExplainPrepQuestion() {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: {
       questionId: string;
@@ -400,6 +412,9 @@ export function useExplainPrepQuestion() {
         method: 'POST',
         body: JSON.stringify({ message: body.message, history: body.history }),
       }),
+    onSuccess: () => {
+      invalidateCreditQueries(qc);
+    },
   });
 }
 
@@ -414,6 +429,7 @@ export function useGeneratePrepQuestionExample(profileId: string) {
       }>(`/api/interview/prep-questions/${questionId}/example`, { method: 'POST' }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['interview-prep-questions', profileId] });
+      invalidateCreditQueries(qc);
     },
   });
 }
@@ -425,6 +441,7 @@ export type PrepReshapeResult = {
 };
 
 export function useReshapePrepQuestion() {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: {
       questionId: string;
@@ -440,5 +457,8 @@ export function useReshapePrepQuestion() {
           target_chars: body.target_chars,
         }),
       }),
+    onSuccess: () => {
+      invalidateCreditQueries(qc);
+    },
   });
 }

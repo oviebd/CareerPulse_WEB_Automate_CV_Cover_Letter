@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -8,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useStartInterview } from '@/hooks/useInterview';
+import { invalidateCreditQueries } from '@/hooks/useCredits';
 import { ApiError } from '@/lib/api-fetch';
 import { jobStatusToColumn } from '@/lib/job-status-ui';
 import type { JobStatus } from '@/types/database';
@@ -38,6 +40,7 @@ export function ContextualAITools({
   const router = useRouter();
   const { toast } = useToast();
   const start = useStartInterview();
+  const queryClient = useQueryClient();
   const column = jobStatusToColumn(status);
   const [output, setOutput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -82,6 +85,7 @@ export function ContextualAITools({
           ? data.result
           : JSON.stringify(data.result, null, 2)
       );
+      invalidateCreditQueries(queryClient);
     } catch {
       setOutput('Could not generate. Please try again.');
     } finally {

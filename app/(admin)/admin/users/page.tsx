@@ -9,6 +9,7 @@ import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { AdminDataTable } from '@/components/admin/AdminDataTable';
 import { StatusBadge } from '@/components/admin/StatusBadge';
 import { Input } from '@/components/ui/input';
+import { formatCredits } from '@/lib/credits/calculator';
 
 type AdminUser = {
   id: string;
@@ -93,7 +94,7 @@ export default function AdminUsersPage() {
           {
             key: 'credits',
             header: 'Credits',
-            render: (u) => u.balance.toLocaleString(),
+            render: (u) => formatCredits(u.balance),
           },
           {
             key: 'created',

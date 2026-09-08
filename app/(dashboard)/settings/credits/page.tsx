@@ -5,6 +5,21 @@ import Link from 'next/link';
 import { apiFetch } from '@/lib/api-fetch';
 import { Card } from '@/components/ui/card';
 import type { CreditTransaction } from '@/types';
+import { formatCredits } from '@/lib/credits/calculator';
+
+function formatTokenCount(value: number | null | undefined) {
+  if (value == null) return null;
+  return value.toLocaleString();
+}
+
+function formatWhen(iso: string) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleString(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+}
 
 export default function CreditsSettingsPage() {
   const { data: credits, isLoading: creditsLoading } = useQuery({
@@ -17,6 +32,10 @@ export default function CreditsSettingsPage() {
     queryFn: () =>
       apiFetch<{ transactions: CreditTransaction[] }>('/api/user/credits/transactions?limit=30'),
   });
+
+  const transactions = (txData?.transactions ?? []).filter(
+    (t) => t.type !== 'reservation' && t.type !== 'reservation_release' && t.type !== 'refund'
+  );
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -34,12 +53,12 @@ export default function CreditsSettingsPage() {
       <Card className="p-6">
         <p className="text-sm text-[var(--color-text-muted)]">Available credits</p>
         <p className="mt-2 text-4xl font-semibold text-[var(--color-text-primary)]">
-          {creditsLoading ? '…' : (credits?.balance ?? 0).toLocaleString()}
+          {creditsLoading ? '…' : formatCredits(credits?.balance ?? 0)}
         </p>
         {!creditsLoading && credits?.rule && (
           <p className="mt-3 text-xs text-[var(--color-text-muted)]">
-            ~{credits.rule.input_token_credits} credit per {credits.rule.input_token_unit} input
-            tokens · ~{credits.rule.output_token_credits} credits per{' '}
+            ~{formatCredits(credits.rule.input_token_credits)} credit per {credits.rule.input_token_unit} input
+            tokens · ~{formatCredits(credits.rule.output_token_credits)} credits per{' '}
             {credits.rule.output_token_unit} output tokens
           </p>
         )}
@@ -51,29 +70,49 @@ export default function CreditsSettingsPage() {
           <p className="mt-4 text-sm text-[var(--color-text-muted)]">Loading…</p>
         ) : (
           <div className="mt-4 space-y-2 text-sm">
-            {(txData?.transactions ?? []).length === 0 ? (
+            {transactions.length === 0 ? (
               <p className="text-[var(--color-text-muted)]">No credit activity yet.</p>
             ) : (
-              txData?.transactions.map((t) => (
-                <div
-                  key={t.id}
-                  className="flex items-start justify-between gap-4 border-b border-[var(--color-border)] py-2"
-                >
-                  <div>
-                    <p className="font-medium capitalize">{t.type.replace(/_/g, ' ')}</p>
-                    <p className="text-[var(--color-text-muted)]">{t.description ?? '—'}</p>
+              transactions.map((t) => {
+                const readTokens = formatTokenCount(t.input_tokens);
+                const writeTokens = formatTokenCount(t.output_tokens);
+                const hasTokens = readTokens != null && writeTokens != null;
+
+                return (
+                  <div
+                    key={t.id}
+                    className="flex items-start justify-between gap-4 border-b border-[var(--color-border)] py-2"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-medium capitalize">{t.type.replace(/_/g, ' ')}</p>
+                      <p className="text-[var(--color-text-muted)]">{t.description ?? '—'}</p>
+                      <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                        {formatWhen(t.created_at)}
+                      </p>
+                      {hasTokens ? (
+                        <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                          Read {readTokens} · Write {writeTokens}
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p
+                        className={
+                          t.amount >= 0
+                            ? 'text-[var(--color-success)]'
+                            : 'text-[var(--color-text-primary)]'
+                        }
+                      >
+                        {t.amount >= 0 ? '+' : ''}
+                        {formatCredits(t.amount)}
+                      </p>
+                      <p className="text-xs text-[var(--color-text-muted)]">
+                        Bal {formatCredits(t.balance_after)}
+                      </p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className={t.amount >= 0 ? 'text-emerald-600' : 'text-[var(--color-text-primary)]'}>
-                      {t.amount >= 0 ? '+' : ''}
-                      {t.amount}
-                    </p>
-                    <p className="text-xs text-[var(--color-text-muted)]">
-                      Bal {t.balance_after}
-                    </p>
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         )}

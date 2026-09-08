@@ -5,6 +5,7 @@ import {
   creditRuleVersions,
   creditTransactions,
   systemSettings,
+  aiUsageEvents,
 } from '@/lib/db/schema';
 import { toSnake, rowsToSnake } from '@/lib/db/map-row';
 import type {
@@ -12,9 +13,40 @@ import type {
   CreditTransaction,
   CreditTransactionType,
 } from '@/types';
-import type { CreditRuleInput } from '@/lib/credits/calculator';
+import { roundCredits, type CreditRuleInput } from '@/lib/credits/calculator';
 
 const DEFAULT_INITIAL_CREDITS = 150;
+
+function asCredit(value: unknown): number {
+  return roundCredits(Number(value ?? 0));
+}
+
+function creditValue(value: number): string {
+  return roundCredits(value).toFixed(4);
+}
+
+function toCreditTransaction(
+  row: Record<string, unknown>,
+  usage?: { inputTokens?: number | null; outputTokens?: number | null }
+): CreditTransaction {
+  const snake = toSnake(row);
+  const snapshot = snake.rule_snapshot as Record<string, unknown> | null;
+  const snapshotInput =
+    typeof snapshot?.input_tokens === 'number' ? snapshot.input_tokens : undefined;
+  const snapshotOutput =
+    typeof snapshot?.output_tokens === 'number' ? snapshot.output_tokens : undefined;
+  const inputTokens = snapshotInput ?? usage?.inputTokens ?? null;
+  const outputTokens = snapshotOutput ?? usage?.outputTokens ?? null;
+
+  return {
+    ...(snake as unknown as CreditTransaction),
+    amount: asCredit(snake.amount),
+    balance_before: asCredit(snake.balance_before),
+    balance_after: asCredit(snake.balance_after),
+    input_tokens: inputTokens,
+    output_tokens: outputTokens,
+  };
+}
 
 async function lockBalance(tx: Parameters<Parameters<ReturnType<typeof getDb>['transaction']>[0]>[0], userId: string) {
   const [row] = await tx
@@ -22,7 +54,7 @@ async function lockBalance(tx: Parameters<Parameters<ReturnType<typeof getDb>['t
     .from(creditBalances)
     .where(eq(creditBalances.userId, userId))
     .for('update');
-  return row?.balance ?? 0;
+  return asCredit(row?.balance);
 }
 
 async function getActiveRule(): Promise<CreditRuleInput & { id: string }> {
@@ -44,9 +76,9 @@ async function getActiveRule(): Promise<CreditRuleInput & { id: string }> {
   return {
     id: row.id,
     input_token_unit: row.inputTokenUnit,
-    input_token_credits: row.inputTokenCredits,
+    input_token_credits: asCredit(row.inputTokenCredits),
     output_token_unit: row.outputTokenUnit,
-    output_token_credits: row.outputTokenCredits,
+    output_token_credits: asCredit(row.outputTokenCredits),
   };
 }
 
@@ -58,7 +90,8 @@ async function getInitialFreeCredits(): Promise<number> {
     .where(eq(systemSettings.key, 'initial_free_credits'))
     .limit(1);
   const val = row?.value;
-  if (typeof val === 'number' && Number.isFinite(val)) return Math.max(0, Math.round(val));
+  if (typeof val === 'number' && Number.isFinite(val)) return Math.max(0, roundCredits(val));
+  if (typeof val === 'string' && Number.isFinite(Number(val))) return Math.max(0, roundCredits(Number(val)));
   return DEFAULT_INITIAL_CREDITS;
 }
 
@@ -69,14 +102,14 @@ async function getBalance(userId: string): Promise<number> {
     .from(creditBalances)
     .where(eq(creditBalances.userId, userId))
     .limit(1);
-  return row?.balance ?? 0;
+  return asCredit(row?.balance);
 }
 
 async function ensureBalanceRow(userId: string) {
   const db = getDb();
   await db
     .insert(creditBalances)
-    .values({ userId, balance: 0 })
+    .values({ userId, balance: '0' })
     .onConflictDoNothing();
 }
 
@@ -86,13 +119,24 @@ async function listTransactions(
 ): Promise<CreditTransaction[]> {
   const db = getDb();
   const rows = await db
-    .select()
+    .select({
+      txn: creditTransactions,
+      inputTokens: aiUsageEvents.inputTokens,
+      outputTokens: aiUsageEvents.outputTokens,
+    })
     .from(creditTransactions)
+    .leftJoin(aiUsageEvents, eq(creditTransactions.aiUsageId, aiUsageEvents.id))
     .where(eq(creditTransactions.userId, userId))
     .orderBy(desc(creditTransactions.createdAt))
     .limit(opts?.limit ?? 50)
     .offset(opts?.offset ?? 0);
-  return rowsToSnake(rows) as unknown as CreditTransaction[];
+
+  return rows.map(({ txn, inputTokens, outputTokens }) =>
+    toCreditTransaction(txn as Record<string, unknown>, {
+      inputTokens,
+      outputTokens,
+    })
+  );
 }
 
 async function hasAnyTransaction(userId: string): Promise<boolean> {
@@ -119,22 +163,23 @@ async function grantCredits(input: {
   }
   const db = getDb();
   return db.transaction(async (tx) => {
-    await tx.insert(creditBalances).values({ userId: input.userId, balance: 0 }).onConflictDoNothing();
+    await tx.insert(creditBalances).values({ userId: input.userId, balance: '0' }).onConflictDoNothing();
     const before = await lockBalance(tx, input.userId);
-    const after = before + input.amount;
-    await tx.update(creditBalances).set({ balance: after, updatedAt: new Date() }).where(eq(creditBalances.userId, input.userId));
+    const amount = roundCredits(input.amount);
+    const after = roundCredits(before + amount);
+    await tx.update(creditBalances).set({ balance: creditValue(after), updatedAt: new Date() }).where(eq(creditBalances.userId, input.userId));
     const [txnRow] = await tx.insert(creditTransactions).values({
       userId: input.userId,
       type: input.type,
-      amount: input.amount,
-      balanceBefore: before,
-      balanceAfter: after,
+      amount: creditValue(amount),
+      balanceBefore: creditValue(before),
+      balanceAfter: creditValue(after),
       source: input.source ?? null,
       referenceId: input.referenceId ?? null,
       description: input.description ?? null,
       createdBy: input.createdBy ?? null,
     }).returning();
-    return { balance: after, transaction: txnRow ? (toSnake(txnRow) as unknown as CreditTransaction) : null };
+    return { balance: after, transaction: txnRow ? toCreditTransaction(txnRow as Record<string, unknown>) : null };
   });
 }
 
@@ -144,22 +189,23 @@ async function reserveCredits(input: {
   referenceId?: string;
   description?: string;
 }): Promise<{ reservationId: string; balance: number }> {
-  if (input.amount <= 0) {
+  const amount = roundCredits(input.amount);
+  if (amount <= 0) {
     return { reservationId: '', balance: await getBalance(input.userId) };
   }
   const db = getDb();
   return db.transaction(async (tx) => {
-    await tx.insert(creditBalances).values({ userId: input.userId, balance: 0 }).onConflictDoNothing();
+    await tx.insert(creditBalances).values({ userId: input.userId, balance: '0' }).onConflictDoNothing();
     const before = await lockBalance(tx, input.userId);
-    if (before < input.amount) throw new Error('INSUFFICIENT_CREDITS');
-    const after = before - input.amount;
-    await tx.update(creditBalances).set({ balance: after, updatedAt: new Date() }).where(eq(creditBalances.userId, input.userId));
+    if (before < amount) throw new Error('INSUFFICIENT_CREDITS');
+    const after = roundCredits(before - amount);
+    await tx.update(creditBalances).set({ balance: creditValue(after), updatedAt: new Date() }).where(eq(creditBalances.userId, input.userId));
     const [txnRow] = await tx.insert(creditTransactions).values({
       userId: input.userId,
       type: 'reservation',
-      amount: -input.amount,
-      balanceBefore: before,
-      balanceAfter: after,
+      amount: creditValue(-amount),
+      balanceBefore: creditValue(before),
+      balanceAfter: creditValue(after),
       referenceId: input.referenceId ?? null,
       description: input.description ?? 'AI credit reservation',
     }).returning();
@@ -174,19 +220,11 @@ async function releaseReservation(reservationId: string, userId: string): Promis
     if (!reservation || reservation.userId !== userId || reservation.type !== 'reservation') {
       return getBalance(userId);
     }
-    const refundAmount = Math.abs(reservation.amount);
+    const reserved = Math.abs(asCredit(reservation.amount));
     const before = await lockBalance(tx, userId);
-    const after = before + refundAmount;
-    await tx.update(creditBalances).set({ balance: after, updatedAt: new Date() }).where(eq(creditBalances.userId, userId));
-    await tx.insert(creditTransactions).values({
-      userId,
-      type: 'reservation_release',
-      amount: refundAmount,
-      balanceBefore: before,
-      balanceAfter: after,
-      referenceId: reservationId,
-      description: 'Released unused AI credit reservation',
-    });
+    const after = roundCredits(before + reserved);
+    await tx.update(creditBalances).set({ balance: creditValue(after), updatedAt: new Date() }).where(eq(creditBalances.userId, userId));
+    await tx.delete(creditTransactions).where(eq(creditTransactions.id, reservationId));
     return after;
   });
 }
@@ -203,44 +241,32 @@ async function settleReservation(input: {
   return db.transaction(async (tx) => {
     const [reservation] = await tx.select().from(creditTransactions).where(eq(creditTransactions.id, input.reservationId)).limit(1);
     if (!reservation || reservation.userId !== input.userId) throw new Error('RESERVATION_NOT_FOUND');
-
-    const reserved = Math.abs(reservation.amount);
-    const actual = Math.max(0, input.actualCredits);
-    const diff = reserved - actual;
-    let before = await lockBalance(tx, input.userId);
-    let balance = before;
-
-    if (diff > 0) {
-      balance = before + diff;
-      await tx.update(creditBalances).set({ balance, updatedAt: new Date() }).where(eq(creditBalances.userId, input.userId));
-      await tx.insert(creditTransactions).values({
-        userId: input.userId,
-        type: 'refund',
-        amount: diff,
-        balanceBefore: before,
-        balanceAfter: balance,
-        referenceId: input.reservationId,
-        description: 'Partial reservation refund after AI usage',
-      });
-    } else if (diff < 0) {
-      const extra = Math.abs(diff);
-      if (before < extra) throw new Error('INSUFFICIENT_CREDITS');
-      balance = before - extra;
-      await tx.update(creditBalances).set({ balance, updatedAt: new Date() }).where(eq(creditBalances.userId, input.userId));
+    if (reservation.type !== 'reservation') {
+      return lockBalance(tx, input.userId);
     }
 
-    await tx.insert(creditTransactions).values({
-      userId: input.userId,
+    const reserved = Math.abs(asCredit(reservation.amount));
+    const actual = roundCredits(Math.max(0, input.actualCredits));
+    const current = await lockBalance(tx, input.userId);
+    const after = roundCredits(current + reserved - actual);
+    if (after < 0) throw new Error('INSUFFICIENT_CREDITS');
+
+    await tx.update(creditBalances).set({
+      balance: creditValue(after),
+      updatedAt: new Date(),
+    }).where(eq(creditBalances.userId, input.userId));
+
+    await tx.update(creditTransactions).set({
       type: 'ai_usage',
-      amount: -actual,
-      balanceBefore: balance + (diff < 0 ? Math.abs(diff) : 0),
-      balanceAfter: balance,
+      amount: creditValue(-actual),
+      balanceBefore: creditValue(current + reserved),
+      balanceAfter: creditValue(after),
       aiUsageId: input.aiUsageId ?? null,
-      referenceId: input.reservationId,
       description: input.description ?? 'AI usage',
       ruleSnapshot: input.ruleSnapshot ?? null,
-    });
-    return balance;
+    }).where(eq(creditTransactions.id, input.reservationId));
+
+    return after;
   });
 }
 
@@ -251,24 +277,25 @@ async function adjustCredits(input: {
   createdBy: string;
 }): Promise<{ balance: number; transaction: CreditTransaction | null }> {
   const type: CreditTransactionType = input.amount >= 0 ? 'admin_grant' : 'admin_adjust';
+  const amount = roundCredits(input.amount);
   const db = getDb();
   return db.transaction(async (tx) => {
-    await tx.insert(creditBalances).values({ userId: input.userId, balance: 0 }).onConflictDoNothing();
+    await tx.insert(creditBalances).values({ userId: input.userId, balance: '0' }).onConflictDoNothing();
     const before = await lockBalance(tx, input.userId);
-    const after = before + input.amount;
+    const after = roundCredits(before + amount);
     if (after < 0) throw new Error('NEGATIVE_BALANCE');
-    await tx.update(creditBalances).set({ balance: after, updatedAt: new Date() }).where(eq(creditBalances.userId, input.userId));
+    await tx.update(creditBalances).set({ balance: creditValue(after), updatedAt: new Date() }).where(eq(creditBalances.userId, input.userId));
     const [txnRow] = await tx.insert(creditTransactions).values({
       userId: input.userId,
       type,
-      amount: input.amount,
-      balanceBefore: before,
-      balanceAfter: after,
+      amount: creditValue(amount),
+      balanceBefore: creditValue(before),
+      balanceAfter: creditValue(after),
       description: input.description,
       createdBy: input.createdBy,
       source: 'admin',
     }).returning();
-    return { balance: after, transaction: txnRow ? (toSnake(txnRow) as unknown as CreditTransaction) : null };
+    return { balance: after, transaction: txnRow ? toCreditTransaction(txnRow as Record<string, unknown>) : null };
   });
 }
 
@@ -289,10 +316,10 @@ async function saveCreditRule(input: {
   return db.transaction(async (tx) => {
     await tx.update(creditRuleVersions).set({ isActive: false }).where(eq(creditRuleVersions.isActive, true));
     const [row] = await tx.insert(creditRuleVersions).values({
-      inputTokenUnit: input.input_token_unit,
-      inputTokenCredits: input.input_token_credits,
-      outputTokenUnit: input.output_token_unit,
-      outputTokenCredits: input.output_token_credits,
+      inputTokenUnit: Math.max(1, Math.round(input.input_token_unit)),
+      inputTokenCredits: creditValue(Math.max(0, input.input_token_credits)),
+      outputTokenUnit: Math.max(1, Math.round(input.output_token_unit)),
+      outputTokenCredits: creditValue(Math.max(0, input.output_token_credits)),
       isActive: true,
       createdBy: input.createdBy ?? null,
     }).returning();

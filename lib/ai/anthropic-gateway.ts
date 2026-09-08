@@ -60,6 +60,7 @@ export type ClaudeCompleteResult = {
   inputTokens: number;
   outputTokens: number;
   creditsConsumed?: number;
+  aiUsageId?: string | null;
 };
 
 async function invokeAnthropic(opts: ClaudeCompleteOptions) {
@@ -137,8 +138,9 @@ export async function claudeComplete(
       result.outputTokens,
       rule
     );
+    let aiUsageId: string | null = null;
     if (userId) {
-      await persistUsage({ ...result, creditsConsumed });
+      aiUsageId = await persistUsage({ ...result, creditsConsumed });
     }
     return {
       text: result.text,
@@ -146,6 +148,7 @@ export async function claudeComplete(
       inputTokens: result.inputTokens,
       outputTokens: result.outputTokens,
       creditsConsumed: userId ? creditsConsumed : undefined,
+      aiUsageId,
     };
   }
 
@@ -181,6 +184,7 @@ export async function claudeComplete(
     inputTokens: billed.inputTokens,
     outputTokens: billed.outputTokens,
     creditsConsumed: billed.creditsConsumed,
+    aiUsageId: billed.aiUsageId ?? null,
   };
 }
 

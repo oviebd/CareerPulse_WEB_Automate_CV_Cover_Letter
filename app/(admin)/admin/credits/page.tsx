@@ -72,6 +72,7 @@ export default function AdminCreditsPage() {
           <Input
             label="Initial free credits (new registrations)"
             type="number"
+            step="any"
             value={current.initial_free_credits}
             onChange={(e) =>
               setForm({
@@ -97,6 +98,7 @@ export default function AdminCreditsPage() {
           <Input
             label="Input token credits"
             type="number"
+            step="any"
             value={current.active_rule.input_token_credits}
             onChange={(e) =>
               setForm({
@@ -125,6 +127,7 @@ export default function AdminCreditsPage() {
           <Input
             label="Output token credits"
             type="number"
+            step="any"
             value={current.active_rule.output_token_credits}
             onChange={(e) =>
               setForm({

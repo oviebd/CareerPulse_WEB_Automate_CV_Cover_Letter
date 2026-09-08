@@ -542,7 +542,7 @@ export const creditBalances = pgTable('credit_balances', {
   userId: uuid('user_id')
     .primaryKey()
     .references(() => profiles.id, { onDelete: 'cascade' }),
-  balance: integer('balance').notNull().default(0),
+  balance: decimal('balance', { precision: 12, scale: 4 }).notNull().default('0'),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -551,9 +551,9 @@ export const creditRuleVersions = pgTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
     inputTokenUnit: integer('input_token_unit').notNull().default(1000),
-    inputTokenCredits: integer('input_token_credits').notNull().default(1),
+    inputTokenCredits: decimal('input_token_credits', { precision: 12, scale: 4 }).notNull().default('1'),
     outputTokenUnit: integer('output_token_unit').notNull().default(1000),
-    outputTokenCredits: integer('output_token_credits').notNull().default(5),
+    outputTokenCredits: decimal('output_token_credits', { precision: 12, scale: 4 }).notNull().default('5'),
     isActive: boolean('is_active').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
@@ -569,9 +569,9 @@ export const creditTransactions = pgTable(
       .notNull()
       .references(() => profiles.id, { onDelete: 'cascade' }),
     type: text('type').notNull(),
-    amount: integer('amount').notNull(),
-    balanceBefore: integer('balance_before').notNull(),
-    balanceAfter: integer('balance_after').notNull(),
+    amount: decimal('amount', { precision: 12, scale: 4 }).notNull(),
+    balanceBefore: decimal('balance_before', { precision: 12, scale: 4 }).notNull(),
+    balanceAfter: decimal('balance_after', { precision: 12, scale: 4 }).notNull(),
     source: text('source'),
     referenceId: uuid('reference_id'),
     aiUsageId: uuid('ai_usage_id'),
@@ -627,7 +627,7 @@ export const aiUsageEvents = pgTable(
     provider: text('provider').default('anthropic'),
     feature: text('feature'),
     requestId: text('request_id'),
-    creditsConsumed: integer('credits_consumed').notNull().default(0),
+    creditsConsumed: decimal('credits_consumed', { precision: 12, scale: 4 }).notNull().default('0'),
     creditRuleVersion: uuid('credit_rule_version').references(() => creditRuleVersions.id, {
       onDelete: 'set null',
     }),

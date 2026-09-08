@@ -1,12 +1,14 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Modal } from '@/components/ui/modal';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/components/ui/toast';
+import { invalidateCreditQueries } from '@/hooks/useCredits';
 
 const TONE_OPTIONS = [
   { value: 'professional', label: 'Professional' },
@@ -59,6 +61,7 @@ export function CVRewriteWithAIModal({
   onAuthRequired,
 }: CVRewriteWithAIModalProps) {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [selectedTones, setSelectedTones] = useState<string[]>(['professional']);
   const [wordLimitPreset, setWordLimitPreset] = useState('100');
   const [customWordLimit, setCustomWordLimit] = useState('100');
@@ -163,6 +166,7 @@ export function CVRewriteWithAIModal({
           : null
       );
       setBestReason((json.result?.best_reason ?? '').trim());
+      invalidateCreditQueries(queryClient);
     } catch {
       toast('Failed to generate suggestions.', 'error');
     } finally {

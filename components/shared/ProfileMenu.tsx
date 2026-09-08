@@ -10,6 +10,7 @@ import { signOutAndGoHome } from '@/lib/sign-out-client';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useCredits } from '@/hooks/useCredits';
+import { formatCredits } from '@/lib/credits/calculator';
 
 function initials(name: string | null | undefined, email: string | undefined) {
   if (name?.trim()) {
@@ -116,7 +117,7 @@ export function ProfileMenu({ menuPlacement = 'below' }: ProfileMenuProps) {
                 onClick={() => setOpen(false)}
               >
                 <Sparkles className="h-4 w-4 shrink-0 text-[var(--color-muted)]" />
-                AI Credits ({credits?.balance ?? '…'})
+                AI Credits ({credits ? formatCredits(credits.balance) : '…'})
               </Link>
               <Link
                 href="/settings/billing"

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
 import { useCVProfile } from '@/hooks/useCV';
+import { invalidateCreditQueries } from '@/hooks/useCredits';
 import { useSubscription } from '@/hooks/useSubscription';
 import { uploadFileWithProgress, createSignedUploadUrl, removeUploadedFile } from '@/lib/file-upload-client';
 import { isAllowedCvFile } from '@/lib/cv-file';
@@ -170,6 +171,7 @@ export function CVUploadForm() {
 
         setPhase('complete');
         setUploadProgress(100);
+        invalidateCreditQueries(queryClient);
         toast('CV imported. Review and press Save.', 'success');
         router.push('/cv/edit');
         router.refresh();

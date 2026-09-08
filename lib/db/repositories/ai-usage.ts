@@ -2,6 +2,7 @@ import { desc, eq, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
 import { aiUsageEvents } from '@/lib/db/schema';
 import { rowsToSnake, toSnake } from '@/lib/db/map-row';
+import { roundCredits } from '@/lib/credits/calculator';
 
 export type AiUsageEventInsert = {
   user_id: string;
@@ -43,7 +44,7 @@ async function insertEvent(event: AiUsageEventInsert) {
       provider: event.provider ?? 'anthropic',
       feature: event.feature ?? null,
       requestId: event.request_id ?? null,
-      creditsConsumed: event.credits_consumed ?? 0,
+      creditsConsumed: String(roundCredits(event.credits_consumed ?? 0)),
       creditRuleVersion: event.credit_rule_version ?? null,
       tokenSource: event.token_source ?? 'api',
       metadata: event.metadata ?? {},

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
@@ -15,6 +16,7 @@ import { InsightPanel } from '@/components/cv/optimise/InsightPanel';
 import { StepperHeader, type StepId } from '@/components/cv/optimise/StepperHeader';
 import { useOptimiseDraftStore } from '@/stores/useOptimiseDraftStore';
 import { useOptimiseEditDraftStore } from '@/stores/useOptimiseEditDraftStore';
+import { invalidateCreditQueries } from '@/hooks/useCredits';
 import type { DraftResult, GenerationType, JobAnalysisResult } from '@/types';
 import { cn } from '@/lib/utils';
 
@@ -22,6 +24,7 @@ type AnalysisState = 'idle' | 'loading' | 'done' | 'error';
 
 export function AddJobWizard() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { tier } = useSubscription();
   const { toast } = useToast();
   const setOptimiseDraft = useOptimiseDraftStore((s) => s.setDraft);
@@ -101,11 +104,12 @@ export function AddJobWizard() {
       const data = (await res.json()) as JobAnalysisResult;
       setAnalysisResult(data);
       setAnalysisState('done');
+      invalidateCreditQueries(queryClient);
     } catch (e) {
       setAnalysisState('error');
       setAnalysisError(e instanceof Error ? e.message : 'Analysis failed');
     }
-  }, [jobDescription, jobUrl, selectedCV]);
+  }, [jobDescription, jobUrl, selectedCV, queryClient]);
 
   const handleGenerate = useCallback(async () => {
     if (!selectedCV) return;
@@ -190,6 +194,7 @@ export function AddJobWizard() {
         coverLetterEmphasis: draft.coverLetterEmphasis ?? null,
       });
 
+      invalidateCreditQueries(queryClient);
       router.push('/cv/optimise/result');
     } catch {
       toast('Something went wrong. Please try again.', 'error');
@@ -208,6 +213,7 @@ export function AddJobWizard() {
     setCvEditDraft,
     setOptimiseDraft,
     toast,
+    queryClient,
   ]);
 
   const actionLabel =
