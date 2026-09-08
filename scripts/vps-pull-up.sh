@@ -16,7 +16,18 @@ if [ ! -f .env.prod ]; then
   exit 1
 fi
 
+DOCKER_CONFIG_DIR=""
+cleanup_docker_config() {
+  if [ -n "$DOCKER_CONFIG_DIR" ] && [ -d "$DOCKER_CONFIG_DIR" ]; then
+    rm -rf "$DOCKER_CONFIG_DIR"
+  fi
+}
+trap cleanup_docker_config EXIT
+
 if [ -n "${GHCR_TOKEN:-}" ] && [ -n "${GHCR_USER:-}" ]; then
+  DOCKER_CONFIG_DIR="$(mktemp -d "${TMPDIR:-/tmp}/careerpulse-docker-config.XXXXXX")"
+  chmod 700 "$DOCKER_CONFIG_DIR"
+  export DOCKER_CONFIG="$DOCKER_CONFIG_DIR"
   printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
 fi
 
