@@ -2,24 +2,42 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from './schema';
 
-let client: ReturnType<typeof postgres> | null = null;
-let db: ReturnType<typeof drizzle<typeof schema>> | null = null;
+type PostgresClient = ReturnType<typeof postgres>;
+type DrizzleDb = ReturnType<typeof drizzle<typeof schema>>;
+
+const globalForDb = globalThis as unknown as {
+  __careerpulsePg?: PostgresClient;
+  __careerpulseDb?: DrizzleDb;
+};
+
+function poolSize() {
+  const raw = Number.parseInt(process.env.DATABASE_POOL_MAX ?? '', 10);
+  if (Number.isFinite(raw) && raw > 0) return Math.min(raw, 20);
+  return process.env.NODE_ENV === 'development' ? 3 : 10;
+}
 
 export function getDb() {
-  if (db) return db;
+  if (globalForDb.__careerpulseDb) return globalForDb.__careerpulseDb;
   const url = process.env.DATABASE_URL?.trim();
   if (!url) throw new Error('DATABASE_URL is required for postgres backend');
-  client = postgres(url, { max: 10 });
-  db = drizzle(client, { schema });
+  const client = postgres(url, {
+    max: poolSize(),
+    idle_timeout: 20,
+    max_lifetime: 60 * 30,
+    connect_timeout: 10,
+  });
+  const db = drizzle(client, { schema });
+  globalForDb.__careerpulsePg = client;
+  globalForDb.__careerpulseDb = db;
   return db;
 }
 
 export async function closeDb() {
-  if (client) {
-    await client.end();
-    client = null;
-    db = null;
-  }
+  const client = globalForDb.__careerpulsePg;
+  if (!client) return;
+  await client.end({ timeout: 5 });
+  globalForDb.__careerpulsePg = undefined;
+  globalForDb.__careerpulseDb = undefined;
 }
 
 export { schema };

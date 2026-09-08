@@ -3,6 +3,7 @@ import { getSessionUser } from '@/lib/auth/session';
 import { getInterviewRepo } from '@/lib/db/repositories/interview';
 import { pauseInterviewSession, resumeInterviewSession } from '@/lib/interview/orchestrator';
 import { err } from '@/lib/interview/api-auth';
+import { handleInterviewApiError } from '@/lib/interview/api-errors';
 
 export const runtime = 'nodejs';
 
@@ -64,6 +65,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     return NextResponse.json(session);
   } catch (e) {
     console.error('interview/sessions/[id] PATCH', e);
-    return err('Failed to update session', 500);
+    if (e instanceof Error && e.message === 'Session not found') return err('Not found', 404);
+    return handleInterviewApiError(e);
   }
 }

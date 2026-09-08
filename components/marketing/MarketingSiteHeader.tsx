@@ -2,15 +2,24 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { FileText, LayoutTemplate, Menu, Sparkles, X } from 'lucide-react';
+import {
+  FileText,
+  LayoutTemplate,
+  Menu,
+  MessageSquare,
+  Sparkles,
+  X,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { MarketingThemeToggle } from '@/components/shared/MarketingThemeToggle';
 import { BuildCvLink } from '@/components/marketing/BuildCvLink';
 import { useAuthStore } from '@/stores/useAuthStore';
 
 const nav = [
-  { href: '/#templates', label: 'Templates' },
-  { href: '/#features', label: 'Features' },
+  { href: '/#features', label: 'Features', icon: Sparkles },
+  { href: '/#interview', label: 'Interview', icon: MessageSquare },
+  { href: '/#templates', label: 'Templates', icon: LayoutTemplate },
+  { href: '/pricing', label: 'Pricing', icon: null },
 ] as const;
 
 export function MarketingSiteHeader() {
@@ -53,8 +62,7 @@ export function MarketingSiteHeader() {
               href={item.href}
               className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-[var(--color-text-secondary)] transition hover:bg-[var(--color-hover-surface)] hover:text-[var(--color-text-primary)]"
             >
-              {item.label === 'Templates' ? <LayoutTemplate className="h-4 w-4" /> : null}
-              {item.label === 'Features' ? <Sparkles className="h-4 w-4" /> : null}
+              {item.icon ? <item.icon className="h-4 w-4" /> : null}
               {item.label}
             </Link>
           ))}

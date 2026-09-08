@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Pause, Play } from 'lucide-react';
@@ -18,6 +18,7 @@ import {
   usePauseInterviewSession,
   useResumeInterviewSession,
 } from '@/hooks/useInterview';
+import { usePauseInterviewOnLeave } from '@/hooks/usePauseInterviewOnLeave';
 
 type TurnFeedback = {
   instant_feedback: string;
@@ -40,47 +41,41 @@ export default function InterviewSessionPage() {
 
   const [turnFeedback, setTurnFeedback] = useState<TurnFeedback | null>(null);
   const [turnComplete, setTurnComplete] = useState(false);
-  const pausedOnLeave = useRef(false);
   const skipPause = useRef(false);
+  const { clearLeavePause } = usePauseInterviewOnLeave(
+    sessionId,
+    data?.session.status as string | undefined,
+    skipPause
+  );
 
   const handleFinishEarly = useCallback(async () => {
     skipPause.current = true;
-    await complete.mutateAsync();
-    router.push(`/interview/${profileId}/report/${sessionId}`);
+    try {
+      await complete.mutateAsync();
+      router.push(`/interview/${profileId}/report/${sessionId}`);
+    } catch {
+      skipPause.current = false;
+    }
   }, [complete, profileId, router, sessionId]);
 
   const saveDraft = useDebouncedSessionDraft(sessionId);
 
   const handlePause = useCallback(async () => {
-    await pause.mutateAsync();
-    await refetch();
+    try {
+      await pause.mutateAsync();
+    } finally {
+      await refetch();
+    }
   }, [pause, refetch]);
 
   const handleResume = useCallback(async () => {
-    await resume.mutateAsync();
-    await refetch();
-  }, [resume, refetch]);
-
-  useEffect(() => {
-    const pauseOnLeave = () => {
-      if (pausedOnLeave.current) return;
-      pausedOnLeave.current = true;
-      void fetch(`/api/interview/sessions/${sessionId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'pause' }),
-        keepalive: true,
-      });
-    };
-
-    window.addEventListener('beforeunload', pauseOnLeave);
-    return () => {
-      window.removeEventListener('beforeunload', pauseOnLeave);
-      if (data?.session.status === 'active' && !skipPause.current) {
-        pauseOnLeave();
-      }
-    };
-  }, [sessionId, data?.session.status]);
+    clearLeavePause();
+    try {
+      await resume.mutateAsync();
+    } finally {
+      await refetch();
+    }
+  }, [clearLeavePause, resume, refetch]);
 
   if (isLoading || !data) {
     return <Skeleton className="mx-auto h-64 max-w-2xl rounded-xl" />;
@@ -177,6 +172,13 @@ export default function InterviewSessionPage() {
           </Button>
         )}
       </div>
+      {complete.isError ? (
+        <p className="text-sm text-[var(--color-accent-coral)]">
+          {complete.error instanceof Error
+            ? complete.error.message
+            : 'Could not complete interview.'}
+        </p>
+      ) : null}
 
       {isPaused ? (
         <Card className="py-8 text-center">
@@ -188,7 +190,11 @@ export default function InterviewSessionPage() {
             <Button variant="primary" loading={resume.isPending} onClick={() => void handleResume()}>
               Resume interview
             </Button>
-            <Button variant="ghost" onClick={() => void handleFinishEarly()}>
+            <Button
+              variant="ghost"
+              loading={complete.isPending}
+              onClick={() => void handleFinishEarly()}
+            >
               End interview
             </Button>
           </div>

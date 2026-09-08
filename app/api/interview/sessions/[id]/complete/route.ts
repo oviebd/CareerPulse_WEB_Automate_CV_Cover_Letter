@@ -1,9 +1,10 @@
-import { NextResponse } from 'next/server';
+    import { NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/auth/session';
 import { withInterviewAiRoute } from '@/lib/ai/with-user-route';
 import { requireInterviewAccess, err } from '@/lib/interview/api-auth';
 import { completeInterviewSession } from '@/lib/interview/orchestrator';
 import { getInterviewRepo } from '@/lib/db/repositories/interview';
+import { handleInterviewApiError } from '@/lib/interview/api-errors';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
@@ -27,6 +28,6 @@ export async function POST(_request: Request, { params }: RouteContext) {
     return NextResponse.json(result);
   } catch (e) {
     console.error('interview/sessions/complete', e);
-    return err('Could not complete interview.', 500);
+    return handleInterviewApiError(e);
   }
 }

@@ -1149,7 +1149,9 @@ export async function completeInterviewSession(userId: string, sessionId: string
 export async function pauseInterviewSession(userId: string, sessionId: string) {
   const repo = getInterviewRepo();
   const session = await repo.getSession(userId, sessionId);
-  if (!session || session.status !== 'active') throw new Error('Session not found');
+  if (!session) throw new Error('Session not found');
+  if (session.status === 'paused' || session.status === 'completed') return session;
+  if (session.status !== 'active') throw new Error('Session not found');
 
   const elapsed = sessionElapsedSeconds(session);
   return repo.updateSession(userId, sessionId, {
@@ -1162,7 +1164,9 @@ export async function pauseInterviewSession(userId: string, sessionId: string) {
 export async function resumeInterviewSession(userId: string, sessionId: string) {
   const repo = getInterviewRepo();
   const session = await repo.getSession(userId, sessionId);
-  if (!session || session.status !== 'paused') throw new Error('Session not found');
+  if (!session) throw new Error('Session not found');
+  if (session.status === 'active' || session.status === 'completed') return session;
+  if (session.status !== 'paused') throw new Error('Session not found');
 
   return repo.updateSession(userId, sessionId, {
     status: 'active',

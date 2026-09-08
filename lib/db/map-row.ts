@@ -12,6 +12,7 @@ const TIMESTAMP_CAMEL_KEYS = new Set([
   'trialEndsAt',
   'startedAt',
   'completedAt',
+  'timerStartedAt',
   'lastAssessedAt',
   'interviewDate',
   'billingPeriodStart',
@@ -29,7 +30,7 @@ export function toSnake<T extends Record<string, unknown>>(row: T): Record<strin
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(row)) {
     const snake = key.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
-    out[snake] = value;
+    out[snake] = value instanceof Date ? value.toISOString() : value;
   }
   return out;
 }

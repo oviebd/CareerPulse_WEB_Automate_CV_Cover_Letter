@@ -632,7 +632,7 @@ STRATEGY: ${ctx.blueprintSummary}
 EVALUATIONS: ${ctx.evaluationDigest}
 MASTERY: ${ctx.masterySummary}`,
     promptVersion: PROMPT_V.REPORT_V2,
-    maxTokens: 3072,
+    maxTokens: 1536,
     sourceJobHash: hashes.job,
     sourceCvHash: hashes.cv,
     normalize: normalizeFinalReport,

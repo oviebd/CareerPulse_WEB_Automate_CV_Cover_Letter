@@ -24,11 +24,15 @@ export async function apiFetch<T>(
     },
   });
   if (!res.ok) {
-    const json = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
+    const json = (await res.json().catch(() => ({}))) as {
+      error?: string;
+      message?: string;
+      code?: string;
+    };
     throw new ApiError(
-      json.error ?? `Request failed (HTTP ${res.status})`,
+      json.message ?? json.error ?? `Request failed (HTTP ${res.status})`,
       res.status,
-      json.code
+      json.code ?? json.error
     );
   }
   if (res.status === 204) return undefined as T;

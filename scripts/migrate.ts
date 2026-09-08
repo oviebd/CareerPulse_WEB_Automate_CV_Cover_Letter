@@ -43,6 +43,7 @@ async function main() {
     join(process.cwd(), 'db/migrations/035_monetization.sql'),
     join(process.cwd(), 'db/migrations/036_admin_user_controls.sql'),
     join(process.cwd(), 'db/migrations/037_fractional_credits.sql'),
+    join(process.cwd(), 'db/migrations/038_interview_session_timer.sql'),
   ];
   const db = postgres(url, { max: 1 });
 

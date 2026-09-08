@@ -390,7 +390,10 @@ CREATE TABLE IF NOT EXISTS interview_sessions (
   status TEXT NOT NULL DEFAULT 'active', question_count INTEGER NOT NULL DEFAULT 0,
   target_question_count INTEGER, duration_minutes INTEGER,
   current_question_id UUID, draft_answer TEXT, overall_score INTEGER, evaluation_json JSONB,
-  started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), completed_at TIMESTAMPTZ,
+  started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  elapsed_seconds INTEGER NOT NULL DEFAULT 0,
+  timer_started_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

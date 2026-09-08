@@ -22,11 +22,6 @@ function isValidCoverLetterTemplateId(id: string): boolean {
 
 export async function GET(request: Request) {
   try {
-    const user = await getSessionUser();
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const { searchParams } = new URL(request.url);
     const templateId = searchParams.get('template_id') ?? '';
     const accent = searchParams.get('accent') ?? '#2563EB';
@@ -39,7 +34,9 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
     }
 
-    const profile = await getProfilesRepo().getById(user.id);
+    /** Public sample document only (no user data) — used by marketing + signed-in gallery. */
+    const user = await getSessionUser();
+    const profile = user ? await getProfilesRepo().getById(user.id) : null;
 
     const templatePath = path.join(
       process.cwd(),
@@ -56,7 +53,9 @@ export async function GET(request: Request) {
       status: 200,
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
-        'Cache-Control': 'private, max-age=60',
+        'Cache-Control': user
+          ? 'private, max-age=60'
+          : 'public, s-maxage=3600, stale-while-revalidate=86400',
       },
     });
   } catch (e) {

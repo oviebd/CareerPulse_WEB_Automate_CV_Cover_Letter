@@ -1,14 +1,16 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
-import { ExternalLink } from 'lucide-react';
 import type { CVTemplate } from '@/types';
 import { TEMPLATE_CONFIGS } from '@/src/config/templateConfig';
 import { normalizeTemplateId } from '@/src/utils/cvDefaults';
 import type { TemplateId } from '@/src/types/cv.types';
-import { BuildCvLink } from '@/components/marketing/BuildCvLink';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import {
+  DOCUMENT_PREVIEW_A4_HEIGHT,
+  DOCUMENT_PREVIEW_WIDTH,
+} from '@/components/shared/DocumentPrintPreviewFrame';
 
 const CV_DOC_WIDTH = 794;
 const CV_DOC_HEIGHT = 1123;
@@ -24,110 +26,165 @@ function accentForId(id: string) {
   return ACCENTS[h] ?? '#2563EB';
 }
 
-function LandingTemplateIframe({
+function injectCoverLetterPreviewOverrides(iframe: HTMLIFrameElement): void {
+  try {
+    const doc = iframe.contentDocument;
+    if (!doc?.head) return;
+    if (doc.getElementById('__cl-preview-overrides')) return;
+    const style = doc.createElement('style');
+    style.id = '__cl-preview-overrides';
+    style.textContent = [
+      'html{height:auto!important;overflow:hidden!important;',
+      'margin:0!important;padding:0!important;',
+      'color-scheme:light!important;background:#fff!important;}',
+      'body{box-sizing:border-box!important;width:794px!important;',
+      'min-height:0!important;height:auto!important;overflow:visible!important;',
+      'background:#fff!important;color:#0f172a!important;}',
+    ].join('');
+    doc.head.appendChild(style);
+  } catch {
+    // ignore cross-origin
+  }
+}
+
+function TemplatePreviewIframe({
   templateId,
   accent,
   name,
+  kind,
 }: {
   templateId: string;
   accent: string;
   name: string;
+  kind: 'cv' | 'cover_letter';
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(0.28);
+  const docWidth = kind === 'cv' ? CV_DOC_WIDTH : DOCUMENT_PREVIEW_WIDTH;
+  const docHeight = kind === 'cv' ? CV_DOC_HEIGHT : DOCUMENT_PREVIEW_A4_HEIGHT;
+  const [scale, setScale] = useState(0.2);
 
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
     const ro = new ResizeObserver(() => {
       const w = el.clientWidth;
-      if (w > 0) setScale(w / CV_DOC_WIDTH);
+      if (w > 0) setScale(w / docWidth);
     });
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [docWidth]);
 
-  const src = `/api/cv/preview-html?template_id=${encodeURIComponent(templateId)}&sample=1&accent=${encodeURIComponent(accent)}`;
+  const apiPath =
+    kind === 'cv'
+      ? `/api/cv/preview-html?template_id=${encodeURIComponent(templateId)}&sample=1&accent=${encodeURIComponent(accent)}`
+      : `/api/cover-letter/preview-html?template_id=${encodeURIComponent(templateId)}&sample=1&accent=${encodeURIComponent(accent)}`;
 
   return (
-    <div ref={wrapRef} className="relative aspect-[210/297] w-full overflow-hidden bg-slate-100 dark:bg-slate-900/50">
+    <div
+      ref={wrapRef}
+      className="relative aspect-[210/297] w-full overflow-hidden bg-[var(--color-document-paper-well)] p-2"
+    >
       <div
-        className="absolute left-0 top-0 origin-top-left will-change-transform"
-        style={{ width: CV_DOC_WIDTH, height: CV_DOC_HEIGHT, transform: `scale(${scale})` }}
+        className="relative h-full w-full overflow-hidden rounded-sm bg-[var(--color-document-paper)]"
+        style={{ boxShadow: 'var(--shadow-document-paper)' }}
       >
-        <iframe
-          src={src}
-          className="pointer-events-none block max-w-none border-0"
-          width={CV_DOC_WIDTH}
-          height={CV_DOC_HEIGHT}
-          title={`${name} sample preview`}
-          loading="lazy"
-        />
+        <div
+          className="absolute left-0 top-0 origin-top-left will-change-transform"
+          style={{
+            width: docWidth,
+            height: docHeight,
+            transform: `scale(${scale})`,
+          }}
+        >
+          <iframe
+            src={apiPath}
+            className="pointer-events-none block max-w-none border-0 bg-[var(--color-document-paper)]"
+            width={docWidth}
+            height={docHeight}
+            title={`${name} sample preview`}
+            loading="lazy"
+            onLoad={
+              kind === 'cover_letter'
+                ? (e) => injectCoverLetterPreviewOverrides(e.currentTarget)
+                : undefined
+            }
+          />
+        </div>
       </div>
     </div>
   );
 }
 
-export function LandingTemplateGrid({ templates }: { templates: CVTemplate[] }) {
+function ProRibbon() {
   return (
-    <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    <div className="absolute right-0 top-0 z-10">
+      <Badge variant="warning" className="rounded-none rounded-bl-lg rounded-tr-xl px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
+        Pro
+      </Badge>
+    </div>
+  );
+}
+
+type Props = {
+  templates: CVTemplate[];
+  kind?: 'cv' | 'cover_letter';
+  /** Denser grid for CV (18); slightly larger cells for cover letters (5). */
+  columns?: 'default' | 'cover_letter';
+};
+
+export function LandingTemplateGrid({ templates, kind = 'cv', columns = 'default' }: Props) {
+  const gridClass =
+    columns === 'cover_letter'
+      ? 'mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'
+      : 'mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6';
+
+  return (
+    <div className={gridClass}>
       {templates.map((t) => {
         const tid = normalizeTemplateId(t.id) as TemplateId;
-        const cfg = TEMPLATE_CONFIGS[tid];
+        const cfg = kind === 'cv' ? TEMPLATE_CONFIGS[tid] : undefined;
         const accent = accentForId(t.id);
         const label = t.name || cfg?.label || t.id;
-        const blurb = t.description ?? cfg?.description ?? '';
-        const category = t.category || (cfg?.layout === 'two-column' ? 'Modern' : 'Classic');
+        const isPro =
+          t.is_premium ||
+          (t.available_tiers?.length === 1 && t.available_tiers[0] === 'pro');
+
         return (
-          <div
+          <article
             key={t.id}
             className={cn(
-              'group flex flex-col overflow-hidden rounded-2xl border border-[var(--color-border)]',
-              'bg-[var(--color-surface)]/60 transition hover:border-[var(--color-primary-200)] hover:shadow-lg'
+              'group relative flex flex-col overflow-hidden rounded-xl border border-[var(--color-border)]',
+              'bg-[var(--color-surface)]/60 transition hover:border-[var(--color-primary-200)] hover:shadow-md'
             )}
           >
-            <div className="relative w-full overflow-hidden border-b border-[var(--color-border)] bg-white dark:bg-slate-950/40">
+            <div className="relative overflow-hidden border-b border-[var(--color-border)]">
+              {isPro ? <ProRibbon /> : null}
               {t.preview_image_url ? (
-                <div className="relative aspect-[4/3] w-full">
+                <div className="relative aspect-[210/297] w-full bg-[var(--color-document-paper-well)] p-2">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={t.preview_image_url}
                     alt=""
-                    className="h-full w-full object-cover object-top"
+                    className="h-full w-full rounded-sm object-cover object-top"
+                    style={{ boxShadow: 'var(--shadow-document-paper)' }}
                     loading="lazy"
                   />
                 </div>
               ) : (
-                <LandingTemplateIframe templateId={t.id} accent={accent} name={label} />
+                <TemplatePreviewIframe
+                  templateId={t.id}
+                  accent={accent}
+                  name={label}
+                  kind={kind}
+                />
               )}
             </div>
-            <div className="flex flex-1 flex-col p-4">
-              <div className="flex items-start justify-between gap-2">
-                <h3 className="font-display font-semibold text-[var(--color-text-primary)]">{label}</h3>
-                <span className="shrink-0 rounded-full border border-[var(--color-border)] px-2 py-0.5 text-[10px] font-medium uppercase text-[var(--color-muted)]">
-                  {category}
-                </span>
-              </div>
-              {blurb ? (
-                <p className="mt-1 line-clamp-2 text-xs text-[var(--color-muted)]">{blurb}</p>
-              ) : null}
-              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                <Link
-                  href={`/cv/templates/${encodeURIComponent(t.id)}/preview`}
-                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-btn border border-[var(--color-border)] py-2.5 text-sm font-semibold text-[var(--color-text-primary)] transition hover:bg-[var(--color-hover-surface)]"
-                >
-                  <ExternalLink className="h-3.5 w-3.5" aria-hidden />
-                  Full preview
-                </Link>
-                <BuildCvLink
-                  builderPath={`/cv/builder?template=${encodeURIComponent(t.id)}`}
-                  className="inline-flex flex-1 items-center justify-center rounded-btn bg-[var(--color-primary-500)] py-2.5 text-sm font-semibold text-white transition hover:brightness-110"
-                >
-                  Use template
-                </BuildCvLink>
-              </div>
+            <div className="px-2 py-2">
+              <h3 className="truncate text-center text-xs font-medium text-[var(--color-text-primary)]">
+                {label}
+              </h3>
             </div>
-          </div>
+          </article>
         );
       })}
     </div>

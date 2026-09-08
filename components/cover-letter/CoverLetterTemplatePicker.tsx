@@ -19,9 +19,11 @@ function injectCoverLetterPreviewOverrides(iframe: HTMLIFrameElement): void {
     style.id = '__cl-preview-overrides';
     style.textContent = [
       'html{height:auto!important;overflow:hidden!important;',
-      'margin:0!important;padding:0!important;}',
+      'margin:0!important;padding:0!important;',
+      'color-scheme:light!important;background:#fff!important;}',
       'body{box-sizing:border-box!important;width:794px!important;',
-      'min-height:0!important;height:auto!important;overflow:visible!important;}',
+      'min-height:0!important;height:auto!important;overflow:visible!important;',
+      'background:#fff!important;color:#0f172a!important;}',
     ].join('');
     doc.head.appendChild(style);
   } catch {
@@ -62,29 +64,34 @@ function CoverLetterSampleThumb({
     <div
       ref={wrapRef}
       className={cn(
-        'relative aspect-[210/297] w-full overflow-hidden bg-white shadow-inner',
+        'relative aspect-[210/297] w-full overflow-hidden bg-[var(--color-document-paper-well)] p-2',
         className
       )}
     >
       <div
-        className="pointer-events-none absolute left-0 top-0 origin-top-left"
-        style={{
-          width: DOCUMENT_PREVIEW_WIDTH,
-          height: DOCUMENT_PREVIEW_A4_HEIGHT,
-          transform: `scale(${scale})`,
-        }}
+        className="relative h-full w-full overflow-hidden rounded-sm bg-[var(--color-document-paper)]"
+        style={{ boxShadow: 'var(--shadow-document-paper)' }}
       >
-        <iframe
-          src={src}
-          className="block h-full w-full border-0"
-          width={DOCUMENT_PREVIEW_WIDTH}
-          height={DOCUMENT_PREVIEW_A4_HEIGHT}
-          title={`${name} preview`}
-          loading="lazy"
-          onLoad={(e) => {
-            injectCoverLetterPreviewOverrides(e.currentTarget);
+        <div
+          className="pointer-events-none absolute left-0 top-0 origin-top-left"
+          style={{
+            width: DOCUMENT_PREVIEW_WIDTH,
+            height: DOCUMENT_PREVIEW_A4_HEIGHT,
+            transform: `scale(${scale})`,
           }}
-        />
+        >
+          <iframe
+            src={src}
+            className="block h-full w-full border-0 bg-[var(--color-document-paper)]"
+            width={DOCUMENT_PREVIEW_WIDTH}
+            height={DOCUMENT_PREVIEW_A4_HEIGHT}
+            title={`${name} preview`}
+            loading="lazy"
+            onLoad={(e) => {
+              injectCoverLetterPreviewOverrides(e.currentTarget);
+            }}
+          />
+        </div>
       </div>
       <div className="absolute inset-0 z-10" />
     </div>

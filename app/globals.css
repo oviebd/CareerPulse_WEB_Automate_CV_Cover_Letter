@@ -107,6 +107,11 @@
   --color-preview-well: rgba(212, 220, 232, 0.95);
   --color-preview-overlay: rgba(240, 244, 250, 0.88);
 
+  /* Document iframe previews — always light paper (print output), both themes */
+  --color-document-paper: #ffffff;
+  --color-document-paper-well: #e2e8f0;
+  --shadow-document-paper: 0 1px 3px rgba(15, 23, 42, 0.12), 0 4px 12px rgba(15, 23, 42, 0.08);
+
   --auth-hero-from: #d5deeb;
   --auth-hero-via: #dde4ef;
   --auth-hero-to: #d8e2ee;
@@ -236,6 +241,11 @@
 
   --color-preview-well: rgba(11, 17, 32, 0.5);
   --color-preview-overlay: rgba(11, 17, 32, 0.75);
+
+  /* Document iframe previews — always light paper (print output), both themes */
+  --color-document-paper: #ffffff;
+  --color-document-paper-well: #cbd5e1;
+  --shadow-document-paper: 0 2px 8px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(15, 23, 42, 0.06);
 
   --auth-hero-from: #0f1a2e;
   --auth-hero-via: #0b1120;
