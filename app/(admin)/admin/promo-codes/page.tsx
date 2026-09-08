@@ -85,6 +85,17 @@ export default function AdminPromoCodesPage() {
         setError('Code is required.');
         return;
       }
+      if (form.max_redemptions.trim()) {
+        const maxUses = Number(form.max_redemptions);
+        if (!Number.isInteger(maxUses) || maxUses < 1) {
+          setError('Maximum uses must be a whole number of at least 1, or left blank for unlimited.');
+          return;
+        }
+        if (editing && maxUses < editing.redemption_count) {
+          setError(`Maximum uses cannot be less than current usage (${editing.redemption_count}).`);
+          return;
+        }
+      }
       if (editing) {
         const { code: _code, ...patch } = payload;
         await apiFetch(`/api/admin/promo-codes/${editing.id}`, {
@@ -212,13 +223,18 @@ export default function AdminPromoCodesPage() {
             onChange={(e) => setForm({ ...form, bonus_credits: e.target.value })}
           />
           <Input
-            label="Max redemptions (optional)"
+            label="Maximum uses (optional)"
             type="number"
             min={1}
             value={form.max_redemptions}
             onChange={(e) => setForm({ ...form, max_redemptions: e.target.value })}
             placeholder="Unlimited"
           />
+          {editing && editing.redemption_count > 0 ? (
+            <p className="text-xs text-[var(--color-muted)]">
+              Used: {editing.redemption_count.toLocaleString()}
+            </p>
+          ) : null}
           <Input
             label="Expires at (optional)"
             type="datetime-local"

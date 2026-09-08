@@ -1,20 +1,88 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, Clock, CreditCard, Sparkles, X } from 'lucide-react';
 import { PRICING, type PricingPlanKey, TIER_LIMITS } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Modal } from '@/components/ui/modal';
 import { useSubscription } from '@/hooks/useSubscription';
+import { invalidateCreditQueries } from '@/hooks/useCredits';
 import { useToast } from '@/components/ui/toast';
 import { cn, formatDate } from '@/lib/utils';
+import { formatCredits } from '@/lib/credits/calculator';
+import type { PromoResultType } from '@/lib/promo/resolvePromoResultType';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { apiFetch } from '@/lib/api-fetch';
 import type { Profile } from '@/types';
 
 type Payment = { id: string; plan: string; amount: number; status: string; created_at: string };
+
+type PromoApplyResponse = {
+  ok?: boolean;
+  error?: string;
+  code?: string;
+  tier?: 'pro' | null;
+  bonusCredits?: number;
+  resultType?: PromoResultType;
+  expiresAt?: string | null;
+};
+
+type PromoSuccessState = {
+  resultType: PromoResultType;
+  bonusCredits: number;
+};
+
+function PromoSuccessModal({
+  success,
+  onClose,
+}: {
+  success: PromoSuccessState;
+  onClose: () => void;
+}) {
+  const content = getPromoSuccessContent(success.resultType, success.bonusCredits);
+  return (
+    <Modal isOpen onClose={onClose} title={content.title}>
+      <div className="space-y-4 text-center">
+        <div className="text-5xl">🎉</div>
+        <p className="text-[var(--color-text-primary)]">{content.body}</p>
+        <p className="text-sm text-[var(--color-muted)]">{content.detail}</p>
+        <Button variant="primary" className="w-full" onClick={onClose}>
+          {content.button}
+        </Button>
+      </div>
+    </Modal>
+  );
+}
+
+function getPromoSuccessContent(resultType: PromoResultType, bonusCredits: number) {
+  switch (resultType) {
+    case 'premium':
+      return {
+        title: "You're now Premium!",
+        body: 'Promo code applied successfully. Premium access is now unlimited.',
+        detail:
+          'You now have unlimited tailored applications, premium CV templates, AI enhancements, DOCX export, and all Premium features.',
+        button: 'Start using Premium',
+      };
+    case 'credits':
+      return {
+        title: 'Credits added!',
+        body: `${formatCredits(bonusCredits)} AI credits have been added to your account.`,
+        detail: 'Use your credits for AI enhancements, rewrites, and other AI-powered features.',
+        button: 'Got it',
+      };
+    case 'both':
+      return {
+        title: 'Promo applied!',
+        body: `Premium access is now active and ${formatCredits(bonusCredits)} bonus credits have been added to your account.`,
+        detail:
+          'You now have unlimited tailored applications, premium CV templates, AI enhancements, DOCX export, and all Premium features.',
+        button: 'Start using Premium',
+      };
+  }
+}
 
 const PRO_PLANS: PricingPlanKey[] = ['pro_monthly', 'pro_yearly'];
 
@@ -50,6 +118,7 @@ export default function BillingPage() {
   const { tier, status, expiresAt, profile } = useSubscription();
   const limits = TIER_LIMITS[tier];
   const setProfile = useAuthStore((s) => s.setProfile);
+  const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const { data: payments = [], isLoading: paymentsLoading } = useQuery({
@@ -64,7 +133,7 @@ export default function BillingPage() {
   const [promoCode, setPromoCode] = useState('');
   const [promoLoading, setPromoLoading] = useState(false);
   const [promoError, setPromoError] = useState('');
-  const [showPromoSuccess, setShowPromoSuccess] = useState(false);
+  const [promoSuccess, setPromoSuccess] = useState<PromoSuccessState | null>(null);
 
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
@@ -100,23 +169,35 @@ export default function BillingPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: promoCode }),
       });
-      const j = await res.json() as { ok?: boolean; error?: string; expiresAt?: string };
+      const j = (await res.json()) as PromoApplyResponse;
       if (!res.ok || !j.ok) {
         setPromoError(j.error ?? 'Invalid promo code.');
         return;
       }
+
       if (profile) {
-        setProfile({
+        const updated: Profile = {
           ...profile,
-          subscription_tier: 'pro',
-          subscription_status: 'active',
-          subscription_expires_at: j.expiresAt ?? null,
-          promo_code_used: '2468',
-        } as Profile);
+          promo_code_used: j.code ?? promoCode.trim(),
+        };
+        if (j.tier === 'pro') {
+          updated.subscription_tier = 'pro';
+          updated.subscription_status = 'active';
+          updated.subscription_expires_at = j.expiresAt ?? null;
+        }
+        setProfile(updated);
       }
+
+      if (j.resultType === 'credits' || j.resultType === 'both') {
+        invalidateCreditQueries(queryClient);
+      }
+
       setPromoCode('');
       setShowPromo(false);
-      setShowPromoSuccess(true);
+      setPromoSuccess({
+        resultType: j.resultType ?? 'premium',
+        bonusCredits: j.bonusCredits ?? 0,
+      });
     } catch {
       setPromoError('Something went wrong. Please try again.');
     } finally {
@@ -400,29 +481,9 @@ export default function BillingPage() {
       </Card>
 
       {/* Promo success modal */}
-      <Modal
-        isOpen={showPromoSuccess}
-        onClose={() => setShowPromoSuccess(false)}
-        title="You're now Premium!"
-      >
-        <div className="space-y-4 text-center">
-          <div className="text-5xl">🎉</div>
-          <p className="text-[var(--color-text-primary)]">
-            Promo code applied successfully. Premium access is now unlimited.
-          </p>
-          <p className="text-sm text-[var(--color-muted)]">
-            You now have unlimited tailored applications, premium CV templates, AI
-            enhancements, DOCX export, and all Premium features.
-          </p>
-          <Button
-            variant="primary"
-            className="w-full"
-            onClick={() => setShowPromoSuccess(false)}
-          >
-            Start using Premium
-          </Button>
-        </div>
-      </Modal>
+      {promoSuccess ? (
+        <PromoSuccessModal success={promoSuccess} onClose={() => setPromoSuccess(null)} />
+      ) : null}
 
       {/* Cancel subscription confirmation */}
       <Modal

@@ -4,6 +4,12 @@ import { promoCodes } from '@/lib/db/schema';
 import { toSnake, rowsToSnake } from '@/lib/db/map-row';
 import type { PromoCode } from '@/types';
 
+async function findById(id: string): Promise<PromoCode | null> {
+  const db = getDb();
+  const [row] = await db.select().from(promoCodes).where(eq(promoCodes.id, id)).limit(1);
+  return row ? (toSnake(row) as unknown as PromoCode) : null;
+}
+
 async function findByCode(code: string): Promise<PromoCode | null> {
   const db = getDb();
   const [row] = await db
@@ -78,5 +84,5 @@ async function remove(id: string): Promise<boolean> {
 }
 
 export function getPromoRepo() {
-  return { findByCode, listAll, create, update, redeem, remove };
+  return { findById, findByCode, listAll, create, update, redeem, remove };
 }

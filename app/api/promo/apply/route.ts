@@ -3,6 +3,7 @@ import { getSessionUser } from '@/lib/auth/session';
 import { getProfilesRepo } from '@/lib/db/repositories/profiles';
 import { getPromoRepo } from '@/lib/db/repositories/promo';
 import { getCreditsRepo } from '@/lib/db/repositories/credits';
+import { resolvePromoResultType } from '@/lib/promo/resolvePromoResultType';
 import { validatePromoRedemption } from '@/lib/promo/validate';
 import { normalizeSubscriptionTier } from '@/types';
 
@@ -68,7 +69,14 @@ export async function POST(request: Request) {
       ? normalizeSubscriptionTier(activePromo.grants_plan)
       : null;
 
-    return NextResponse.json({ ok: true, tier, expiresAt: null });
+    return NextResponse.json({
+      ok: true,
+      code: activePromo.code,
+      tier,
+      bonusCredits: activePromo.bonus_credits,
+      resultType: resolvePromoResultType(activePromo.grants_plan, activePromo.bonus_credits),
+      expiresAt: null,
+    });
   } catch (e) {
     console.error('promo apply', e);
     return NextResponse.json({ error: 'Unexpected error.' }, { status: 500 });

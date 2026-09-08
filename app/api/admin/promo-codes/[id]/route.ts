@@ -19,6 +19,25 @@ export async function PATCH(request: Request, ctx: RouteCtx) {
     expires_at?: string | null;
   };
 
+  if (body.max_redemptions != null) {
+    if (!Number.isInteger(body.max_redemptions) || body.max_redemptions < 1) {
+      return NextResponse.json(
+        { error: 'Maximum uses must be a whole number of at least 1, or null for unlimited.' },
+        { status: 400 }
+      );
+    }
+    const existing = await getPromoRepo().findById(id);
+    if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    if (body.max_redemptions < existing.redemption_count) {
+      return NextResponse.json(
+        {
+          error: `Maximum uses cannot be less than current usage (${existing.redemption_count}).`,
+        },
+        { status: 400 }
+      );
+    }
+  }
+
   const promo = await getPromoRepo().update(id, body);
   if (!promo) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   return NextResponse.json(promo);

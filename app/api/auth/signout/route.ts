@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { signOut } from '@/lib/auth';
+import { publicAppUrl } from '@/lib/redirect';
 import type { NextRequest } from 'next/server';
 
 function safeRedirectPath(value: string | null): string {
@@ -15,5 +16,5 @@ export async function POST() {
 export async function GET(request: NextRequest) {
   const redirectPath = safeRedirectPath(request.nextUrl.searchParams.get('redirect'));
   await signOut({ redirect: false });
-  return NextResponse.redirect(new URL(redirectPath, request.url));
+  return NextResponse.redirect(publicAppUrl(request, redirectPath));
 }

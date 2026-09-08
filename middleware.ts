@@ -1,7 +1,8 @@
 import { auth } from '@/lib/auth';
+import { isProtectedAppPath } from '@/lib/guest-cv-paths';
+import { publicAppUrl } from '@/lib/redirect';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { isProtectedAppPath } from '@/lib/guest-cv-paths';
 
 const AUTH_ROUTES = ['/login', '/register'];
 
@@ -20,7 +21,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
   if (isAuthRoute && user) {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
+    return NextResponse.redirect(publicAppUrl(request, '/dashboard'));
   }
   return NextResponse.next();
 }

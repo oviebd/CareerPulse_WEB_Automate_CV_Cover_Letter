@@ -19,6 +19,7 @@ type BuildCvLinkProps = {
   className?: string;
   children: React.ReactNode;
   onClick?: () => void;
+  'aria-current'?: 'page';
 };
 
 /** Routes guests to login; logged-in users go to the CV builder. */
@@ -27,13 +28,14 @@ export function BuildCvLink({
   className,
   children,
   onClick,
+  'aria-current': ariaCurrent,
 }: BuildCvLinkProps) {
   const user = useAuthStore((s) => s.user);
   const initialized = useAuthStore((s) => s.initialized);
   const href = resolveBuildCvHref(builderPath, initialized, Boolean(user));
 
   return (
-    <Link href={href} className={className} onClick={onClick}>
+    <Link href={href} className={className} onClick={onClick} aria-current={ariaCurrent}>
       {children}
     </Link>
   );

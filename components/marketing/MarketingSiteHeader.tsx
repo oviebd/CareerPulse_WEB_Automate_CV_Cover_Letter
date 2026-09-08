@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
   FileText,
@@ -13,6 +14,7 @@ import {
 import { cn } from '@/lib/utils';
 import { MarketingThemeToggle } from '@/components/shared/MarketingThemeToggle';
 import { BuildCvLink } from '@/components/marketing/BuildCvLink';
+import { isBuildCvNavActive, isMarketingNavActive } from '@/lib/marketing/navActive';
 import { useAuthStore } from '@/stores/useAuthStore';
 
 const nav = [
@@ -22,11 +24,56 @@ const nav = [
   { href: '/pricing', label: 'Pricing', icon: null },
 ] as const;
 
+function marketingNavClass(active: boolean, extra?: string) {
+  return cn(
+    'flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition',
+    extra,
+    active
+      ? 'bg-[var(--color-primary-100)] font-semibold text-[var(--color-primary-500)]'
+      : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-hover-surface)] hover:text-[var(--color-text-primary)]'
+  );
+}
+
+function MarketingNavItems({
+  pathname,
+  hash,
+  showIcons,
+  onSelect,
+}: {
+  pathname: string;
+  hash: string;
+  showIcons?: boolean;
+  onSelect?: (href: string) => void;
+}) {
+  return (
+    <>
+      {nav.map((item) => {
+        const active = isMarketingNavActive(pathname, hash, item.href);
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            aria-current={active ? 'page' : undefined}
+            onClick={() => onSelect?.(item.href)}
+            className={marketingNavClass(active)}
+          >
+            {showIcons && item.icon ? <item.icon className="h-4 w-4" /> : null}
+            {item.label}
+          </Link>
+        );
+      })}
+    </>
+  );
+}
+
 export function MarketingSiteHeader() {
+  const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
+  const [hash, setHash] = useState('');
   const user = useAuthStore((s) => s.user);
   const initialized = useAuthStore((s) => s.initialized);
+  const buildCvActive = isBuildCvNavActive(pathname);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 12);
@@ -34,6 +81,13 @@ export function MarketingSiteHeader() {
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
+
+  useEffect(() => {
+    const syncHash = () => setHash(window.location.hash);
+    syncHash();
+    window.addEventListener('hashchange', syncHash);
+    return () => window.removeEventListener('hashchange', syncHash);
+  }, [pathname]);
 
   return (
     <header
@@ -56,18 +110,17 @@ export function MarketingSiteHeader() {
           <span>CareerPulse</span>
         </Link>
         <nav className="hidden items-center gap-1 md:flex" aria-label="Marketing">
-          {nav.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-[var(--color-text-secondary)] transition hover:bg-[var(--color-hover-surface)] hover:text-[var(--color-text-primary)]"
-            >
-              {item.icon ? <item.icon className="h-4 w-4" /> : null}
-              {item.label}
-            </Link>
-          ))}
+          <MarketingNavItems
+            pathname={pathname}
+            hash={hash}
+            showIcons
+            onSelect={(href) => {
+              if (href.startsWith('/#')) setHash(href.slice(1));
+            }}
+          />
           <BuildCvLink
-            className="ml-1 flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-[var(--color-primary-500)] transition hover:bg-[var(--color-primary-100)]/50"
+            aria-current={buildCvActive ? 'page' : undefined}
+            className={marketingNavClass(buildCvActive, 'ml-1')}
           >
             <FileText className="h-4 w-4" />
             Build CV
@@ -115,19 +168,18 @@ export function MarketingSiteHeader() {
       {open ? (
         <div className="border-t border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-4 md:hidden">
           <div className="flex flex-col gap-2">
-            {nav.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setOpen(false)}
-                className="py-2 text-sm font-medium"
-              >
-                {item.label}
-              </Link>
-            ))}
+            <MarketingNavItems
+              pathname={pathname}
+              hash={hash}
+              onSelect={(href) => {
+                if (href.startsWith('/#')) setHash(href.slice(1));
+                setOpen(false);
+              }}
+            />
             <BuildCvLink
+              aria-current={buildCvActive ? 'page' : undefined}
               onClick={() => setOpen(false)}
-              className="py-2 text-sm font-semibold text-[var(--color-primary-500)]"
+              className={marketingNavClass(buildCvActive)}
             >
               Build CV
             </BuildCvLink>
