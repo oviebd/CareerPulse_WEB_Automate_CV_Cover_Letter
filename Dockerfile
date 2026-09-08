@@ -17,6 +17,9 @@ ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
 ENV NEXT_PUBLIC_GOOGLE_CLIENT_ID=$NEXT_PUBLIC_GOOGLE_CLIENT_ID
 ENV NEXT_PUBLIC_DEV_SUBSCRIPTION_PLAN=$NEXT_PUBLIC_DEV_SUBSCRIPTION_PLAN
 ENV NODE_ENV=production
+# Build-time placeholder only.
+# The real AUTH_SECRET is provided at runtime from VPS .env.prod.
+ENV AUTH_SECRET=ci-build-placeholder-not-for-production
 
 RUN npm run build && mkdir -p /app/public
 
