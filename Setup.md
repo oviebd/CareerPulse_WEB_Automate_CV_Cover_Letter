@@ -39,6 +39,10 @@ These are baked into the browser bundle. Changing them requires a new image.
 |---|---|
 | `NEXT_PUBLIC_APP_URL` | Public **HTTPS** origin, e.g. `https://your-domain`. Never `localhost` or a Docker hostname. |
 | `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | Optional. Public Google OAuth client id (same as `GOOGLE_CLIENT_ID`). |
+| `NEXT_PUBLIC_PADDLE_ENVIRONMENT` | `sandbox` or `live`. Baked into the client bundle. |
+| `NEXT_PUBLIC_PADDLE_CLIENT_TOKEN` | Paddle.js client-side token (`test_...` / `live_...`). |
+| `NEXT_PUBLIC_PADDLE_PRICE_PRO_MONTHLY` | Paddle price id for Pro monthly. |
+| `NEXT_PUBLIC_PADDLE_PRICE_PRO_YEARLY` | Paddle price id for Pro yearly. |
 
 ### PRIVATE RUNTIME SECRET (VPS `.env.prod` only)
 
@@ -51,7 +55,8 @@ Never pass these as Docker build-args. Never put them in `NEXT_PUBLIC_*`.
 | `ANTHROPIC_API_KEY` | Claude API key |
 | `GOOGLE_CLIENT_SECRET` | Server-side OAuth secret |
 | `RESEND_API_KEY` | Email |
-| `SSLCOMMERZ_STORE_ID` / `SSLCOMMERZ_STORE_PASSWORD` | Payments |
+| `PADDLE_API_KEY` | Paddle Billing API key (server only) |
+| `PADDLE_WEBHOOK_SECRET` | Paddle notification destination secret |
 
 ### SERVER-ONLY NON-SECRET (VPS `.env.prod`)
 
@@ -61,7 +66,7 @@ Never pass these as Docker build-args. Never put them in `NEXT_PUBLIC_*`.
 | `AUTH_TRUST_HOST` | `true` behind Nginx |
 | `POSTGRES_USER` / `POSTGRES_DB` | Defaults `careerpulse` |
 | `ANTHROPIC_MODEL` / `CV_ANALYZER_API_MODEL` | Model ids |
-| `SSLCOMMERZ_IS_LIVE` | `true` only for live payments |
+| `PADDLE_API_VERSION` | Paddle API version header (default `1`) |
 | `SUPER_ADMIN_EMAILS` | Comma-separated bootstrap admins |
 | `APP_BIND_HOST` / `APP_PORT` | Defaults `127.0.0.1` and `3000` |
 | `CAREERPULSE_IMAGE` | Written by CI into `.env.deploy` |
@@ -155,7 +160,7 @@ systemctl enable certbot.timer
 
 Google OAuth redirect: `https://your-domain/api/auth/callback/google`.
 
-SSLCommerz IPN: `https://your-domain/api/payment/ipn`.
+Paddle webhook: `https://your-domain/api/webhooks/paddle`. See [docs/paddle-setup.md](docs/paddle-setup.md).
 
 ### 5. Backups
 

@@ -61,7 +61,7 @@ Stack:
 - Next.js 15 (standalone `server.js`), Node 20
 - Postgres 16 Alpine
 - Puppeteer + Chromium in the app image (PDF export)
-- Auth.js / JWT, Anthropic, optional Google OAuth, Resend, SSLCommerz
+- Auth.js / JWT, Anthropic, optional Google OAuth, Resend, Paddle Billing
 
 ---
 
@@ -149,6 +149,10 @@ Restrict Environment `production` to branch `main`. Protect `main` (PR + review)
 - `NEXT_PUBLIC_APP_URL`
 - `NEXT_PUBLIC_GOOGLE_CLIENT_ID`
 - `NEXT_PUBLIC_DEV_SUBSCRIPTION_PLAN` — leave empty in Docker/production; local `npm run dev` only
+- `NEXT_PUBLIC_PADDLE_ENVIRONMENT`
+- `NEXT_PUBLIC_PADDLE_CLIENT_TOKEN`
+- `NEXT_PUBLIC_PADDLE_PRICE_PRO_MONTHLY`
+- `NEXT_PUBLIC_PADDLE_PRICE_PRO_YEARLY`
 
 ### PRIVATE RUNTIME SECRET (VPS `.env.prod` only)
 
@@ -157,7 +161,8 @@ Restrict Environment `production` to branch `main`. Protect `main` (PR + review)
 - `ANTHROPIC_API_KEY`
 - `GOOGLE_CLIENT_SECRET`
 - `RESEND_API_KEY`
-- `SSLCOMMERZ_STORE_ID`, `SSLCOMMERZ_STORE_PASSWORD`
+- `PADDLE_API_KEY`
+- `PADDLE_WEBHOOK_SECRET`
 
 ### SERVER-ONLY NON-SECRET (VPS `.env.prod`)
 
@@ -165,7 +170,7 @@ Restrict Environment `production` to branch `main`. Protect `main` (PR + review)
 - `AUTH_TRUST_HOST=true` behind Nginx
 - `POSTGRES_USER`, `POSTGRES_DB` (defaults `careerpulse`)
 - `ANTHROPIC_MODEL`, `CV_ANALYZER_API_MODEL`
-- `SSLCOMMERZ_IS_LIVE`
+- `PADDLE_API_VERSION`
 - `SUPER_ADMIN_EMAILS`
 - `APP_BIND_HOST` (default `127.0.0.1`)
 - `APP_PORT` (default `3000`) — **change this if another app already binds host 3000**
@@ -202,7 +207,7 @@ Compose always sets for the app container: `DATABASE_URL`, `UPLOAD_DIR=/data/upl
 5. Merge to `main` (or run the deploy workflow) so CI copies compose files and pulls the image.
 6. Install Nginx site from `infra/nginx-careerpulse.conf.example`; `certbot --nginx -d <hostname>`.
 7. Google OAuth callback: `https://<hostname>/api/auth/callback/google`.
-8. SSLCommerz IPN: `https://<hostname>/api/payment/ipn`.
+8. Paddle webhook: `https://<hostname>/api/webhooks/paddle`.
 9. Schedule `db/backup.sh`; copy dumps off the VPS.
 
 Until `.env.prod` exists, `vps-pull-up.sh` **exits 1**.

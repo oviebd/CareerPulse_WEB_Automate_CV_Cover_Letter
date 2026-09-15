@@ -1137,6 +1137,8 @@ Everything in Premium, plus:
 
 ## 8. Payment Integration — SSLCommerz
 
+> **Implementation note (2026):** Web billing is Paddle Billing. See `docs/paddle-setup.md`. This section is historical.
+
 ### 8.1 Why SSLCommerz
 
 SSLCommerz supports international card payments (Visa, Mastercard, Amex) in USD, making it viable for the global market while being operable from Bangladesh. Supports recurring billing via their subscription APIs.

@@ -191,6 +191,46 @@ export const payments = pgTable('payments', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const subscriptions = pgTable(
+  'subscriptions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    paddleCustomerId: text('paddle_customer_id'),
+    paddleSubscriptionId: text('paddle_subscription_id'),
+    paddleTransactionId: text('paddle_transaction_id'),
+    paddlePriceId: text('paddle_price_id'),
+    plan: text('plan'),
+    status: text('status').notNull().default('inactive'),
+    billingInterval: text('billing_interval'),
+    currentPeriodStart: timestamp('current_period_start', { withTimezone: true }),
+    currentPeriodEnd: timestamp('current_period_end', { withTimezone: true }),
+    scheduledChange: jsonb('scheduled_change'),
+    cancelAtPeriodEnd: boolean('cancel_at_period_end').notNull().default(false),
+    lastEventId: text('last_event_id'),
+    lastEventOccurredAt: timestamp('last_event_occurred_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('subscriptions_user_id_uidx').on(t.userId),
+    uniqueIndex('subscriptions_paddle_subscription_uidx').on(t.paddleSubscriptionId),
+    index('subscriptions_paddle_customer_idx').on(t.paddleCustomerId),
+  ]
+);
+
+export const paddleWebhookEvents = pgTable('paddle_webhook_events', {
+  eventId: text('event_id').primaryKey(),
+  eventType: text('event_type').notNull(),
+  status: text('status').notNull(),
+  payloadHash: text('payload_hash'),
+  occurredAt: timestamp('occurred_at', { withTimezone: true }),
+  processedAt: timestamp('processed_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const cvTemplates = pgTable('cv_templates', {
   id: text('id').primaryKey(),
   type: text('type').notNull(),
@@ -652,3 +692,4 @@ export type DbCreditTransaction = typeof creditTransactions.$inferSelect;
 export type DbCreditRuleVersion = typeof creditRuleVersions.$inferSelect;
 export type DbPromoCode = typeof promoCodes.$inferSelect;
 export type DbPlan = typeof plans.$inferSelect;
+export type DbSubscription = typeof subscriptions.$inferSelect;

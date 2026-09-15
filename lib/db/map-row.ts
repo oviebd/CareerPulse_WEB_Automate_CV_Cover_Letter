@@ -17,6 +17,11 @@ const TIMESTAMP_CAMEL_KEYS = new Set([
   'interviewDate',
   'billingPeriodStart',
   'billingPeriodEnd',
+  'currentPeriodStart',
+  'currentPeriodEnd',
+  'lastEventOccurredAt',
+  'processedAt',
+  'occurredAt',
 ]);
 
 function coerceTimestampValue(key: string, value: unknown): unknown {

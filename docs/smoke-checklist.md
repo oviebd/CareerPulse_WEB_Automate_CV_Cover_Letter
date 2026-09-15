@@ -39,6 +39,13 @@ Run after every migration phase (local or Docker).
 
 ## Billing & account
 - [ ] Billing page loads (subscription + payment history)
+- [ ] Pricing page loads (Paddle copy, no SSLCommerz)
+- [ ] Signed-out pricing CTA goes to `/register`; signed-in users can start Paddle checkout
+- [ ] Sandbox checkout (test card) does not grant Premium until the webhook updates the session
+- [ ] Webhook `POST /api/webhooks/paddle` activates Pro; billing page shows renewal date
+- [ ] Cancel at period end keeps Premium until `current_period_end`
+- [ ] Past-due banner appears when status is `past_due`
+- [ ] Promo code apply still works (no Paddle row)
 - [ ] Account settings: update display name
 - [ ] Account settings: GDPR JSON export
 

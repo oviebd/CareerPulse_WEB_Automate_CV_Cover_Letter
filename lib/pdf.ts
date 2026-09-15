@@ -7,7 +7,7 @@ import { profileToUniversalCV } from '@/lib/cv-universal-bridge';
 import type { CVProfile, SubscriptionTier } from '@/types';
 import type { CVData } from '@/types';
 import { canAccessFeature } from '@/lib/subscription';
-import { resolveEffectiveTier } from '@/lib/dev-subscription';
+import { effectiveAccessTier } from '@/lib/access/premium';
 import { assertTemplateAccess } from '@/lib/templates/access';
 import { ALL_TEMPLATE_IDS } from '@/src/config/templateConfig';
 import { migrateLegacyCVData } from '@/src/utils/cvDefaults';
@@ -153,7 +153,7 @@ export async function exportCV(
   format: 'pdf' | 'docx' = 'pdf'
 ): Promise<{ pdf: Buffer; filename: string }> {
   const profile = await getProfilesRepo().getById(userId);
-  const tier = resolveEffectiveTier(profile?.subscription_tier ?? 'free');
+  const tier = effectiveAccessTier(profile);
 
   const normalizedId = normalizeTemplateId(templateId) as TemplateId;
 

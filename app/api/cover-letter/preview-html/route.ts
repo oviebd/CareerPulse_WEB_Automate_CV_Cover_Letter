@@ -13,6 +13,7 @@ import { getCoverLettersRepo } from '@/lib/db/repositories/cover-letters';
 import { getCvsRepo } from '@/lib/db/repositories/cvs';
 import { getJobsRepo } from '@/lib/db/repositories/jobs';
 import { getProfilesRepo } from '@/lib/db/repositories/profiles';
+import { effectiveAccessTier } from '@/lib/access/premium';
 
 export const runtime = 'nodejs';
 
@@ -46,7 +47,7 @@ export async function GET(request: Request) {
     );
     const templateHtml = await readFile(templatePath, 'utf-8');
     const vars = getSampleCoverLetterPreviewVars(accent);
-    const html = renderCoverLetterPageHtml(templateHtml, vars, profile?.subscription_tier, {
+    const html = renderCoverLetterPageHtml(templateHtml, vars, effectiveAccessTier(profile), {
       preview: true,
     });
     return new NextResponse(html, {
@@ -173,7 +174,7 @@ export async function POST(request: Request) {
         },
         accent
       );
-      const html = renderCoverLetterPageHtml(templateHtml, vars, profile?.subscription_tier, {
+      const html = renderCoverLetterPageHtml(templateHtml, vars, effectiveAccessTier(profile), {
         preview: true,
       });
       return new NextResponse(html, {
@@ -253,7 +254,7 @@ export async function POST(request: Request) {
       },
       accent
     );
-    const html = renderCoverLetterPageHtml(templateHtml, vars, profile?.subscription_tier, {
+    const html = renderCoverLetterPageHtml(templateHtml, vars, effectiveAccessTier(profile), {
       preview: true,
     });
     return new NextResponse(html, {

@@ -1,4 +1,5 @@
 import { resolveEffectiveTier } from '@/lib/dev-subscription';
+import { effectiveAccessTier, hasPremiumAccess } from '@/lib/access/premium';
 import { canUseTemplate as canUseTemplateTier } from '@/lib/subscription';
 import type { Profile, SubscriptionTier } from '@/types';
 
@@ -34,7 +35,6 @@ export function canAccessFeatureSync(
   opts?: { templateTiers?: string[] }
 ): boolean {
   if (!profile?.id) return false;
-  const tier = resolveTier(profile);
 
   switch (feature) {
     case Feature.CV_BUILDER:
@@ -48,11 +48,11 @@ export function canAccessFeatureSync(
     case Feature.PREMIUM_CV_TEMPLATE:
     case Feature.PREMIUM_CL_TEMPLATE:
       return opts?.templateTiers
-        ? canUseTemplateTier(opts.templateTiers, tier)
+        ? canUseTemplateTier(opts.templateTiers, effectiveAccessTier(profile))
         : false;
     case Feature.DOCX_EXPORT:
     case Feature.ATS_AUTO_FIX:
-      return tier === 'pro';
+      return hasPremiumAccess(profile);
     default:
       return false;
   }

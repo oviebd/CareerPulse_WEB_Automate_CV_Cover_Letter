@@ -9,7 +9,7 @@ import {
 import { generateCoverLetterDocx } from '@/lib/cover-letter-docx';
 import { exportCV, generatePDF } from '@/lib/pdf';
 import { canAccessFeature } from '@/lib/subscription';
-import { resolveEffectiveTier } from '@/lib/dev-subscription';
+import { effectiveAccessTier } from '@/lib/access/premium';
 import { assertTemplateAccess } from '@/lib/templates/access';
 import { rateLimitHit } from '@/lib/rate-limit';
 import { CL_TEMPLATE_IDS } from '@/src/config/templateConfig';
@@ -242,7 +242,7 @@ export async function POST(request: Request) {
     }
 
     const profile = await getProfilesRepo().getById(user.id);
-    const tier = resolveEffectiveTier(profile?.subscription_tier ?? 'free');
+    const tier = effectiveAccessTier(profile);
     try {
       await assertTemplateAccess(templateId, tier);
     } catch {
@@ -286,7 +286,7 @@ export async function POST(request: Request) {
     const cvForLetter = pickGeneralOrLatest(cvRows);
 
     if (format === 'docx') {
-      const tier = resolveEffectiveTier(profile?.subscription_tier ?? 'free');
+      const tier = effectiveAccessTier(profile);
       if (!canAccessFeature(tier, 'docxExport')) {
         return NextResponse.json({ error: 'docx_upgrade_required' }, { status: 403 });
       }
@@ -342,7 +342,7 @@ export async function POST(request: Request) {
       },
       body.primaryColor ?? body.accent_color ?? '#2563EB'
     );
-    const html = renderCoverLetterPageHtml(templateHtml, vars, profile?.subscription_tier);
+    const html = renderCoverLetterPageHtml(templateHtml, vars, tier);
     const pdfBuffer = await generatePDF(html);
     const filePath = `${user.id}/cl-${templateId}-${Date.now()}.pdf`;
     try {

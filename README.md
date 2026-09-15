@@ -36,7 +36,7 @@ Edit `.env.prod` and set at least:
 | `JWT_SECRET` | Can be the same value as `AUTH_SECRET` |
 | `ANTHROPIC_API_KEY` | Required for AI generation |
 
-Google OAuth, Resend, and SSLCommerz can stay empty until you need those features.
+Google OAuth, Resend, and Paddle Billing can stay empty until you need those features.
 
 `DATABASE_URL` is set by Compose for the app container — you do not need to add it to `.env.prod`.
 
@@ -157,7 +157,7 @@ Fresh Docker installs apply `db/schema.sql` and `db/seed.sql` automatically.
 
 - New users receive **configurable free AI credits** (default 150) on registration.
 - AI features consume credits based on **actual token usage** (input/output rates are admin-configurable).
-- **Premium** unlocks premium CV templates, DOCX export, and ATS auto-fix; promo codes upgrade plans without payment.
+- **Premium** unlocks premium CV templates, DOCX export, and ATS auto-fix; promo codes upgrade plans without payment. Paid plans are billed through **Paddle**. See [docs/paddle-setup.md](docs/paddle-setup.md) and [docs/paddle-architecture.md](docs/paddle-architecture.md).
 - Set `SUPER_ADMIN_EMAILS` in `.env.prod` (comma-separated) to bootstrap Super Admin access, then open `/admin`.
 
 ---

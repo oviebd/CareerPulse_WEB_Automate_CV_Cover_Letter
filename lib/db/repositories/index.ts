@@ -4,6 +4,8 @@ export { getCvsRepo } from './cvs';
 export { getJobsRepo } from './jobs';
 export { getCoverLettersRepo } from './cover-letters';
 export { getPaymentsRepo } from './payments';
+export { getSubscriptionsRepo } from './subscriptions';
+export { getPaddleWebhookEventsRepo } from './paddle-webhook-events';
 export { getUsersRepo } from './users';
 export { getInterviewRepo } from './interview';
 export { getAiUsageRepo } from './ai-usage';

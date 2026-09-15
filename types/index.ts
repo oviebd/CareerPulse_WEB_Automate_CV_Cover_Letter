@@ -11,7 +11,13 @@ export function normalizeSubscriptionTier(
   if (tier === 'pro' || tier === 'premium' || tier === 'career') return 'pro';
   return 'free';
 }
-export type SubscriptionStatus = 'active' | 'inactive' | 'cancelled' | 'past_due';
+export type SubscriptionStatus =
+  | 'active'
+  | 'inactive'
+  | 'cancelled'
+  | 'past_due'
+  | 'trialing'
+  | 'paused';
 export type UserRole = 'user' | 'super_admin';
 
 export type CreditTransactionType =
@@ -589,7 +595,7 @@ export const TIER_LIMITS: Record<
   },
 };
 
-// Pricing (SSLCommerz plans — payment callbacks unchanged)
+// Pricing (CareerPulse paid SKUs — Paddle price IDs live in lib/config/paddle.ts)
 export const PRICING = {
   pro_monthly: {
     amount: 9.99,

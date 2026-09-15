@@ -36,7 +36,7 @@ describe('canAccessFeatureSync', () => {
   it('allows premium template for pro users', () => {
     expect(
       canAccessFeatureSync(
-        { ...baseProfile, subscription_tier: 'pro' },
+        { ...baseProfile, subscription_tier: 'pro', subscription_status: 'active' },
         Feature.PREMIUM_CV_TEMPLATE,
         { templateTiers: ['pro'] }
       )

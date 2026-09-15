@@ -48,6 +48,14 @@ async function getByTranId(tranId: string) {
   return row ? toSnake(row) : null;
 }
 
+async function upsertByTranId(row: Record<string, unknown>) {
+  const existing = await getByTranId(String(row.tran_id));
+  if (existing) {
+    return updateByTranId(String(row.tran_id), row);
+  }
+  return insert(row);
+}
+
 export function getPaymentsRepo() {
-  return { listByUser, insert, updateByTranId, deleteByTranId, getByTranId };
+  return { listByUser, insert, updateByTranId, deleteByTranId, getByTranId, upsertByTranId };
 }
