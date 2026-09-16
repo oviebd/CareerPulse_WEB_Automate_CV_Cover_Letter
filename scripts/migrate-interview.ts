@@ -8,6 +8,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import postgres from 'postgres';
 
+
+
 async function main() {
   // Load .env.local when DATABASE_URL is not set (common for npm run dev workflow)
   if (!process.env.DATABASE_URL?.trim()) {
