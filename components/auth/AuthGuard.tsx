@@ -1,19 +1,35 @@
 'use client';
 
-import Link from 'next/link';
+import { useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import { SIGNING_OUT_STORAGE_KEY } from '@/lib/sign-out-client';
 import { useAuthStore } from '@/stores/useAuthStore';
 
 /**
  * Client-side layout guard for the dashboard group.
  *
- * Server middleware enforces the session. No automatic hard redirect here:
- * doing `window.location` to /login while cookies are valid caused middleware
- * to send users to /dashboard and felt like an endless “reload” when auth
- * events briefly nulled the client user. Use a static fallback if needed.
+ * When the client cannot restore app user state, purge caches and send visitors
+ * to the marketing home. Avoid linking to /login here: a stale session cookie
+ * makes middleware bounce straight back to /dashboard.
  */
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const user = useAuthStore((s) => s.user);
   const initialized = useAuthStore((s) => s.initialized);
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!initialized || user) return;
+
+    useAuthStore.getState().reset();
+    queryClient.clear();
+    try {
+      sessionStorage.removeItem(SIGNING_OUT_STORAGE_KEY);
+      sessionStorage.removeItem('cp_profile');
+    } catch {
+      // ignore
+    }
+    window.location.replace('/');
+  }, [initialized, user, queryClient]);
 
   if (!initialized) {
     return (
@@ -45,14 +61,8 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
   if (!user) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-[var(--color-background)] px-4 text-center text-sm text-[var(--color-text-secondary)]">
-        <p>We couldn&apos;t restore your session in this view.</p>
-        <Link
-          href="/login"
-          className="text-sm font-semibold text-[var(--color-primary)] hover:underline"
-        >
-          Sign in
-        </Link>
+      <div className="flex min-h-screen items-center justify-center bg-[var(--color-background)]">
+        <p className="text-sm text-[var(--color-text-secondary)]">Redirecting…</p>
       </div>
     );
   }

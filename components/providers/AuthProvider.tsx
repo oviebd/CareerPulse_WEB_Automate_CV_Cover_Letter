@@ -38,7 +38,7 @@ function AuthJsSessionSync() {
       }
 
       try {
-        const res = await fetch('/api/auth/session', { credentials: 'same-origin' });
+        const res = await fetch('/api/me', { credentials: 'same-origin' });
         const json = (await res.json()) as {
           user: { id: string; email: string; role?: 'user' | 'super_admin' } | null;
           profile: Profile | null;

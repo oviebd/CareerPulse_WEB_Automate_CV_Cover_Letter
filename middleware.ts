@@ -6,10 +6,18 @@ import type { NextRequest } from 'next/server';
 
 const AUTH_ROUTES = ['/login', '/register'];
 
+const NO_STORE = 'private, no-store';
+
+function withNoStore(response: NextResponse): NextResponse {
+  response.headers.set('Cache-Control', NO_STORE);
+  return response;
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isProtected = isProtectedAppPath(pathname);
   const isAuthRoute = AUTH_ROUTES.some((p) => pathname.startsWith(p));
+  const shouldNoStore = isProtected || isAuthRoute;
 
   const session = await auth();
   const user = session?.user;
@@ -18,10 +26,13 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     url.searchParams.set('returnTo', `${pathname}${request.nextUrl.search}`);
-    return NextResponse.redirect(url);
+    return withNoStore(NextResponse.redirect(url));
   }
   if (isAuthRoute && user) {
-    return NextResponse.redirect(publicAppUrl(request, '/dashboard'));
+    return withNoStore(NextResponse.redirect(publicAppUrl(request, '/dashboard')));
+  }
+  if (shouldNoStore) {
+    return withNoStore(NextResponse.next());
   }
   return NextResponse.next();
 }
