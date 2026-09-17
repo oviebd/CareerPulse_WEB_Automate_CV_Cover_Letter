@@ -1,4 +1,5 @@
 import { AuthHeroPanel } from '@/components/auth/AuthHeroPanel';
+import { RedirectIfAuthenticated } from '@/components/auth/RedirectIfAuthenticated';
 import { LoginForm } from './login-form';
 
 export const dynamic = 'force-dynamic';
@@ -16,6 +17,7 @@ export default async function LoginPage({
 
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
+      <RedirectIfAuthenticated returnTo={returnTo} />
       <AuthHeroPanel variant="login" />
       <div className="flex items-center justify-center px-6 py-12">
         <LoginForm

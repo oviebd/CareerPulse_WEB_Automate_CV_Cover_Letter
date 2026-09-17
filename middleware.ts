@@ -1,10 +1,7 @@
 import { auth } from '@/lib/auth';
 import { isProtectedAppPath } from '@/lib/guest-cv-paths';
-import { publicAppUrl } from '@/lib/redirect';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-
-const AUTH_ROUTES = ['/login', '/register'];
 
 const NO_STORE = 'private, no-store';
 
@@ -16,7 +13,8 @@ function withNoStore(response: NextResponse): NextResponse {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isProtected = isProtectedAppPath(pathname);
-  const isAuthRoute = AUTH_ROUTES.some((p) => pathname.startsWith(p));
+  const isAuthRoute =
+    pathname.startsWith('/login') || pathname.startsWith('/register');
   const shouldNoStore = isProtected || isAuthRoute;
 
   const session = await auth();
@@ -27,9 +25,6 @@ export async function middleware(request: NextRequest) {
     url.pathname = '/login';
     url.searchParams.set('returnTo', `${pathname}${request.nextUrl.search}`);
     return withNoStore(NextResponse.redirect(url));
-  }
-  if (isAuthRoute && user) {
-    return withNoStore(NextResponse.redirect(publicAppUrl(request, '/dashboard')));
   }
   if (shouldNoStore) {
     return withNoStore(NextResponse.next());

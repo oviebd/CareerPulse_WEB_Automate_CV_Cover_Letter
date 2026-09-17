@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { getSessionUser } from '@/lib/auth/session';
 import { getProfilesRepo } from '@/lib/db/repositories/profiles';
 import { applyDevSubscriptionOverride } from '@/lib/dev-subscription';
 import { resolveUserRole, ensureSuperAdminRole } from '@/lib/auth/roles';
@@ -17,17 +17,22 @@ function emptyPayload() {
 }
 
 export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) {
+  let appUser;
+  try {
+    appUser = await getSessionUser();
+  } catch {
+    return emptyPayload();
+  }
+  if (!appUser) {
     return emptyPayload();
   }
 
-  const userId = session.user.id;
-  const email = session.user.email ?? '';
+  const userId = appUser.id;
+  const email = appUser.email;
 
   try {
-    if (session.user.email) {
-      await ensureSuperAdminRole(userId, session.user.email);
+    if (email) {
+      await ensureSuperAdminRole(userId, email);
     }
 
     const [profile, role, balance] = await Promise.all([

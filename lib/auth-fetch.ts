@@ -1,13 +1,19 @@
+import { signOut } from 'next-auth/react';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { isClientSigningOut } from '@/lib/sign-out-client';
 
 let redirecting = false;
 
-function handleUnauthorized() {
+async function handleUnauthorized() {
   if (redirecting) return;
   if (isClientSigningOut()) return;
   redirecting = true;
   useAuthStore.getState().reset();
+  try {
+    await signOut({ redirect: false });
+  } catch {
+    // ignore
+  }
   if (typeof window !== 'undefined') {
     const returnTo = encodeURIComponent(window.location.pathname);
     window.location.href = `/login?returnTo=${returnTo}`;
@@ -25,7 +31,7 @@ export async function authFetch(
 ): Promise<Response> {
   const res = await fetch(input, init);
   if (res.status === 401) {
-    handleUnauthorized();
+    void handleUnauthorized();
   }
   return res;
 }
@@ -57,6 +63,6 @@ export function isUnauthorizedError(error: unknown): boolean {
  */
 export function handleQueryAuthError(error: unknown): void {
   if (isUnauthorizedError(error)) {
-    handleUnauthorized();
+    void handleUnauthorized();
   }
 }

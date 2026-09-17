@@ -2,15 +2,14 @@
 
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { SIGNING_OUT_STORAGE_KEY } from '@/lib/sign-out-client';
+import { signOutAndGoHome } from '@/lib/sign-out-client';
 import { useAuthStore } from '@/stores/useAuthStore';
 
 /**
  * Client-side layout guard for the dashboard group.
  *
- * When the client cannot restore app user state, purge caches and send visitors
- * to the marketing home. Avoid linking to /login here: a stale session cookie
- * makes middleware bounce straight back to /dashboard.
+ * When the client cannot restore app user state, clear the session cookie and
+ * send visitors to the marketing home.
  */
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const user = useAuthStore((s) => s.user);
@@ -22,13 +21,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
     useAuthStore.getState().reset();
     queryClient.clear();
-    try {
-      sessionStorage.removeItem(SIGNING_OUT_STORAGE_KEY);
-      sessionStorage.removeItem('cp_profile');
-    } catch {
-      // ignore
-    }
-    window.location.replace('/');
+    signOutAndGoHome();
   }, [initialized, user, queryClient]);
 
   if (!initialized) {

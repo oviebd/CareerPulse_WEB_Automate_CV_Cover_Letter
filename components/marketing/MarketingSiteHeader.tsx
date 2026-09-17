@@ -128,7 +128,12 @@ export function MarketingSiteHeader() {
         </nav>
         <div className="hidden items-center gap-2 sm:flex">
           <MarketingThemeToggle />
-          {initialized && user ? (
+          {!initialized ? (
+            <span
+              className="inline-block h-9 w-[9.5rem] shrink-0 rounded-btn bg-[var(--color-surface-2)] opacity-60"
+              aria-hidden
+            />
+          ) : user ? (
             <Link
               href="/dashboard"
               className="rounded-btn bg-[var(--color-primary-500)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:brightness-110"
@@ -183,7 +188,7 @@ export function MarketingSiteHeader() {
             >
               Build CV
             </BuildCvLink>
-            {initialized && user ? (
+            {!initialized ? null : user ? (
               <Link
                 href="/dashboard"
                 onClick={() => setOpen(false)}
