@@ -42,10 +42,7 @@ export function getBrowserPaddle(): Promise<Paddle | undefined> {
 
 export type CheckoutResult = 'completed' | 'closed' | 'error';
 
-function billingSuccessUrl(): string | undefined {
-  if (typeof window === 'undefined') return undefined;
-  return `${window.location.origin}/settings/billing`;
-}
+const CLOSE_GRACE_MS = 500;
 
 export async function openPaddleCheckout(input: {
   priceId: string;
@@ -58,13 +55,16 @@ export async function openPaddleCheckout(input: {
     throw new Error('Paddle failed to initialize');
   }
 
-  const successUrl = billingSuccessUrl();
-
   return new Promise((resolve, reject) => {
     let settled = false;
+    let closeTimer: ReturnType<typeof setTimeout> | null = null;
     const finish = (result: CheckoutResult) => {
       if (settled) return;
       settled = true;
+      if (closeTimer) {
+        clearTimeout(closeTimer);
+        closeTimer = null;
+      }
       resolve(result);
     };
 
@@ -74,7 +74,9 @@ export async function openPaddleCheckout(input: {
           paddleLog('checkout_completed', {});
           finish('completed');
         } else if (event.name === CheckoutEventNames.CHECKOUT_CLOSED) {
-          finish('closed');
+          // Overlay often fires closed before/with completed after a successful pay.
+          if (closeTimer) return;
+          closeTimer = setTimeout(() => finish('closed'), CLOSE_GRACE_MS);
         } else if (
           event.name === CheckoutEventNames.CHECKOUT_ERROR ||
           event.name === CheckoutEventNames.CHECKOUT_FAILED
@@ -97,7 +99,6 @@ export async function openPaddleCheckout(input: {
         customer: input.customerId ? { id: input.customerId } : { email: input.email },
         settings: {
           displayMode: 'overlay',
-          ...(successUrl ? { successUrl } : {}),
         },
       });
     } catch (error) {

@@ -9,6 +9,7 @@ import { hasPremiumAccess } from '@/lib/access/premium';
 import { openPaddleCheckout } from '@/lib/paddle/browser';
 import { paddleLog } from '@/lib/paddle/log';
 import { useToast } from '@/components/ui/toast';
+import { invalidateCreditQueries } from '@/hooks/useCredits';
 import type { BillingInterval } from '@/lib/paddle/plans';
 
 type CheckoutResponse = {
@@ -63,6 +64,7 @@ export function CheckoutButton({
       const activated = await waitForActivation();
       await queryClient.invalidateQueries({ queryKey: ['billing-subscription'] });
       await queryClient.invalidateQueries({ queryKey: ['payments'] });
+      await invalidateCreditQueries(queryClient);
       if (activated) {
         toast('Premium is now active.', 'success');
       } else {

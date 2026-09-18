@@ -8,7 +8,11 @@ import { apiFetch } from '@/lib/api-fetch';
 import { openPaddleCheckout } from '@/lib/paddle/browser';
 import { CREDIT_PACKS, type CreditPackKey } from '@/lib/paddle/packs';
 import { useToast } from '@/components/ui/toast';
-import { invalidateCreditQueries } from '@/hooks/useCredits';
+import {
+  fetchCredits,
+  invalidateCreditQueries,
+  waitForCreditBalance,
+} from '@/hooks/useCredits';
 
 const PACK_ORDER: CreditPackKey[] = ['credits5', 'credits10'];
 
@@ -19,15 +23,6 @@ type CheckoutResponse = {
   customData: Record<string, unknown>;
 };
 
-async function waitForCreditBalance(previous: number, minIncrease: number): Promise<boolean> {
-  for (let i = 0; i < 8; i += 1) {
-    const { balance } = await apiFetch<{ balance: number }>('/api/user/credits');
-    if (balance >= previous + minIncrease) return true;
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-  }
-  return false;
-}
-
 export function ActionPacksCard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -36,7 +31,7 @@ export function ActionPacksCard() {
   async function buy(pack: CreditPackKey) {
     setLoading(pack);
     try {
-      const before = await apiFetch<{ balance: number }>('/api/user/credits');
+      const before = await fetchCredits(queryClient);
       const payload = await apiFetch<CheckoutResponse>('/api/billing/checkout', {
         method: 'POST',
         body: JSON.stringify({ type: 'pack', pack }),
@@ -47,14 +42,22 @@ export function ActionPacksCard() {
         customerId: payload.customerId,
         customData: payload.customData,
       });
-      if (result === 'closed') return;
       if (result === 'error') {
         toast('Checkout could not be completed. Please try again.', 'error');
         return;
       }
+
+      const minIncrease = CREDIT_PACKS[pack].credits;
+      if (result === 'closed') {
+        const granted = await waitForCreditBalance(queryClient, before.balance, minIncrease, 3);
+        await invalidateCreditQueries(queryClient);
+        if (granted) toast('Credits added to your account.', 'success');
+        return;
+      }
+
       toast('Payment received. Adding credits…', 'info');
-      const granted = await waitForCreditBalance(before.balance, CREDIT_PACKS[pack].credits);
-      invalidateCreditQueries(queryClient);
+      const granted = await waitForCreditBalance(queryClient, before.balance, minIncrease);
+      await invalidateCreditQueries(queryClient);
       if (granted) {
         toast('Credits added to your account.', 'success');
       } else {
