@@ -13,6 +13,10 @@ export async function GET(request: Request) {
   const offset = Math.max(0, Number(url.searchParams.get('offset') ?? 0));
   const userId = url.searchParams.get('userId') ?? undefined;
 
-  const usage = await getAdminRepo().listAiUsage({ limit, offset, userId });
-  return NextResponse.json({ usage, limit, offset });
+  const repo = getAdminRepo();
+  const [usage, token_stats] = await Promise.all([
+    repo.listAiUsage({ limit, offset, userId }),
+    repo.aiUsageTokenSourceStats(),
+  ]);
+  return NextResponse.json({ usage, limit, offset, token_stats });
 }

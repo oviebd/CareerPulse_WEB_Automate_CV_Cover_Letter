@@ -588,6 +588,7 @@ export default function CVTemplatePreviewPage() {
           <ExportMenu
             busyFormat={exportingFormat}
             disabled={!allowed || !draft || !templateId}
+            canExport={canAccessFeature(tier, 'pdfExport')}
             canDocx={canAccessFeature(tier, 'docxExport')}
             onExport={(format) => void exportPdf(format)}
           />

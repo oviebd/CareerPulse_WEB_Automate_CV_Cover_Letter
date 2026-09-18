@@ -493,6 +493,7 @@ export function CVEditor() {
             label="Export"
             busyFormat={exportingFormat}
             disabled={!allowed || !cvData || !selectedTemplateId}
+            canExport={canAccessFeature(tier, 'pdfExport')}
             canDocx={canAccessFeature(tier, 'docxExport')}
             onExport={(format) => {
               requireAuth(() => {
@@ -548,6 +549,7 @@ export function CVEditor() {
             <ExportReadyNudge
               completion={completionPct}
               busyFormat={exportingFormat}
+              canExport={canAccessFeature(tier, 'pdfExport')}
               canDocx={canAccessFeature(tier, 'docxExport')}
               exportDisabled={!allowed}
               onExport={(format) => {

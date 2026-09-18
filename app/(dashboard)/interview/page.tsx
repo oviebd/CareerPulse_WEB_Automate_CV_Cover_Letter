@@ -118,7 +118,6 @@ export default function InterviewListPage() {
         title="Interview Preparation"
         subtitle="Prepare for a specific job or build skills by topic"
       />
-
       {limits.interviewPrep ? (
         <section className="grid gap-3 sm:grid-cols-2">
           <Link href="/interview/new">

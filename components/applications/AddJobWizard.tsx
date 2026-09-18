@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
@@ -243,14 +242,6 @@ export function AddJobWizard() {
           <p className="max-w-3xl text-sm leading-relaxed text-[var(--color-muted)]">
             Paste a job description, select your base CV, and generate a tailored CV and cover letter in one flow.
           </p>
-          {tier === 'free' ? (
-            <p className="text-xs text-[var(--color-muted)]">
-              Free plan includes 3 tailored applications per month.{' '}
-              <Link href="/settings/billing" className="font-medium text-[var(--color-primary)]">
-                Upgrade for unlimited
-              </Link>
-            </p>
-          ) : null}
         </header>
 
         <div

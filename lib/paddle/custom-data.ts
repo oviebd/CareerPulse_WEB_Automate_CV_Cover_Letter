@@ -19,3 +19,11 @@ export function checkoutCustomData(userId: string, planKey: string) {
     plan: planKey,
   };
 }
+
+export function packCheckoutCustomData(userId: string, packKey: string) {
+  return {
+    careerPulseUserId: userId,
+    source: 'career_pulse_web',
+    pack: packKey,
+  };
+}

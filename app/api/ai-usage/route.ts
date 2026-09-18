@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/auth/session';
-import { getCharsPerToken } from '@/lib/ai/token-estimate';
+import { isAiUsageVisibleToUser } from '@/lib/ai/show-usage';
 import { getAiUsageRepo } from '@/lib/db/repositories/ai-usage';
+import { getProfilesRepo } from '@/lib/db/repositories/profiles';
 
 export const runtime = 'nodejs';
 
@@ -9,6 +10,11 @@ export async function GET() {
   const user = await getSessionUser();
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+  }
+
+  const profile = await getProfilesRepo().getById(user.id);
+  if (!isAiUsageVisibleToUser(profile?.role)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   const repo = getAiUsageRepo();
@@ -19,7 +25,6 @@ export async function GET() {
   ]);
 
   return NextResponse.json({
-    chars_per_token: getCharsPerToken(),
     totals,
     breakdown,
     recent,

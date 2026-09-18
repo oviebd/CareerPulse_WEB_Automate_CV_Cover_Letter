@@ -611,6 +611,7 @@ export default function CoverLetterDetailPage() {
           <ExportMenu
             busyFormat={exportingPdf ? 'pdf' : null}
             disabled={isDraftMode || !letter}
+            canExport={canAccessFeature(tier, 'pdfExport')}
             canDocx={canAccessFeature(tier, 'docxExport')}
             onExport={(format) => void handleExport(format)}
           />

@@ -5,6 +5,8 @@ import { FreePlanCard, UpgradePlans } from '@/components/billing/UpgradePlans';
 import { PastDueBanner } from '@/components/billing/PastDueBanner';
 import { PromoCodeCard } from '@/components/billing/PromoCodeCard';
 import { PaymentHistory } from '@/components/billing/PaymentHistory';
+import { ActionPacksCard } from '@/components/billing/ActionPacksCard';
+import { LearnCreditsCard } from '@/components/billing/LearnCreditsCard';
 import { useBillingSubscription } from '@/hooks/useBillingSubscription';
 import { useSubscription } from '@/hooks/useSubscription';
 
@@ -31,6 +33,10 @@ export default function BillingPage() {
       )}
 
       {!showPremium && <UpgradePlans allowCheckout />}
+
+      <ActionPacksCard />
+
+      <LearnCreditsCard />
 
       <PromoCodeCard profile={profile} />
       <PaymentHistory />

@@ -1,11 +1,12 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { recordAiUsage } from '@/lib/ai/record-usage';
-import { estimateTokensFromText, getCharsPerToken } from '@/lib/ai/token-estimate';
+import { requireAnthropicUsageTokens } from '@/lib/ai/anthropic-usage';
 import { getAiUsageContext } from '@/lib/ai/usage-context';
 import { calculateCreditsFromTokens } from '@/lib/credits/calculator';
 import { withCreditBilling, InsufficientCreditsError } from '@/lib/credits/ai-billing';
 import { getCreditsRepo } from '@/lib/db/repositories/credits';
 import type { AiUsageCategory } from '@/lib/ai/usage-context';
+import { computeAnthropicUsdCost } from '@/lib/ai/anthropic-pricing';
 
 export const CLAUDE_MODEL =
   process.env.ANTHROPIC_MODEL?.trim() || 'claude-sonnet-4-20250514';
@@ -81,16 +82,38 @@ async function invokeAnthropic(opts: ClaudeCompleteOptions) {
 
   const block = message.content[0];
   const text = block.type === 'text' ? block.text : '';
-  const tokenSource =
-    message.usage?.input_tokens != null && message.usage?.output_tokens != null
-      ? ('api' as const)
-      : ('estimated' as const);
-  const inputTokens =
-    message.usage?.input_tokens ?? estimateTokensFromText(inputText, getCharsPerToken());
-  const outputTokens =
-    message.usage?.output_tokens ?? estimateTokensFromText(text, getCharsPerToken());
+  const usage = message.usage as
+    | {
+        input_tokens?: number;
+        output_tokens?: number;
+        cache_creation_input_tokens?: number;
+        cache_read_input_tokens?: number;
+      }
+    | undefined;
+  const parsed = requireAnthropicUsageTokens(usage);
+  const { inputTokens, outputTokens, cacheCreationInputTokens, cacheReadInputTokens, tokenSource } =
+    parsed;
+  const { usd: usdCost, rates: pricingRates } = computeAnthropicUsdCost({
+    model,
+    inputTokens,
+    outputTokens,
+    cacheCreationInputTokens,
+    cacheReadInputTokens,
+  });
 
-  return { text, model, inputTokens, outputTokens, inputText, tokenSource };
+  return {
+    text,
+    model,
+    inputTokens,
+    outputTokens,
+    inputText,
+    tokenSource,
+    requestId: message.id ?? null,
+    cacheCreationInputTokens,
+    cacheReadInputTokens,
+    usdCost,
+    pricingRates,
+  };
 }
 
 export async function claudeComplete(
@@ -112,6 +135,11 @@ export async function claudeComplete(
     inputText: string;
     tokenSource: 'api' | 'estimated';
     creditsConsumed: number;
+    requestId?: string | null;
+    cacheCreationInputTokens?: number;
+    cacheReadInputTokens?: number;
+    usdCost?: number;
+    pricingRates?: ReturnType<typeof computeAnthropicUsdCost>['rates'];
   }): Promise<string | null> => {
     return recordAiUsage({
       inputText: result.inputText,
@@ -127,6 +155,11 @@ export async function claudeComplete(
       tokenSource: result.tokenSource,
       feature,
       creditsConsumed: result.creditsConsumed,
+      requestId: result.requestId ?? undefined,
+      cacheCreationInputTokens: result.cacheCreationInputTokens,
+      cacheReadInputTokens: result.cacheReadInputTokens,
+      usdCost: result.usdCost,
+      pricingRates: result.pricingRates,
     });
   };
 

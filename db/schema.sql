@@ -267,6 +267,8 @@ CREATE TABLE IF NOT EXISTS ai_usage_events (
   credit_rule_version UUID,
   token_source TEXT NOT NULL DEFAULT 'api' CHECK (token_source IN ('api', 'estimated')),
   cached_input_tokens INTEGER NOT NULL DEFAULT 0,
+  cache_creation_input_tokens INTEGER NOT NULL DEFAULT 0,
+  usd_cost NUMERIC(12, 6) NOT NULL DEFAULT 0,
   metadata JSONB NOT NULL DEFAULT '{}',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -352,6 +354,20 @@ CREATE INDEX IF NOT EXISTS ai_usage_events_user_category_idx
 CREATE INDEX IF NOT EXISTS ai_usage_events_feature_created_idx
   ON ai_usage_events (feature, created_at DESC)
   WHERE feature IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS quota_usage (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  metric TEXT NOT NULL,
+  period_key TEXT NOT NULL,
+  used INTEGER NOT NULL DEFAULT 0 CHECK (used >= 0),
+  bonus INTEGER NOT NULL DEFAULT 0 CHECK (bonus >= 0),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (user_id, metric, period_key)
+);
+
+CREATE INDEX IF NOT EXISTS quota_usage_user_metric_idx
+  ON quota_usage (user_id, metric, period_key);
 
 CREATE INDEX IF NOT EXISTS credit_transactions_user_created_idx
   ON credit_transactions (user_id, created_at DESC);

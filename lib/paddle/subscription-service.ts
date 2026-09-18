@@ -1,4 +1,3 @@
-import { ApiError } from '@paddle/paddle-node-sdk';
 import { getProfilesRepo } from '@/lib/db/repositories/profiles';
 import { getSubscriptionsRepo } from '@/lib/db/repositories/subscriptions';
 import { assertPaddlePublicConfig, getPaddlePublicConfig } from '@/lib/config/paddle';
@@ -6,24 +5,39 @@ import { getPaddleClient } from '@/lib/paddle/client';
 import { checkoutCustomData } from '@/lib/paddle/custom-data';
 import { BillingError, paddleUserMessage } from '@/lib/paddle/errors';
 import { paddleLog } from '@/lib/paddle/log';
+import { wrapPaddle } from '@/lib/paddle/paddle-api';
 import { planKeyFor, resolvePaddlePriceId } from '@/lib/paddle/plans';
+import { resolvePackPriceId, type CreditPackKey } from '@/lib/paddle/packs';
+import { packCheckoutCustomData } from '@/lib/paddle/custom-data';
 import type { BillingSubscriptionDto } from '@/lib/paddle/types';
 import type { PricingPlanKey } from '@/types';
 
-function wrapPaddle<T>(work: () => Promise<T>): Promise<T> {
-  return work().catch((error: unknown) => {
-    paddleLog('paddle_api_error', {
-      name: error instanceof Error ? error.name : 'error',
-    });
-    if (error instanceof BillingError) throw error;
-    if (error instanceof ApiError) {
-      throw new BillingError('paddle_unavailable', paddleUserMessage('paddle_unavailable'), 502);
-    }
-    throw new BillingError('paddle_unavailable', paddleUserMessage('paddle_unavailable'), 502);
-  });
-}
+export type CheckoutOpenPayload = {
+  priceId: string;
+  email: string;
+  customerId: string | null;
+  customData: Record<string, unknown>;
+  environment: ReturnType<typeof getPaddlePublicConfig>['environment'];
+};
 
 const PADDLE_LIVE_STATUSES = new Set(['active', 'trialing', 'past_due', 'cancelled', 'paused']);
+
+export async function createPackCheckoutPayload(
+  user: { id: string; email: string },
+  pack: CreditPackKey
+) {
+  const { packKey, priceId } = resolvePackPriceId(pack);
+  assertPaddlePublicConfig();
+  paddleLog('checkout_started', { userId: user.id, pack: packKey });
+  const existing = await getSubscriptionsRepo().getByUserId(user.id);
+  return {
+    priceId,
+    email: user.email,
+    customerId: existing?.paddle_customer_id ?? null,
+    customData: packCheckoutCustomData(user.id, packKey),
+    environment: getPaddlePublicConfig().environment,
+  };
+}
 
 export async function createCheckoutPayload(
   user: { id: string; email: string },

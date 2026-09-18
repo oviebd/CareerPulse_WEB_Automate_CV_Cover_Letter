@@ -115,6 +115,7 @@ function CVTemplatesPageContent() {
   }
 
   const canDocx = canAccessFeature(tier, 'docxExport');
+  const canExport = canAccessFeature(tier, 'pdfExport');
 
   async function exportCv(templateId: string, format: ExportFormat = 'pdf') {
     if (jobCvId) {
@@ -258,6 +259,7 @@ function CVTemplatesPageContent() {
                       <ExportMenu
                         busyFormat={exporting === tid ? 'pdf' : null}
                         disabled={!hasEditableCv || !allowed || (!jobCvId && draftActive)}
+                        canExport={canExport}
                         canDocx={canDocx}
                         label="Export DOCX"
                         onExport={(format) => void exportCv(tid, format)}

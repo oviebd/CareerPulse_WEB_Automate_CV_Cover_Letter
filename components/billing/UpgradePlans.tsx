@@ -4,28 +4,27 @@ import { Check, CreditCard, X } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { CheckoutButton } from '@/components/billing/CheckoutButton';
 import { cn } from '@/lib/utils';
-import { PRICING, TIER_LIMITS, type PricingPlanKey } from '@/types';
+import { PRICING, type PricingPlanKey } from '@/types';
 
 const PRO_PLANS: PricingPlanKey[] = ['pro_monthly', 'pro_yearly'];
 
 const PRO_FEATURES = [
-  'Unlimited tailored applications',
-  'AI enhancements & extras',
-  'DOCX export',
-  'ATS auto-fix',
+  '700 AI credits refreshed each billing month',
+  'Unlimited AI within your credit balance',
+  'PDF & DOCX export',
   'Interview prep',
+  'ATS auto-fix',
 ];
 
 const FREE_FEATURES = [
-  { label: 'Job tracker', included: true },
-  { label: 'ATS score checker', included: true },
-  { label: 'Unlimited applications', included: false },
-  { label: 'AI enhancements', included: false },
-  { label: 'DOCX export', included: false },
+  { label: 'Job tracker & ATS checker', included: true },
+  { label: '50 welcome AI credits', included: true },
+  { label: 'AI features (credit-gated)', included: true },
+  { label: 'PDF/DOCX export', included: false },
+  { label: 'Interview prep', included: false },
 ];
 
 export function FreePlanCard({ email }: { email?: string | null }) {
-  const limits = TIER_LIMITS.free;
   return (
     <Card>
       <div className="flex items-start gap-3">
@@ -40,7 +39,7 @@ export function FreePlanCard({ email }: { email?: string | null }) {
             </span>
           </div>
           <p className="mt-0.5 text-xs text-[var(--color-muted)]">
-            {limits.generationsPerMonth} tailored applications / month · {email}
+            Welcome credits · pay-as-you-go with credit packs · {email}
           </p>
         </div>
       </div>
@@ -102,7 +101,7 @@ export function UpgradePlans({ allowCheckout }: { allowCheckout: boolean }) {
                 <span className="mb-1 text-sm text-[var(--color-muted)]">/{isYearly ? 'yr' : 'mo'}</span>
               </div>
               {isYearly && (
-                <p className="text-xs text-[var(--color-success)]">~$7.50/mo · Save 25%</p>
+                <p className="text-xs text-[var(--color-success)]">~$6.67/mo · Save vs monthly</p>
               )}
               <div className="mt-4 space-y-1.5">
                 {PRO_FEATURES.map((feat) => (

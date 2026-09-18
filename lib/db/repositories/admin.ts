@@ -132,6 +132,7 @@ async function listAiUsage(opts?: { limit?: number; offset?: number; userId?: st
       credit_rule_version: aiUsageEvents.creditRuleVersion,
       token_source: aiUsageEvents.tokenSource,
       cached_input_tokens: aiUsageEvents.cachedInputTokens,
+      usd_cost: aiUsageEvents.usdCost,
       metadata: aiUsageEvents.metadata,
       created_at: aiUsageEvents.createdAt,
       model: aiUsageEvents.model,
@@ -150,6 +151,33 @@ async function listAiUsage(opts?: { limit?: number; offset?: number; userId?: st
   return rowsToSnake(rows);
 }
 
+async function aiUsageTokenSourceStats() {
+  const db = getDb();
+  const sourceRows = await db.execute<{ token_source: string; count: string }>(sql`
+    SELECT token_source, count(*)::text AS count
+    FROM ai_usage_events
+    GROUP BY token_source
+    ORDER BY token_source
+  `);
+  const breakdown: Record<string, number> = {};
+  for (const row of sourceRows) {
+    breakdown[row.token_source] = Number(row.count ?? 0);
+  }
+
+  const [recentRow] = await db.execute<{ count: string }>(sql`
+    SELECT count(*)::text AS count
+    FROM ai_usage_events
+    WHERE token_source = 'estimated'
+      AND created_at >= now() - interval '24 hours'
+  `);
+  const estimatedLast24h = Number(recentRow?.count ?? 0);
+
+  return {
+    by_source: breakdown,
+    estimated_last_24h: estimatedLast24h,
+  };
+}
+
 export function getAdminRepo() {
   return {
     listUsers,
@@ -158,5 +186,6 @@ export function getAdminRepo() {
     updateUserActive,
     dashboardStats,
     listAiUsage,
+    aiUsageTokenSourceStats,
   };
 }

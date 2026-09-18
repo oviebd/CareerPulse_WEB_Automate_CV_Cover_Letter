@@ -45,6 +45,9 @@ async function main() {
     join(process.cwd(), 'db/migrations/037_fractional_credits.sql'),
     join(process.cwd(), 'db/migrations/038_interview_session_timer.sql'),
     join(process.cwd(), 'db/migrations/039_paddle_billing.sql'),
+    join(process.cwd(), 'db/migrations/040_ai_usage_cost.sql'),
+    join(process.cwd(), 'db/migrations/041_quota_usage.sql'),
+    join(process.cwd(), 'db/migrations/042_backfill_ai_usage_usd_cost.sql'),
   ];
   const db = postgres(url, { max: 1 });
 

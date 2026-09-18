@@ -12,6 +12,7 @@ import { useSubscription } from '@/hooks/useSubscription';
 import { useToast } from '@/components/ui/toast';
 import { useCoverLetterTemplates } from '@/hooks/useTemplates';
 import { canAccessFeature } from '@/lib/subscription';
+import { invalidateCreditQueries } from '@/hooks/useCredits';
 import type { CoverLetterLength, CoverLetterTone, CVTemplate } from '@/types';
 
 const TONES: { id: CoverLetterTone; label: string }[] = [
@@ -74,13 +75,18 @@ export function GenerateCoverLetterForm() {
         specific_emphasis: emphasis.trim() || undefined,
       }),
     });
-    if (res.status === 403) {
+    if (res.status === 402 || res.status === 403) {
       const j = await res.json().catch(() => ({}));
       toast(
-        typeof j.message === 'string' ? j.message : 'Upgrade required for this feature.',
+        typeof j.message === 'string'
+          ? j.message
+          : j.error === 'INSUFFICIENT_CREDITS'
+            ? 'Not enough AI credits. Upgrade or buy a credit pack on Billing.'
+            : 'Upgrade required for this feature.',
         'error'
       );
       setLoading(false);
+      invalidateCreditQueries(qc);
       return;
     }
     if (!res.ok) {
@@ -93,6 +99,7 @@ export function GenerateCoverLetterForm() {
     const text = data.coverLetter?.trim() ?? '';
     setStreaming(text);
     setLoading(false);
+    invalidateCreditQueries(qc);
 
     if (text && canAccessFeature(tier, 'atsAccess')) {
       try {

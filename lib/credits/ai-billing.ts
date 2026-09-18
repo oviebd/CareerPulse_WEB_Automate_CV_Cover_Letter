@@ -1,10 +1,6 @@
-import {
-  calculateCreditsFromTokens,
-  estimateCreditsFromPrompt,
-  toRuleSnapshot,
-} from '@/lib/credits/calculator';
+import { calculateCreditsFromTokens, toRuleSnapshot } from '@/lib/credits/calculator';
+import { estimateReservationCredits } from '@/lib/credits/reservation';
 import { getCreditsRepo } from '@/lib/db/repositories/credits';
-import { getCharsPerToken } from '@/lib/ai/token-estimate';
 import { assertFeatureAccess, FeatureDisabledError } from '@/lib/access/user-permissions';
 import { Feature } from '@/lib/access/feature-flags';
 import type { CreditRuleInput } from '@/lib/credits/calculator';
@@ -95,15 +91,10 @@ export async function withCreditBilling<T>(opts: {
 
   const repo = getCreditsRepo();
   const rule = await repo.getActiveRule();
-  const typicalOutputTokens = Math.min(
-    opts.maxOutputTokens,
-    Math.max(256, Math.round(opts.maxOutputTokens * 0.4))
-  );
-  const estimated = estimateCreditsFromPrompt(
+  const estimated = estimateReservationCredits(
     opts.inputText,
-    typicalOutputTokens,
-    rule,
-    getCharsPerToken()
+    opts.maxOutputTokens,
+    rule as CreditRuleInput
   );
 
   let reservationId = '';

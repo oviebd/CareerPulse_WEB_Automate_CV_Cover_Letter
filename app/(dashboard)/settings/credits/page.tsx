@@ -40,11 +40,12 @@ export default function CreditsSettingsPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-[var(--color-text-primary)]">AI Credits</h1>
+        <h1 className="text-2xl font-semibold text-[var(--color-text-primary)]">Usage ledger</h1>
         <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-          AI features consume credits based on token usage. Need Premium templates?{' '}
+          Your plan limits tailored CVs, letters, and interview prep. This ledger is the internal safety
+          wallet for AI usage.{' '}
           <Link href="/settings/billing" className="text-[var(--color-primary)] hover:underline">
-            Upgrade or apply a promo code
+            Upgrade or buy action packs
           </Link>
           .
         </p>

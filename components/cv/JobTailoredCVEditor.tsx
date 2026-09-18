@@ -1146,6 +1146,7 @@ export function JobTailoredCVEditor() {
             label="Export"
             busyFormat={exportingFormat}
             disabled={!allowed || !draft || !selectedTemplateId}
+            canExport={canAccessFeature(tier, 'pdfExport')}
             canDocx={canAccessFeature(tier, 'docxExport')}
             onExport={(format) => {
               void exportPdf(format);

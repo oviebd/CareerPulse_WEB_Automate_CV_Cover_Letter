@@ -3,6 +3,8 @@ import { getSessionUser } from '@/lib/auth/session';
 import { rateLimitHit } from '@/lib/rate-limit';
 import { assertFeatureAccess, FeatureDisabledError, featureDisabledMessage } from '@/lib/access/user-permissions';
 import { Feature } from '@/lib/access/feature-flags';
+import { getProfilesRepo } from '@/lib/db/repositories/profiles';
+import { hasPremiumAccess } from '@/lib/access/premium';
 
 export const runtime = 'nodejs';
 
@@ -18,6 +20,14 @@ export async function requireInterviewAccess(userId: string) {
       );
     }
     return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 });
+  }
+
+  const profile = await getProfilesRepo().getById(userId);
+  if (!hasPremiumAccess(profile)) {
+    return NextResponse.json(
+      { error: 'Interview prep is available on Pro.', code: 'PRO_REQUIRED' },
+      { status: 403 }
+    );
   }
 
   if (rateLimitHit(`interview:${userId}`)) {

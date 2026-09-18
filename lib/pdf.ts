@@ -196,6 +196,9 @@ export async function exportCV(
     cvData.personal.fullName ?? cvRow?.full_name ?? 'untitled'
   );
   const filename = `cv-${nameSlug}-${normalizedId}.${format === 'docx' ? 'docx' : 'pdf'}`;
+  if (format === 'pdf' && !canAccessFeature(tier, 'pdfExport')) {
+    throw new Error('PDF_FORBIDDEN');
+  }
   if (format === 'docx') {
     if (!canAccessFeature(tier, 'docxExport')) {
       throw new Error('DOCX_FORBIDDEN');

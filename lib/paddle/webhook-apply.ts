@@ -17,7 +17,12 @@ import { userIdFromCustomData } from '@/lib/paddle/custom-data';
 import { paddleLog } from '@/lib/paddle/log';
 import { shouldSkipStaleEvent, subscriptionNotificationToLocalState } from '@/lib/paddle/map-status';
 import { planKeyFromPriceId } from '@/lib/paddle/plans';
+import { packKeyFromPriceId } from '@/lib/paddle/packs';
 import { webhookApplyKind } from '@/lib/paddle/webhook-handlers';
+import {
+  applyCreditPackGrant,
+  grantProSubscriptionSafetyCredits,
+} from '@/lib/credits/paddle-grants';
 
 type Tx = Parameters<Parameters<ReturnType<typeof getDb>['transaction']>[0]>[0];
 
@@ -194,6 +199,18 @@ async function applyTransaction(
     await tx.update(payments).set(patch).where(eq(payments.tranId, txEntity.id));
   } else {
     await tx.insert(payments).values(patch);
+  }
+
+  if (status !== 'success') return;
+
+  const packKey = packKeyFromPriceId(priceId);
+  if (packKey) {
+    await applyCreditPackGrant(userId, packKey, txEntity.id);
+    return;
+  }
+
+  if (planKeyFromPriceId(priceId)) {
+    await grantProSubscriptionSafetyCredits(userId, txEntity.id);
   }
 }
 

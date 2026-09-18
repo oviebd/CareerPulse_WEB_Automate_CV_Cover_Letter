@@ -15,7 +15,7 @@ import type {
 } from '@/types';
 import { roundCredits, type CreditRuleInput } from '@/lib/credits/calculator';
 
-const DEFAULT_INITIAL_CREDITS = 150;
+const DEFAULT_INITIAL_CREDITS = 50;
 
 function asCredit(value: unknown): number {
   return roundCredits(Number(value ?? 0));

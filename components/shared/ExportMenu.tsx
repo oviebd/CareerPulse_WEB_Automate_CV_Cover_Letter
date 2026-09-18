@@ -9,6 +9,8 @@ export interface ExportMenuProps {
   /** Current export in flight ('pdf' | 'docx' | null) for the loading state. */
   busyFormat: ExportFormat | null;
   disabled?: boolean;
+  /** When false, export control is hidden (preview remains available elsewhere). */
+  canExport?: boolean;
   /** Free tier sees the DOCX option but gets an upgrade toast on click. */
   canDocx: boolean;
   onExport: (format: ExportFormat) => void;
@@ -25,6 +27,7 @@ export interface ExportMenuProps {
 export function ExportMenu({
   busyFormat,
   disabled,
+  canExport = true,
   canDocx,
   onExport,
   label = 'Export',
@@ -50,6 +53,8 @@ export function ExportMenu({
   }, [open]);
 
   const busy = busyFormat !== null;
+
+  if (!canExport) return null;
 
   const items: { format: ExportFormat; label: string; icon: typeof FileDown }[] = [
     { format: 'pdf', label: 'PDF', icon: FileDown },

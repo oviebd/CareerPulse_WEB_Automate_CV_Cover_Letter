@@ -3,6 +3,7 @@ import { getAiUsageContext, type AiUsageCategory } from '@/lib/ai/usage-context'
 import { calculateCreditsFromTokens, toRuleSnapshot } from '@/lib/credits/calculator';
 import { getCreditsRepo } from '@/lib/db/repositories/credits';
 import { getAiUsageRepo } from '@/lib/db/repositories/ai-usage';
+import { computeAnthropicUsdCost } from '@/lib/ai/anthropic-pricing';
 
 export type RecordAiUsageInput = {
   inputText: string;
@@ -19,6 +20,10 @@ export type RecordAiUsageInput = {
   feature?: string;
   creditsConsumed?: number;
   requestId?: string;
+  cacheCreationInputTokens?: number;
+  cacheReadInputTokens?: number;
+  usdCost?: number;
+  pricingRates?: Record<string, number>;
 };
 
 export async function recordAiUsage(input: RecordAiUsageInput): Promise<string | null> {
@@ -40,10 +45,26 @@ export async function recordAiUsage(input: RecordAiUsageInput): Promise<string |
     const charsPerToken = getCharsPerToken();
     const inputChars = input.inputText.length;
     const outputChars = input.outputText.length;
-    const inputTokens =
-      input.inputTokens ?? estimateTokensFromText(input.inputText, charsPerToken);
-    const outputTokens =
-      input.outputTokens ?? estimateTokensFromText(input.outputText, charsPerToken);
+
+    let inputTokens: number;
+    let outputTokens: number;
+    if (input.tokenSource === 'api') {
+      if (
+        input.inputTokens == null ||
+        input.outputTokens == null ||
+        !Number.isFinite(input.inputTokens) ||
+        !Number.isFinite(input.outputTokens)
+      ) {
+        throw new Error('recordAiUsage: tokenSource api requires inputTokens and outputTokens');
+      }
+      inputTokens = Math.max(0, Math.floor(input.inputTokens));
+      outputTokens = Math.max(0, Math.floor(input.outputTokens));
+    } else {
+      inputTokens =
+        input.inputTokens ?? estimateTokensFromText(input.inputText, charsPerToken);
+      outputTokens =
+        input.outputTokens ?? estimateTokensFromText(input.outputText, charsPerToken);
+    }
 
     let creditsConsumed = input.creditsConsumed ?? 0;
     let ruleVersionId: string | null = null;
@@ -58,6 +79,24 @@ export async function recordAiUsage(input: RecordAiUsageInput): Promise<string |
     }
 
     const feature = input.feature ?? `${category}:${operation}`;
+
+    const metadata: Record<string, unknown> = {};
+    if (ruleSnapshot) metadata.rule_snapshot = ruleSnapshot;
+
+    let usdCost = input.usdCost;
+    let pricingRates = input.pricingRates;
+    if (usdCost == null && input.model) {
+      const computed = computeAnthropicUsdCost({
+        model: input.model,
+        inputTokens,
+        outputTokens,
+        cacheCreationInputTokens: input.cacheCreationInputTokens,
+        cacheReadInputTokens: input.cacheReadInputTokens,
+      });
+      usdCost = computed.usd;
+      pricingRates = pricingRates ?? computed.rates;
+    }
+    if (pricingRates) metadata.pricing = pricingRates;
 
     const row = await getAiUsageRepo().insertEvent({
       user_id: userId,
@@ -77,7 +116,10 @@ export async function recordAiUsage(input: RecordAiUsageInput): Promise<string |
       credits_consumed: creditsConsumed,
       credit_rule_version: ruleVersionId,
       token_source: input.tokenSource ?? 'api',
-      metadata: ruleSnapshot ? { rule_snapshot: ruleSnapshot } : {},
+      cached_input_tokens: input.cacheReadInputTokens ?? 0,
+      cache_creation_input_tokens: input.cacheCreationInputTokens ?? 0,
+      usd_cost: usdCost ?? 0,
+      metadata,
     });
 
     return (row?.id as string | undefined) ?? null;

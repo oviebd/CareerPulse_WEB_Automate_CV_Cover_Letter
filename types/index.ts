@@ -25,6 +25,8 @@ export type CreditTransactionType =
   | 'admin_grant'
   | 'admin_adjust'
   | 'promo_grant'
+  | 'subscription_grant'
+  | 'credit_purchase'
   | 'reservation'
   | 'reservation_release'
   | 'ai_usage'
@@ -556,7 +558,7 @@ export interface Payment {
   updated_at: string;
 }
 
-// Tier limits (V3: free gets CV builder + interview prep; AI is credit-gated)
+// Tier limits — AI volume is credit-gated; these flags gate UI/API features.
 export const TIER_LIMITS: Record<
   SubscriptionTier,
   {
@@ -566,10 +568,9 @@ export const TIER_LIMITS: Record<
     trackerAccess: boolean;
     atsAccess: boolean;
     atsAutoFix: boolean;
-    /** @deprecated AI extras are credit-gated for all users */
     aiExtrasAccess: boolean;
     docxExport: boolean;
-    /** @deprecated Interview prep is available to all authenticated users */
+    pdfExport: boolean;
     interviewPrep: boolean;
   }
 > = {
@@ -581,7 +582,8 @@ export const TIER_LIMITS: Record<
     atsAutoFix: false,
     aiExtrasAccess: true,
     docxExport: false,
-    interviewPrep: true,
+    pdfExport: false,
+    interviewPrep: false,
   },
   pro: {
     generationsPerMonth: Number.POSITIVE_INFINITY,
@@ -591,6 +593,7 @@ export const TIER_LIMITS: Record<
     atsAutoFix: true,
     aiExtrasAccess: true,
     docxExport: true,
+    pdfExport: true,
     interviewPrep: true,
   },
 };
@@ -598,14 +601,14 @@ export const TIER_LIMITS: Record<
 // Pricing (CareerPulse paid SKUs — Paddle price IDs live in lib/config/paddle.ts)
 export const PRICING = {
   pro_monthly: {
-    amount: 9.99,
+    amount: 7.99,
     period: 'monthly' as const,
     tier: 'pro' as SubscriptionTier,
     days: 30,
     label: 'Pro',
   },
   pro_yearly: {
-    amount: 89.99,
+    amount: 79.99,
     period: 'yearly' as const,
     tier: 'pro' as SubscriptionTier,
     days: 365,

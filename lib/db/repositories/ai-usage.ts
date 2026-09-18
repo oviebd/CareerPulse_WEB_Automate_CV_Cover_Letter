@@ -22,6 +22,9 @@ export type AiUsageEventInsert = {
   credits_consumed?: number;
   credit_rule_version?: string | null;
   token_source?: string;
+  cached_input_tokens?: number;
+  cache_creation_input_tokens?: number;
+  usd_cost?: number;
   metadata?: Record<string, unknown>;
 };
 
@@ -47,6 +50,9 @@ async function insertEvent(event: AiUsageEventInsert) {
       creditsConsumed: String(roundCredits(event.credits_consumed ?? 0)),
       creditRuleVersion: event.credit_rule_version ?? null,
       tokenSource: event.token_source ?? 'api',
+      cachedInputTokens: event.cached_input_tokens ?? 0,
+      cacheCreationInputTokens: event.cache_creation_input_tokens ?? 0,
+      usdCost: String(event.usd_cost ?? 0),
       metadata: event.metadata ?? {},
     })
     .returning();
@@ -75,6 +81,8 @@ async function aggregateByCategory(userId: string) {
       input_chars: sql<number>`coalesce(sum(${aiUsageEvents.inputChars}), 0)`.mapWith(Number),
       output_chars: sql<number>`coalesce(sum(${aiUsageEvents.outputChars}), 0)`.mapWith(Number),
       event_count: sql<number>`count(*)`.mapWith(Number),
+      credits_consumed: sql<number>`coalesce(sum(${aiUsageEvents.creditsConsumed}), 0)`.mapWith(Number),
+      usd_cost: sql<number>`coalesce(sum(${aiUsageEvents.usdCost}), 0)`.mapWith(Number),
     })
     .from(aiUsageEvents)
     .where(eq(aiUsageEvents.userId, userId))
@@ -92,6 +100,8 @@ async function aggregateTotals(userId: string) {
       input_chars: sql<number>`coalesce(sum(${aiUsageEvents.inputChars}), 0)`.mapWith(Number),
       output_chars: sql<number>`coalesce(sum(${aiUsageEvents.outputChars}), 0)`.mapWith(Number),
       event_count: sql<number>`count(*)`.mapWith(Number),
+      credits_consumed: sql<number>`coalesce(sum(${aiUsageEvents.creditsConsumed}), 0)`.mapWith(Number),
+      usd_cost: sql<number>`coalesce(sum(${aiUsageEvents.usdCost}), 0)`.mapWith(Number),
     })
     .from(aiUsageEvents)
     .where(eq(aiUsageEvents.userId, userId));
@@ -101,6 +111,8 @@ async function aggregateTotals(userId: string) {
     input_chars: 0,
     output_chars: 0,
     event_count: 0,
+    credits_consumed: 0,
+    usd_cost: 0,
   };
 }
 

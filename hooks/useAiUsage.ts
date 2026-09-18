@@ -11,19 +11,35 @@ export type AiUsageBreakdownRow = {
   input_chars: number;
   output_chars: number;
   event_count: number;
+  credits_consumed: number;
+  usd_cost: number;
+};
+
+export type AiUsageRecentRow = {
+  id?: string;
+  category?: string;
+  operation?: string;
+  input_tokens?: number;
+  output_tokens?: number;
+  input_chars?: number;
+  output_chars?: number;
+  credits_consumed?: number | string;
+  usd_cost?: number | string;
+  created_at?: string;
 };
 
 export type AiUsageResponse = {
-  chars_per_token: number;
   totals: {
     input_tokens: number;
     output_tokens: number;
     input_chars: number;
     output_chars: number;
     event_count: number;
+    credits_consumed: number;
+    usd_cost: number;
   };
   breakdown: AiUsageBreakdownRow[];
-  recent: Array<Record<string, unknown>>;
+  recent: AiUsageRecentRow[];
 };
 
 export function useAiUsage() {

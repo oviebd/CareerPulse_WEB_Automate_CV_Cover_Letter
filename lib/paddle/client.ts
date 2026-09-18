@@ -1,8 +1,5 @@
 import { Environment, Paddle } from '@paddle/paddle-node-sdk';
-import {
-  assertPaddleServerConfig,
-  getPaddleServerConfig,
-} from '@/lib/config/paddle';
+import { assertPaddleApiKey, getPaddleServerConfig } from '@/lib/config/paddle';
 import { paddleLog } from '@/lib/paddle/log';
 
 let paddle: Paddle | null = null;
@@ -14,7 +11,7 @@ export function resetPaddleClient(): void {
 }
 
 export function getPaddleClient(): Paddle {
-  const config = assertPaddleServerConfig();
+  const config = assertPaddleApiKey();
   if (!paddle || cachedKey !== config.apiKey) {
     paddle = new Paddle(config.apiKey, {
       environment:

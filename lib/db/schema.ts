@@ -636,6 +636,25 @@ export const systemSettings = pgTable('system_settings', {
   updatedBy: uuid('updated_by').references(() => users.id, { onDelete: 'set null' }),
 });
 
+export const quotaUsage = pgTable(
+  'quota_usage',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    metric: text('metric').notNull(),
+    periodKey: text('period_key').notNull(),
+    used: integer('used').notNull().default(0),
+    bonus: integer('bonus').notNull().default(0),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('quota_usage_user_metric_period_uidx').on(t.userId, t.metric, t.periodKey),
+    index('quota_usage_user_metric_idx').on(t.userId, t.metric, t.periodKey),
+  ]
+);
+
 export const promoCodes = pgTable('promo_codes', {
   id: uuid('id').primaryKey().defaultRandom(),
   code: text('code').notNull().unique(),
@@ -674,7 +693,10 @@ export const aiUsageEvents = pgTable(
       onDelete: 'set null',
     }),
     tokenSource: text('token_source').notNull().default('api'),
+    /** Anthropic cache_read_input_tokens */
     cachedInputTokens: integer('cached_input_tokens').notNull().default(0),
+    cacheCreationInputTokens: integer('cache_creation_input_tokens').notNull().default(0),
+    usdCost: decimal('usd_cost', { precision: 12, scale: 6 }).notNull().default('0'),
     metadata: jsonb('metadata').notNull().default({}),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },

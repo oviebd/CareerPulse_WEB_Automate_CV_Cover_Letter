@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/auth/session';
 import { BillingError, paddleUserMessage } from '@/lib/paddle/errors';
 import { PaddleConfigError } from '@/lib/config/paddle';
-import { createCheckoutPayload } from '@/lib/paddle/subscription-service';
+import { createCheckoutPayload, createPackCheckoutPayload } from '@/lib/paddle/subscription-service';
+import { isCreditPackKey } from '@/lib/paddle/packs';
 
 export async function POST(request: Request) {
   try {
@@ -10,7 +11,22 @@ export async function POST(request: Request) {
     if (!user) {
       return NextResponse.json({ error: paddleUserMessage('unauthorized') }, { status: 401 });
     }
-    const body = (await request.json()) as { plan?: string; billingInterval?: string };
+    const body = (await request.json()) as {
+      type?: 'subscription' | 'pack';
+      plan?: string;
+      billingInterval?: string;
+      pack?: string;
+    };
+
+    if (body.type === 'pack') {
+      const pack = body.pack ?? '';
+      if (!isCreditPackKey(pack)) {
+        return NextResponse.json({ error: 'Invalid pack.' }, { status: 400 });
+      }
+      const payload = await createPackCheckoutPayload(user, pack);
+      return NextResponse.json(payload);
+    }
+
     const payload = await createCheckoutPayload(
       user,
       body.plan ?? '',

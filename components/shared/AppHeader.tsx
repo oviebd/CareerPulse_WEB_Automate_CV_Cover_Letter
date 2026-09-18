@@ -18,6 +18,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ProfileMenu } from '@/components/shared/ProfileMenu';
 import { ThemeToggle } from '@/components/shared/ThemeToggle';
 import { AiUsageDebugButton } from '@/components/debug/AiUsageDebugButton';
+import { isAiUsageNavVisible } from '@/lib/ai/show-usage-client';
 import { cn } from '@/lib/utils';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useCredits } from '@/hooks/useCredits';
@@ -182,12 +183,16 @@ export function AppHeader() {
   const profile = useAuthStore((s) => s.profile);
   const { data: trackerBadge } = useTrackedJobsCount();
   const isFree = tier === 'free';
+  const showAiUsage = isAiUsageNavVisible(user?.role);
   const { mobileMenuOpen, setMobileMenuOpen, toggleMobileMenu, sidebarCollapsed, toggleSidebar } = useUIStore();
   const navRef = useRef<HTMLElement>(null);
 
   const visibleNav = nav.filter((item) => {
     if (item.href === '/documents' && profile?.can_create_documents === false) return false;
-    if (item.href === '/interview' && profile?.can_use_interview_prep === false) return false;
+    if (item.href === '/interview') {
+      if (profile?.can_use_interview_prep === false) return false;
+      if (tier !== 'pro') return false;
+    }
     return true;
   });
 
@@ -312,7 +317,7 @@ export function AppHeader() {
           </Link>
         </nav>
         <div className="shrink-0 space-y-3 border-t border-[var(--color-border)] p-3">
-          <AiUsageDebugButton collapsed={sidebarCollapsed} />
+          {showAiUsage ? <AiUsageDebugButton collapsed={sidebarCollapsed} /> : null}
           <ThemeToggle collapsed={sidebarCollapsed} />
           <div className="flex items-center justify-start">
             <ProfileMenu menuPlacement="above" />
@@ -403,7 +408,7 @@ export function AppHeader() {
                 </Link>
               </nav>
               <div className="border-t border-[var(--color-border)] px-3 pb-2 space-y-2">
-                <AiUsageDebugButton />
+                {showAiUsage ? <AiUsageDebugButton /> : null}
                 <ThemeToggle />
               </div>
             </motion.aside>

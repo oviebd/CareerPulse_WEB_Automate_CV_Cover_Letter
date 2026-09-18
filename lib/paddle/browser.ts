@@ -42,6 +42,11 @@ export function getBrowserPaddle(): Promise<Paddle | undefined> {
 
 export type CheckoutResult = 'completed' | 'closed' | 'error';
 
+function billingSuccessUrl(): string | undefined {
+  if (typeof window === 'undefined') return undefined;
+  return `${window.location.origin}/settings/billing`;
+}
+
 export async function openPaddleCheckout(input: {
   priceId: string;
   email: string;
@@ -52,6 +57,8 @@ export async function openPaddleCheckout(input: {
   if (!paddle) {
     throw new Error('Paddle failed to initialize');
   }
+
+  const successUrl = billingSuccessUrl();
 
   return new Promise((resolve, reject) => {
     let settled = false;
@@ -88,7 +95,10 @@ export async function openPaddleCheckout(input: {
         items: [{ priceId: input.priceId, quantity: 1 }],
         customData: input.customData,
         customer: input.customerId ? { id: input.customerId } : { email: input.email },
-        settings: { displayMode: 'overlay' },
+        settings: {
+          displayMode: 'overlay',
+          ...(successUrl ? { successUrl } : {}),
+        },
       });
     } catch (error) {
       reject(error);

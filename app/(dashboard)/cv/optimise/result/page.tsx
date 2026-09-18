@@ -27,6 +27,8 @@ import { useOptimiseEditDraftStore } from '@/stores/useOptimiseEditDraftStore';
 import { CoverLetterPrintPreviewFrame } from '@/components/cover-letter/CoverLetterPrintPreviewFrame';
 import { DocumentPrintPreviewFrame } from '@/components/shared/DocumentPrintPreviewFrame';
 import { ExportMenu } from '@/components/shared/ExportMenu';
+import { useSubscription } from '@/hooks/useSubscription';
+import { canAccessFeature } from '@/lib/subscription';
 import {
   downloadCvExport,
   exportCoverLetter,
@@ -45,6 +47,8 @@ const btnSecondarySm =
 export default function OptimiseResultPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const { tier } = useSubscription();
+  const canExportPdf = canAccessFeature(tier, 'pdfExport');
   const qc = useQueryClient();
   const draft = useOptimiseDraftStore((s) => s.draft);
   const setStoreDraft = useOptimiseDraftStore((s) => s.setDraft);
@@ -670,7 +674,8 @@ export default function OptimiseResultPage() {
                 {hasSavedCv ? (
                   <ExportMenu
                     busyFormat={downloadBusy ? 'pdf' : null}
-                    canDocx
+                    canExport={canExportPdf}
+                    canDocx={canExportPdf}
                     label="Download"
                     onExport={(format) => void handleDownloadCv(format)}
                   />
@@ -737,7 +742,8 @@ export default function OptimiseResultPage() {
                 {hasSavedCl ? (
                   <ExportMenu
                     busyFormat={downloadBusy ? 'pdf' : null}
-                    canDocx
+                    canExport={canExportPdf}
+                    canDocx={canExportPdf}
                     label="Download"
                     onExport={(format) => void handleDownloadCoverLetter(format)}
                   />

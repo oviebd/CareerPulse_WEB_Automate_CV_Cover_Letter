@@ -13,6 +13,8 @@ export type PaddlePublicConfig = {
   priceIds: {
     pro_monthly: string;
     pro_yearly: string;
+    pack_credits5: string;
+    pack_credits10: string;
   };
 };
 
@@ -41,6 +43,8 @@ export function getPaddlePublicConfig(): PaddlePublicConfig {
     priceIds: {
       pro_monthly: process.env.NEXT_PUBLIC_PADDLE_PRICE_PRO_MONTHLY?.trim() ?? '',
       pro_yearly: process.env.NEXT_PUBLIC_PADDLE_PRICE_PRO_YEARLY?.trim() ?? '',
+      pack_credits5: process.env.NEXT_PUBLIC_PADDLE_PRICE_PACK_CREDITS5?.trim() ?? '',
+      pack_credits10: process.env.NEXT_PUBLIC_PADDLE_PRICE_PACK_CREDITS10?.trim() ?? '',
     },
   };
 }
@@ -70,11 +74,16 @@ export function assertPaddlePublicConfig(config: PaddlePublicConfig = getPaddleP
   return config;
 }
 
-export function assertPaddleServerConfig(config: PaddleServerConfig = getPaddleServerConfig()): PaddleServerConfig {
+export function assertPaddleApiKey(config: PaddleServerConfig = getPaddleServerConfig()): PaddleServerConfig {
   assertPaddlePublicConfig(config);
   if (!config.apiKey) {
     throw new PaddleConfigError('missing_paddle_api_key');
   }
+  return config;
+}
+
+export function assertPaddleServerConfig(config: PaddleServerConfig = getPaddleServerConfig()): PaddleServerConfig {
+  assertPaddleApiKey(config);
   if (!config.webhookSecret) {
     throw new PaddleConfigError('missing_paddle_webhook_secret');
   }

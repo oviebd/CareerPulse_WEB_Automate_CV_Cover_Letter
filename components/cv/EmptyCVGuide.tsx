@@ -101,12 +101,14 @@ export function ExportReadyNudge({
   onExport,
   exportDisabled,
   busyFormat,
+  canExport,
   canDocx,
 }: {
   completion: number;
   onExport?: (format: ExportFormat) => void;
   exportDisabled?: boolean;
   busyFormat?: ExportFormat | null;
+  canExport?: boolean;
   canDocx?: boolean;
 }) {
   if (completion < 80 || !onExport) return null;
@@ -125,6 +127,7 @@ export function ExportReadyNudge({
           fullWidth
           busyFormat={busyFormat ?? null}
           disabled={exportDisabled}
+          canExport={canExport ?? true}
           canDocx={canDocx ?? false}
           onExport={onExport}
         />

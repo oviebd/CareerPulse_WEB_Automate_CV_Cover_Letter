@@ -9,7 +9,7 @@ import {
 import { generateCoverLetterDocx } from '@/lib/cover-letter-docx';
 import { exportCV, generatePDF } from '@/lib/pdf';
 import { canAccessFeature } from '@/lib/subscription';
-import { effectiveAccessTier } from '@/lib/access/premium';
+import { effectiveAccessTier, hasPremiumAccess } from '@/lib/access/premium';
 import { assertTemplateAccess } from '@/lib/templates/access';
 import { rateLimitHit } from '@/lib/rate-limit';
 import { CL_TEMPLATE_IDS } from '@/src/config/templateConfig';
@@ -70,7 +70,13 @@ export async function POST(request: Request) {
 
     const format = body.format ?? 'pdf';
 
+    const profile = await getProfilesRepo().getById(user.id);
+    const tier = effectiveAccessTier(profile);
+
     if (body.type === 'cv') {
+      if (!hasPremiumAccess(profile)) {
+        return NextResponse.json({ error: 'export_upgrade_required' }, { status: 403 });
+      }
       const accent = body.accent_color ?? body.primaryColor ?? '#6C63FF';
 
       if (body.job_cv_id) {
@@ -232,6 +238,10 @@ export async function POST(request: Request) {
       }
     }
 
+    if (!hasPremiumAccess(profile)) {
+      return NextResponse.json({ error: 'export_upgrade_required' }, { status: 403 });
+    }
+
     const templateId = body.template_id ?? body.templateId;
     if (!body.id || !templateId) {
       return NextResponse.json({ error: 'invalid_body' }, { status: 400 });
@@ -240,9 +250,6 @@ export async function POST(request: Request) {
     if (!(CL_TEMPLATE_IDS as readonly string[]).includes(templateId)) {
       return NextResponse.json({ error: 'invalid_template' }, { status: 400 });
     }
-
-    const profile = await getProfilesRepo().getById(user.id);
-    const tier = effectiveAccessTier(profile);
     try {
       await assertTemplateAccess(templateId, tier);
     } catch {

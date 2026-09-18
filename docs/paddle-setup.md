@@ -41,8 +41,8 @@ On that product, create two recurring prices:
 
 | CareerPulse plan | Billing cycle | Suggested amount |
 | ---------------- | ------------- | ---------------- |
-| Pro Monthly      | month         | USD 9.99         |
-| Pro Yearly       | year          | USD 89.99        |
+| Pro Monthly      | month         | USD 7.99         |
+| Pro Yearly       | year          | USD 79.99        |
 
 
 Optional: add a trial on the Paddle price (CareerPulse does not implement a separate frontend trial timer).
@@ -55,6 +55,24 @@ NEXT_PUBLIC_PADDLE_PRICE_PRO_YEARLY=pri_...
 ```
 
 Never put `pri_...` in React components. The server maps `plan=pro` + `billingInterval=monthly|yearly` to these IDs.
+
+### One-time credit packs
+
+Create two **one-time** prices on the same product (or separate products):
+
+| Pack | Amount | Credits granted (app) |
+| ---- | ------ | --------------------- |
+| credits5 | USD 5 | 300 |
+| credits10 | USD 10 | 650 |
+
+```text
+NEXT_PUBLIC_PADDLE_PRICE_PACK_CREDITS5=pri_...
+NEXT_PUBLIC_PADDLE_PRICE_PACK_CREDITS10=pri_...
+```
+
+Credits are granted by the app on `transaction.completed`, not by Paddle line items.
+
+Checkout: `POST /api/billing/checkout` with `{ "type": "pack", "pack": "credits5" | "credits10" }`.
 
 ---
 
@@ -132,8 +150,10 @@ Overlay checkout returns **400** (`transaction_default_checkout_url_not_set`) un
 
 Paddle Dashboard → **Checkout** → **Checkout settings** → **Default payment link**:
 
-- Sandbox local: `http://localhost:3000`
+- Sandbox local: **`http://localhost:3000`** (include the port — `http://localhost` alone breaks overlay checkout when the app runs on port 3000)
 - Production: the same HTTPS origin as `NEXT_PUBLIC_APP_URL`
+
+`NEXT_PUBLIC_APP_URL` should match the URL in your browser (e.g. `http://localhost:3000`). Checkout uses Paddle.js overlay with your dashboard default payment link — it must use the **same origin** (including port).
 
 Sandbox: [https://sandbox-vendors.paddle.com/checkout-settings](https://sandbox-vendors.paddle.com/checkout-settings)
 
