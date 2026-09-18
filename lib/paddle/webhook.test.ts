@@ -4,7 +4,7 @@ import { Environment, EventName, Paddle } from '@paddle/paddle-node-sdk';
 import { interpretWebhookInsert } from '@/lib/db/repositories/paddle-webhook-events';
 import { BillingError } from '@/lib/paddle/errors';
 import { handlePaddleWebhook } from '@/lib/paddle/webhook-service';
-import { resolveWebhookUserId, webhookApplyKind } from '@/lib/paddle/webhook-handlers';
+import { resolveWebhookUserId, priceIdFromPaddleItems, webhookApplyKind } from '@/lib/paddle/webhook-handlers';
 
 function sign(body: string, secret: string) {
   const ts = Math.floor(Date.now() / 1000);
@@ -115,5 +115,21 @@ describe('paddle webhook user resolution', () => {
         paddleCustomerUserId: null,
       })
     ).toBeNull();
+  });
+});
+
+describe('paddle transaction price id', () => {
+  it('reads nested price.id', () => {
+    expect(priceIdFromPaddleItems([{ price: { id: 'pri_nested' } }])).toBe('pri_nested');
+  });
+
+  it('falls back to item.priceId when price is omitted', () => {
+    expect(priceIdFromPaddleItems([{ priceId: 'pri_item', price: null }])).toBe('pri_item');
+  });
+
+  it('skips empty items and returns null when none have a price', () => {
+    expect(priceIdFromPaddleItems([])).toBeNull();
+    expect(priceIdFromPaddleItems([{ price: null, priceId: null }])).toBeNull();
+    expect(priceIdFromPaddleItems(null)).toBeNull();
   });
 });

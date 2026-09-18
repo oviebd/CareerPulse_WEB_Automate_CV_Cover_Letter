@@ -1,5 +1,7 @@
 import { getCreditsRepo } from '@/lib/db/repositories/credits';
-import { CREDIT_PACKS, type CreditPackKey } from '@/lib/paddle/packs';
+import { paddleLog } from '@/lib/paddle/log';
+import { CREDIT_PACKS, packKeyFromPriceId, type CreditPackKey } from '@/lib/paddle/packs';
+import { planKeyFromPriceId } from '@/lib/paddle/plans';
 import type { CreditTransactionType } from '@/types';
 
 export const PRO_SUBSCRIPTION_SAFETY_CREDITS = 700;
@@ -64,5 +66,43 @@ export async function grantProSubscriptionSafetyCredits(
     amount: PRO_SUBSCRIPTION_SAFETY_CREDITS,
     type: 'subscription_grant',
     detail: 'Pro monthly safety credits',
+  });
+}
+
+export async function grantCreditsForCompletedPaddleTransaction(input: {
+  userId: string;
+  priceId: string | null;
+  paddleTransactionId: string;
+  eventId: string;
+}): Promise<void> {
+  const packKey = packKeyFromPriceId(input.priceId);
+  if (packKey) {
+    const granted = await applyCreditPackGrant(input.userId, packKey, input.paddleTransactionId);
+    paddleLog('paddle_webhook_processed', {
+      eventId: input.eventId,
+      userId: input.userId,
+      result: granted ? 'credit_pack_granted' : 'credit_pack_already_granted',
+      packKey,
+    });
+    return;
+  }
+
+  const planKey = planKeyFromPriceId(input.priceId);
+  if (planKey) {
+    const granted = await grantProSubscriptionSafetyCredits(input.userId, input.paddleTransactionId);
+    paddleLog('paddle_webhook_processed', {
+      eventId: input.eventId,
+      userId: input.userId,
+      result: granted ? 'subscription_credits_granted' : 'subscription_credits_already_granted',
+      plan: planKey,
+    });
+    return;
+  }
+
+  paddleLog('paddle_webhook_processed', {
+    eventId: input.eventId,
+    userId: input.userId,
+    result: 'unknown_price',
+    priceId: input.priceId,
   });
 }

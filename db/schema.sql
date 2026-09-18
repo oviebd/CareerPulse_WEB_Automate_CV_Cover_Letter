@@ -305,6 +305,7 @@ CREATE TABLE IF NOT EXISTS credit_transactions (
   user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   type TEXT NOT NULL CHECK (type IN (
     'initial_grant', 'admin_grant', 'admin_adjust', 'promo_grant',
+    'subscription_grant', 'credit_purchase',
     'reservation', 'reservation_release', 'ai_usage', 'refund'
   )),
   amount NUMERIC(12, 4) NOT NULL,

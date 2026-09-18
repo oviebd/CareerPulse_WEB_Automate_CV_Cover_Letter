@@ -48,6 +48,7 @@ async function main() {
     join(process.cwd(), 'db/migrations/040_ai_usage_cost.sql'),
     join(process.cwd(), 'db/migrations/041_quota_usage.sql'),
     join(process.cwd(), 'db/migrations/042_backfill_ai_usage_usd_cost.sql'),
+    join(process.cwd(), 'db/migrations/043_credit_purchase_types.sql'),
   ];
   const db = postgres(url, { max: 1 });
 

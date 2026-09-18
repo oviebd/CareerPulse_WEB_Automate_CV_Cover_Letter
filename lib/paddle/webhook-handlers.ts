@@ -28,6 +28,23 @@ export function webhookApplyKind(eventType: string): WebhookApplyKind {
   return 'ignored';
 }
 
+export function priceIdFromPaddleItems(
+  items:
+    | ReadonlyArray<{
+        priceId?: string | null;
+        price?: { id?: string | null } | null;
+      }>
+    | null
+    | undefined
+): string | null {
+  if (!items) return null;
+  for (const item of items) {
+    const id = item.price?.id || item.priceId;
+    if (id) return id;
+  }
+  return null;
+}
+
 export function resolveWebhookUserId(params: {
   customUserId: string | null;
   customUserExists: boolean;

@@ -17,12 +17,8 @@ import { userIdFromCustomData } from '@/lib/paddle/custom-data';
 import { paddleLog } from '@/lib/paddle/log';
 import { shouldSkipStaleEvent, subscriptionNotificationToLocalState } from '@/lib/paddle/map-status';
 import { planKeyFromPriceId } from '@/lib/paddle/plans';
-import { packKeyFromPriceId } from '@/lib/paddle/packs';
-import { webhookApplyKind } from '@/lib/paddle/webhook-handlers';
-import {
-  applyCreditPackGrant,
-  grantProSubscriptionSafetyCredits,
-} from '@/lib/credits/paddle-grants';
+import { grantCreditsForCompletedPaddleTransaction } from '@/lib/credits/paddle-grants';
+import { priceIdFromPaddleItems, webhookApplyKind } from '@/lib/paddle/webhook-handlers';
 
 type Tx = Parameters<Parameters<ReturnType<typeof getDb>['transaction']>[0]>[0];
 
@@ -166,13 +162,24 @@ async function applyTransaction(
     return;
   }
 
-  const priceId = txEntity.items.find((item) => item.price?.id)?.price?.id ?? null;
-  const plan = planKeyFromPriceId(priceId) ?? 'pro_monthly';
+  const priceId = priceIdFromPaddleItems(txEntity.items);
+  if (status === 'success') {
+    await grantCreditsForCompletedPaddleTransaction({
+      userId,
+      priceId,
+      paddleTransactionId: txEntity.id,
+      eventId,
+    });
+  }
+
   const amount = paddleMinorToDecimal(
     txEntity.details?.totals?.grandTotal ?? txEntity.details?.totals?.total,
     txEntity.currencyCode
   );
-  if (amount == null || amount <= 0) return;
+  if (amount == null || amount <= 0) {
+    paddleLog('paddle_webhook_processed', { eventId, result: 'payment_skipped_amount' });
+    return;
+  }
 
   const existing = await tx
     .select({ id: payments.id })
@@ -189,7 +196,7 @@ async function applyTransaction(
     amount: String(amount),
     currency: txEntity.currencyCode,
     status,
-    plan,
+    plan: planKeyFromPriceId(priceId) ?? 'pro_monthly',
     billingPeriodStart: periodStart,
     billingPeriodEnd: periodEnd,
     gatewayResponse: { paddleTransactionId: txEntity.id, origin: txEntity.origin },
@@ -199,18 +206,6 @@ async function applyTransaction(
     await tx.update(payments).set(patch).where(eq(payments.tranId, txEntity.id));
   } else {
     await tx.insert(payments).values(patch);
-  }
-
-  if (status !== 'success') return;
-
-  const packKey = packKeyFromPriceId(priceId);
-  if (packKey) {
-    await applyCreditPackGrant(userId, packKey, txEntity.id);
-    return;
-  }
-
-  if (planKeyFromPriceId(priceId)) {
-    await grantProSubscriptionSafetyCredits(userId, txEntity.id);
   }
 }
 

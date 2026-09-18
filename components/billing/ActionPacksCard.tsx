@@ -19,6 +19,15 @@ type CheckoutResponse = {
   customData: Record<string, unknown>;
 };
 
+async function waitForCreditBalance(previous: number, minIncrease: number): Promise<boolean> {
+  for (let i = 0; i < 8; i += 1) {
+    const { balance } = await apiFetch<{ balance: number }>('/api/user/credits');
+    if (balance >= previous + minIncrease) return true;
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+  }
+  return false;
+}
+
 export function ActionPacksCard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -27,6 +36,7 @@ export function ActionPacksCard() {
   async function buy(pack: CreditPackKey) {
     setLoading(pack);
     try {
+      const before = await apiFetch<{ balance: number }>('/api/user/credits');
       const payload = await apiFetch<CheckoutResponse>('/api/billing/checkout', {
         method: 'POST',
         body: JSON.stringify({ type: 'pack', pack }),
@@ -42,8 +52,14 @@ export function ActionPacksCard() {
         toast('Checkout could not be completed. Please try again.', 'error');
         return;
       }
-      toast('Credits added to your account.', 'success');
+      toast('Payment received. Adding credits…', 'info');
+      const granted = await waitForCreditBalance(before.balance, CREDIT_PACKS[pack].credits);
       invalidateCreditQueries(queryClient);
+      if (granted) {
+        toast('Credits added to your account.', 'success');
+      } else {
+        toast('Payment received. Credits will appear in a moment.', 'info');
+      }
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Checkout failed.';
       toast(message, 'error');
