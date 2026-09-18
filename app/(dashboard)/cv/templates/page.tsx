@@ -10,7 +10,7 @@ import { useCvTemplates } from '@/hooks/useTemplates';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { FeatureGate, TemplateGate } from '@/components/shared/FeatureGate';
+import { useRequirePremium } from '@/hooks/useRequirePremium';
 import { ExportMenu } from '@/components/shared/ExportMenu';
 import { useCVProfile } from '@/hooks/useCV';
 import { useJobSpecificCV } from '@/hooks/useJobSpecificCVs';
@@ -83,6 +83,7 @@ function CVTemplatesPageContent() {
     jobCvId ?? ''
   );
   const { tier } = useSubscription();
+  const { requirePremium, openGoPremium } = useRequirePremium();
   const [color, setColor] = useState('#2563EB');
   const [exporting, setExporting] = useState<string | null>(null);
   const [draftActive, setDraftActive] = useState(false);
@@ -98,7 +99,7 @@ function CVTemplatesPageContent() {
 
   const { data: templates = [] } = useCvTemplates();
 
-  async function setPreferredTemplate(id: string) {
+  async function runSetPreferredTemplate(id: string) {
     if (!cv) {
       toast('Create your CV profile first.', 'error');
       return;
@@ -114,10 +115,20 @@ function CVTemplatesPageContent() {
     toast('Default template updated.', 'success');
   }
 
+  function setPreferredTemplate(id: string) {
+    const row = templates.find((t) => t.id === id);
+    const availableTiers = (row?.available_tiers ?? ['free', 'pro']) as SubscriptionTier[];
+    if (!canUseTemplate(availableTiers, tier)) {
+      openGoPremium('template');
+      return;
+    }
+    void runSetPreferredTemplate(id);
+  }
+
   const canDocx = canAccessFeature(tier, 'docxExport');
   const canExport = canAccessFeature(tier, 'pdfExport');
 
-  async function exportCv(templateId: string, format: ExportFormat = 'pdf') {
+  async function runExportCv(templateId: string, format: ExportFormat = 'pdf') {
     if (jobCvId) {
       if (!jobCv || jobCvLoading) return;
       setExporting(templateId);
@@ -131,7 +142,7 @@ function CVTemplatesPageContent() {
       );
       setExporting(null);
       if (result === 'upgrade_required') {
-        toast('DOCX export is a Pro feature. Upgrade to unlock.', 'error');
+        openGoPremium(format === 'docx' ? 'docx' : 'export');
       } else if (result === 'error') {
         toast('Export failed.', 'error');
       }
@@ -151,10 +162,29 @@ function CVTemplatesPageContent() {
     );
     setExporting(null);
     if (result === 'upgrade_required') {
-      toast('DOCX export is a Pro feature. Upgrade to unlock.', 'error');
+      openGoPremium(format === 'docx' ? 'docx' : 'export');
     } else if (result === 'error') {
       toast('Export failed.', 'error');
     }
+  }
+
+  function exportCv(templateId: string, format: ExportFormat = 'pdf') {
+    const row = templates.find((t) => t.id === templateId);
+    const availableTiers = (row?.available_tiers ?? ['free', 'pro']) as SubscriptionTier[];
+    const templateAllowed = canUseTemplate(availableTiers, tier);
+    if (!templateAllowed) {
+      openGoPremium('template');
+      return;
+    }
+    const needsExportPremium =
+      format === 'docx' ? !canDocx : !canExport;
+    if (needsExportPremium) {
+      requirePremium(format === 'docx' ? 'docx' : 'export', () => {
+        void runExportCv(templateId, format);
+      });
+      return;
+    }
+    void runExportCv(templateId, format);
   }
 
   const hasEditableCv = jobCvId
@@ -167,20 +197,18 @@ function CVTemplatesPageContent() {
       <p className="text-sm text-[var(--color-muted)]">
         Browse layouts with sample previews. Open a template to edit your CV with a live preview, then export PDF.
       </p>
-      <FeatureGate requiredTier={['pro']} userTier={tier}>
-        <div className="flex flex-wrap gap-2">
-          <span className="text-sm text-[var(--color-muted)]">Gallery accent:</span>
-          {SWATCHES.map((c) => (
-            <button
-              key={c}
-              type="button"
-              className="h-8 w-8 rounded-full border-2 border-white shadow ring-2 ring-transparent ring-offset-2"
-              style={{ background: c }}
-              onClick={() => setColor(c)}
-            />
-          ))}
-        </div>
-      </FeatureGate>
+      <div className="flex flex-wrap gap-2">
+        <span className="text-sm text-[var(--color-muted)]">Gallery accent:</span>
+        {SWATCHES.map((c) => (
+          <button
+            key={c}
+            type="button"
+            className="h-8 w-8 rounded-full border-2 border-white shadow ring-2 ring-transparent ring-offset-2"
+            style={{ background: c }}
+            onClick={() => setColor(c)}
+          />
+        ))}
+      </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {VISIBLE_TEMPLATE_IDS.map((tid) => {
           const cfg = TEMPLATE_CONFIGS[tid];
@@ -189,8 +217,6 @@ function CVTemplatesPageContent() {
           const description = row?.description ?? cfg.description;
           const category = row?.category ?? cfg.layout;
           const isPremium = row ? row.is_premium : false;
-          const availableTiers = (row?.available_tiers ?? ['free', 'pro']) as SubscriptionTier[];
-          const allowed = canUseTemplate(availableTiers, tier);
           return (
             <Card key={tid} padding="none" className="flex flex-col overflow-hidden">
               <TemplatePreviewThumb templateId={tid} accent={cfg.templateAccent ?? color} name={name} />
@@ -203,7 +229,7 @@ function CVTemplatesPageContent() {
                     </Badge>
                   </div>
                   {isPremium ? (
-                    <Badge variant="warning">Pro+</Badge>
+                    <Badge variant="warning">Premium</Badge>
                   ) : (
                     <Badge variant="success">Free</Badge>
                   )}
@@ -232,40 +258,35 @@ function CVTemplatesPageContent() {
                   >
                     Preview &amp; edit
                   </Link>
-                  <TemplateGate
-                    availableTiers={availableTiers}
-                    userTier={tier}
-                  >
-                    <div className="flex flex-wrap gap-2">
-                      {!jobCvId ? (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          disabled={!cv || !allowed || draftActive}
-                          onClick={() => void setPreferredTemplate(tid)}
-                        >
-                          Use as default
-                        </Button>
-                      ) : null}
+                  <div className="flex flex-wrap gap-2">
+                    {!jobCvId ? (
                       <Button
                         variant="secondary"
                         size="sm"
-                        loading={exporting === tid}
-                        disabled={!hasEditableCv || !allowed || (!jobCvId && draftActive)}
-                        onClick={() => void exportCv(tid, 'pdf')}
+                        disabled={!cv || draftActive}
+                        onClick={() => setPreferredTemplate(tid)}
                       >
-                        Export PDF
+                        Use as default
                       </Button>
-                      <ExportMenu
-                        busyFormat={exporting === tid ? 'pdf' : null}
-                        disabled={!hasEditableCv || !allowed || (!jobCvId && draftActive)}
-                        canExport={canExport}
-                        canDocx={canDocx}
-                        label="Export DOCX"
-                        onExport={(format) => void exportCv(tid, format)}
-                      />
-                    </div>
-                  </TemplateGate>
+                    ) : null}
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      loading={exporting === tid}
+                      disabled={!hasEditableCv || (!jobCvId && draftActive)}
+                      onClick={() => exportCv(tid, 'pdf')}
+                    >
+                      Export PDF
+                    </Button>
+                    <ExportMenu
+                      busyFormat={exporting === tid ? 'pdf' : null}
+                      disabled={!hasEditableCv || (!jobCvId && draftActive)}
+                      canExport={canExport}
+                      canDocx={canDocx}
+                      label="Export DOCX"
+                      onExport={(format) => exportCv(tid, format)}
+                    />
+                  </div>
                 </div>
               </div>
             </Card>

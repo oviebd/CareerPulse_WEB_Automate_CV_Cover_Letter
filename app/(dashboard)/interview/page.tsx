@@ -13,9 +13,11 @@ import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/components/ui/toast';
 import { PrepareJobModal } from '@/components/interview/PrepareJobModal';
 import { DeleteInterviewProfileButton } from '@/components/interview/DeleteInterviewProfileButton';
+import { PremiumLabel } from '@/components/shared/PremiumLabel';
+import { useRequirePremium } from '@/hooks/useRequirePremium';
 import { useInterviewDashboard, useStartInterview } from '@/hooks/useInterview';
-import { useSubscription } from '@/hooks/useSubscription';
 import { ApiError } from '@/lib/api-fetch';
+import { isInterviewPremiumRequiredError } from '@/lib/interview/premium-gate-client';
 import { AiWorkingOverlay } from '@/components/shared/AiWorkingOverlay';
 import { isTopicPrepProfile } from '@/lib/interview/topic-config';
 import {
@@ -63,10 +65,50 @@ function JobStatusBadge({ status }: { status: JobStatus }) {
   );
 }
 
+function PrepStartCard({
+  href,
+  icon: Icon,
+  title,
+  description,
+  onLockedClick,
+}: {
+  href: string;
+  icon: typeof Briefcase;
+  title: string;
+  description: string;
+  onLockedClick: () => void;
+}) {
+  const { isPremium } = useRequirePremium();
+  const inner = (
+    <Card hoverable className="flex h-full flex-col gap-3 p-5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--color-primary-100)]">
+          <Icon className="h-5 w-5 text-[var(--color-primary)]" />
+        </div>
+        {!isPremium ? <PremiumLabel /> : null}
+      </div>
+      <div>
+        <p className="font-semibold text-[var(--color-text-primary)]">{title}</p>
+        <p className="mt-1 text-sm text-[var(--color-muted)]">{description}</p>
+      </div>
+    </Card>
+  );
+
+  if (isPremium) {
+    return <Link href={href}>{inner}</Link>;
+  }
+
+  return (
+    <button type="button" className="w-full text-left" onClick={onLockedClick}>
+      {inner}
+    </button>
+  );
+}
+
 export default function InterviewListPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const { limits } = useSubscription();
+  const { isPremium, requirePremium, openGoPremium } = useRequirePremium();
   const { data, isLoading } = useInterviewDashboard();
   const start = useStartInterview();
 
@@ -85,20 +127,26 @@ export default function InterviewListPage() {
         router.push(`/interview/${profileId}`);
       }
     } catch (e) {
+      if (isInterviewPremiumRequiredError(e)) {
+        openGoPremium('interview');
+        return;
+      }
       toast(interviewErrorMessage(e), 'error');
     }
   }
 
   function handlePrepare(job: EligibleInterviewJob) {
-    if (!job.has_cv) {
-      toast('Create a CV in Documents before starting interview preparation.', 'error');
-      return;
-    }
-    if (job.needs_job_context) {
-      setModalJob(job);
-      return;
-    }
-    void runStart({ job_id: job.id });
+    requirePremium('interview', () => {
+      if (!job.has_cv) {
+        toast('Create a CV in Documents before starting interview preparation.', 'error');
+        return;
+      }
+      if (job.needs_job_context) {
+        setModalJob(job);
+        return;
+      }
+      void runStart({ job_id: job.id });
+    });
   }
 
   const showEmpty = !isLoading && profiles.length === 0 && eligibleJobs.length === 0;
@@ -118,44 +166,22 @@ export default function InterviewListPage() {
         title="Interview Preparation"
         subtitle="Prepare for a specific job or build skills by topic"
       />
-      {limits.interviewPrep ? (
-        <section className="grid gap-3 sm:grid-cols-2">
-          <Link href="/interview/new">
-            <Card hoverable className="flex h-full flex-col gap-3 p-5">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--color-primary-100)]">
-                <Briefcase className="h-5 w-5 text-[var(--color-primary)]" />
-              </div>
-              <div>
-                <p className="font-semibold text-[var(--color-text-primary)]">Prepare for a job</p>
-                <p className="mt-1 text-sm text-[var(--color-muted)]">
-                  Match your CV to a role and get tailored interview prep
-                </p>
-              </div>
-            </Card>
-          </Link>
-          <Link href="/interview/new/topic">
-            <Card hoverable className="flex h-full flex-col gap-3 p-5">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--color-primary-100)]">
-                <BookOpen className="h-5 w-5 text-[var(--color-primary)]" />
-              </div>
-              <div>
-                <p className="font-semibold text-[var(--color-text-primary)]">Prepare by topic</p>
-                <p className="mt-1 text-sm text-[var(--color-muted)]">
-                  Choose topics and goals — no CV or job application needed
-                </p>
-              </div>
-            </Card>
-          </Link>
-        </section>
-      ) : (
-        <Card className="p-4 text-center">
-          <Link href="/settings/billing">
-            <Button variant="secondary" size="sm">
-              Upgrade for interview prep
-            </Button>
-          </Link>
-        </Card>
-      )}
+      <section className="grid gap-3 sm:grid-cols-2">
+        <PrepStartCard
+          href="/interview/new"
+          icon={Briefcase}
+          title="Prepare for a job"
+          description="Match your CV to a role and get tailored interview prep"
+          onLockedClick={() => openGoPremium('interview')}
+        />
+        <PrepStartCard
+          href="/interview/new/topic"
+          icon={BookOpen}
+          title="Prepare by topic"
+          description="Choose topics and goals — no CV or job application needed"
+          onLockedClick={() => openGoPremium('interview')}
+        />
+      </section>
 
       {isLoading ? (
         <Skeleton className="h-32 rounded-xl" />
@@ -224,16 +250,17 @@ export default function InterviewListPage() {
                       </p>
                     ) : null}
                   </div>
-                  {limits.interviewPrep ? (
-                    <Button
-                      size="sm"
-                      variant="primary"
-                      loading={start.isPending}
-                      onClick={() => void handlePrepare(job)}
-                    >
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    loading={start.isPending}
+                    onClick={() => handlePrepare(job)}
+                  >
+                    <span className="inline-flex items-center gap-2">
                       {start.isPending ? 'Finding topics…' : 'Prepare'}
-                    </Button>
-                  ) : null}
+                      {!isPremium ? <PremiumLabel className="normal-case" /> : null}
+                    </span>
+                  </Button>
                 </Card>
               ))}
             </section>
@@ -248,26 +275,31 @@ export default function InterviewListPage() {
               <p className="mt-1 text-sm text-[var(--color-muted)]">
                 Start with a job from your applications or prepare by topic above.
               </p>
-              {limits.interviewPrep ? (
-                <div className="mt-4 flex flex-wrap justify-center gap-2">
-                  <Link href="/interview/new">
-                    <Button variant="primary">
+              <div className="mt-4 flex flex-wrap justify-center gap-2">
+                {isPremium ? (
+                  <>
+                    <Link href="/interview/new">
+                      <Button variant="primary">
+                        <Plus className="mr-1.5 h-4 w-4" />
+                        Job preparation
+                      </Button>
+                    </Link>
+                    <Link href="/interview/new/topic">
+                      <Button variant="secondary">Topic preparation</Button>
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    <Button variant="primary" onClick={() => openGoPremium('interview')}>
                       <Plus className="mr-1.5 h-4 w-4" />
                       Job preparation
                     </Button>
-                  </Link>
-                  <Link href="/interview/new/topic">
-                    <Button variant="secondary">Topic preparation</Button>
-                  </Link>
-                </div>
-              ) : (
-                <Link
-                  href="/settings/billing"
-                  className="mt-4 inline-block text-sm font-semibold text-[var(--color-primary)]"
-                >
-                  Upgrade to Pro →
-                </Link>
-              )}
+                    <Button variant="secondary" onClick={() => openGoPremium('interview')}>
+                      Topic preparation
+                    </Button>
+                  </>
+                )}
+              </div>
             </Card>
           ) : null}
         </>

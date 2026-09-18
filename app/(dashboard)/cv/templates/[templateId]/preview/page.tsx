@@ -9,7 +9,7 @@ import { apiFetch } from '@/lib/api-fetch';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { cn, formatDate } from '@/lib/utils';
-import { FeatureGate } from '@/components/shared/FeatureGate';
+import { useRequirePremium } from '@/hooks/useRequirePremium';
 import { Modal } from '@/components/ui/modal';
 import { CVFormFields, type CVFormTab } from '@/components/cv/CVFormFields';
 import { Sidebar } from '@/components/cv/premium/Sidebar';
@@ -125,6 +125,7 @@ export default function CVTemplatePreviewPage() {
     refetch: refetchJobCv,
   } = useJobSpecificCV(jobCvId ?? '');
   const { tier } = useSubscription();
+  const { requirePremium, openGoPremium } = useRequirePremium();
   const [tab, setTab] = useState<CVFormTab>('photo');
   const [draft, setDraft] = useState<CVProfile | null>(null);
   const [accent, setAccent] = useState('#2563EB');
@@ -397,6 +398,10 @@ export default function CVTemplatePreviewPage() {
 
   async function setPreferredTemplate() {
     if (!cv || !templateId) return;
+    if (!allowed) {
+      openGoPremium('template');
+      return;
+    }
     if (draftActive) {
       toast('Press Save first to persist your core CV.', 'error');
       return;
@@ -410,12 +415,8 @@ export default function CVTemplatePreviewPage() {
     toast('Default template updated.', 'success');
   }
 
-  async function exportPdf(format: ExportFormat = 'pdf') {
+  async function performExport(format: ExportFormat = 'pdf') {
     if (!draft || !templateId) return;
-    if (!allowed) {
-      toast('Upgrade to export with this template.', 'error');
-      return;
-    }
     setExporting(true);
     setExportingFormat(format);
     try {
@@ -436,7 +437,7 @@ export default function CVTemplatePreviewPage() {
         format
       );
       if (result === 'upgrade_required') {
-        toast('DOCX export is a Pro feature. Upgrade to unlock.', 'error');
+        openGoPremium(format === 'docx' ? 'docx' : 'export');
       } else if (result === 'error') {
         toast('Export failed.', 'error');
       }
@@ -444,6 +445,25 @@ export default function CVTemplatePreviewPage() {
       setExporting(false);
       setExportingFormat(null);
     }
+  }
+
+  function exportPdf(format: ExportFormat = 'pdf') {
+    if (!draft || !templateId) return;
+    if (!allowed) {
+      openGoPremium('template');
+      return;
+    }
+    const needsPremium =
+      format === 'docx'
+        ? !canAccessFeature(tier, 'docxExport')
+        : !canAccessFeature(tier, 'pdfExport');
+    if (needsPremium) {
+      requirePremium(format === 'docx' ? 'docx' : 'export', () => {
+        void performExport(format);
+      });
+      return;
+    }
+    void performExport(format);
   }
 
   const isLoading = isJobMode ? jobCvLoading : cvLoading;
@@ -587,17 +607,17 @@ export default function CVTemplatePreviewPage() {
           </span>
           <ExportMenu
             busyFormat={exportingFormat}
-            disabled={!allowed || !draft || !templateId}
+            disabled={!draft || !templateId}
             canExport={canAccessFeature(tier, 'pdfExport')}
             canDocx={canAccessFeature(tier, 'docxExport')}
-            onExport={(format) => void exportPdf(format)}
+            onExport={(format) => exportPdf(format)}
           />
           <Button
             variant="primary"
             size="sm"
             loading={exporting}
-            disabled={!allowed}
-            onClick={() => void exportPdf('pdf')}
+            disabled={!draft || !templateId}
+            onClick={() => exportPdf('pdf')}
           >
             Export PDF
           </Button>
@@ -605,25 +625,23 @@ export default function CVTemplatePreviewPage() {
       </div>
 
       {!allowed ? (
-        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          You can preview this layout with your data here. Upgrade to set it as default and export PDF with this template.
+        <p className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-faint)] px-3 py-2 text-sm text-[var(--color-muted)]">
+          You can preview this premium layout here. Export and set as default require Premium.
         </p>
       ) : null}
 
-      <FeatureGate requiredTier={['pro']} userTier={tier}>
-        <div className="flex flex-wrap gap-2">
-          <span className="text-sm text-[var(--color-muted)]">Accent:</span>
-          {SWATCHES.map((c) => (
-            <button
-              key={c}
-              type="button"
-              className="h-8 w-8 rounded-full border-2 border-white shadow ring-2 ring-transparent ring-offset-2"
-              style={{ background: c }}
-              onClick={() => setAccent(c)}
-            />
-          ))}
-        </div>
-      </FeatureGate>
+      <div className="flex flex-wrap gap-2">
+        <span className="text-sm text-[var(--color-muted)]">Accent:</span>
+        {SWATCHES.map((c) => (
+          <button
+            key={c}
+            type="button"
+            className="h-8 w-8 rounded-full border-2 border-white shadow ring-2 ring-transparent ring-offset-2"
+            style={{ background: c }}
+            onClick={() => setAccent(c)}
+          />
+        ))}
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,480px)]">
         <div className="grid min-w-0 gap-4 xl:grid-cols-[260px_1fr]">

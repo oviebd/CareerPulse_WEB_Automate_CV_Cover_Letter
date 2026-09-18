@@ -26,6 +26,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { useJobApplications, useUpsertJobApplication } from '@/hooks/useTracker';
 import { ExportMenu } from '@/components/shared/ExportMenu';
+import { useRequirePremium } from '@/hooks/useRequirePremium';
+import { useSubscription } from '@/hooks/useSubscription';
+import { canAccessFeature } from '@/lib/subscription';
 import {
   downloadCvExport,
   exportCoverLetter,
@@ -579,6 +582,8 @@ function TrackerPreviewModal({
   onClose: () => void;
   toast: ReturnType<typeof useToast>['toast'];
 }) {
+  const { tier } = useSubscription();
+  const { requirePremium, openGoPremium } = useRequirePremium();
   const [html, setHtml] = useState('');
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
@@ -637,7 +642,7 @@ function TrackerPreviewModal({
       ? `/cv/job-specific/${preview.id}/edit`
       : `/cover-letters/${preview.id}`;
 
-  const download = async (format: ExportFormat = 'pdf') => {
+  const runDownload = async (format: ExportFormat = 'pdf') => {
     setDownloading(true);
     try {
       const result =
@@ -648,13 +653,27 @@ function TrackerPreviewModal({
               format
             );
       if (result === 'upgrade_required') {
-        toast('DOCX export is a Pro feature. Upgrade to unlock.', 'error');
+        openGoPremium(format === 'docx' ? 'docx' : 'export');
       } else if (result === 'error') {
         toast('Download failed', 'error');
       }
     } finally {
       setDownloading(false);
     }
+  };
+
+  const download = (format: ExportFormat = 'pdf') => {
+    const needsPremium =
+      format === 'docx'
+        ? !canAccessFeature(tier, 'docxExport')
+        : !canAccessFeature(tier, 'pdfExport');
+    if (needsPremium) {
+      requirePremium(format === 'docx' ? 'docx' : 'export', () => {
+        void runDownload(format);
+      });
+      return;
+    }
+    void runDownload(format);
   };
 
   return (

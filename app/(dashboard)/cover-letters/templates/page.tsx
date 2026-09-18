@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { CoverLetterTemplateThumb } from '@/components/cover-letter/CoverLetterTemplatePicker';
-import { TemplateGate } from '@/components/shared/FeatureGate';
+import { useRequirePremium } from '@/hooks/useRequirePremium';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useToast } from '@/components/ui/toast';
@@ -23,11 +23,12 @@ export default function CoverLetterTemplatesPage() {
   const { toast } = useToast();
   const userId = useAuthStore((s) => s.user?.id);
   const { tier } = useSubscription();
+  const { openGoPremium } = useRequirePremium();
   const [color, setColor] = useState('#2563EB');
 
   const { data: templates = [] } = useCoverLetterTemplates();
 
-  async function setPreferredTemplate(id: string) {
+  async function runSetPreferredTemplate(id: string) {
     if (!userId) {
       toast('Sign in to save a default template.', 'error');
       return;
@@ -41,6 +42,16 @@ export default function CoverLetterTemplatesPage() {
       return;
     }
     toast('Default cover letter template updated.', 'success');
+  }
+
+  function setPreferredTemplate(id: string) {
+    const row = templates.find((t) => t.id === id);
+    const availableTiers = (row?.available_tiers ?? ['free', 'pro']) as SubscriptionTier[];
+    if (!canUseTemplate(availableTiers, tier)) {
+      openGoPremium('template');
+      return;
+    }
+    void runSetPreferredTemplate(id);
   }
 
   return (
@@ -78,10 +89,6 @@ export default function CoverLetterTemplatesPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {templates.map((t) => {
-          const allowed = canUseTemplate(
-            t.available_tiers as SubscriptionTier[],
-            tier
-          );
           return (
             <Card key={t.id} padding="none" className="flex flex-col overflow-hidden">
               <CoverLetterTemplateThumb
@@ -98,26 +105,21 @@ export default function CoverLetterTemplatesPage() {
                     </Badge>
                   </div>
                   {t.is_premium ? (
-                    <Badge variant="warning">Pro+</Badge>
+                    <Badge variant="warning">Premium</Badge>
                   ) : (
                     <Badge variant="success">Free</Badge>
                   )}
                 </div>
                 <p className="mt-2 flex-1 text-sm text-[var(--color-muted)]">{t.description}</p>
                 <div className="mt-4">
-                  <TemplateGate
-                    availableTiers={t.available_tiers as SubscriptionTier[]}
-                    userTier={tier}
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={!userId}
+                    onClick={() => setPreferredTemplate(t.id)}
                   >
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      disabled={!userId || !allowed}
-                      onClick={() => void setPreferredTemplate(t.id)}
-                    >
-                      Use as default
-                    </Button>
-                  </TemplateGate>
+                    Use as default
+                  </Button>
                 </div>
               </div>
             </Card>

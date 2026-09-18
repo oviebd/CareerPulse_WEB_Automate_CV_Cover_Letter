@@ -24,6 +24,7 @@ import { useSubscription } from '@/hooks/useSubscription';
 import { useCredits } from '@/hooks/useCredits';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useTrackedJobsCount } from '@/hooks/useTracker';
+import { PremiumLabel } from '@/components/shared/PremiumLabel';
 import { useUIStore } from '@/stores/useUIStore';
 
 interface NavItem {
@@ -37,7 +38,7 @@ interface NavItem {
 const nav: NavItem[] = [
   { href: '/dashboard', label: 'Applications', icon: Kanban },
   { href: '/documents', label: 'Documents', icon: FolderOpen },
-  { href: '/interview', label: 'Interview prep', icon: MessageSquare },
+  { href: '/interview', label: 'Interview prep', icon: MessageSquare, proOnly: true },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -125,11 +126,7 @@ function NavLinkContent({
                     )}
                   />
                   <span className="min-w-0 flex-1 truncate">{child.label}</span>
-                  {child.proOnly && isFree ? (
-                    <span className="shrink-0 rounded-badge bg-[var(--color-accent-gold)]/20 px-2 py-0.5 text-[10px] font-semibold text-[var(--color-accent-gold)]">
-                      Pro
-                    </span>
-                  ) : null}
+                  {child.proOnly && isFree ? <PremiumLabel /> : null}
                 </Link>
               );
             })}
@@ -171,6 +168,7 @@ function NavLinkContent({
           {trackerBadge > 99 ? '99+' : trackerBadge}
         </span>
       ) : null}
+      {item.proOnly && isFree && !collapsed ? <PremiumLabel /> : null}
     </Link>
   );
 }
@@ -189,9 +187,8 @@ export function AppHeader() {
 
   const visibleNav = nav.filter((item) => {
     if (item.href === '/documents' && profile?.can_create_documents === false) return false;
-    if (item.href === '/interview') {
-      if (profile?.can_use_interview_prep === false) return false;
-      if (tier !== 'pro') return false;
+    if (item.href === '/interview' && profile?.can_use_interview_prep === false) {
+      return false;
     }
     return true;
   });

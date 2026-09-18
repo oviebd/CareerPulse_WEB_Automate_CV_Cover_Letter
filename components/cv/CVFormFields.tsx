@@ -34,6 +34,8 @@ import { CVSectionVisibilityPanel } from '@/components/cv/CVSectionVisibilityPan
 import { CVRewriteWithAIModal } from '@/components/cv/CVRewriteWithAIModal';
 import { CvAtsPolishButton } from '@/components/cv/CvAtsPolishButton';
 import { TemplateThumbnail } from '@/components/cv/TemplateThumbnail';
+import { PremiumLabel } from '@/components/shared/PremiumLabel';
+import { useRequirePremium } from '@/hooks/useRequirePremium';
 import { cn, generateId, moveIndexInArray } from '@/lib/utils';
 import { CV_FORM_CARD as FORM_CARD, CV_FORM_STACK, CV_FORM_GRID_GAP } from '@/lib/cv-editor-styles';
 import { RemoveEntryButton } from '@/components/cv/RemoveEntryButton';
@@ -307,6 +309,8 @@ export function CVFormFields(props: Props) {
     onRequireAiAuth,
   } = props;
 
+  const { openGoPremium } = useRequirePremium();
+
   const visibleTabs = hiddenTabs
     ? TAB_DEFS.filter((t) => !hiddenTabs.includes(t.id))
     : TAB_DEFS;
@@ -436,15 +440,17 @@ export function CVFormFields(props: Props) {
                     <button
                       key={tid}
                       type="button"
-                      disabled={!allowed}
                       aria-pressed={selected}
                       aria-label={`${name} layout${selected ? ', in use' : ''}`}
                       onClick={() => {
-                        if (allowed) onTemplateChange?.(tid);
+                        if (!allowed) {
+                          openGoPremium('template');
+                          return;
+                        }
+                        onTemplateChange?.(tid);
                       }}
                       className={cn(
                         'group relative aspect-[3/4] overflow-hidden rounded-xl border-2 transition-all duration-300',
-                        !allowed && 'cursor-not-allowed opacity-60',
                         selected
                           ? 'border-[var(--color-primary-400)] shadow-lg shadow-[var(--color-primary-400)]/20'
                           : 'border-[var(--color-border)] hover:border-[var(--color-border-hover)]'
@@ -476,8 +482,8 @@ export function CVFormFields(props: Props) {
                         <p className="line-clamp-2 text-[8px] text-white/80">{targetLabel}</p>
                       </div>
                       {!allowed ? (
-                        <span className="absolute left-2 top-2 rounded bg-black/60 px-1.5 py-0.5 text-[8px] font-semibold uppercase text-white">
-                          Upgrade
+                        <span className="absolute left-2 top-2 z-20">
+                          <PremiumLabel />
                         </span>
                       ) : null}
                       {selected ? (

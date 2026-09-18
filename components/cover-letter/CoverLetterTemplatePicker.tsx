@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { PremiumLabel } from '@/components/shared/PremiumLabel';
+import { useRequirePremium } from '@/hooks/useRequirePremium';
 import { cn } from '@/lib/utils';
 import type { CVTemplate, SubscriptionTier } from '@/types';
 import { canUseTemplate } from '@/lib/subscription';
@@ -120,6 +122,8 @@ export function CoverLetterTemplatePicker({
   className,
   columns = 'default',
 }: Props) {
+  const { openGoPremium } = useRequirePremium();
+
   if (templates.length === 0) {
     return (
       <p className="text-sm text-[var(--color-muted)]">Loading templates…</p>
@@ -147,15 +151,17 @@ export function CoverLetterTemplatePicker({
           <button
             key={t.id}
             type="button"
-            disabled={!allowed}
             aria-pressed={selected}
             aria-label={`${t.name} layout${selected ? ', in use' : ''}`}
             onClick={() => {
-              if (allowed) onSelect(t.id);
+              if (!allowed) {
+                openGoPremium('template');
+                return;
+              }
+              onSelect(t.id);
             }}
             className={cn(
               'group relative aspect-[210/297] overflow-hidden rounded-xl border-2 transition-all duration-300',
-              !allowed && 'cursor-not-allowed opacity-60',
               selected
                 ? 'border-[var(--color-primary-400)] shadow-lg shadow-[var(--color-primary-400)]/20'
                 : 'border-[var(--color-border)] hover:border-[var(--color-border-hover)]'
@@ -185,8 +191,8 @@ export function CoverLetterTemplatePicker({
               ) : null}
             </div>
             {!allowed ? (
-              <span className="absolute left-2 top-2 z-20 rounded bg-black/60 px-1.5 py-0.5 text-[8px] font-semibold uppercase text-white">
-                Upgrade
+              <span className="absolute left-2 top-2 z-20">
+                <PremiumLabel />
               </span>
             ) : null}
             {selected ? (

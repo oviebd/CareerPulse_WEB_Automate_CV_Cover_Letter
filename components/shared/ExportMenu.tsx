@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, FileDown, FileText, Loader2 } from 'lucide-react';
+import { PremiumLabel } from '@/components/shared/PremiumLabel';
 import { cn } from '@/lib/utils';
 import type { ExportFormat } from '@/lib/export-client';
 
@@ -54,8 +55,6 @@ export function ExportMenu({
 
   const busy = busyFormat !== null;
 
-  if (!canExport) return null;
-
   const items: { format: ExportFormat; label: string; icon: typeof FileDown }[] = [
     { format: 'pdf', label: 'PDF', icon: FileDown },
     { format: 'docx', label: 'Google Docs (Word)', icon: FileText },
@@ -106,11 +105,8 @@ export function ExportMenu({
             >
               <Icon className="h-4 w-4 shrink-0" />
               <span className="flex-1">{itemLabel}</span>
-              {format === 'docx' && !canDocx ? (
-                <span className="rounded-full bg-[var(--color-accent-gold)]/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-accent-gold)]">
-                  Pro
-                </span>
-              ) : null}
+              {format === 'pdf' && !canExport ? <PremiumLabel /> : null}
+              {format === 'docx' && !canDocx ? <PremiumLabel /> : null}
             </button>
           ))}
         </div>

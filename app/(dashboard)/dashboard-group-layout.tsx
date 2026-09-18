@@ -6,6 +6,7 @@ import { MeshBackground } from '@/components/layout/MeshBackground';
 import { SubscriptionBanner } from '@/components/shared/SubscriptionBanner';
 import { OnboardingGate } from '@/components/onboarding/OnboardingGate';
 import { PageTransition } from '@/components/shared/PageTransition';
+import { GoPremiumDialog } from '@/components/billing/GoPremiumDialog';
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/stores/useUIStore';
 
@@ -22,6 +23,7 @@ export default function DashboardGroupLayout({
         <MeshBackground />
         <SubscriptionBanner />
         <AppHeader />
+        <GoPremiumDialog />
         <main
           className={cn(
             'relative z-10 flex-1 px-4 pb-8 pt-14 transition-all duration-300 lg:px-8 lg:pb-12 lg:pt-8',

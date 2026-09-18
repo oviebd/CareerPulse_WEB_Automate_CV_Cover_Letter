@@ -2,12 +2,13 @@
 
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { PremiumLabel } from '@/components/shared/PremiumLabel';
+import { useRequirePremium } from '@/hooks/useRequirePremium';
+import { isInterviewPremiumRequiredError } from '@/lib/interview/premium-gate-client';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
-import { useSubscription } from '@/hooks/useSubscription';
 import { useStartInterview } from '@/hooks/useInterview';
 import { invalidateCreditQueries } from '@/hooks/useCredits';
 import { ApiError } from '@/lib/api-fetch';
@@ -36,7 +37,7 @@ export function ContextualAITools({
   status: JobStatus;
   jobSummary?: string | null;
 }) {
-  const { tier, limits } = useSubscription();
+  const { isPremium, requirePremium, openGoPremium } = useRequirePremium();
   const router = useRouter();
   const { toast } = useToast();
   const start = useStartInterview();
@@ -48,22 +49,6 @@ export function ContextualAITools({
 
   const summaryLength = (jobSummary ?? '').trim().length;
   const needsJobContext = summaryLength < 80;
-
-  if (!limits.aiExtrasAccess && tier === 'free') {
-    return (
-      <div className="rounded-xl border border-amber-200/60 bg-amber-50/50 p-4 text-sm dark:bg-amber-950/20">
-        <p className="font-medium text-amber-950 dark:text-amber-100">
-          Interview prep & follow-up emails are Pro features.
-        </p>
-        <Link
-          href="/settings/billing"
-          className="mt-2 inline-block text-xs font-semibold text-[var(--color-primary)]"
-        >
-          Upgrade to Pro →
-        </Link>
-      </div>
-    );
-  }
 
   async function runColdEmail() {
     setTool('cold');
@@ -93,7 +78,7 @@ export function ContextualAITools({
     }
   }
 
-  async function prepareInterview() {
+  async function runPrepareInterview() {
     if (needsJobContext) {
       toast(
         'Open Interview Preparation and use Prepare on this job to paste the job description.',
@@ -110,10 +95,20 @@ export function ContextualAITools({
         router.push(`/interview/${profileId}`);
       }
     } catch (e) {
+      if (isInterviewPremiumRequiredError(e)) {
+        openGoPremium('interview');
+        return;
+      }
       const message = interviewErrorMessage(e);
       toast(message, 'error');
       setOutput(message);
     }
+  }
+
+  function prepareInterview() {
+    requirePremium('interview', () => {
+      void runPrepareInterview();
+    });
   }
 
   return (
@@ -130,16 +125,17 @@ export function ContextualAITools({
             Follow-up email
           </Button>
         ) : null}
-        {limits.interviewPrep ? (
-          <Button
-            size="sm"
-            variant="primary"
-            loading={start.isPending}
-            onClick={() => void prepareInterview()}
-          >
+        <Button
+          size="sm"
+          variant="primary"
+          loading={start.isPending}
+          onClick={prepareInterview}
+        >
+          <span className="inline-flex items-center gap-2">
             Prepare for interview
-          </Button>
-        ) : null}
+            {!isPremium ? <PremiumLabel className="normal-case" /> : null}
+          </span>
+        </Button>
       </div>
       {output ? (
         <Textarea readOnly value={output} rows={8} className="text-sm" />

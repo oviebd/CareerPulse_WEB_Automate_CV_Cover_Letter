@@ -28,6 +28,7 @@ import { CoverLetterPrintPreviewFrame } from '@/components/cover-letter/CoverLet
 import { DocumentPrintPreviewFrame } from '@/components/shared/DocumentPrintPreviewFrame';
 import { ExportMenu } from '@/components/shared/ExportMenu';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useRequirePremium } from '@/hooks/useRequirePremium';
 import { canAccessFeature } from '@/lib/subscription';
 import {
   downloadCvExport,
@@ -48,7 +49,9 @@ export default function OptimiseResultPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { tier } = useSubscription();
+  const { requirePremium, openGoPremium } = useRequirePremium();
   const canExportPdf = canAccessFeature(tier, 'pdfExport');
+  const canDocx = canAccessFeature(tier, 'docxExport');
   const qc = useQueryClient();
   const draft = useOptimiseDraftStore((s) => s.draft);
   const setStoreDraft = useOptimiseDraftStore((s) => s.setDraft);
@@ -516,7 +519,7 @@ export default function OptimiseResultPage() {
     },
   });
 
-  const handleDownloadCv = useCallback(
+  const runDownloadCv = useCallback(
     async (format: ExportFormat = 'pdf') => {
       const d = useOptimiseDraftStore.getState().draft;
       if (!d?.savedCvId) {
@@ -527,7 +530,7 @@ export default function OptimiseResultPage() {
       try {
         const result = await downloadCvExport({ job_cv_id: d.savedCvId }, format);
         if (result === 'upgrade_required') {
-          toast('DOCX export is a Pro feature. Upgrade to unlock.', 'error');
+          openGoPremium(format === 'docx' ? 'docx' : 'export');
         } else if (result === 'error') {
           toast('Could not download.', 'error');
         }
@@ -535,10 +538,24 @@ export default function OptimiseResultPage() {
         setDownloadBusy(false);
       }
     },
-    [toast]
+    [openGoPremium, toast]
   );
 
-  const handleDownloadCoverLetter = useCallback(
+  const handleDownloadCv = useCallback(
+    (format: ExportFormat = 'pdf') => {
+      const needsPremium = format === 'docx' ? !canDocx : !canExportPdf;
+      if (needsPremium) {
+        requirePremium(format === 'docx' ? 'docx' : 'export', () => {
+          void runDownloadCv(format);
+        });
+        return;
+      }
+      void runDownloadCv(format);
+    },
+    [canDocx, canExportPdf, requirePremium, runDownloadCv]
+  );
+
+  const runDownloadCoverLetter = useCallback(
     async (format: ExportFormat = 'pdf') => {
       const d = useOptimiseDraftStore.getState().draft;
       if (!d?.savedCoverLetterId) {
@@ -557,7 +574,7 @@ export default function OptimiseResultPage() {
           format
         );
         if (result === 'upgrade_required') {
-          toast('DOCX export is a Pro feature. Upgrade to unlock.', 'error');
+          openGoPremium(format === 'docx' ? 'docx' : 'export');
         } else if (result === 'error') {
           toast('Export failed.', 'error');
         }
@@ -565,7 +582,21 @@ export default function OptimiseResultPage() {
         setDownloadBusy(false);
       }
     },
-    [toast]
+    [openGoPremium, toast]
+  );
+
+  const handleDownloadCoverLetter = useCallback(
+    (format: ExportFormat = 'pdf') => {
+      const needsPremium = format === 'docx' ? !canDocx : !canExportPdf;
+      if (needsPremium) {
+        requirePremium(format === 'docx' ? 'docx' : 'export', () => {
+          void runDownloadCoverLetter(format);
+        });
+        return;
+      }
+      void runDownloadCoverLetter(format);
+    },
+    [canDocx, canExportPdf, requirePremium, runDownloadCoverLetter]
   );
 
   const trackBusy =
@@ -675,7 +706,7 @@ export default function OptimiseResultPage() {
                   <ExportMenu
                     busyFormat={downloadBusy ? 'pdf' : null}
                     canExport={canExportPdf}
-                    canDocx={canExportPdf}
+                    canDocx={canDocx}
                     label="Download"
                     onExport={(format) => void handleDownloadCv(format)}
                   />
@@ -743,7 +774,7 @@ export default function OptimiseResultPage() {
                   <ExportMenu
                     busyFormat={downloadBusy ? 'pdf' : null}
                     canExport={canExportPdf}
-                    canDocx={canExportPdf}
+                    canDocx={canDocx}
                     label="Download"
                     onExport={(format) => void handleDownloadCoverLetter(format)}
                   />

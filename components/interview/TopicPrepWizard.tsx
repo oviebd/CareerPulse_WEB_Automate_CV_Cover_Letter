@@ -9,7 +9,9 @@ import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
 import { useStartInterview } from '@/hooks/useInterview';
+import { useRequirePremium } from '@/hooks/useRequirePremium';
 import { ApiError } from '@/lib/api-fetch';
+import { isInterviewPremiumRequiredError } from '@/lib/interview/premium-gate-client';
 import { AiWorkingOverlay } from '@/components/shared/AiWorkingOverlay';
 import {
   SUGGESTED_TOPIC_CHIPS,
@@ -33,6 +35,7 @@ function topicErrorMessage(e: unknown): string {
 export function TopicPrepWizard() {
   const router = useRouter();
   const { toast } = useToast();
+  const { requirePremium, openGoPremium } = useRequirePremium();
   const start = useStartInterview();
 
   const [topic, setTopic] = useState('');
@@ -45,7 +48,7 @@ export function TopicPrepWizard() {
   const selectedPurpose = TOPIC_PURPOSES.find((p) => p.value === purpose);
   const canSubmit = normalizedTopic.length > 0 && Boolean(currentLevel) && Boolean(goalLevel) && Boolean(purpose);
 
-  async function handleSubmit() {
+  async function submitStart() {
     if (!canSubmit) return;
     try {
       const result = await start.mutateAsync({
@@ -62,8 +65,18 @@ export function TopicPrepWizard() {
         router.push(`/interview/${profileId}`);
       }
     } catch (e) {
+      if (isInterviewPremiumRequiredError(e)) {
+        openGoPremium('interview');
+        return;
+      }
       toast(topicErrorMessage(e), 'error');
     }
+  }
+
+  function handleSubmit() {
+    requirePremium('interview', () => {
+      void submitStart();
+    });
   }
 
   return (
@@ -161,7 +174,7 @@ export function TopicPrepWizard() {
           variant="primary"
           loading={start.isPending}
           disabled={!canSubmit}
-          onClick={() => void handleSubmit()}
+          onClick={handleSubmit}
         >
           {start.isPending ? 'Setting up…' : 'Start preparation'}
         </Button>

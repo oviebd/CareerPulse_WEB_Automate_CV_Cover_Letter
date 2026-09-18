@@ -20,6 +20,7 @@ import {
   useUpdateCoverLetter,
 } from '@/hooks/useCoverLetters';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useRequirePremium } from '@/hooks/useRequirePremium';
 import { apiFetch } from '@/lib/api-fetch';
 import { useCoverLetterTemplates } from '@/hooks/useTemplates';
 import { useQueryClient } from '@tanstack/react-query';
@@ -56,6 +57,7 @@ export default function CoverLetterDetailPage() {
     enabled: Boolean(jobId) && Boolean(userId),
   });
   const { tier } = useSubscription();
+  const { requirePremium, openGoPremium } = useRequirePremium();
   const updateLetter = useUpdateCoverLetter();
   const qc = useQueryClient();
 
@@ -513,11 +515,7 @@ export default function CoverLetterDetailPage() {
     persistSavedLetter,
   ]);
 
-  async function handleExport(format: ExportFormat = 'pdf') {
-    if (isDraftMode) {
-      toast('Save your cover letter first to export.', 'error');
-      return;
-    }
+  async function performExport(format: ExportFormat = 'pdf') {
     if (!letter) return;
     setExportingPdf(true);
     try {
@@ -538,13 +536,32 @@ export default function CoverLetterDetailPage() {
         format
       );
       if (result === 'upgrade_required') {
-        toast('DOCX export is a Pro feature. Upgrade to unlock.', 'error');
+        openGoPremium(format === 'docx' ? 'docx' : 'export');
       } else if (result === 'error') {
         toast('Export failed.', 'error');
       }
     } finally {
       setExportingPdf(false);
     }
+  }
+
+  function handleExport(format: ExportFormat = 'pdf') {
+    if (isDraftMode) {
+      toast('Save your cover letter first to export.', 'error');
+      return;
+    }
+    if (!letter) return;
+    const needsPremium =
+      format === 'docx'
+        ? !canAccessFeature(tier, 'docxExport')
+        : !canAccessFeature(tier, 'pdfExport');
+    if (needsPremium) {
+      requirePremium(format === 'docx' ? 'docx' : 'export', () => {
+        void performExport(format);
+      });
+      return;
+    }
+    void performExport(format);
   }
 
   if ((!isDraftMode && isLoading) || (isDraftMode && !draftClMeta)) {

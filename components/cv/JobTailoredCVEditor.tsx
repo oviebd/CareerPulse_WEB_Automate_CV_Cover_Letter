@@ -27,6 +27,7 @@ import type { CVSectionVisibility } from '@/types';
 import { useJobSpecificCV, useArchiveJobSpecificCV } from '@/hooks/useJobSpecificCVs';
 import { useCoreCVVersions } from '@/hooks/useCV';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useRequirePremium } from '@/hooks/useRequirePremium';
 import { cn } from '@/lib/utils';
 import type { CVData } from '@/types';
 import type { CVTemplate, SubscriptionTier } from '@/types';
@@ -148,6 +149,7 @@ export function JobTailoredCVEditor() {
   const previewControl = useCVEditorPreviewState();
 
   const { tier } = useSubscription();
+  const { requirePremium, openGoPremium } = useRequirePremium();
   const { toast } = useToast();
 
   const [draft, setDraft] = useState<CVData | null>(null);
@@ -489,40 +491,61 @@ export function JobTailoredCVEditor() {
     };
   }, []);
 
-  const exportPdf = useCallback(async (format: ExportFormat = 'pdf') => {
-    if (!draft || !selectedTemplateId) return;
-    if (!allowed) {
-      toast('Upgrade to export with this template.', 'error');
-      return;
-    }
-    setExportingFormat(format);
-    try {
-      const result = await downloadCvExport(
-        isDraftMode
-          ? {
-              template_id: selectedTemplateId,
-              accent_color: accent,
-              font_family: fontFamily,
-              cv_snapshot: previewPayloadFromCVData(draft),
-            }
-          : {
-              job_cv_id: id,
-              template_id: selectedTemplateId,
-              accent_color: accent,
-              font_family: fontFamily,
-              cv_snapshot: previewPayloadFromCVData(draft),
-            },
-        format
-      );
-      if (result === 'upgrade_required') {
-        toast('DOCX export is a Pro feature. Upgrade to unlock.', 'error');
-      } else if (result === 'error') {
-        toast('Export failed.', 'error');
+  const performExport = useCallback(
+    async (format: ExportFormat = 'pdf') => {
+      if (!draft || !selectedTemplateId) return;
+      setExportingFormat(format);
+      try {
+        const result = await downloadCvExport(
+          isDraftMode
+            ? {
+                template_id: selectedTemplateId,
+                accent_color: accent,
+                font_family: fontFamily,
+                cv_snapshot: previewPayloadFromCVData(draft),
+              }
+            : {
+                job_cv_id: id,
+                template_id: selectedTemplateId,
+                accent_color: accent,
+                font_family: fontFamily,
+                cv_snapshot: previewPayloadFromCVData(draft),
+              },
+          format
+        );
+        if (result === 'upgrade_required') {
+          openGoPremium(format === 'docx' ? 'docx' : 'export');
+        } else if (result === 'error') {
+          toast('Export failed.', 'error');
+        }
+      } finally {
+        setExportingFormat(null);
       }
-    } finally {
-      setExportingFormat(null);
-    }
-  }, [accent, allowed, draft, id, selectedTemplateId, toast, fontFamily, isDraftMode]);
+    },
+    [accent, draft, id, selectedTemplateId, toast, fontFamily, isDraftMode, openGoPremium]
+  );
+
+  const exportPdf = useCallback(
+    (format: ExportFormat = 'pdf') => {
+      if (!draft || !selectedTemplateId) return;
+      if (!allowed) {
+        openGoPremium('template');
+        return;
+      }
+      const needsPremium =
+        format === 'docx'
+          ? !canAccessFeature(tier, 'docxExport')
+          : !canAccessFeature(tier, 'pdfExport');
+      if (needsPremium) {
+        requirePremium(format === 'docx' ? 'docx' : 'export', () => {
+          void performExport(format);
+        });
+        return;
+      }
+      void performExport(format);
+    },
+    [allowed, draft, openGoPremium, performExport, requirePremium, selectedTemplateId, tier]
+  );
 
   useEffect(() => {
     if (templatesLoading || !templates.length) return;
@@ -1145,7 +1168,7 @@ export function JobTailoredCVEditor() {
           <ExportMenu
             label="Export"
             busyFormat={exportingFormat}
-            disabled={!allowed || !draft || !selectedTemplateId}
+            disabled={!draft || !selectedTemplateId}
             canExport={canAccessFeature(tier, 'pdfExport')}
             canDocx={canAccessFeature(tier, 'docxExport')}
             onExport={(format) => {

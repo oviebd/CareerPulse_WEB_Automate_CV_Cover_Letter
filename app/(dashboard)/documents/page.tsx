@@ -23,7 +23,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { PrimaryActionBar } from '@/components/shared/PrimaryActionBar';
-import { UpgradeCTA } from '@/components/shared/UpgradeCTA';
 import { useToast } from '@/components/ui/toast';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -32,7 +31,6 @@ import {
   useDeleteCoverLetter,
   useToggleCoverLetterFavourite,
 } from '@/hooks/useCoverLetters';
-import { useSubscription } from '@/hooks/useSubscription';
 import { formatDate, cn } from '@/lib/utils';
 import { relativeTime } from '@/lib/cv-dashboard-utils';
 import type { CVProfile } from '@/types';
@@ -251,12 +249,10 @@ function ResumesTab() {
 
 function CoverLettersTab() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const { tier } = useSubscription();
   const { data: letters = [], isLoading } = useCoverLettersList();
   const del = useDeleteCoverLetter();
   const fav = useToggleCoverLetterFavourite();
-  const isFree = tier === 'free';
-  const visible = isFree ? letters.slice(0, 5) : letters;
+  const visible = letters;
 
   return (
     <div className="space-y-6">
@@ -364,14 +360,6 @@ function CoverLettersTab() {
         ))}
       </ul>
 
-      {isFree && letters.length > 5 ? (
-        <div className="relative rounded-xl border border-dashed border-[var(--color-border)] p-8 text-center">
-          <p className="text-sm text-[var(--color-muted)] blur-sm">Older letters hidden on Free plan.</p>
-          <div className="absolute inset-0 flex items-center justify-center bg-[var(--color-preview-overlay)]">
-            <UpgradeCTA />
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

@@ -54,7 +54,12 @@ export async function downloadCvExport(
     });
     if (res.status === 403) {
       const j = (await res.json().catch(() => null)) as { error?: string } | null;
-      if (j?.error === 'docx_upgrade_required') return 'upgrade_required';
+      if (
+        j?.error === 'docx_upgrade_required' ||
+        j?.error === 'export_upgrade_required'
+      ) {
+        return 'upgrade_required';
+      }
       return 'error';
     }
     if (!res.ok) return 'error';
@@ -92,7 +97,10 @@ export async function exportCoverLetter(
       docxUrl?: string;
       error?: string;
     } | null;
-    if (res.status === 403 && j?.error === 'docx_upgrade_required') {
+    if (
+      res.status === 403 &&
+      (j?.error === 'docx_upgrade_required' || j?.error === 'export_upgrade_required')
+    ) {
       return 'upgrade_required';
     }
     const url = format === 'docx' ? j?.docxUrl : j?.pdfUrl;

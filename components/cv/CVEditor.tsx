@@ -7,6 +7,7 @@ import { useCVEditor } from '@/hooks/useCVEditor';
 import { useCVEditorPreviewState } from '@/hooks/useCVEditorPreviewState';
 import { useAuthGate } from '@/hooks/useAuthGate';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useRequirePremium } from '@/hooks/useRequirePremium';
 import { useCvTemplates } from '@/hooks/useTemplates';
 import { Button } from '@/components/ui/button';
 import { CVEditorPanel } from '@/components/cv/CVEditorPanel';
@@ -106,6 +107,7 @@ export function CVEditor() {
 
   const { toast } = useToast();
   const { tier } = useSubscription();
+  const { requirePremium, openGoPremium } = useRequirePremium();
 
   const cvData = editorState.cvData;
   const selectedTemplateId = editorState.preferred_template_id;
@@ -372,12 +374,8 @@ export function CVEditor() {
     }
   }, [editorState, handleSave, queryClient, router]);
 
-  async function runExport(format: ExportFormat = 'pdf') {
+  async function performExport(format: ExportFormat = 'pdf') {
     if (!cvData || !selectedTemplateId) return;
-    if (!allowed) {
-      toast('Upgrade to export with this template.', 'error');
-      return;
-    }
     setExportingFormat(format);
     try {
       const result = await downloadCvExport(
@@ -391,13 +389,32 @@ export function CVEditor() {
         format
       );
       if (result === 'upgrade_required') {
-        toast('DOCX export is a Pro feature. Upgrade to unlock.', 'error');
+        openGoPremium(format === 'docx' ? 'docx' : 'export');
       } else if (result === 'error') {
         toast('Export failed.', 'error');
       }
     } finally {
       setExportingFormat(null);
     }
+  }
+
+  function runExport(format: ExportFormat = 'pdf') {
+    if (!cvData || !selectedTemplateId) return;
+    if (!allowed) {
+      openGoPremium('template');
+      return;
+    }
+    const needsPremium =
+      format === 'docx'
+        ? !canAccessFeature(tier, 'docxExport')
+        : !canAccessFeature(tier, 'pdfExport');
+    if (needsPremium) {
+      requirePremium(format === 'docx' ? 'docx' : 'export', () => {
+        void performExport(format);
+      });
+      return;
+    }
+    void performExport(format);
   }
 
   const ats = cvData
@@ -492,7 +509,7 @@ export function CVEditor() {
           <ExportMenu
             label="Export"
             busyFormat={exportingFormat}
-            disabled={!allowed || !cvData || !selectedTemplateId}
+            disabled={!cvData || !selectedTemplateId}
             canExport={canAccessFeature(tier, 'pdfExport')}
             canDocx={canAccessFeature(tier, 'docxExport')}
             onExport={(format) => {
@@ -551,7 +568,7 @@ export function CVEditor() {
               busyFormat={exportingFormat}
               canExport={canAccessFeature(tier, 'pdfExport')}
               canDocx={canAccessFeature(tier, 'docxExport')}
-              exportDisabled={!allowed}
+              exportDisabled={!cvData || !selectedTemplateId}
               onExport={(format) => {
                 requireAuth(() => {
                   void runExport(format);

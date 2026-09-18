@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import type { SubscriptionTier } from '@/types';
-import { canUseTemplate } from '@/lib/subscription';
 
 interface FeatureGateProps {
   requiredTier: SubscriptionTier[];
@@ -39,31 +38,14 @@ export function FeatureGate({
   );
 }
 
+/** @deprecated Prefer visible controls + useRequirePremium; pass-through for layout compatibility. */
 export function TemplateGate({
-  availableTiers,
-  userTier,
   children,
-  lockedOverlay,
 }: {
-  availableTiers: SubscriptionTier[];
-  userTier: SubscriptionTier;
+  availableTiers?: SubscriptionTier[];
+  userTier?: SubscriptionTier;
   children: React.ReactNode;
   lockedOverlay?: React.ReactNode;
 }) {
-  if (canUseTemplate(availableTiers, userTier)) return <>{children}</>;
-  return (
-    <div className="relative">
-      <div className="pointer-events-none opacity-40">{children}</div>
-      <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-[var(--color-preview-overlay)] p-4">
-        {lockedOverlay ?? (
-          <Link
-            href="/settings/billing"
-            className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white"
-          >
-            Upgrade
-          </Link>
-        )}
-      </div>
-    </div>
-  );
+  return <>{children}</>;
 }

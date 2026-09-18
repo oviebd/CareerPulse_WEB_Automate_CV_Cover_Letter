@@ -12,7 +12,9 @@ import { InterviewCVSelector } from '@/components/interview/InterviewCVSelector'
 import { Step2JobDetails } from '@/components/cv/optimise/Step2JobDetails';
 import { useAllCVVersions } from '@/hooks/useCV';
 import { useStartInterview, type StartInterviewBody } from '@/hooks/useInterview';
+import { useRequirePremium } from '@/hooks/useRequirePremium';
 import { ApiError } from '@/lib/api-fetch';
+import { isInterviewPremiumRequiredError } from '@/lib/interview/premium-gate-client';
 import { AiWorkingOverlay } from '@/components/shared/AiWorkingOverlay';
 import { cn } from '@/lib/utils';
 
@@ -36,7 +38,7 @@ function interviewErrorMessage(e: unknown): string {
     if (e.code === 'JOB_CONTEXT_INSUFFICIENT') {
       return e.message;
     }
-    if (e.code === 'UPGRADE_REQUIRED') {
+    if (e.code === 'UPGRADE_REQUIRED' || e.code === 'PRO_REQUIRED') {
       return 'Interview preparation requires a Pro plan.';
     }
     return e.message;
@@ -47,6 +49,7 @@ function interviewErrorMessage(e: unknown): string {
 export function InterviewStartWizard() {
   const router = useRouter();
   const { toast } = useToast();
+  const { requirePremium, openGoPremium } = useRequirePremium();
   const start = useStartInterview();
   const { data: cvOptions = [], isLoading: cvsLoading } = useAllCVVersions();
 
@@ -82,7 +85,7 @@ export function InterviewStartWizard() {
     [maxStep]
   );
 
-  async function handleSubmit() {
+  async function submitStart() {
     if (!selectedCV || !canStep3) return;
     const body: StartInterviewBody = {
       job_title: jobTitle.trim(),
@@ -103,8 +106,18 @@ export function InterviewStartWizard() {
         router.push(`/interview/${profileId}`);
       }
     } catch (e) {
+      if (isInterviewPremiumRequiredError(e)) {
+        openGoPremium('interview');
+        return;
+      }
       toast(interviewErrorMessage(e), 'error');
     }
+  }
+
+  function handleSubmit() {
+    requirePremium('interview', () => {
+      void submitStart();
+    });
   }
 
   return (
@@ -224,7 +237,7 @@ export function InterviewStartWizard() {
             variant="primary"
             loading={start.isPending}
             disabled={!canStep3}
-            onClick={() => void handleSubmit()}
+            onClick={handleSubmit}
           >
             {start.isPending ? 'Finding topics…' : 'Start preparation'}
           </Button>
