@@ -1349,7 +1349,7 @@ export function CVFormFields(props: Props) {
           <div className={CV_FORM_STACK}>
             {languages.map((lang, i) => (
               <div key={lang.id} className={FORM_CARD}>
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className={cn('grid sm:grid-cols-2', CV_FORM_GRID_GAP)}>
                   <Input
                     label="Language"
                     value={lang.language}
@@ -1424,7 +1424,7 @@ export function CVFormFields(props: Props) {
           <div className={CV_FORM_STACK}>
             {certifications.map((c, i) => (
               <div key={c.id} className={FORM_CARD}>
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className={cn('grid sm:grid-cols-2', CV_FORM_GRID_GAP)}>
                   <Input
                     className="sm:col-span-2"
                     label="Certification name"
@@ -1556,7 +1556,7 @@ export function CVFormFields(props: Props) {
             </p>
             {referrals.map((r, i) => (
               <div key={r.id} className={FORM_CARD}>
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className={cn('grid sm:grid-cols-2', CV_FORM_GRID_GAP)}>
                   <Input
                     className="sm:col-span-2"
                     label="Name"
@@ -1670,7 +1670,7 @@ export function CVFormFields(props: Props) {
           <div className={CV_FORM_STACK}>
             {awards.map((a, i) => (
               <div key={a.id} className={FORM_CARD}>
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className={cn('grid sm:grid-cols-2', CV_FORM_GRID_GAP)}>
                   <Input
                     className="sm:col-span-2"
                     label="Title"

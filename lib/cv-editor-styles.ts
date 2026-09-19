@@ -13,8 +13,8 @@ export const CV_FORM_CARD =
 /** Vertical rhythm between form sections and list blocks. */
 export const CV_FORM_STACK = 'space-y-6';
 
-/** Gap inside multi-field grids within a card. */
-export const CV_FORM_GRID_GAP = 'gap-5';
+/** Small gap between adjacent fields in a multi-column form grid. */
+export const CV_FORM_GRID_GAP = 'gap-field';
 
 /** Primary editing canvas — extra breathing room vs. the legacy card. */
 export const CV_EDITOR_CANVAS =

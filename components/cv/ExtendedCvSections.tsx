@@ -5,9 +5,9 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select } from '@/components/ui/select';
 import type { CustomSection, Publication, Research, Volunteer } from '@/types';
-import { CV_FORM_CARD as FORM_CARD } from '@/lib/cv-editor-styles';
+import { CV_FORM_CARD as FORM_CARD, CV_FORM_GRID_GAP } from '@/lib/cv-editor-styles';
 import { RemoveEntryButton } from '@/components/cv/RemoveEntryButton';
-import { generateId, moveIndexInArray } from '@/lib/utils';
+import { cn, generateId, moveIndexInArray } from '@/lib/utils';
 import { ListReorderArrows } from '@/components/cv/ListReorderArrows';
 
 const PUB_TYPES: { value: Publication['type']; label: string }[] = [
@@ -45,7 +45,7 @@ export function PublicationsSection({ publications, onChange }: PubProps) {
               onMove={(from, to) => onChange(moveIndexInArray(publications, from, to))}
             />
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className={cn('grid sm:grid-cols-2', CV_FORM_GRID_GAP)}>
             <Input
               className="sm:col-span-2"
               label="Title"
@@ -178,7 +178,7 @@ export function ResearchSection({ research, onChange }: ResearchProps) {
               onMove={(from, to) => onChange(moveIndexInArray(research, from, to))}
             />
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className={cn('grid sm:grid-cols-2', CV_FORM_GRID_GAP)}>
             <Input
               className="sm:col-span-2"
               label="Title"
@@ -297,7 +297,7 @@ export function VolunteerSection({ volunteer, onChange }: VolProps) {
               onMove={(from, to) => onChange(moveIndexInArray(volunteer, from, to))}
             />
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className={cn('grid sm:grid-cols-2', CV_FORM_GRID_GAP)}>
             <Input
               label="Organization"
               value={v.organization}

@@ -130,6 +130,9 @@
   --radius-lg: 12px;
   --radius-xl: 16px;
 
+  /* Layout rhythm — form fields, stacks, and section spacing */
+  --space-field: 0.75rem;
+
   /* Rich code blocks & inline chips */
   --code-bg: var(--color-preview-well);
   --code-toolbar-bg: var(--bg-elevated);
@@ -389,6 +392,11 @@
   .btn-primary-themed {
     box-shadow: var(--shadow-primary-btn);
   }
+}
+
+/* Form field grids — outside @layer so Tailwind cannot purge token classes */
+.gap-field {
+  gap: var(--space-field);
 }
 
 /* Rich code editor — outside @layer so Tailwind cannot purge token classes */
