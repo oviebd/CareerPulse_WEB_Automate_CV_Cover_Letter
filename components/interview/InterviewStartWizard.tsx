@@ -4,9 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Select } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
 import { InterviewCVSelector } from '@/components/interview/InterviewCVSelector';
 import { Step2JobDetails } from '@/components/cv/optimise/Step2JobDetails';
@@ -17,16 +15,6 @@ import { ApiError } from '@/lib/api-fetch';
 import { isInterviewPremiumRequiredError } from '@/lib/interview/premium-gate-client';
 import { AiWorkingOverlay } from '@/components/shared/AiWorkingOverlay';
 import { cn } from '@/lib/utils';
-
-const STAGE_OPTIONS = [
-  { value: '', label: 'Not specified' },
-  { value: 'phone', label: 'Phone screen' },
-  { value: 'technical', label: 'Technical' },
-  { value: 'behavioral', label: 'Behavioral' },
-  { value: 'panel', label: 'Panel' },
-  { value: 'final', label: 'Final' },
-  { value: 'assessment', label: 'Assessment / case study' },
-];
 
 type StepId = 1 | 2 | 3;
 
@@ -59,8 +47,6 @@ export function InterviewStartWizard() {
   const [companyName, setCompanyName] = useState('');
   const [jobUrl, setJobUrl] = useState('');
   const [jobDescription, setJobDescription] = useState('');
-  const [interviewDate, setInterviewDate] = useState('');
-  const [interviewStage, setInterviewStage] = useState('');
   const [extraNotes, setExtraNotes] = useState('');
 
   useEffect(() => {
@@ -93,8 +79,6 @@ export function InterviewStartWizard() {
       job_description: jobDescription.trim(),
       cv_id: selectedCV,
       job_url: jobUrl.trim() || undefined,
-      interview_date: interviewDate || undefined,
-      interview_stage: interviewStage || undefined,
       extra_context: extraNotes.trim() || undefined,
     };
 
@@ -186,18 +170,6 @@ export function InterviewStartWizard() {
               Optional details to personalize your preparation plan.
             </p>
           </header>
-          <Input
-            label="Interview date (optional)"
-            type="date"
-            value={interviewDate}
-            onChange={(e) => setInterviewDate(e.target.value)}
-          />
-          <Select
-            label="Interview stage (optional)"
-            value={interviewStage}
-            onChange={(e) => setInterviewStage(e.target.value)}
-            options={STAGE_OPTIONS}
-          />
           <Textarea
             label="Extra notes (optional)"
             value={extraNotes}

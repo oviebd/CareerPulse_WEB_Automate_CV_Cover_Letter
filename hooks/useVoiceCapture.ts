@@ -1,14 +1,12 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export type VoiceState =
   | 'idle'
   | 'listening'
   | 'processing'
-  | 'transcript_ready'
-  | 'evaluating'
-  | 'next_question';
+  | 'transcript_ready';
 
 type SpeechRecognitionLike = {
   continuous: boolean;
@@ -35,9 +33,33 @@ export function useVoiceCapture(sessionId?: string) {
   const mediaRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const skipUploadRef = useRef(false);
+  const voiceStateRef = useRef(voiceState);
+  voiceStateRef.current = voiceState;
+
+  const releaseMedia = useCallback(async () => {
+    try {
+      recognitionRef.current?.stop();
+    } catch {
+      /* already stopped */
+    }
+    recognitionRef.current = null;
+
+    const recorder = mediaRef.current;
+    if (recorder && recorder.state !== 'inactive') {
+      await new Promise<void>((resolve) => {
+        recorder.onstop = () => resolve();
+        recorder.stop();
+        recorder.stream.getTracks().forEach((t) => t.stop());
+      });
+    }
+    mediaRef.current = null;
+  }, []);
 
   const startListening = useCallback(async () => {
     setTranscript('');
+    setAudioPath(null);
+    skipUploadRef.current = false;
     setVoiceState('listening');
     chunksRef.current = [];
 
@@ -70,15 +92,13 @@ export function useVoiceCapture(sessionId?: string) {
   }, []);
 
   const stopListening = useCallback(async () => {
+    skipUploadRef.current = false;
     setVoiceState('processing');
-    recognitionRef.current?.stop();
-    const recorder = mediaRef.current;
-    if (recorder && recorder.state !== 'inactive') {
-      await new Promise<void>((resolve) => {
-        recorder.onstop = () => resolve();
-        recorder.stop();
-        recorder.stream.getTracks().forEach((t) => t.stop());
-      });
+    await releaseMedia();
+
+    if (skipUploadRef.current) {
+      setVoiceState('idle');
+      return;
     }
 
     const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
@@ -99,15 +119,39 @@ export function useVoiceCapture(sessionId?: string) {
         /* text fallback remains */
       }
     }
+
+    if (skipUploadRef.current) {
+      setVoiceState('idle');
+      return;
+    }
     setVoiceState('transcript_ready');
-  }, [sessionId]);
+  }, [releaseMedia, sessionId]);
+
+  const cancel = useCallback(async () => {
+    skipUploadRef.current = true;
+    const state = voiceStateRef.current;
+    if (state === 'listening' || state === 'processing') {
+      await releaseMedia();
+    }
+    setVoiceState('idle');
+  }, [releaseMedia]);
 
   const reset = useCallback(() => {
-    setVoiceState('idle');
-    setTranscript('');
-    setAudioPath(null);
-    chunksRef.current = [];
-  }, []);
+    skipUploadRef.current = true;
+    void releaseMedia().then(() => {
+      setVoiceState('idle');
+      setTranscript('');
+      setAudioPath(null);
+      chunksRef.current = [];
+    });
+  }, [releaseMedia]);
+
+  useEffect(() => {
+    return () => {
+      skipUploadRef.current = true;
+      void releaseMedia();
+    };
+  }, [releaseMedia]);
 
   return {
     voiceState,
@@ -116,7 +160,7 @@ export function useVoiceCapture(sessionId?: string) {
     audioPath,
     startListening,
     stopListening,
+    cancel,
     reset,
-    setVoiceState,
   };
 }

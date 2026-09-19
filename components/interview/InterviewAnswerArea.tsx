@@ -7,14 +7,15 @@ import { Mic, MicOff } from 'lucide-react';
 import { useVoiceCapture } from '@/hooks/useVoiceCapture';
 import type { VoiceState } from '@/hooks/useVoiceCapture';
 
-const STATE_LABELS: Record<VoiceState, string> = {
-  idle: 'Ready',
+const ACTIVE_VOICE_LABELS: Partial<Record<VoiceState, string>> = {
   listening: 'Listening…',
-  processing: 'Processing…',
+  processing: 'Processing audio…',
   transcript_ready: 'Transcript ready',
-  evaluating: 'Evaluating…',
-  next_question: 'Next question',
 };
+
+function showVoiceStatus(state: VoiceState): state is keyof typeof ACTIVE_VOICE_LABELS {
+  return state === 'listening' || state === 'processing' || state === 'transcript_ready';
+}
 
 export function InterviewAnswerArea({
   sessionId,
@@ -31,7 +32,7 @@ export function InterviewAnswerArea({
     text_answer?: string;
     transcript?: string;
     audio_path?: string;
-  }) => void;
+  }) => void | Promise<void>;
   loading?: boolean;
   mode: string;
 }) {
@@ -40,19 +41,39 @@ export function InterviewAnswerArea({
 
   const combined = voice.transcript || text;
 
-  function handleSubmit() {
-    voice.setVoiceState('evaluating');
-    onSubmit({
-      text_answer: text.trim() || undefined,
-      transcript: voice.transcript.trim() || undefined,
-      audio_path: voice.audioPath ?? undefined,
-    });
+  async function handleSubmit() {
+    const stateBefore = voice.voiceState;
+    const transcriptBefore = voice.transcript.trim();
+    const audioBefore = voice.audioPath;
+
+    if (stateBefore === 'listening' || stateBefore === 'processing') {
+      await voice.cancel();
+    }
+
+    const answerText = (transcriptBefore || text).trim();
+    const usedVoice =
+      stateBefore === 'transcript_ready' ||
+      (Boolean(audioBefore) && Boolean(transcriptBefore));
+
+    if (usedVoice) {
+      onSubmit({
+        text_answer: text.trim() || undefined,
+        transcript: transcriptBefore || undefined,
+        audio_path: audioBefore ?? undefined,
+      });
+    } else {
+      onSubmit({ text_answer: answerText || undefined });
+    }
   }
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between text-xs text-[var(--color-muted)]">
-        <span>Voice: {STATE_LABELS[voice.voiceState]}</span>
+        {showVoiceStatus(voice.voiceState) ? (
+          <span>Voice: {ACTIVE_VOICE_LABELS[voice.voiceState]}</span>
+        ) : (
+          <span />
+        )}
         {mode === 'realistic' ? (
           <span>Realistic mode — brief note after each answer, full scores at end</span>
         ) : (
@@ -82,13 +103,18 @@ export function InterviewAnswerArea({
             size="sm"
             icon={<Mic className="h-4 w-4" />}
             onClick={() => void voice.startListening()}
-            disabled={loading}
+            disabled={loading || voice.voiceState === 'processing'}
           >
             Record
           </Button>
         )}
-        <Button variant="primary" loading={loading} onClick={handleSubmit} disabled={!combined.trim()}>
-          Submit answer
+        <Button
+          variant="primary"
+          loading={loading}
+          onClick={() => void handleSubmit()}
+          disabled={!combined.trim() || loading || voice.voiceState === 'processing'}
+        >
+          {loading ? 'Submitting…' : 'Submit answer'}
         </Button>
       </div>
     </div>

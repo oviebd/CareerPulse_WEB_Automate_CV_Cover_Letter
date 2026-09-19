@@ -101,24 +101,28 @@ export default function InterviewSessionPage() {
     audio_path?: string;
   }) {
     const answerText = payload.transcript?.trim() || payload.text_answer?.trim() || '';
-    const result = (await submit.mutateAsync(payload)) as {
-      complete?: boolean;
-      instant_feedback?: string;
-      overall_score?: number;
-    };
+    try {
+      const result = (await submit.mutateAsync(payload)) as {
+        complete?: boolean;
+        instant_feedback?: string;
+        overall_score?: number;
+      };
 
-    setTurnFeedback({
-      instant_feedback: result.instant_feedback ?? '',
-      overall_score: result.overall_score,
-      questionText: (current_question?.question_text as string) ?? '',
-      answerText,
-    });
-    setTurnComplete(Boolean(result.complete));
+      setTurnFeedback({
+        instant_feedback: result.instant_feedback ?? '',
+        overall_score: result.overall_score,
+        questionText: (current_question?.question_text as string) ?? '',
+        answerText,
+      });
+      setTurnComplete(Boolean(result.complete));
 
-    if (result.complete) {
-      skipPause.current = true;
-      await complete.mutateAsync();
-      router.push(`/interview/${profileId}/report/${sessionId}`);
+      if (result.complete) {
+        skipPause.current = true;
+        await complete.mutateAsync();
+        router.push(`/interview/${profileId}/report/${sessionId}`);
+      }
+    } catch {
+      /* submit.isError surfaces in UI */
     }
   }
 
@@ -177,6 +181,13 @@ export default function InterviewSessionPage() {
           {complete.error instanceof Error
             ? complete.error.message
             : 'Could not complete interview.'}
+        </p>
+      ) : null}
+      {submit.isError ? (
+        <p className="text-sm text-[var(--color-accent-coral)]">
+          {submit.error instanceof Error
+            ? submit.error.message
+            : 'Could not submit your answer. Try again.'}
         </p>
       ) : null}
 

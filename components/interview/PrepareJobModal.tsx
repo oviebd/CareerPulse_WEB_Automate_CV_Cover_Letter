@@ -5,21 +5,10 @@ import Link from 'next/link';
 import { Modal } from '@/components/ui/modal';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { useAllCVVersions } from '@/hooks/useCV';
 import { formatDate } from '@/lib/utils';
 import type { EligibleInterviewJob } from '@/types/interview';
-
-const STAGE_OPTIONS = [
-  { value: '', label: 'Not specified' },
-  { value: 'phone', label: 'Phone screen' },
-  { value: 'technical', label: 'Technical' },
-  { value: 'behavioral', label: 'Behavioral' },
-  { value: 'panel', label: 'Panel' },
-  { value: 'final', label: 'Final' },
-  { value: 'assessment', label: 'Assessment / case study' },
-];
 
 type PrepareJobModalProps = {
   job: EligibleInterviewJob | null;
@@ -30,8 +19,6 @@ type PrepareJobModalProps = {
     job_id: string;
     cv_id?: string;
     job_description?: string;
-    interview_date?: string;
-    interview_stage?: string;
     extra_context?: string;
   }) => void;
 };
@@ -46,8 +33,6 @@ export function PrepareJobModal({
   const { data: cvOptions = [], isLoading: cvsLoading } = useAllCVVersions();
   const [selectedCvId, setSelectedCvId] = useState<string>('');
   const [jobDescription, setJobDescription] = useState('');
-  const [interviewDate, setInterviewDate] = useState('');
-  const [interviewStage, setInterviewStage] = useState('');
   const [extraNotes, setExtraNotes] = useState('');
 
   useEffect(() => {
@@ -71,8 +56,6 @@ export function PrepareJobModal({
   function handleClose() {
     setSelectedCvId('');
     setJobDescription('');
-    setInterviewDate('');
-    setInterviewStage('');
     setExtraNotes('');
     onClose();
   }
@@ -84,8 +67,6 @@ export function PrepareJobModal({
       job_id: job.id,
       cv_id: selectedCvId,
       job_description: needsJd || jdLength >= 100 ? jobDescription.trim() : undefined,
-      interview_date: interviewDate || undefined,
-      interview_stage: interviewStage || undefined,
       extra_context: extraNotes.trim() || undefined,
     });
   }
@@ -112,7 +93,7 @@ export function PrepareJobModal({
           {job.company_name}
           {needsJd
             ? ' — paste the job description so we can tailor your interview prep.'
-            : ' — add optional interview details or extra context.'}
+            : ' — add optional extra context.'}
         </p>
 
         {!cvsLoading && !hasCv ? (
@@ -158,20 +139,6 @@ export function PrepareJobModal({
             </p>
           </div>
         ) : null}
-
-        <Input
-          label="Interview date (optional)"
-          type="date"
-          value={interviewDate}
-          onChange={(e) => setInterviewDate(e.target.value)}
-        />
-
-        <Select
-          label="Interview stage (optional)"
-          value={interviewStage}
-          onChange={(e) => setInterviewStage(e.target.value)}
-          options={STAGE_OPTIONS}
-        />
 
         <Textarea
           label="Extra context (optional)"
