@@ -42,7 +42,7 @@ export function CvTitleModal({
         <Input
           label="CV title"
           name="cv_title"
-          placeholder="e.g. John Doe (12 june 26)"
+          placeholder="e.g. CV _ Habibur Rahman _ 10 jun 26"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           autoFocus

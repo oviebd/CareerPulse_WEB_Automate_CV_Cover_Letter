@@ -220,25 +220,40 @@ export function migrateLegacyCVData(legacyData: unknown): CVData {
   out.personal.links.github = str(L.github_url) || undefined;
 
   const linksArr = Array.isArray(L.links) ? L.links : [];
+  const otherFromDb: NonNullable<CVData['personal']['links']['other']> = [];
   for (const raw of linksArr) {
     if (!isRecord(raw)) continue;
-    const label = str(raw.label).toLowerCase();
+    const label = str(raw.label);
+    const labelLower = label.toLowerCase();
     const url = str(raw.url);
+    if (!labelLower.includes('linkedin') && !labelLower.includes('github')) {
+      otherFromDb.push({
+        id:
+          raw.id && String(raw.id).length >= 8
+            ? String(raw.id)
+            : `l-${otherFromDb.length}`,
+        label,
+        url,
+      });
+    }
     if (!url) continue;
-    if (label.includes('portfolio') || label === 'portfolio')
+    if (labelLower.includes('portfolio') || labelLower === 'portfolio')
       out.personal.links.portfolio = url;
-    else if (label.includes('behance')) out.personal.links.behance = url;
-    else if (label.includes('dribbble')) out.personal.links.dribbble = url;
+    else if (labelLower.includes('behance')) out.personal.links.behance = url;
+    else if (labelLower.includes('dribbble')) out.personal.links.dribbble = url;
     else if (
-      label.includes('website') ||
-      label.includes('blog') ||
-      label === 'site'
+      labelLower.includes('website') ||
+      labelLower.includes('blog') ||
+      labelLower === 'site'
     )
       out.personal.links.website = url;
-    else if (label.includes('orcid')) out.personal.links.orcid = url;
-    else if (label.includes('scholar')) out.personal.links.googleScholar = url;
-    else if (label.includes('researchgate') || label === 'rg')
+    else if (labelLower.includes('orcid')) out.personal.links.orcid = url;
+    else if (labelLower.includes('scholar')) out.personal.links.googleScholar = url;
+    else if (labelLower.includes('researchgate') || labelLower === 'rg')
       out.personal.links.researchGate = url;
+  }
+  if (otherFromDb.length > 0) {
+    out.personal.links.other = otherFromDb;
   }
   const port = str(L.portfolio_url);
   const web = str(L.website_url);

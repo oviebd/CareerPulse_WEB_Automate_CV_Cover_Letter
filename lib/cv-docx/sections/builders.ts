@@ -17,6 +17,7 @@ import {
   timelineExperienceBlock,
 } from '../primitives';
 import { dateRange, sectionTitleFor } from '../utils';
+import { labelToNamedPersonalLinkKey } from '@/lib/profile-links';
 
 const RATING_LABELS = ['', 'Beginner', 'Basic', 'Intermediate', 'Advanced', 'Professional'];
 
@@ -425,5 +426,11 @@ export function linksLine(cvData: CVData): string {
   if (l.researchGate) bits.push(`ResearchGate: ${l.researchGate}`);
   if (l.behance) bits.push(`Behance: ${l.behance}`);
   if (l.dribbble) bits.push(`Dribbble: ${l.dribbble}`);
+  for (const item of l.other ?? []) {
+    const url = item.url?.trim();
+    if (!url || labelToNamedPersonalLinkKey(item.label)) continue;
+    const lbl = item.label?.trim() || url;
+    bits.push(`${lbl}: ${url}`);
+  }
   return bits.join(' · ');
 }

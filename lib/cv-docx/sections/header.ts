@@ -8,6 +8,7 @@ import {
 } from '../primitives';
 import { buildPhotoParagraph } from '../photo';
 import { contactLine, linksLine } from './builders';
+import { labelToNamedPersonalLinkKey } from '@/lib/profile-links';
 import { splitFullName } from '../utils';
 
 /** Standard centered header for single-column templates. */
@@ -163,12 +164,18 @@ export function buildSidebarContact(
     );
   }
   const l = p.links ?? {};
-  for (const url of [
+  const sidebarUrls: string[] = [
     l.linkedin,
     l.github,
     l.portfolio,
     l.website,
-  ].filter(Boolean)) {
+  ].filter(Boolean) as string[];
+  for (const item of l.other ?? []) {
+    const url = item.url?.trim();
+    if (!url || labelToNamedPersonalLinkKey(item.label)) continue;
+    sidebarUrls.push(url);
+  }
+  for (const url of sidebarUrls) {
     out.push(
       new Paragraph({
         children: [run(theme, url!, { size: 16, color: theme.sidebarText })],

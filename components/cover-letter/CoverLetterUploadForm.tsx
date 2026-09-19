@@ -9,6 +9,7 @@ import { useToast } from '@/components/ui/toast';
 import { uploadFileWithProgress, createSignedUploadUrl, removeUploadedFile } from '@/lib/file-upload-client';
 import { isAllowedCvFile } from '@/lib/cv-file';
 import type { ExtractedCoverLetter } from '@/types';
+import { defaultCoverLetterDisplayName } from '@/lib/cv-display-name';
 
 const MAX = 10 * 1024 * 1024;
 
@@ -168,14 +169,11 @@ export function CoverLetterUploadForm({ onExtracted }: Props) {
           return;
         }
 
-        const nameParts = [
-          json.letter.job_title,
-          json.letter.company_name,
-        ].filter(Boolean);
-        const name =
-          nameParts.length > 0
-            ? nameParts.join(' — ').slice(0, 200)
-            : 'Uploaded Cover Letter';
+        const name = defaultCoverLetterDisplayName({
+          applicantName: json.letter.applicant_name,
+          jobTitle: json.letter.job_title,
+          companyName: json.letter.company_name,
+        }).slice(0, 200);
 
         const createRes = await fetch('/api/cover-letters', {
           method: 'POST',

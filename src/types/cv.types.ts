@@ -51,6 +51,8 @@ export interface PersonalInfo {
     behance?: string;
     dribbble?: string;
     website?: string;
+    /** Header “Additional links” list (source of truth when present). */
+    other?: { id?: string; label: string; url: string }[];
   };
 }
 

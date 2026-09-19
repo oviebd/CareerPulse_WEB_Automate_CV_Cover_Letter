@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { apiFetch } from '@/lib/api-fetch';
+import { defaultCoreClDisplayName } from '@/lib/cv-display-name';
 
 export default function NewCoverLetterPage() {
   const router = useRouter();
@@ -33,6 +34,7 @@ export default function NewCoverLetterPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          name: defaultCoreClDisplayName(primaryCv?.full_name),
           content: '',
           template_id: 'cl-classic',
           source_type: 'scratch',

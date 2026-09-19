@@ -17,7 +17,9 @@ import {
   Trash2,
   Upload,
   Copy,
+  Pencil,
 } from 'lucide-react';
+import { CvTitleModal } from '@/components/cv/CvTitleModal';
 import { ATSBadge } from '@/components/shared/ATSBadge';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -34,6 +36,11 @@ import {
 import { formatDate, cn } from '@/lib/utils';
 import { relativeTime } from '@/lib/cv-dashboard-utils';
 import type { CVProfile } from '@/types';
+import {
+  defaultCoreCvDisplayName,
+  resolveFullNameForCvTitle,
+} from '@/lib/cv-display-name';
+import { apiFetch } from '@/lib/api-fetch';
 
 // ─── Resumes tab ─────────────────────────────────────────────────────────────
 
@@ -53,9 +60,49 @@ function useAllCVs() {
 
 function CVCard({ cv, onDelete, deleting }: { cv: CVProfile; onDelete: (id: string) => void; deleting: boolean }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameBusy, setRenameBusy] = useState(false);
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const userId = useAuthStore((s) => s.user?.id);
   const preparedFromJob = (cv.job_ids?.length ?? 0) > 0;
 
+  async function handleRename(title: string) {
+    const trimmed = title.trim();
+    if (!trimmed) return;
+    setRenameBusy(true);
+    qc.setQueryData(['all-cvs', userId], (old: CVProfile[] | undefined) =>
+      old?.map((item) => (item.id === cv.id ? { ...item, name: trimmed } : item)) ?? []
+    );
+    try {
+      const res = await fetch(`/api/cvs/${cv.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: trimmed }),
+      });
+      if (!res.ok) throw new Error('Failed to rename');
+      void qc.invalidateQueries({ queryKey: ['all-cvs'] });
+      void qc.invalidateQueries({ queryKey: ['cv-versions'] });
+      toast('CV renamed.', 'success');
+      setRenameOpen(false);
+    } catch {
+      void qc.invalidateQueries({ queryKey: ['all-cvs'] });
+      toast('Could not rename CV.', 'error');
+    } finally {
+      setRenameBusy(false);
+    }
+  }
+
   return (
+    <>
+      <CvTitleModal
+        isOpen={renameOpen}
+        defaultTitle={cv.name?.trim() || 'Untitled CV'}
+        onClose={() => setRenameOpen(false)}
+        onConfirm={(title) => void handleRename(title)}
+        isSubmitting={renameBusy}
+        submitLabel="Save name"
+      />
     <motion.div
       layout
       initial={{ opacity: 0, y: 8 }}
@@ -68,7 +115,18 @@ function CVCard({ cv, onDelete, deleting }: { cv: CVProfile; onDelete: (id: stri
             {cv.name || 'Untitled CV'}
           </p>
         </div>
-        <FileText className="h-5 w-5 shrink-0 text-[var(--color-icon)]" />
+        <div className="flex shrink-0 items-center gap-0.5">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0"
+            aria-label="Rename CV"
+            onClick={() => setRenameOpen(true)}
+          >
+            <Pencil className="h-3.5 w-3.5 text-[var(--color-icon)]" />
+          </Button>
+          <FileText className="h-5 w-5 text-[var(--color-icon)]" aria-hidden />
+        </div>
       </div>
 
       <div className="space-y-0.5 text-xs text-[var(--color-muted)]">
@@ -132,6 +190,7 @@ function CVCard({ cv, onDelete, deleting }: { cv: CVProfile; onDelete: (id: stri
         )}
       </div>
     </motion.div>
+    </>
   );
 }
 
@@ -147,10 +206,16 @@ function ResumesTab() {
   async function handleCreateCV() {
     setCreating(true);
     try {
+      const [profile, account] = await Promise.all([
+        apiFetch<{ full_name?: string | null } | null>('/api/cvs/profile').catch(() => null),
+        apiFetch<{ full_name?: string | null }>('/api/account').catch(() => null),
+      ]);
+      const fullName = resolveFullNameForCvTitle(null, profile?.full_name, account?.full_name);
+      const name = defaultCoreCvDisplayName(fullName);
       const res = await fetch('/api/cvs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: 'Untitled CV' }),
+        body: JSON.stringify({ name }),
       });
       if (!res.ok) throw new Error('Failed to create CV');
       const cv = (await res.json()) as { id: string };

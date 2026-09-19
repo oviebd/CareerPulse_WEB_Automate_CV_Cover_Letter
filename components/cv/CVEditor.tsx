@@ -26,36 +26,35 @@ import { buildATSReport } from '@/lib/cv-ats';
 import { CV_EDITOR_CANVAS } from '@/lib/cv-editor-styles';
 import { ExportMenu } from '@/components/shared/ExportMenu';
 import { downloadCvExport, type ExportFormat } from '@/lib/export-client';
-import { CvTitleModal } from '@/components/cv/CvTitleModal';
 import { UnsavedLeaveModal } from '@/components/shared/UnsavedLeaveModal';
-import { defaultCoreCvDisplayName } from '@/lib/cv-display-name';
+import { CvTitleModal } from '@/components/cv/CvTitleModal';
 import { cloneCvData } from '@/lib/cv-clone';
 import { cvCompletionPercent } from '@/lib/cv-sidebar-content';
 import { ALL_TEMPLATE_IDS, TEMPLATE_CONFIGS } from '@/src/config/templateConfig';
 import { normalizeTemplateId } from '@/src/utils/cvDefaults';
-import { CV_DRAFT_UPDATED_EVENT, clearCvDraft, hasCvDraft } from '@/lib/cv-draft-storage';
+import { clearCvDraft } from '@/lib/cv-draft-storage';
 import type { TemplateId } from '@/src/types/cv.types';
+import { applyPreviewHtmlResponse, revokePreviewBlob } from '@/lib/preview-html-client';
 
 function previewPayloadFromCVData(d: CVData): Record<string, unknown> {
   return JSON.parse(JSON.stringify(d)) as Record<string, unknown>;
 }
 
 function buildSaveStatusLine({
-  isNew,
   isDirty,
   isSaving,
   saveError,
+  autosaveStatus,
 }: {
-  isNew: boolean;
   isDirty: boolean;
   isSaving: boolean;
   saveError: string | null;
+  autosaveStatus: string;
 }) {
   if (isSaving) return 'Saving…';
   if (saveError) return "Couldn't save";
   if (isDirty) return 'Unsaved changes';
-  if (!isNew) return 'Saved to account';
-  return '';
+  return 'Saved to account';
 }
 
 export function CVEditor() {
@@ -78,9 +77,12 @@ export function CVEditor() {
     loadError,
     isLoading,
     isDirty,
-    isNew,
+    hasUnsavedWork,
+    autosaveStatus,
     saveButtonLabel,
-    handleSave,
+    flushAutosave,
+    cancelAutosave,
+    renameCv,
     editorState,
     setEditorState,
     reloadFromServer,
@@ -90,20 +92,10 @@ export function CVEditor() {
   const { requireAuth, authModal } = useAuthGate();
   const queryClient = useQueryClient();
 
-  const [titleModalOpen, setTitleModalOpen] = useState(false);
-  const [titleModalDefault, setTitleModalDefault] = useState('');
-  const [draftActive, setDraftActive] = useState(false);
   const [leaveModalOpen, setLeaveModalOpen] = useState(false);
   const [leaveSaving, setLeaveSaving] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const compute = () => setDraftActive(hasCvDraft());
-    compute();
-    const onUpdate = () => compute();
-    window.addEventListener(CV_DRAFT_UPDATED_EVENT, onUpdate);
-    return () => window.removeEventListener(CV_DRAFT_UPDATED_EVENT, onUpdate);
-  }, []);
+  const [renameModalOpen, setRenameModalOpen] = useState(false);
+  const [renameBusy, setRenameBusy] = useState(false);
 
   const { toast } = useToast();
   const { tier } = useSubscription();
@@ -170,6 +162,7 @@ export function CVEditor() {
   const [previewSrc, setPreviewSrc] = useState<string>('');
   const [previewBusy, setPreviewBusy] = useState(false);
   const previewUrlRef = useRef<string | null>(null);
+  const previewHtmlRef = useRef<string | null>(null);
   const [exportingFormat, setExportingFormat] = useState<ExportFormat | null>(null);
   const [editorTab, setEditorTab] = useState<CVFormTab>('header');
   const [zoom, setZoom] = useState(100);
@@ -275,41 +268,44 @@ export function CVEditor() {
     setSelectedTemplateId(templates[0].id);
   }, [templatesLoading, templates, selectedTemplateId, setSelectedTemplateId]);
 
-  const refreshPreview = useCallback(async () => {
-    if (!selectedTemplateId || !cvData) return;
-    setPreviewBusy(true);
-    try {
-      const snapshot = previewPayloadFromCVData(cvData);
-      const res = await fetch('/api/cv/preview-html', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          template_id: selectedTemplateId,
-          accent_color: accent,
-          cv: {
-            ...snapshot,
-            font_family: fontFamily,
-            preferred_template_id: selectedTemplateId,
+  const refreshPreview = useCallback(
+    async (opts?: { showBusy?: boolean }) => {
+      if (!selectedTemplateId || !cvData) return;
+      const showBusy = opts?.showBusy !== false;
+      if (showBusy) setPreviewBusy(true);
+      try {
+        const snapshot = previewPayloadFromCVData(cvData);
+        const res = await fetch('/api/cv/preview-html', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            template_id: selectedTemplateId,
             accent_color: accent,
-          },
-        }),
-      });
-      const text = await res.text();
-      if (!res.ok) {
-        setPreviewSrc('');
-        return;
+            cv: {
+              ...snapshot,
+              font_family: fontFamily,
+              preferred_template_id: selectedTemplateId,
+              accent_color: accent,
+            },
+          }),
+        });
+        const text = await res.text();
+        if (!res.ok) {
+          setPreviewSrc('');
+          previewHtmlRef.current = null;
+          return;
+        }
+        const { url } = await applyPreviewHtmlResponse(text, {
+          urlRef: previewUrlRef,
+          htmlRef: previewHtmlRef,
+        });
+        if (url) setPreviewSrc(url);
+      } finally {
+        if (showBusy) setPreviewBusy(false);
       }
-      if (previewUrlRef.current) {
-        URL.revokeObjectURL(previewUrlRef.current);
-      }
-      const blob = new Blob([text], { type: 'text/html;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      previewUrlRef.current = url;
-      setPreviewSrc(url);
-    } finally {
-      setPreviewBusy(false);
-    }
-  }, [selectedTemplateId, cvData, accent, fontFamily]);
+    },
+    [selectedTemplateId, cvData, accent, fontFamily]
+  );
 
   useEffect(() => {
     if (!selectedTemplateId || !cvData || templatesLoading) return;
@@ -321,49 +317,29 @@ export function CVEditor() {
 
   useEffect(() => {
     return () => {
-      if (previewUrlRef.current) {
-        URL.revokeObjectURL(previewUrlRef.current);
-        previewUrlRef.current = null;
-      }
+      revokePreviewBlob({ urlRef: previewUrlRef, htmlRef: previewHtmlRef });
     };
   }, []);
 
-  function openSaveTitleModal() {
-    const generated = defaultCoreCvDisplayName(editorState.cvData.personal.fullName);
-    const current = editorState.name?.trim();
-    setTitleModalDefault(current && current !== 'Untitled CV' ? current : generated);
-    setTitleModalOpen(true);
-  }
-
-  async function confirmSaveWithTitle(title: string) {
-    const ok = await handleSave(title);
-    if (ok) {
-      setTitleModalOpen(false);
-      void queryClient.invalidateQueries({ queryKey: ['cv-versions'] });
-    }
-  }
-
   const handleBackClick = useCallback(() => {
-    if (isDirty) {
+    if (hasUnsavedWork) {
       setLeaveModalOpen(true);
       return;
     }
     router.push('/documents');
-  }, [isDirty, router]);
+  }, [hasUnsavedWork, router]);
 
   const handleDiscardLeave = useCallback(() => {
+    cancelAutosave();
     clearCvDraft();
     setLeaveModalOpen(false);
     router.push('/documents');
-  }, [router]);
+  }, [router, cancelAutosave]);
 
   const handleSaveAndLeave = useCallback(async () => {
     setLeaveSaving(true);
     try {
-      const generated = defaultCoreCvDisplayName(editorState.cvData.personal.fullName);
-      const current = editorState.name?.trim();
-      const name = current && current !== 'Untitled CV' ? current : generated;
-      const ok = await handleSave(name);
+      const ok = await flushAutosave();
       if (ok) {
         setLeaveModalOpen(false);
         void queryClient.invalidateQueries({ queryKey: ['cv-versions'] });
@@ -372,7 +348,7 @@ export function CVEditor() {
     } finally {
       setLeaveSaving(false);
     }
-  }, [editorState, handleSave, queryClient, router]);
+  }, [flushAutosave, queryClient, router]);
 
   async function performExport(format: ExportFormat = 'pdf') {
     if (!cvData || !selectedTemplateId) return;
@@ -422,7 +398,12 @@ export function CVEditor() {
     : { score: 0, summary: '', suggestions: [], sections: {} };
 
   const subtitleName = cvData?.personal?.fullName?.trim();
-  const statusLine = buildSaveStatusLine({ isNew, isDirty, isSaving, saveError });
+  const statusLine = buildSaveStatusLine({
+    isDirty,
+    isSaving,
+    saveError,
+    autosaveStatus,
+  });
 
   if (loadError) {
     return (
@@ -451,21 +432,57 @@ export function CVEditor() {
         entityLabel="CV"
       />
       <CvTitleModal
-        isOpen={titleModalOpen}
-        defaultTitle={titleModalDefault}
-        onClose={() => setTitleModalOpen(false)}
-        onConfirm={confirmSaveWithTitle}
-        isSubmitting={isSaving}
-        submitLabel={saveButtonLabel}
+        isOpen={renameModalOpen}
+        defaultTitle={editorState.name?.trim() || ''}
+        onClose={() => setRenameModalOpen(false)}
+        onConfirm={async (title) => {
+          setRenameBusy(true);
+          try {
+            const ok = await renameCv(title);
+            if (ok) {
+              setRenameModalOpen(false);
+              void queryClient.invalidateQueries({ queryKey: ['cv-versions'] });
+              void queryClient.invalidateQueries({ queryKey: ['all-cvs'] });
+            }
+          } finally {
+            setRenameBusy(false);
+          }
+        }}
+        isSubmitting={renameBusy}
+        submitLabel="Save name"
       />
       <CVEditorTopBar
         backHref="/documents"
         onBackClick={handleBackClick}
         title="Core CV"
-        subtitle={subtitleName || 'Master CV — reused for every application'}
-        caption={subtitleName ? 'Master CV — reused for every application' : undefined}
+        subtitle={editorState.name?.trim() || subtitleName || 'Master CV — reused for every application'}
+        caption={
+          cvId
+            ? 'Library name · click Rename to change'
+            : subtitleName
+              ? 'Master CV — reused for every application'
+              : undefined
+        }
+        bottomRow={
+          cvId ? (
+            <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-muted)]">
+              <span className="truncate font-medium text-[var(--color-text-secondary)]">
+                {editorState.name}
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={() => setRenameModalOpen(true)}
+              >
+                Rename
+              </Button>
+            </div>
+          ) : undefined
+        }
         badge={
-          isDirty ? (
+          hasUnsavedWork ? (
             <span className="rounded-full border border-amber-400/60 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900">
               Unsaved
             </span>
@@ -489,11 +506,9 @@ export function CVEditor() {
           disabled: isSaving && !isDirty,
           highlight: isDirty,
           onClick: requireAuth(() => {
-            if (isNew || draftActive) {
-              openSaveTitleModal();
-            } else {
-              void handleSave();
-            }
+            void flushAutosave().then((ok) => {
+              if (ok) void queryClient.invalidateQueries({ queryKey: ['cv-versions'] });
+            });
           }),
         }}
         statusLine={
@@ -502,7 +517,7 @@ export function CVEditor() {
             {saveError ? <span className="text-[var(--color-danger)]"> · {saveError}</span> : null}
           </>
         }
-        onRetrySave={saveError ? () => void handleSave() : undefined}
+        onRetrySave={saveError ? () => void flushAutosave() : undefined}
         focusMode={focusMode}
         onFocusModeChange={setFocusMode}
         trailingControls={
@@ -582,11 +597,9 @@ export function CVEditor() {
           primaryLoading: isSaving,
           primaryDisabled: isSaving,
           onPrimaryClick: requireAuth(() => {
-            if (isNew || draftActive) {
-              openSaveTitleModal();
-            } else {
-              void handleSave();
-            }
+            void flushAutosave().then((ok) => {
+              if (ok) void queryClient.invalidateQueries({ queryKey: ['cv-versions'] });
+            });
           }),
         }}
       />

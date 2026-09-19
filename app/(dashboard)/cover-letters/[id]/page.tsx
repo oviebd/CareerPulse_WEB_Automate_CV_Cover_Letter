@@ -36,8 +36,42 @@ import {
   useOptimiseEditDraftStore,
   type CoverLetterOptimiseEditDraft,
 } from '@/stores/useOptimiseEditDraftStore';
+import {
+  defaultCoverLetterDisplayName,
+  isPlaceholderClName,
+} from '@/lib/cv-display-name';
+import { useDebouncedAutosave } from '@/hooks/useDebouncedAutosave';
+import { applyPreviewHtmlResponse, revokePreviewBlob } from '@/lib/preview-html-client';
 
 const SWATCHES = ['#2563EB', '#0d9488', '#7c3aed', '#dc2626', '#0f172a'];
+
+function serializeCoverLetterEditorState(p: {
+  content: string;
+  templateId: string;
+  companyName: string;
+  jobTitle: string;
+  applicantName: string;
+  applicantRole: string;
+  applicantEmail: string;
+  applicantPhone: string;
+  applicantLocation: string;
+}): string {
+  return JSON.stringify(p);
+}
+
+function resolveClSaveName(
+  storedName: string | null | undefined,
+  applicantName: string,
+  jobTitle: string,
+  companyName: string
+): string | undefined {
+  if (storedName?.trim() && !isPlaceholderClName(storedName)) return undefined;
+  return defaultCoverLetterDisplayName({
+    applicantName,
+    jobTitle,
+    companyName,
+  });
+}
 
 export default function CoverLetterDetailPage() {
   const params = useParams();
@@ -94,6 +128,33 @@ export default function CoverLetterDetailPage() {
   const initLetterIdRef = useRef<string | null>(null);
   const jobSyncedForLetterRef = useRef<string | null>(null);
   const previewUrlRef = useRef<string | null>(null);
+  const previewHtmlRef = useRef<string | null>(null);
+  const [manualSaveBusy, setManualSaveBusy] = useState(false);
+  const draftAutoCreateRef = useRef(false);
+  const draftFieldsRef = useRef({
+    draftContent: '',
+    draftTemplateId: 'cl-classic',
+    draftCompanyName: '',
+    draftJobTitle: '',
+    draftApplicantName: '',
+    draftApplicantRole: '',
+    draftApplicantEmail: '',
+    draftApplicantPhone: '',
+    draftApplicantLocation: '',
+  });
+  const [savedSnapshot, setSavedSnapshot] = useState<string | null>(null);
+
+  draftFieldsRef.current = {
+    draftContent,
+    draftTemplateId,
+    draftCompanyName,
+    draftJobTitle,
+    draftApplicantName,
+    draftApplicantRole,
+    draftApplicantEmail,
+    draftApplicantPhone,
+    draftApplicantLocation,
+  };
 
   const { data: templates = [] } = useCoverLetterTemplates();
 
@@ -140,15 +201,31 @@ export default function CoverLetterDetailPage() {
     if (initLetterIdRef.current !== letter.id) {
       initLetterIdRef.current = letter.id;
       jobSyncedForLetterRef.current = null;
+      const templateId = letter.template_id?.trim() || preferredClTemplateId || 'cl-classic';
+      const company = letter.company_name ?? '';
+      const jobTitle = letter.job_title ?? '';
       setDraftContent(letter.content ?? '');
-      setDraftTemplateId(letter.template_id?.trim() || preferredClTemplateId || 'cl-classic');
+      setDraftTemplateId(templateId);
       setDraftApplicantName(letter.applicant_name ?? '');
       setDraftApplicantRole(letter.applicant_role ?? '');
       setDraftApplicantEmail(letter.applicant_email ?? '');
       setDraftApplicantPhone(letter.applicant_phone ?? '');
       setDraftApplicantLocation(letter.applicant_location ?? '');
-      setDraftCompanyName(letter.company_name ?? '');
-      setDraftJobTitle(letter.job_title ?? '');
+      setDraftCompanyName(company);
+      setDraftJobTitle(jobTitle);
+      setSavedSnapshot(
+        serializeCoverLetterEditorState({
+          content: letter.content ?? '',
+          templateId,
+          companyName: company,
+          jobTitle,
+          applicantName: letter.applicant_name ?? '',
+          applicantRole: letter.applicant_role ?? '',
+          applicantEmail: letter.applicant_email ?? '',
+          applicantPhone: letter.applicant_phone ?? '',
+          applicantLocation: letter.applicant_location ?? '',
+        })
+      );
     }
   }, [letter, preferredClTemplateId, isDraftMode]);
 
@@ -158,46 +235,116 @@ export default function CoverLetterDetailPage() {
     jobSyncedForLetterRef.current = letter.id;
     setDraftCompanyName(linkedJob.company_name);
     setDraftJobTitle(linkedJob.job_title);
-  }, [letter, linkedJob]);
+    setSavedSnapshot(
+      serializeCoverLetterEditorState({
+        content: letter.content ?? '',
+        templateId: letter.template_id?.trim() || preferredClTemplateId || 'cl-classic',
+        companyName: linkedJob.company_name,
+        jobTitle: linkedJob.job_title,
+        applicantName: letter.applicant_name ?? '',
+        applicantRole: letter.applicant_role ?? '',
+        applicantEmail: letter.applicant_email ?? '',
+        applicantPhone: letter.applicant_phone ?? '',
+        applicantLocation: letter.applicant_location ?? '',
+      })
+    );
+  }, [letter, linkedJob, preferredClTemplateId]);
 
   useEffect(() => {
     return () => {
-      if (previewUrlRef.current) {
-        URL.revokeObjectURL(previewUrlRef.current);
-        previewUrlRef.current = null;
-      }
+      revokePreviewBlob({ urlRef: previewUrlRef, htmlRef: previewHtmlRef });
     };
   }, []);
 
-  const syncDraftFromLetter = useCallback((saved: CoverLetter) => {
-    setDraftContent(saved.content ?? '');
-    setDraftTemplateId(saved.template_id?.trim() || preferredClTemplateId || 'cl-classic');
-    setDraftApplicantName(saved.applicant_name ?? '');
-    setDraftApplicantRole(saved.applicant_role ?? '');
-    setDraftApplicantEmail(saved.applicant_email ?? '');
-    setDraftApplicantPhone(saved.applicant_phone ?? '');
-    setDraftApplicantLocation(saved.applicant_location ?? '');
-    setDraftCompanyName(saved.company_name ?? '');
-    setDraftJobTitle(saved.job_title ?? '');
-  }, [preferredClTemplateId]);
+  const syncDraftFromLetter = useCallback(
+    (saved: CoverLetter, companyOverride?: string, jobTitleOverride?: string) => {
+      const templateId = saved.template_id?.trim() || preferredClTemplateId || 'cl-classic';
+      const company = companyOverride ?? saved.company_name ?? '';
+      const jobTitle = jobTitleOverride ?? saved.job_title ?? '';
+      setDraftContent(saved.content ?? '');
+      setDraftTemplateId(templateId);
+      setDraftApplicantName(saved.applicant_name ?? '');
+      setDraftApplicantRole(saved.applicant_role ?? '');
+      setDraftApplicantEmail(saved.applicant_email ?? '');
+      setDraftApplicantPhone(saved.applicant_phone ?? '');
+      setDraftApplicantLocation(saved.applicant_location ?? '');
+      setDraftCompanyName(company);
+      setDraftJobTitle(jobTitle);
+      setSavedSnapshot(
+        serializeCoverLetterEditorState({
+          content: saved.content ?? '',
+          templateId,
+          companyName: company,
+          jobTitle,
+          applicantName: saved.applicant_name ?? '',
+          applicantRole: saved.applicant_role ?? '',
+          applicantEmail: saved.applicant_email ?? '',
+          applicantPhone: saved.applicant_phone ?? '',
+          applicantLocation: saved.applicant_location ?? '',
+        })
+      );
+    },
+    [preferredClTemplateId]
+  );
 
-  const refreshPreview = useCallback(async () => {
-    if (isDraftMode) {
-      if (!draftClMeta) return;
-      setPreviewLoading(true);
+  const refreshPreview = useCallback(
+    async (opts?: { showBusy?: boolean }) => {
+      const showBusy = opts?.showBusy !== false;
+      const applyHtml = async (text: string, ok: boolean) => {
+        if (!ok) {
+          toast('Preview could not be updated.', 'error');
+          return;
+        }
+        const { url } = await applyPreviewHtmlResponse(text, {
+          urlRef: previewUrlRef,
+          htmlRef: previewHtmlRef,
+        });
+        if (url) setPreviewUrl(url);
+      };
+
+      if (isDraftMode) {
+        if (!draftClMeta) return;
+        if (showBusy) setPreviewLoading(true);
+        try {
+          const res = await fetch('/api/cover-letter/preview-html', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              content: draftContent,
+              template_id: draftTemplateId,
+              accent_color: accent,
+              company_name: draftCompanyName || null,
+              job_title: draftJobTitle || null,
+              ...(draftClMeta.originalCvId
+                ? { original_cv_id: draftClMeta.originalCvId }
+                : {}),
+              applicant_name: draftApplicantName,
+              applicant_role: draftApplicantRole,
+              applicant_email: draftApplicantEmail,
+              applicant_phone: draftApplicantPhone,
+              applicant_location: draftApplicantLocation,
+            }),
+          });
+          const text = await res.text();
+          await applyHtml(text, res.ok);
+        } finally {
+          if (showBusy) setPreviewLoading(false);
+        }
+        return;
+      }
+      if (!letter) return;
+      if (showBusy) setPreviewLoading(true);
       try {
         const res = await fetch('/api/cover-letter/preview-html', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            cover_letter_id: letter.id,
             content: draftContent,
             template_id: draftTemplateId,
             accent_color: accent,
-            company_name: draftCompanyName || null,
-            job_title: draftJobTitle || null,
-            ...(draftClMeta.originalCvId
-              ? { original_cv_id: draftClMeta.originalCvId }
-              : {}),
+            company_name: draftCompanyName,
+            job_title: draftJobTitle,
             applicant_name: draftApplicantName,
             applicant_role: draftApplicantRole,
             applicant_email: draftApplicantEmail,
@@ -206,58 +353,12 @@ export default function CoverLetterDetailPage() {
           }),
         });
         const text = await res.text();
-        if (!res.ok) {
-          toast('Preview could not be updated.', 'error');
-          return;
-        }
-        if (previewUrlRef.current) {
-          URL.revokeObjectURL(previewUrlRef.current);
-        }
-        const blob = new Blob([text], { type: 'text/html;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        previewUrlRef.current = url;
-        setPreviewUrl(url);
+        await applyHtml(text, res.ok);
       } finally {
-        setPreviewLoading(false);
+        if (showBusy) setPreviewLoading(false);
       }
-      return;
-    }
-    if (!letter) return;
-    setPreviewLoading(true);
-    try {
-      const res = await fetch('/api/cover-letter/preview-html', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          cover_letter_id: letter.id,
-          content: draftContent,
-          template_id: draftTemplateId,
-          accent_color: accent,
-          company_name: draftCompanyName,
-          job_title: draftJobTitle,
-          applicant_name: draftApplicantName,
-          applicant_role: draftApplicantRole,
-          applicant_email: draftApplicantEmail,
-          applicant_phone: draftApplicantPhone,
-          applicant_location: draftApplicantLocation,
-        }),
-      });
-      const text = await res.text();
-      if (!res.ok) {
-        toast('Preview could not be updated.', 'error');
-        return;
-      }
-      if (previewUrlRef.current) {
-        URL.revokeObjectURL(previewUrlRef.current);
-      }
-      const blob = new Blob([text], { type: 'text/html;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      previewUrlRef.current = url;
-      setPreviewUrl(url);
-    } finally {
-      setPreviewLoading(false);
-    }
-  }, [
+    },
+    [
     isDraftMode,
     draftClMeta,
     letter,
@@ -297,25 +398,37 @@ export default function CoverLetterDetailPage() {
     refreshPreview,
   ]);
 
-  const isDirty = Boolean(
-    (isDraftMode && draftClMeta && draftContent.trim().length > 0) ||
-      (!isDraftMode &&
-        letter &&
-        (draftContent !== (letter.content ?? '') ||
-          draftTemplateId !== (letter.template_id?.trim() || 'cl-classic') ||
-          draftCompanyName !== (linkedJob?.company_name ?? letter.company_name ?? '') ||
-          draftJobTitle !== (linkedJob?.job_title ?? letter.job_title ?? '') ||
-          draftApplicantName !== (letter.applicant_name ?? '') ||
-          draftApplicantRole !== (letter.applicant_role ?? '') ||
-          draftApplicantEmail !== (letter.applicant_email ?? '') ||
-          draftApplicantPhone !== (letter.applicant_phone ?? '') ||
-          draftApplicantLocation !== (letter.applicant_location ?? '')))
-  );
+  const currentSnapshot = serializeCoverLetterEditorState({
+    content: draftContent,
+    templateId: draftTemplateId,
+    companyName: draftCompanyName,
+    jobTitle: draftJobTitle,
+    applicantName: draftApplicantName,
+    applicantRole: draftApplicantRole,
+    applicantEmail: draftApplicantEmail,
+    applicantPhone: draftApplicantPhone,
+    applicantLocation: draftApplicantLocation,
+  });
+
+  const isDirty =
+    savedSnapshot !== null ? currentSnapshot !== savedSnapshot : Boolean(isDraftMode && draftClMeta);
 
   const persistSavedLetter = useCallback(
     async (options?: { silent?: boolean }): Promise<boolean> => {
       if (!letter) return false;
-      const tmpl = templates.find((x) => x.id === draftTemplateId);
+      const fields = draftFieldsRef.current;
+      const snapshotAtSave = serializeCoverLetterEditorState({
+        content: fields.draftContent,
+        templateId: fields.draftTemplateId,
+        companyName: fields.draftCompanyName,
+        jobTitle: fields.draftJobTitle,
+        applicantName: fields.draftApplicantName,
+        applicantRole: fields.draftApplicantRole,
+        applicantEmail: fields.draftApplicantEmail,
+        applicantPhone: fields.draftApplicantPhone,
+        applicantLocation: fields.draftApplicantLocation,
+      });
+      const tmpl = templates.find((x) => x.id === fields.draftTemplateId);
       if (
         tmpl &&
         !canUseTemplate(tmpl.available_tiers as SubscriptionTier[], tier)
@@ -323,31 +436,66 @@ export default function CoverLetterDetailPage() {
         if (!options?.silent) toast('Upgrade your plan to use this template.', 'error');
         return false;
       }
+      const resolvedName = resolveClSaveName(
+        letter.name,
+        fields.draftApplicantName,
+        fields.draftJobTitle,
+        fields.draftCompanyName
+      );
+      const silent = options?.silent ?? false;
+      if (!silent) setManualSaveBusy(true);
       try {
         const saved = await updateLetter.mutateAsync({
           id: letter.id,
-          content: draftContent,
-          template_id: draftTemplateId,
-          company_name: draftCompanyName.trim() || null,
-          job_title: draftJobTitle.trim() || null,
-          applicant_name: draftApplicantName.trim() || null,
-          applicant_role: draftApplicantRole.trim() || null,
-          applicant_email: draftApplicantEmail.trim() || null,
-          applicant_phone: draftApplicantPhone.trim() || null,
-          applicant_location: draftApplicantLocation.trim() || null,
+          content: fields.draftContent,
+          template_id: fields.draftTemplateId,
+          ...(resolvedName ? { name: resolvedName } : {}),
+          company_name: fields.draftCompanyName.trim() || null,
+          job_title: fields.draftJobTitle.trim() || null,
+          applicant_name: fields.draftApplicantName.trim() || null,
+          applicant_role: fields.draftApplicantRole.trim() || null,
+          applicant_email: fields.draftApplicantEmail.trim() || null,
+          applicant_phone: fields.draftApplicantPhone.trim() || null,
+          applicant_location: fields.draftApplicantLocation.trim() || null,
         });
-        syncDraftFromLetter(saved);
+        const afterSave = serializeCoverLetterEditorState({
+          content: draftFieldsRef.current.draftContent,
+          templateId: draftFieldsRef.current.draftTemplateId,
+          companyName: draftFieldsRef.current.draftCompanyName,
+          jobTitle: draftFieldsRef.current.draftJobTitle,
+          applicantName: draftFieldsRef.current.draftApplicantName,
+          applicantRole: draftFieldsRef.current.draftApplicantRole,
+          applicantEmail: draftFieldsRef.current.draftApplicantEmail,
+          applicantPhone: draftFieldsRef.current.draftApplicantPhone,
+          applicantLocation: draftFieldsRef.current.draftApplicantLocation,
+        });
+        if (afterSave === snapshotAtSave) {
+          if (silent) {
+            setSavedSnapshot(snapshotAtSave);
+          } else {
+            syncDraftFromLetter(saved, fields.draftCompanyName, fields.draftJobTitle);
+          }
+        } else {
+          setSavedSnapshot(snapshotAtSave);
+        }
         if (letter.job_ids?.[0]) {
           await apiFetch(`/api/jobs/${letter.job_ids[0]}`, {
             method: 'PATCH',
             body: JSON.stringify({
-              company_name: draftCompanyName.trim() || 'Company',
-              job_title: draftJobTitle.trim() || 'Role',
+              company_name: fields.draftCompanyName.trim() || 'Company',
+              job_title: fields.draftJobTitle.trim() || 'Role',
             }),
           });
-          void qc.invalidateQueries({
-            queryKey: ['job', letter.job_ids[0], userId],
-          });
+          if (silent) {
+            void qc.invalidateQueries({
+              queryKey: ['job', letter.job_ids[0], userId],
+              refetchType: 'none',
+            });
+          } else {
+            void qc.invalidateQueries({
+              queryKey: ['job', letter.job_ids[0], userId],
+            });
+          }
         }
         if (!options?.silent) toast('Cover letter saved.', 'success');
         return true;
@@ -357,114 +505,145 @@ export default function CoverLetterDetailPage() {
           toast(e instanceof Error ? e.message : 'Could not save.', 'error');
         }
         return false;
+      } finally {
+        if (!silent) setManualSaveBusy(false);
       }
     },
     [
       letter,
       templates,
-      draftTemplateId,
       tier,
       toast,
       updateLetter,
-      draftContent,
-      draftApplicantName,
-      draftApplicantRole,
-      draftApplicantEmail,
-      draftApplicantPhone,
-      draftApplicantLocation,
-      draftCompanyName,
-      draftJobTitle,
       userId,
       qc,
       syncDraftFromLetter,
     ]
   );
 
-  async function handleSave(options?: { navigateAfterDraft?: boolean }): Promise<boolean> {
-    if (isDraftMode) {
-      if (!draftClMeta) return false;
-      const tmpl = templates.find((x) => x.id === draftTemplateId);
-      if (
-        tmpl &&
-        !canUseTemplate(tmpl.available_tiers as SubscriptionTier[], tier)
-      ) {
-        toast('Upgrade your plan to use this template.', 'error');
-        return false;
-      }
-      setDraftSaveBusy(true);
-      try {
-        const res = await fetch('/api/cover-letters', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            content: draftContent,
-            tone: draftClMeta.tone ?? 'professional',
-            length: draftClMeta.length ?? 'medium',
-            template_id: draftTemplateId,
-            specific_emphasis: draftClMeta.emphasis?.trim() || null,
-            company_name: draftCompanyName.trim() || null,
-            job_title: draftJobTitle.trim() || null,
-            applicant_name: draftApplicantName.trim() || null,
-            applicant_role: draftApplicantRole.trim() || null,
-            applicant_email: draftApplicantEmail.trim() || null,
-            applicant_phone: draftApplicantPhone.trim() || null,
-            applicant_location: draftApplicantLocation.trim() || null,
-            job_ids: draftClMeta.savedJobId ? [draftClMeta.savedJobId] : [],
-            source_type: draftClMeta.sourceType ?? null,
-          }),
-        });
-        if (!res.ok) {
-          const errText = await res.text();
-          console.error('cover-letters POST', errText);
-          toast('Could not save cover letter.', 'error');
+  const handleSave = useCallback(
+    async (options?: { navigateAfterDraft?: boolean; silent?: boolean }): Promise<boolean> => {
+      if (isDraftMode) {
+        if (!draftClMeta) return false;
+        const fields = draftFieldsRef.current;
+        const tmpl = templates.find((x) => x.id === fields.draftTemplateId);
+        if (
+          tmpl &&
+          !canUseTemplate(tmpl.available_tiers as SubscriptionTier[], tier)
+        ) {
+          if (!options?.silent) toast('Upgrade your plan to use this template.', 'error');
           return false;
         }
-        const created = (await res.json()) as { id: string };
-        useOptimiseEditDraftStore.getState().setClEditDraft(null);
-        const d = useOptimiseDraftStore.getState().draft;
-        if (d) {
-          useOptimiseDraftStore.getState().setDraft({
-            ...d,
-            savedCoverLetterId: created.id,
+        setDraftSaveBusy(true);
+        try {
+          const name = defaultCoverLetterDisplayName({
+            applicantName: fields.draftApplicantName,
+            jobTitle: fields.draftJobTitle,
+            companyName: fields.draftCompanyName,
           });
-        }
-        void qc.invalidateQueries({ queryKey: ['cover-letters'] });
-        toast('Cover letter saved.', 'success');
-        if (options?.navigateAfterDraft === false) {
+          const res = await fetch('/api/cover-letters', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name,
+              content: fields.draftContent,
+              tone: draftClMeta.tone ?? 'professional',
+              length: draftClMeta.length ?? 'medium',
+              template_id: fields.draftTemplateId,
+              specific_emphasis: draftClMeta.emphasis?.trim() || null,
+              company_name: fields.draftCompanyName.trim() || null,
+              job_title: fields.draftJobTitle.trim() || null,
+              applicant_name: fields.draftApplicantName.trim() || null,
+              applicant_role: fields.draftApplicantRole.trim() || null,
+              applicant_email: fields.draftApplicantEmail.trim() || null,
+              applicant_phone: fields.draftApplicantPhone.trim() || null,
+              applicant_location: fields.draftApplicantLocation.trim() || null,
+              job_ids: draftClMeta.savedJobId ? [draftClMeta.savedJobId] : [],
+              source_type: draftClMeta.sourceType ?? null,
+            }),
+          });
+          if (!res.ok) {
+            const errText = await res.text();
+            console.error('cover-letters POST', errText);
+            if (!options?.silent) toast('Could not save cover letter.', 'error');
+            return false;
+          }
+          const created = (await res.json()) as { id: string };
+          useOptimiseEditDraftStore.getState().setClEditDraft(null);
+          const d = useOptimiseDraftStore.getState().draft;
+          if (d) {
+            useOptimiseDraftStore.getState().setDraft({
+              ...d,
+              savedCoverLetterId: created.id,
+            });
+          }
+          void qc.invalidateQueries({ queryKey: ['cover-letters'] });
+          if (!options?.silent) toast('Cover letter saved.', 'success');
+          if (options?.navigateAfterDraft === false) {
+            return true;
+          }
+          router.replace(`/cover-letters/${created.id}`);
           return true;
+        } catch (e) {
+          console.error(e);
+          if (!options?.silent) toast('Could not save.', 'error');
+          return false;
+        } finally {
+          setDraftSaveBusy(false);
         }
-        router.replace(`/cover-letters/${created.id}`);
-        return true;
-      } catch (e) {
-        console.error(e);
-        toast('Could not save.', 'error');
-        return false;
-      } finally {
-        setDraftSaveBusy(false);
       }
-    }
-    return persistSavedLetter();
-  }
+      return persistSavedLetter(options);
+    },
+    [
+      isDraftMode,
+      draftClMeta,
+      templates,
+      tier,
+      toast,
+      qc,
+      router,
+      persistSavedLetter,
+    ]
+  );
+
+  useEffect(() => {
+    if (!isDraftMode || !draftClMeta || draftAutoCreateRef.current) return;
+    draftAutoCreateRef.current = true;
+    void handleSave({ silent: true });
+  }, [isDraftMode, draftClMeta, handleSave]);
+
+  const autosaveEnabled = Boolean(!isDraftMode && letter && savedSnapshot !== null);
+  const { hasPendingSave, flush, cancel, status: autosaveStatus } = useDebouncedAutosave({
+    isDirty,
+    enabled: autosaveEnabled && !draftSaveBusy && !manualSaveBusy,
+    save: () => handleSave({ silent: true }),
+    revision: isDirty ? currentSnapshot : 0,
+    quiet: true,
+  });
+
+  const hasUnsavedWork =
+    isDirty || hasPendingSave || draftSaveBusy || manualSaveBusy;
 
   const handleBackClick = useCallback(() => {
-    if (isDirty) {
+    if (hasUnsavedWork) {
       setLeaveModalOpen(true);
       return;
     }
     router.push('/cover-letters');
-  }, [isDirty, router]);
+  }, [hasUnsavedWork, router]);
 
   useEffect(() => {
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (!isDirty) return;
+      if (!hasUnsavedWork) return;
       e.preventDefault();
       e.returnValue = '';
     };
     window.addEventListener('beforeunload', onBeforeUnload);
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
-  }, [isDirty]);
+  }, [hasUnsavedWork]);
 
   const handleDiscardLeave = useCallback(() => {
+    cancel();
     setLeaveModalOpen(false);
     if (isDraftMode) {
       useOptimiseEditDraftStore.getState().setClEditDraft(null);
@@ -473,6 +652,8 @@ export default function CoverLetterDetailPage() {
       return;
     }
     if (letter) {
+      const company = linkedJob?.company_name ?? letter.company_name ?? '';
+      const jobTitle = linkedJob?.job_title ?? letter.job_title ?? '';
       setDraftContent(letter.content ?? '');
       setDraftTemplateId(letter.template_id?.trim() || preferredClTemplateId || 'cl-classic');
       setDraftApplicantName(letter.applicant_name ?? '');
@@ -480,8 +661,21 @@ export default function CoverLetterDetailPage() {
       setDraftApplicantEmail(letter.applicant_email ?? '');
       setDraftApplicantPhone(letter.applicant_phone ?? '');
       setDraftApplicantLocation(letter.applicant_location ?? '');
-      setDraftCompanyName(linkedJob?.company_name ?? letter.company_name ?? '');
-      setDraftJobTitle(linkedJob?.job_title ?? letter.job_title ?? '');
+      setDraftCompanyName(company);
+      setDraftJobTitle(jobTitle);
+      setSavedSnapshot(
+        serializeCoverLetterEditorState({
+          content: letter.content ?? '',
+          templateId: letter.template_id?.trim() || preferredClTemplateId || 'cl-classic',
+          companyName: company,
+          jobTitle,
+          applicantName: letter.applicant_name ?? '',
+          applicantRole: letter.applicant_role ?? '',
+          applicantEmail: letter.applicant_email ?? '',
+          applicantPhone: letter.applicant_phone ?? '',
+          applicantLocation: letter.applicant_location ?? '',
+        })
+      );
     }
     router.push('/cover-letters');
   }, [isDraftMode, letter, linkedJob, preferredClTemplateId, router]);
@@ -489,7 +683,7 @@ export default function CoverLetterDetailPage() {
   const handleSaveAndLeave = useCallback(async () => {
     setLeaveSaving(true);
     try {
-      const ok = await handleSave({ navigateAfterDraft: false });
+      const ok = await flush();
       if (ok) {
         setLeaveModalOpen(false);
         router.push('/cover-letters');
@@ -497,23 +691,7 @@ export default function CoverLetterDetailPage() {
     } finally {
       setLeaveSaving(false);
     }
-  }, [
-    isDraftMode,
-    draftClMeta,
-    templates,
-    draftTemplateId,
-    tier,
-    draftContent,
-    draftApplicantName,
-    draftApplicantRole,
-    draftApplicantEmail,
-    draftApplicantPhone,
-    draftApplicantLocation,
-    qc,
-    toast,
-    router,
-    persistSavedLetter,
-  ]);
+  }, [flush, router]);
 
   async function performExport(format: ExportFormat = 'pdf') {
     if (!letter) return;
@@ -596,12 +774,16 @@ export default function CoverLetterDetailPage() {
         </button>
         {!isDraftMode ? (
           <span className="text-xs text-[var(--color-muted)]">
-            {updateLetter.isPending
+            {manualSaveBusy
               ? 'Saving…'
-              : isDirty
-                ? 'Unsaved changes'
-                : 'Saved'}
+              : autosaveStatus === 'error'
+                ? "Couldn't save"
+                : isDirty
+                  ? 'Unsaved changes'
+                  : 'Saved'}
           </span>
+        ) : draftSaveBusy ? (
+          <span className="text-xs text-[var(--color-muted)]">Saving…</span>
         ) : isDirty ? (
           <span className="text-xs text-[var(--color-muted)]">Unsaved changes</span>
         ) : null}
@@ -636,8 +818,8 @@ export default function CoverLetterDetailPage() {
             variant="primary"
             size="sm"
             loading={isDraftMode ? draftSaveBusy : updateLetter.isPending}
-            disabled={!isDirty}
-            onClick={() => void handleSave()}
+            disabled={!isDirty && !hasPendingSave}
+            onClick={() => void flush()}
           >
             Save
           </Button>

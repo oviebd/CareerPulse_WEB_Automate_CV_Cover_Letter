@@ -13,6 +13,7 @@ import { useToast } from '@/components/ui/toast';
 import { useCoverLetterTemplates } from '@/hooks/useTemplates';
 import { canAccessFeature } from '@/lib/subscription';
 import { invalidateCreditQueries } from '@/hooks/useCredits';
+import { defaultCoverLetterDisplayName } from '@/lib/cv-display-name';
 import type { CoverLetterLength, CoverLetterTone, CVTemplate } from '@/types';
 
 const TONES: { id: CoverLetterTone; label: string }[] = [
@@ -215,7 +216,10 @@ export function GenerateCoverLetterForm() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                  name: `${jobTitle || 'Role'} — ${companyName || 'Company'}`.slice(0, 200),
+                  name: defaultCoverLetterDisplayName({
+                    jobTitle,
+                    companyName,
+                  }).slice(0, 200),
                   content: streaming,
                   tone,
                   length,

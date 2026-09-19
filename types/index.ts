@@ -143,7 +143,7 @@ export interface JobAnalysisResult {
 
 export type GenerationType = 'cv' | 'coverLetter' | 'both';
 
-/** Client-only draft after optimise/analyse — persisted only after explicit Save */
+/** Client-only draft after optimise/analyse — auto-persisted after generation when possible */
 export interface DraftResult {
   cv?: string;
   coverLetter?: string;

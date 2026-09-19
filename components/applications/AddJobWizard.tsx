@@ -18,6 +18,11 @@ import { useOptimiseEditDraftStore } from '@/stores/useOptimiseEditDraftStore';
 import { invalidateCreditQueries } from '@/hooks/useCredits';
 import type { DraftResult, GenerationType, JobAnalysisResult } from '@/types';
 import { cn } from '@/lib/utils';
+import {
+  optimiseDraftNeedsPersist,
+  persistOptimiseDraft,
+  persistScopeForDraft,
+} from '@/lib/optimise-persist-draft';
 
 type AnalysisState = 'idle' | 'loading' | 'done' | 'error';
 
@@ -192,6 +197,46 @@ export function AddJobWizard() {
         coverLetterLength: draft.coverLetterLength,
         coverLetterEmphasis: draft.coverLetterEmphasis ?? null,
       });
+
+      if (optimiseDraftNeedsPersist(draft)) {
+        try {
+          await persistOptimiseDraft(persistScopeForDraft(draft));
+          const saved = useOptimiseDraftStore.getState().draft;
+          if (saved) {
+            setCvEditDraft({
+              cvContent: saved.cv ?? '',
+              coverLetter: saved.coverLetter,
+              generationType: saved.generationType,
+              originalCvId: saved.originalCvId,
+              jobTitle: saved.jobTitle ?? saved.analysis?.jobTitle ?? null,
+              companyName: saved.companyName ?? saved.analysis?.company ?? null,
+              jobDescription: saved.jobDescription,
+              jobUrl: saved.jobUrl,
+              analysis: saved.analysis,
+              savedJobId: saved.savedJobId,
+              savedCvId: saved.savedCvId,
+              savedCoverLetterId: saved.savedCoverLetterId ?? null,
+              extractedKeywords: saved.extractedKeywords ?? [],
+              aiChangesSummary: saved.aiChangesSummary ?? null,
+              bulletsImproved: saved.bulletsImproved ?? 0,
+              isTracked: saved.isTracked,
+              coverLetterTone: saved.coverLetterTone,
+              coverLetterLength: saved.coverLetterLength,
+              coverLetterEmphasis: saved.coverLetterEmphasis ?? null,
+            });
+          }
+          void queryClient.invalidateQueries({ queryKey: ['job-specific-cvs'] });
+          void queryClient.invalidateQueries({ queryKey: ['cover-letters'] });
+          void queryClient.invalidateQueries({ queryKey: ['all-cvs'] });
+        } catch (e) {
+          toast(
+            e instanceof Error
+              ? e.message
+              : 'Generated, but automatic save failed. Save from the results page.',
+            'error'
+          );
+        }
+      }
 
       invalidateCreditQueries(queryClient);
       router.push('/cv/optimise/result');

@@ -217,6 +217,48 @@
     return h;
   }
 
+  function labelToNamedPersonalLinkKey(label) {
+    var lower = String(label || '').trim().toLowerCase();
+    if (!lower) return null;
+    if (lower.indexOf('linkedin') >= 0 || lower.indexOf('github') >= 0) return null;
+    if (lower.indexOf('portfolio') >= 0 || lower === 'portfolio') return 'portfolio';
+    if (lower.indexOf('behance') >= 0) return 'behance';
+    if (lower.indexOf('dribbble') >= 0) return 'dribbble';
+    if (lower.indexOf('website') >= 0 || lower.indexOf('blog') >= 0 || lower === 'site')
+      return 'website';
+    if (lower.indexOf('orcid') >= 0) return 'orcid';
+    if (lower.indexOf('scholar') >= 0) return 'googleScholar';
+    if (lower.indexOf('researchgate') >= 0 || lower === 'rg') return 'researchGate';
+    return null;
+  }
+
+  function otherPersonalLinksBlock(lk, lineClass) {
+    lk = lk || {};
+    var others = lk.other || [];
+    var h = '';
+    others.forEach(function (item) {
+      if (!item) return;
+      var url = item.url ? String(item.url).trim() : '';
+      if (!url) return;
+      if (labelToNamedPersonalLinkKey(item.label)) return;
+      var lbl =
+        item.label && String(item.label).trim()
+          ? item.label
+          : linkDisplayUrl(url);
+      h +=
+        '<div class="' +
+        lineClass +
+        '"><span class="plink-label">' +
+        esc(lbl) +
+        '</span> <a href="' +
+        esc(url) +
+        '">' +
+        esc(linkDisplayUrl(url)) +
+        '</a></div>';
+    });
+    return h;
+  }
+
   function extraPersonalLinksBlock(lk, lineClass) {
     lk = lk || {};
     var pairs = [
@@ -246,7 +288,7 @@
         esc(linkDisplayUrl(v)) +
         '</a></div>';
     });
-    return h;
+    return h + otherPersonalLinksBlock(lk, lineClass);
   }
 
   function technologiesRow(tech) {
@@ -629,6 +671,21 @@
           esc(u) +
           '">' +
           esc(linkDisplayUrl(u)) +
+          '</a></div>';
+      });
+      (lk.other || []).forEach(function (item) {
+        if (!item) return;
+        var url = item.url ? String(item.url).trim() : '';
+        if (!url || labelToNamedPersonalLinkKey(item.label)) return;
+        var lbl =
+          item.label && String(item.label).trim()
+            ? item.label
+            : linkDisplayUrl(url);
+        h +=
+          '<div class="ocean-crow"><span class="ocean-cico">🔗</span><a href="' +
+          esc(url) +
+          '">' +
+          esc(lbl) +
           '</a></div>';
       });
       h += '</div></aside><main class="cv-main ocean-main"><div class="ocean-topbar"></div>';
@@ -1061,6 +1118,16 @@
       parts.push('<a href="' + esc(lk.googleScholar) + '">Scholar</a>');
     if (lk.researchGate)
       parts.push('<a href="' + esc(lk.researchGate) + '">ResearchGate</a>');
+    (lk.other || []).forEach(function (item) {
+      if (!item) return;
+      var url = item.url ? String(item.url).trim() : '';
+      if (!url || labelToNamedPersonalLinkKey(item.label)) return;
+      var lbl =
+        item.label && String(item.label).trim()
+          ? item.label
+          : linkDisplayUrl(url);
+      parts.push('<a href="' + esc(url) + '">' + esc(lbl) + '</a>');
+    });
     html += parts.join(' · ');
     html += '</div></div></header>';
     return html;

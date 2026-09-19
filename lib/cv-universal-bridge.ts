@@ -12,6 +12,10 @@ import type { CVProfile } from '@/types';
 import type { CVData, Education, WorkExperience } from '@/src/types/cv.types';
 import { migrateLegacyCVData } from '@/src/utils/cvDefaults';
 import { generateId } from '@/lib/utils';
+import {
+  hasStoredOtherProfileLinks,
+  isDedicatedProfileLinkLabel,
+} from '@/lib/profile-links';
 import { normalizeSkillsForSave } from '@/src/utils/migrateSkills';
 
 /** Build universal CVData from a stored profile row + JSONB fields. */
@@ -203,15 +207,26 @@ export function universalToProfilePayload(cv: CVData): Record<string, unknown> {
     if (!u) return;
     links.push({ id, label, url: u });
   };
-  pushLink('li', 'LinkedIn', personal.links.linkedin);
-  pushLink('gh', 'GitHub', personal.links.github);
-  pushLink('pf', 'Portfolio', personal.links.portfolio);
-  pushLink('orcid', 'ORCID', personal.links.orcid);
-  pushLink('scholar', 'Google Scholar', personal.links.googleScholar);
-  pushLink('rg', 'ResearchGate', personal.links.researchGate);
-  pushLink('bh', 'Behance', personal.links.behance);
-  pushLink('dr', 'Dribbble', personal.links.dribbble);
-  pushLink('web', 'Website', personal.links.website);
+  if (hasStoredOtherProfileLinks(personal.links)) {
+    for (const l of personal.links.other ?? []) {
+      if (isDedicatedProfileLinkLabel(l.label ?? '')) continue;
+      const url = (l.url ?? '').trim();
+      const label = (l.label ?? '').trim();
+      links.push({
+        id: l.id && String(l.id).length >= 8 ? String(l.id) : generateId(),
+        label: url ? label || 'Link' : label,
+        url: l.url ?? '',
+      });
+    }
+  } else {
+    pushLink('pf', 'Portfolio', personal.links.portfolio);
+    pushLink('orcid', 'ORCID', personal.links.orcid);
+    pushLink('scholar', 'Google Scholar', personal.links.googleScholar);
+    pushLink('rg', 'ResearchGate', personal.links.researchGate);
+    pushLink('bh', 'Behance', personal.links.behance);
+    pushLink('dr', 'Dribbble', personal.links.dribbble);
+    pushLink('web', 'Website', personal.links.website);
+  }
 
   return {
     section_visibility: cv.sectionVisibility ?? {},

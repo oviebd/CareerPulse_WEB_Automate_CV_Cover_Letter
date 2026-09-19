@@ -72,6 +72,7 @@ export function useUpdateCoverLetter() {
       id: string;
       content: string;
       template_id: string;
+      name?: string | null;
       company_name: string | null;
       job_title: string | null;
       applicant_name: string | null;
@@ -85,6 +86,7 @@ export function useUpdateCoverLetter() {
         body: JSON.stringify({
           content: payload.content,
           template_id: payload.template_id,
+          ...(payload.name !== undefined ? { name: payload.name } : {}),
           company_name: payload.company_name,
           job_title: payload.job_title,
           applicant_name: payload.applicant_name,

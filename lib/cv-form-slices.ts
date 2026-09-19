@@ -22,6 +22,13 @@ import type {
   Volunteer,
 } from '@/types';
 import { generateId } from '@/lib/utils';
+import {
+  extractNamedLinksFromProfileLinks,
+  formLinksToPersonalOther,
+  hasStoredOtherProfileLinks,
+  legacyNamedLinksToFormLinks,
+  personalOtherToFormLinks,
+} from '@/lib/profile-links';
 import type { TemplateId } from '@/src/types/cv.types';
 import { TEMPLATE_CONFIGS } from '@/src/config/templateConfig';
 import { createEmptyCVData, normalizeTemplateId } from '@/src/utils/cvDefaults';
@@ -222,20 +229,9 @@ function referralToRef(r: ReferralEntry): Reference {
 export function cvDataToFormSlices(cv: CVData): FormSlices {
   const p = cv.personal ?? createEmptyCVData().personal;
   const pLinks = p.links ?? {};
-  const links: ProfileLink[] = [];
-  let n = 0;
-  const add = (label: string, url: string | undefined) => {
-    const u = (url ?? '').trim();
-    if (!u) return;
-    links.push({ id: `l-${n++}`, label, url: u });
-  };
-  add('Portfolio', pLinks.portfolio);
-  add('Behance', pLinks.behance);
-  add('Dribbble', pLinks.dribbble);
-  add('Website', pLinks.website);
-  add('ORCID', pLinks.orcid);
-  add('Google Scholar', pLinks.googleScholar);
-  add('ResearchGate', pLinks.researchGate);
+  const links: ProfileLink[] = hasStoredOtherProfileLinks(pLinks)
+    ? personalOtherToFormLinks(pLinks.other)
+    : legacyNamedLinksToFormLinks(pLinks);
 
   return {
     full_name: p.fullName ?? '',
@@ -311,21 +307,8 @@ export function formSlicesToCvData(
       links: {
         linkedin: slices.linkedin_url || undefined,
         github: slices.github_url || undefined,
-        portfolio: slices.links.find((l) => l.label.toLowerCase().includes('portfolio'))?.url,
-        behance: slices.links.find((l) => l.label.toLowerCase().includes('behance'))?.url,
-        dribbble: slices.links.find((l) => l.label.toLowerCase().includes('dribbble'))?.url,
-        website: slices.links.find(
-          (l) =>
-            l.label.toLowerCase().includes('website') ||
-            l.label.toLowerCase().includes('blog')
-        )?.url,
-        orcid: slices.links.find((l) => l.label.toLowerCase().includes('orcid'))?.url,
-        googleScholar: slices.links.find((l) =>
-          l.label.toLowerCase().includes('scholar')
-        )?.url,
-        researchGate: slices.links.find((l) =>
-          l.label.toLowerCase().includes('researchgate')
-        )?.url,
+        ...extractNamedLinksFromProfileLinks(slices.links),
+        other: formLinksToPersonalOther(slices.links),
       },
     },
     postalAddress: slices.address || undefined,

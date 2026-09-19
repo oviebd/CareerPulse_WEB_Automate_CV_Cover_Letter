@@ -3,7 +3,10 @@ import { getSessionUser } from '@/lib/auth/session';
 import type { GenerationType } from '@/types';
 import type { Json } from '@/types/database';
 import { CLAUDE_MODEL } from '@/lib/claude';
-import { defaultJobCvDisplayName } from '@/lib/cv-display-name';
+import {
+  defaultCoverLetterDisplayName,
+  defaultJobCvDisplayName,
+} from '@/lib/cv-display-name';
 import { optimisedJsonToDbPayload } from '@/lib/optimise-result';
 import { getCoverLettersRepo } from '@/lib/db/repositories/cover-letters';
 import { getCvsRepo } from '@/lib/db/repositories/cvs';
@@ -123,9 +126,24 @@ export async function POST(request: Request) {
 
     if (hasCl) {
       const baseCv = await getCvsRepo().getById(user.id, originalCvId);
+      let clJobTitle: string | null = null;
+      let clCompany: string | null = null;
+      if (jobId) {
+        const jobRow = await getJobsRepo().getById(user.id, jobId);
+        if (jobRow) {
+          clJobTitle = String(jobRow.job_title ?? '').trim() || 'Role';
+          clCompany = String(jobRow.company_name ?? '').trim() || 'Company';
+        }
+      }
+      const clName = defaultCoverLetterDisplayName({
+        applicantName: (baseCv?.full_name as string | null) ?? null,
+        jobTitle: clJobTitle,
+        companyName: clCompany,
+      });
 
       try {
         const clRow = await getCoverLettersRepo().insert(user.id, {
+          name: clName,
           applicant_name: (baseCv?.full_name as string | null) ?? null,
           applicant_role: (baseCv?.professional_title as string | null) ?? null,
           applicant_email: (baseCv?.email as string | null) ?? null,
