@@ -155,7 +155,7 @@ Fresh Docker installs apply `db/schema.sql` and `db/seed.sql` automatically.
 
 ## AI credits & Super Admin
 
-- New users receive **configurable free AI credits** (default 150) on registration.
+- New users receive **configurable free AI credits** (default 50) on registration.
 - AI features consume credits based on **actual token usage** (input/output rates are admin-configurable).
 - **Premium** unlocks premium CV templates, DOCX export, and ATS auto-fix; promo codes upgrade plans without payment. Paid plans are billed through **Paddle**. See [docs/paddle-setup.md](docs/paddle-setup.md) and [docs/paddle-architecture.md](docs/paddle-architecture.md).
 - Set `SUPER_ADMIN_EMAILS` in `.env.prod` (comma-separated) to bootstrap Super Admin access, then open `/admin`.

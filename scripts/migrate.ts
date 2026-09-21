@@ -49,6 +49,7 @@ async function main() {
     join(process.cwd(), 'db/migrations/041_quota_usage.sql'),
     join(process.cwd(), 'db/migrations/042_backfill_ai_usage_usd_cost.sql'),
     join(process.cwd(), 'db/migrations/043_credit_purchase_types.sql'),
+    join(process.cwd(), 'db/migrations/044_initial_free_credits_50.sql'),
   ];
   const db = postgres(url, { max: 1 });
 
@@ -60,7 +61,14 @@ async function main() {
     }
     console.log('All migrations applied.');
   } catch (e) {
-    console.error('Migration failed:', e instanceof Error ? e.message : e);
+    if (e instanceof AggregateError) {
+      console.error('Migration failed (database connection):');
+      for (const err of e.errors) {
+        console.error(' -', err instanceof Error ? err.message : err);
+      }
+    } else {
+      console.error('Migration failed:', e instanceof Error ? e.message : e);
+    }
     process.exit(1);
   } finally {
     await db.end();

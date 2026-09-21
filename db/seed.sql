@@ -47,7 +47,7 @@ WHERE NOT EXISTS (SELECT 1 FROM credit_rule_versions WHERE is_active = true);
 
 INSERT INTO system_settings (key, value)
 VALUES
-  ('initial_free_credits', '150'::jsonb),
+  ('initial_free_credits', '50'::jsonb),
   ('minimum_credit_balance', '0'::jsonb)
 ON CONFLICT (key) DO NOTHING;
 
