@@ -365,7 +365,7 @@ export interface ExperienceEntry {
 export interface EducationEntry {
   id: string;
   institution: string;
-  degree: string; // "Bachelor's" | "Master's" | "PhD" | "Diploma" | "Certificate" | "Other"
+  degree: string; // preset ("Bachelor's" | "Master's" | "PhD" | "Diploma" | "Certificate") or free-text custom
   field_of_study: string;
   start_date: string;
   end_date: string | null;

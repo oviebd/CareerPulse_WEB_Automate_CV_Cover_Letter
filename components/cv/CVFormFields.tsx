@@ -72,13 +72,21 @@ export type CVFormTab =
   | 'interests'
   | 'custom';
 
+const KNOWN_DEGREE_VALUES = [
+  "Bachelor's",
+  "Master's",
+  'PhD',
+  'Diploma',
+  'Certificate',
+] as const;
+
+function isKnownDegree(value: string): boolean {
+  return (KNOWN_DEGREE_VALUES as readonly string[]).includes(value);
+}
+
 const DEGREE_OPTIONS = [
-  { value: "Bachelor's", label: "Bachelor's" },
-  { value: "Master's", label: "Master's" },
-  { value: 'PhD', label: 'PhD' },
-  { value: 'Diploma', label: 'Diploma' },
-  { value: 'Certificate', label: 'Certificate' },
-  { value: 'Other', label: 'Other' },
+  ...KNOWN_DEGREE_VALUES.map((value) => ({ value, label: value })),
+  { value: 'Other', label: 'Other (custom)' },
 ];
 
 const PROFICIENCY_OPTIONS = [
@@ -996,11 +1004,15 @@ export function CVFormFields(props: Props) {
                   />
                   <Select
                     label="Degree"
-                    value={ed.degree || 'Other'}
+                    value={isKnownDegree(ed.degree) ? ed.degree : 'Other'}
                     options={DEGREE_OPTIONS}
                     onChange={(e) => {
+                      const next = e.target.value;
                       const n = [...education];
-                      n[i] = { ...ed, degree: e.target.value };
+                      n[i] = {
+                        ...ed,
+                        degree: next === 'Other' ? '' : next,
+                      };
                       onEducationChange(n);
                     }}
                   />
@@ -1014,6 +1026,19 @@ export function CVFormFields(props: Props) {
                       onEducationChange(n);
                     }}
                   />
+                  {!isKnownDegree(ed.degree) ? (
+                    <Input
+                      className="sm:col-span-2"
+                      label="Custom degree"
+                      placeholder="e.g. Associate of Arts"
+                      value={ed.degree === 'Other' ? '' : ed.degree}
+                      onChange={(e) => {
+                        const n = [...education];
+                        n[i] = { ...ed, degree: e.target.value };
+                        onEducationChange(n);
+                      }}
+                    />
+                  ) : null}
                   <Input
                     label="When did you start?"
                     type="month"

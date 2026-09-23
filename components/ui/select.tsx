@@ -32,7 +32,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           ref={ref}
           id={selectId}
           className={cn(
-            'w-full rounded-btn border border-[var(--color-border)] bg-[var(--color-input-bg)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] outline-none transition duration-150 focus:border-[var(--color-primary-500)] focus:shadow-[0_0_0_3px_rgba(108,99,255,0.2)]',
+            'w-full rounded-btn border border-[var(--color-border)] bg-[var(--color-input-bg)] py-2.5 pl-3 pr-8 text-sm text-[var(--color-text-primary)] outline-none transition duration-150 focus:border-[var(--color-primary-500)] focus:shadow-[0_0_0_3px_rgba(108,99,255,0.2)]',
             error && 'border-[var(--color-danger)]',
             className
           )}
