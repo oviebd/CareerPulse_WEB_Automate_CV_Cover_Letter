@@ -182,8 +182,14 @@
   margin-bottom: 4pt;
 }
 
+.tpl-ocean-slate .ocean-skill-list {
+  padding-left: 0;
+  margin: 0;
+  list-style: none;
+}
+
 .tpl-ocean-slate .ocean-skill-row {
-  margin-bottom: 6pt;
+  margin-bottom: 0;
 }
 
 .tpl-ocean-slate .ocean-skill-hd {
@@ -192,7 +198,11 @@
   align-items: baseline;
   gap: 8pt;
   font-size: 10pt;
-  font-weight: 600;
+  font-weight: 400;
+}
+
+.tpl-ocean-slate .ocean-skill-hd .skill-name {
+  font-weight: 400;
 }
 
 .tpl-ocean-slate .ocean-skill-hd .skill-label {

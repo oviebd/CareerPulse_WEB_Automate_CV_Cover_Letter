@@ -95,7 +95,7 @@
 .tpl-golden-hour .golden-side-hd span:last-child {
   color: var(--accent);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -114,9 +114,27 @@
   padding-bottom: 4pt;
 }
 
+.tpl-golden-hour .golden-skill-cat {
+  margin-bottom: 8pt;
+}
+
+.tpl-golden-hour .golden-skill-cat-name {
+  font-weight: 700;
+  color: var(--accent);
+  font-size: 11px;
+  margin-bottom: 3pt;
+}
+
+.tpl-golden-hour .golden-skill-list {
+  color: #ccc;
+  padding-left: 0;
+  list-style: none;
+}
+
 .tpl-golden-hour .golden-skill-name {
   color: #ccc;
   font-size: 11px;
+  font-weight: 400;
   margin-bottom: 3pt;
 }
 
@@ -136,7 +154,7 @@
 }
 
 .tpl-golden-hour .golden-skill {
-  margin-bottom: 8pt;
+  margin-bottom: 0;
 }
 
 .tpl-golden-hour .golden-main {

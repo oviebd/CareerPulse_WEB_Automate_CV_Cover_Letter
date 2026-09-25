@@ -498,10 +498,15 @@
           if (!g.items || !g.items.length) return;
           var cat = (g.category || '').toLowerCase();
           if (cat.indexOf('language') !== -1) return;
+          h += '<div class="skill-category-block golden-skill-cat">';
+          if (g.category) {
+            h += '<div class="skill-cat golden-skill-cat-name">' + esc(g.category) + '</div>';
+          }
+          h += '<ul class="skill-bullet-list golden-skill-list">';
           g.items.forEach(function (it) {
             var name = typeof it === 'string' ? it : it.name;
             var obj = typeof it === 'object' && it ? it : { name: String(name) };
-            h += '<div class="golden-skill skill-item">';
+            h += '<li class="skill-item"><div class="golden-skill">';
             if (cfg.showSkillBars) {
               var pct = skillFillPctFromItem(obj);
               var rr = skillRatingFromItem(obj);
@@ -518,8 +523,9 @@
             } else {
               h += '<div class="golden-skill-name">' + esc(name) + '</div>';
             }
-            h += '</div>';
+            h += '</div></li>';
           });
+          h += '</ul></div>';
         });
         h += '</div></div>';
       }
@@ -697,28 +703,29 @@
           (d.skills || []).forEach(function (g) {
             if (!g.items || !g.items.length) return;
             h +=
-              '<div class="skill-category-block ocean-skill-cat"><div class="ocean-skill-cat-name">' +
+              '<div class="skill-category-block ocean-skill-cat"><div class="ocean-skill-cat-name skill-cat">' +
               esc(g.category || '') +
               '</div>';
+            h += '<ul class="skill-bullet-list ocean-skill-list">';
             g.items.forEach(function (it) {
               var name = typeof it === 'string' ? it : it.name;
               var obj = typeof it === 'object' && it ? it : { name: String(name) };
-              h += '<div class="ocean-skill-row skill-item">';
+              h += '<li class="skill-item"><div class="ocean-skill-row">';
               if (cfg.showSkillBars) {
                 var pct = skillFillPctFromItem(obj);
                 var rr = skillRatingFromItem(obj);
-                h += '<div class="ocean-skill-hd"><span>' + esc(name) + '</span>';
+                h += '<div class="ocean-skill-hd"><span class="skill-name">' + esc(name) + '</span>';
                 h += '<span class="skill-label">' + esc(RATING_LABEL[rr] || '') + '</span></div>';
                 h +=
                   '<div class="ocean-sbar"><span class="ocean-sbar-fill" style="width:' +
                   pct +
                   '%"></span></div>';
               } else {
-                h += '<div class="ocean-skill-hd"><span>' + esc(name) + '</span></div>';
+                h += '<div class="ocean-skill-hd"><span class="skill-name">' + esc(name) + '</span></div>';
               }
-              h += '</div>';
+              h += '</div></li>';
             });
-            h += '</div>';
+            h += '</ul></div>';
           });
           h += '</div></section>';
           return;
@@ -875,10 +882,16 @@
         h += '<div class="violet-side-sec">Skills</div><div class="violet-side-body">';
         (d.skills || []).forEach(function (g) {
           if (!g.items || !g.items.length) return;
+          h += '<div class="skill-category-block violet-skill-cat">';
+          if (g.category) {
+            h += '<div class="skill-cat violet-skill-cat-name">' + esc(g.category) + '</div>';
+          }
+          h += '<ul class="skill-bullet-list violet-skill-list">';
           g.items.forEach(function (it) {
             var name = typeof it === 'string' ? it : it.name;
             var obj = typeof it === 'object' && it ? it : { name: String(name) };
-            h += '<div class="violet-skill-row skill-item"><span>' + esc(name) + '</span>';
+            h += '<li class="skill-item"><div class="violet-skill-row">';
+            h += '<span class="skill-name">' + esc(name) + '</span>';
             if (cfg.showSkillBars) {
               var n = skillRatingFromItem(obj);
               h += '<span class="violet-dots" aria-label="' + n + ' of 5">';
@@ -888,8 +901,9 @@
               }
               h += '</span>';
             }
-            h += '</div>';
+            h += '</div></li>';
           });
+          h += '</ul></div>';
         });
         h += '</div>';
       }
@@ -967,18 +981,20 @@
       }
       html += '<div class="skill-group skill-category-block">';
       html += '<div class="skill-cat">' + esc(g.category) + '</div>';
+      html += '<ul class="skill-bullet-list">';
       g.items.forEach(function (it) {
         var name = typeof it === 'string' ? it : it.name;
         var rr = skillRatingFromItem(it && typeof it === 'object' ? it : { name: name });
-        html += '<div class="skill-row skill-item">';
+        html += '<li class="skill-item">';
+        html += '<div class="skill-row">';
         html += '<span class="skill-name">' + esc(name) + '</span>';
         if (cfg.showSkillBars) {
           html += '<span class="skill-label">' + esc(RATING_LABEL[rr] || '') + '</span>';
           html += skillBarFromItem(it && typeof it === 'object' ? it : { name: String(name) });
         }
-        html += '</div>';
+        html += '</div></li>';
       });
-      html += '</div>';
+      html += '</ul></div>';
     });
     return html;
   }
@@ -1211,7 +1227,7 @@
     });
     if (langs && langs.length) {
       langs.forEach(function (g) {
-        html += '<div class="skill-plain">' + esc(g.category) + ': ';
+        html += '<div class="skill-plain"><span class="skill-cat">' + esc(g.category) + '</span>: ';
         html += (g.items || [])
           .map(function (it) {
             return esc(typeof it === 'string' ? it : it.name);

@@ -125,30 +125,23 @@
   padding-bottom: 6pt;
 }
 
-.tpl-midnight-pro .midnight-main .skill-group .skill-cat {
+.tpl-midnight-pro .midnight-main .skill-group .skill-cat,
+.tpl-midnight-pro .midnight-side .skill-group .skill-cat {
   color: var(--heading-text);
   font-size: 10px;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
 
-.tpl-midnight-pro .midnight-side .skill-row,
-.tpl-midnight-pro .midnight-main .skill-row {
-  position: relative;
-  padding-left: 14px;
-  margin-bottom: 3pt;
+.tpl-midnight-pro .midnight-side .skill-bullet-list,
+.tpl-midnight-pro .midnight-main .skill-bullet-list {
+  color: inherit;
 }
 
-.tpl-midnight-pro .midnight-side .skill-row::before,
-.tpl-midnight-pro .midnight-main .skill-row::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0.35em;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
+.tpl-midnight-pro .midnight-side .skill-bullet-list .skill-name,
+.tpl-midnight-pro .midnight-main .skill-bullet-list .skill-name {
+  font-weight: 400;
 }
 
 .tpl-midnight-pro .midnight-main .exp-block .cv-strong {

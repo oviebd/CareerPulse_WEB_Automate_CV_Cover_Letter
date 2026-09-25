@@ -243,6 +243,7 @@
   background: var(--accent);
 }
 
+.tpl-amber-strike .amber-main .skill-bullet-list .skill-row,
 .tpl-amber-strike .amber-main .skill-row {
   display: flex;
   align-items: center;

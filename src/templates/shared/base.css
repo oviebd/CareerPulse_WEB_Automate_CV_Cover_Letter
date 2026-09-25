@@ -28,7 +28,7 @@ body {
 
 .cv-section-title {
   font-size: 11pt;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   margin: 16pt 0 8pt;
@@ -109,6 +109,13 @@ a {
   }
 }
 
+/* Skill category labels are always bold for hierarchy */
+.skill-cat {
+  font-weight: 700;
+  margin-bottom: 2pt;
+  line-height: 1.3;
+}
+
 /* Compact skills (classic, academic, minimal, healthcare, entry-level): one line per category */
 .skill-group--compact {
   margin-bottom: 6pt;
@@ -116,7 +123,7 @@ a {
 }
 .skill-group--compact .skill-cat {
   font-size: 9pt;
-  font-weight: 600;
+  font-weight: 700;
   color: #475569;
   margin-bottom: 2pt;
   line-height: 1.3;
@@ -126,11 +133,48 @@ a {
   line-height: 1.45;
   color: #334155;
   text-align: left;
+  font-weight: 400;
 }
 .skill-group--compact .skill-inline-level {
   font-size: 8.5pt;
   font-weight: 500;
   color: #64748b;
+}
+
+/* Separate-line skills: category (bold), then "  • skill" (2 spaces, bullet, 1 space, name) */
+.skill-bullet-list {
+  list-style: none;
+  margin: 0 0 6pt;
+  padding-left: 0;
+  font-size: 9pt;
+  font-weight: 400;
+  color: #334155;
+}
+.skill-bullet-list > li {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 3pt;
+  padding-left: 0;
+  line-height: 1.35;
+  font-weight: 400;
+}
+.skill-bullet-list > li::before {
+  content: '\00a0\00a0•\00a0'; /* 2 spaces + bullet + 1 space */
+  flex-shrink: 0;
+}
+.skill-bullet-list .skill-row {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4pt 6pt;
+  margin-bottom: 0;
+}
+/* Premium templates wrap skill content in non-.skill-row divs */
+.skill-bullet-list > li > div {
+  flex: 1;
+  min-width: 0;
 }
 
 /* Shared two-column shell (unified CV templates; layout specifics per tpl-*.css) */
@@ -170,7 +214,7 @@ a {
 }
 
 .skill-name {
-  font-weight: 500;
+  font-weight: 400;
   color: #334155;
 }
 

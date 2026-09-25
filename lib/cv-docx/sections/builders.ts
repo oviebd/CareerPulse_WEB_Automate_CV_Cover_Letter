@@ -4,7 +4,6 @@ import type { DocxBlock, DocxTheme, SectionContext } from '../types';
 import {
   bodyParagraph,
   bullet,
-  chipParagraph,
   competenciesGrid,
   entryHeader,
   labeledLine,
@@ -124,6 +123,29 @@ export function buildEducation(ctx: SectionContext): DocxBlock[] {
   return out;
 }
 
+function skillCategoryHeading(theme: DocxTheme, category: string): Paragraph {
+  return new Paragraph({
+    spacing: { after: 40, before: 80 },
+    children: [
+      run(theme, category, {
+        bold: true,
+        size: 20,
+        color: theme.templateId === 'ocean-slate' ? theme.accent : theme.bodyColor,
+      }),
+    ],
+  });
+}
+
+/** Templates that keep one comma-separated skills line per category (HTML compact path). */
+function skillsDocxInlineByCategory(theme: DocxTheme): boolean {
+  return (
+    theme.skillDisplay === 'inline' ||
+    ['classic', 'academic', 'minimal', 'healthcare', 'entry-level'].includes(
+      theme.templateId
+    )
+  );
+}
+
 export function buildSkills(ctx: SectionContext): DocxBlock[] {
   const { cvData, theme } = ctx;
   const groups = (cvData.skills ?? []).filter((g) => (g.items ?? []).length > 0);
@@ -154,18 +176,27 @@ export function buildSkills(ctx: SectionContext): DocxBlock[] {
     return out;
   }
 
+  const inlineByCategory = skillsDocxInlineByCategory(theme);
+
   for (const g of groups) {
     const items = g.items ?? [];
-    if (g.category && theme.templateId === 'ocean-slate' && !ctx.inSidebar) {
-      out.push(
-        subline(theme, g.category, theme.accent)
-      );
+    const category = (g.category ?? '').trim();
+
+    if (inlineByCategory) {
+      const names = items.map((i) => i.name).filter(Boolean);
+      if (names.length) out.push(labeledLine(theme, category || 'Skills', names.join(', ')));
+      continue;
     }
+
+    if (category) {
+      out.push(skillCategoryHeading(theme, category));
+    }
+
     if (theme.googleDocsCompat && (theme.skillDisplay === 'bars' || theme.skillDisplay === 'dots')) {
       for (const item of items) {
         if (!item.name) continue;
         const label = skillRatingLabel(item.rating ?? 3);
-        out.push(subline(theme, `${item.name} — ${label}`));
+        out.push(bullet(theme, `${item.name} — ${label}`));
       }
     } else if (theme.skillDisplay === 'bars') {
       for (const item of items) {
@@ -183,11 +214,16 @@ export function buildSkills(ctx: SectionContext): DocxBlock[] {
         out.push(skillDotsParagraph(theme, item.name, item.rating ?? 3));
       }
     } else if (theme.skillDisplay === 'chips') {
-      const names = items.map((i) => i.name).filter(Boolean);
-      if (names.length) out.push(chipParagraph(theme, names.join('  ·  ')));
+      for (const item of items) {
+        if (!item.name) continue;
+        out.push(bullet(theme, item.name));
+      }
     } else {
-      const names = items.map((i) => i.name).filter(Boolean);
-      if (names.length) out.push(labeledLine(theme, g.category, names.join(', ')));
+      // sidebar-compact and other separate-line modes
+      for (const item of items) {
+        if (!item.name) continue;
+        out.push(bullet(theme, item.name));
+      }
     }
   }
   return out;
